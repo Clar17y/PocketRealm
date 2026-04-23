@@ -61,8 +61,12 @@ export async function getPremiumStatus(playerId: string) {
     where: { id: playerId },
     select: {
       id: true,
-      isPremium: true,
-      premiumExpiresAt: true,
+      account: {
+        select: {
+          isPremium: true,
+          premiumExpiresAt: true,
+        },
+      },
     },
   });
 
@@ -70,7 +74,11 @@ export async function getPremiumStatus(playerId: string) {
     throw new AppError(404, 'Player not found', 'NOT_FOUND');
   }
 
-  return player;
+  return {
+    id: player.id,
+    isPremium: player.account.isPremium,
+    premiumExpiresAt: player.account.premiumExpiresAt,
+  };
 }
 
 function getCheckoutSessionPlayerId(metadata: Record<string, string> | null | undefined): string {
@@ -145,17 +153,28 @@ function ensureStripePurchaseBelongsToPlayer<T extends { playerId: string }>(
 }
 
 async function grantPremiumDaysTx(tx: PremiumGrantClient, input: GrantPremiumDaysInput) {
-  await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${input.playerId} FOR UPDATE`;
-
   const player = await tx.player.findUnique({
     where: { id: input.playerId },
     select: {
-      premiumExpiresAt: true,
+      accountId: true,
     },
   });
 
   if (!player) {
     throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  await tx.$queryRaw`SELECT id FROM "accounts" WHERE id = ${player.accountId} FOR UPDATE`;
+
+  const account = await tx.account.findUnique({
+    where: { id: player.accountId },
+    select: {
+      premiumExpiresAt: true,
+    },
+  });
+
+  if (!account) {
+    throw new AppError(404, 'Account not found', 'NOT_FOUND');
   }
 
   const existing = await findExistingStripePurchase(tx, input);
@@ -165,7 +184,7 @@ async function grantPremiumDaysTx(tx: PremiumGrantClient, input: GrantPremiumDay
 
   const grantedAt = input.now ?? new Date();
   const { grantedFrom, grantedUntil } = calculatePremiumGrantWindow(
-    player.premiumExpiresAt,
+    account.premiumExpiresAt,
     input.days,
     grantedAt,
   );
@@ -205,8 +224,8 @@ async function grantPremiumDaysTx(tx: PremiumGrantClient, input: GrantPremiumDay
     throw err;
   }
 
-  await tx.player.update({
-    where: { id: input.playerId },
+  await tx.account.update({
+    where: { id: player.accountId },
     data: {
       isPremium: true,
       premiumExpiresAt: grantedUntil,

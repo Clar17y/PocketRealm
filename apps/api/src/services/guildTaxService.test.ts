@@ -309,15 +309,21 @@ describe('spendWithTaxTx', () => {
       playerId: 'p1', currentTurns: 2000, regenProgress: 0, lastRegenAt,
     });
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2026-05-02T00:00:00.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2026-05-02T00:00:00.000Z'),
+      },
     });
 
     await spendWithTaxTx(prisma, 'p1', 0);
 
     expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
       where: { id: 'p1' },
-      select: { isPremium: true, premiumExpiresAt: true },
+      select: {
+        account: {
+          select: { isPremium: true, premiumExpiresAt: true },
+        },
+      },
     });
     expect(calculateCurrentTurns).toHaveBeenCalledWith(
       2000,
@@ -341,8 +347,10 @@ describe('spendWithTaxTx', () => {
       playerId: 'p1', currentTurns: 2000, regenProgress: 0, lastRegenAt,
     });
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+      },
     });
 
     await spendWithTaxTx(prisma, 'p1', 0);

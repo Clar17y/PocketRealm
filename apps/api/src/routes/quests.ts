@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getActiveQuests, claimQuestReward, claimDailyBonus, getQuestState, rerollQuest } from '../services/questService';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const questsRouter = Router();
 questsRouter.use(authenticate);
@@ -14,6 +15,8 @@ questsRouter.get('/', asyncHandler(async (req, res) => {
   const state = await getQuestState(playerId);
   res.json({ quests, state });
 }));
+
+questsRouter.use(requireActiveSeason);
 
 // POST /api/v1/quests/bonus — claim daily completion bonus
 questsRouter.post('/bonus', asyncHandler(async (req, res) => {

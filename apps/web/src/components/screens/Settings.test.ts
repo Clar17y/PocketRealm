@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CharacterSummary } from '@/lib/api';
 
 const {
   createPremiumCheckoutMock,
@@ -64,6 +65,23 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
     emailVerified: false,
     isPremium: false,
     premiumExpiresAt: null,
+    seasonArchives: [],
+    realmLabel: 'Permanent Realm',
+    realmEndsAt: null,
+    activePlayerId: 'permanent-player',
+    characters: [
+      {
+        id: 'permanent-player',
+        username: 'Rook',
+        characterLevel: 18,
+        seasonId: null,
+        seasonName: null,
+        seasonStatus: null,
+        seasonEndsAt: null,
+      },
+    ] as CharacterSummary[],
+    switchingPlayerId: null,
+    onSwitchPlayer: vi.fn(),
     onAccountRefresh: vi.fn().mockResolvedValue(undefined),
     onForceRelogin: vi.fn(),
     combatLogSpeedMs: 800,
@@ -112,6 +130,51 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
 }
 
 describe('Settings', () => {
+  it('renders realm end dates using the canonical UTC calendar day', () => {
+    const dateTimeFormatSpy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (
+      this: Intl.DateTimeFormat,
+      _locale?: string | string[],
+      options?: Intl.DateTimeFormatOptions,
+    ) {
+      return {
+        format: (value: Date | number) => {
+          const date = value instanceof Date ? value : new Date(value);
+          const useUtc = options?.timeZone === 'UTC';
+          const month = useUtc ? date.getUTCMonth() : date.getMonth();
+          const day = useUtc ? date.getUTCDate() : date.getDate();
+          const year = useUtc ? date.getUTCFullYear() : date.getFullYear();
+          const monthLabel = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month];
+
+          return `${monthLabel} ${day}, ${year}`;
+        },
+      } as Intl.DateTimeFormat;
+    } as typeof Intl.DateTimeFormat);
+
+    try {
+      renderSettings({
+        realmLabel: 'Season 7',
+        realmEndsAt: '2026-05-01T00:00:00.000Z',
+        activePlayerId: 'season-player',
+        characters: [
+          {
+            id: 'season-player',
+            username: 'Rook_S7',
+            characterLevel: 26,
+            seasonId: 'season-7',
+            seasonName: 'Season 7',
+            seasonStatus: 'active',
+            seasonEndsAt: '2026-05-01T00:00:00.000Z',
+          },
+        ],
+      });
+
+      expect(screen.getByText('Ends May 1, 2026')).toBeTruthy();
+      expect(dateTimeFormatSpy).toHaveBeenCalledWith('en-US', expect.objectContaining({ timeZone: 'UTC' }));
+    } finally {
+      dateTimeFormatSpy.mockRestore();
+    }
+  });
+
   it('renders the Support Pocketrealm panel with one-time purchase copy', async () => {
     renderSettings();
 
@@ -287,5 +350,160 @@ describe('Settings', () => {
     const passwordCard = screen.getByRole('heading', { name: 'Change password' }).parentElement!;
     expect(within(passwordCard).getByText('New password confirmation does not match.')).toBeTruthy();
     expect(changePassword).not.toHaveBeenCalled();
+  });
+
+  it('renders season archive summaries on the account tab', () => {
+    renderSettings({
+      seasonArchives: [
+        {
+          id: 'archive-1',
+          username: 'Rook_S1',
+          characterLevel: 21,
+          characterXp: 12345,
+          attributes: {},
+          skills: [],
+          stats: {},
+          combatTemplates: [],
+          leaderboardRanks: { pvp_rating: 3 },
+          rewardsEarned: [{ type: 'title', rank: 3 }],
+          mergeLog: {},
+          createdAt: '2026-03-20T00:00:00.000Z',
+          season: {
+            id: 'season-1',
+            name: 'Season 1',
+            startsAt: '2026-03-01T00:00:00.000Z',
+            endsAt: '2026-03-19T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    expect(screen.getByText('Season Archives')).toBeTruthy();
+    expect(screen.getByText('Season 1')).toBeTruthy();
+    expect(screen.getByText('Rook_S1 · Level 21')).toBeTruthy();
+    expect(screen.getByText('1 rewards')).toBeTruthy();
+    expect(screen.getByText('1 tracked ranks')).toBeTruthy();
+  });
+
+  it('single-character account shows Current Realm and Permanent Realm but no interactive button', () => {
+    renderSettings({
+      realmLabel: 'Permanent Realm',
+      realmEndsAt: null,
+      activePlayerId: 'permanent-player',
+      characters: [
+        {
+          id: 'permanent-player',
+          username: 'Rook',
+          characterLevel: 18,
+          seasonId: null,
+          seasonName: null,
+          seasonStatus: null,
+          seasonEndsAt: null,
+        },
+      ],
+    });
+
+    expect(screen.getByText('Username')).toBeTruthy();
+    expect(screen.getByText('Rook')).toBeTruthy();
+    expect(screen.getByText('Current Realm')).toBeTruthy();
+    expect(screen.getByText('Permanent Realm')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /current realm/i })).toBeNull();
+  });
+
+  it('seasonal account shows the active season name', () => {
+    renderSettings({
+      realmLabel: 'Season 7',
+      realmEndsAt: '2026-05-01T00:00:00.000Z',
+      activePlayerId: 'season-player',
+      characters: [
+        {
+          id: 'season-player',
+          username: 'Rook_S7',
+          characterLevel: 26,
+          seasonId: 'season-7',
+          seasonName: 'Season 7',
+          seasonStatus: 'active',
+          seasonEndsAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(screen.getByText('Current Realm')).toBeTruthy();
+    expect(screen.getByText('Season 7')).toBeTruthy();
+  });
+
+  it('multi-character account can open the Current Realm row and switch to another character', async () => {
+    const onSwitchPlayer = vi.fn();
+    renderSettings({
+      realmLabel: 'Season 7',
+      realmEndsAt: '2026-05-01T00:00:00.000Z',
+      activePlayerId: 'season-player',
+      characters: [
+        {
+          id: 'permanent-player',
+          username: 'Rook',
+          characterLevel: 18,
+          seasonId: null,
+          seasonName: null,
+          seasonStatus: null,
+          seasonEndsAt: null,
+        },
+        {
+          id: 'season-player',
+          username: 'Rook_S7',
+          characterLevel: 26,
+          seasonId: 'season-7',
+          seasonName: 'Season 7',
+          seasonStatus: 'active',
+          seasonEndsAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+      onSwitchPlayer,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /current realm: season 7/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rook · permanent realm · level 18/i }));
+
+    expect(onSwitchPlayer).toHaveBeenCalledWith('permanent-player');
+    expect(screen.queryByRole('button', { name: /rook · permanent realm · level 18/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /current realm: season 7/i }).getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('switching in progress disables target buttons', () => {
+    renderSettings({
+      realmLabel: 'Season 7',
+      realmEndsAt: '2026-05-01T00:00:00.000Z',
+      activePlayerId: 'season-player',
+      onSwitchPlayer: vi.fn(),
+      switchingPlayerId: 'season-player',
+      characters: [
+        {
+          id: 'permanent-player',
+          username: 'Rook',
+          characterLevel: 18,
+          seasonId: null,
+          seasonName: null,
+          seasonStatus: null,
+          seasonEndsAt: null,
+        },
+        {
+          id: 'season-player',
+          username: 'Rook_S7',
+          characterLevel: 26,
+          seasonId: 'season-7',
+          seasonName: 'Season 7',
+          seasonStatus: 'active',
+          seasonEndsAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /current realm: season 7/i }));
+
+    const activeRow = screen.getByRole('button', { name: /rook_s7 · season 7 · level 26/i });
+    const targetRow = screen.getByRole('button', { name: /rook · permanent realm · level 18/i });
+
+    expect((activeRow as HTMLButtonElement).disabled).toBe(true);
+    expect((targetRow as HTMLButtonElement).disabled).toBe(true);
   });
 });

@@ -41,8 +41,10 @@ describe('premium router', () => {
       url: 'https://checkout.stripe.com/c/pay/cs_test_123',
     });
     const token = generateAccessToken({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'hero',
+      seasonId: null,
       role: 'player',
     });
 
@@ -68,8 +70,10 @@ describe('premium router', () => {
       premiumExpiresAt: new Date('2026-05-17T12:00:00.000Z'),
     });
     const token = generateAccessToken({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'hero',
+      seasonId: null,
       role: 'player',
     });
 
@@ -99,8 +103,10 @@ describe('premium router', () => {
       },
     ] as never);
     const token = generateAccessToken({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'hero',
+      seasonId: null,
       role: 'player',
     });
 
@@ -130,8 +136,10 @@ describe('premium router', () => {
       premiumExpiresAt: new Date('2026-05-17T12:00:00.000Z'),
     } as never);
     const token = generateAccessToken({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'hero',
+      seasonId: null,
       role: 'player',
     });
 

@@ -19,6 +19,7 @@ import { spendPlayerTurnsTx } from '../turnBankService';
 import { degradeEquippedDurability } from '../durabilityService';
 import { buildPvpCombatant, getAttackStyle } from '../pvpCombatantBuilder';
 import { computeBracketBounds, getOrCreateRating } from './ratings';
+import { getPlayerRole } from './playerRole';
 
 const REVENGE_WINDOW_DAYS = 7;
 
@@ -44,8 +45,8 @@ export async function challenge(
     select: {
       characterLevel: true,
       attributes: true,
-      role: true,
       currentZone: { select: { id: true, zoneType: true } },
+      account: { select: { role: true } },
     },
   });
   if (!attacker) {
@@ -62,7 +63,8 @@ export async function challenge(
     );
   }
 
-  if (attacker.role !== 'admin') {
+  const attackerRole = getPlayerRole(attacker);
+  if (attackerRole !== 'admin') {
     const cooldown = await prisma.pvpCooldown.findUnique({
       where: { attackerId_defenderId: { attackerId, defenderId: targetId } },
     });
@@ -78,7 +80,7 @@ export async function challenge(
       attributes: true,
       username: true,
       isBot: true,
-      role: true,
+      account: { select: { role: true } },
     },
   });
   if (!target) {
@@ -132,7 +134,8 @@ export async function challenge(
   let attackerRatingChange = elo.deltaA;
   let defenderRatingChange = elo.deltaB;
 
-  if (attacker.role === 'admin' || target.role === 'admin') {
+  const targetRole = getPlayerRole(target);
+  if (attackerRole === 'admin' || targetRole === 'admin') {
     attackerRatingChange = 0;
     defenderRatingChange = 0;
   }
@@ -206,7 +209,7 @@ export async function challenge(
       },
     });
 
-    if (attacker.role !== 'admin') {
+    if (attackerRole !== 'admin') {
       const expiresAt = new Date(now.getTime() + PVP_CONSTANTS.COOLDOWN_HOURS * 60 * 60 * 1000);
       await tx.pvpCooldown.upsert({
         where: { attackerId_defenderId: { attackerId, defenderId: targetId } },

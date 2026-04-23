@@ -19,7 +19,18 @@ interface AppShellProps {
   backgroundSrc?: string;
 }
 
-export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, onMailClick, onSettings, onLogout, onWhatsNew, hasUnseenChangelog, backgroundSrc }: AppShellProps) {
+export function AppShell({
+  children,
+  turns = 0,
+  username,
+  mailUnreadCount = 0,
+  onMailClick,
+  onSettings,
+  onLogout,
+  onWhatsNew,
+  hasUnseenChangelog,
+  backgroundSrc,
+}: AppShellProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const hasMenu = Boolean(onLogout || onWhatsNew);
 
@@ -89,7 +100,9 @@ export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, o
               >
                 {hasMenu ? (
                   <button
-                    onClick={() => setDropdownOpen((o) => !o)}
+                    onClick={() => {
+                      setDropdownOpen((open) => !open);
+                    }}
                     onKeyDown={(e) => { if (e.key === 'Escape') setDropdownOpen(false); }}
                     aria-expanded={dropdownOpen}
                     aria-haspopup="menu"

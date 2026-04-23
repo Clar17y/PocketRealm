@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { CharacterSummary } from '@/lib/api';
 import { AppShell } from './AppShell';
 
 vi.mock('@/components/ZoneBackground', () => ({
@@ -111,5 +112,60 @@ describe('AppShell', () => {
 
     expect(onMailClick).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('keeps the header stable without the legacy realm switch control', () => {
+    const appShellProps: React.ComponentProps<typeof AppShell> & {
+      realmLabel: string;
+      realmEndsAt: string | Date | null;
+      activePlayerId: string | null;
+      characters: CharacterSummary[];
+      switchingPlayerId: string | null;
+      onSwitchPlayer: (playerId: string) => void;
+    } = {
+      username: 'RookTheUnyieldingOfTheNorthAndSouth',
+      turns: 42,
+      mailUnreadCount: 3,
+      onMailClick: vi.fn(),
+      onSettings: vi.fn(),
+      onLogout: vi.fn(),
+      onWhatsNew: vi.fn(),
+      realmLabel: 'Permanent Realm',
+      realmEndsAt: null,
+      activePlayerId: 'permanent-player',
+      characters: [
+        {
+          id: 'permanent-player',
+          username: 'RookTheUnyieldingOfTheNorthAndSouth',
+          characterLevel: 42,
+          seasonId: null,
+          seasonName: null,
+          seasonStatus: null,
+          seasonEndsAt: null,
+        },
+        {
+          id: 'season-player',
+          username: 'Rook_S1',
+          characterLevel: 18,
+          seasonId: 'season-1',
+          seasonName: 'Season 1',
+          seasonStatus: 'active',
+          seasonEndsAt: '2099-01-01T00:00:00.000Z',
+        },
+      ],
+      switchingPlayerId: 'season-player',
+      onSwitchPlayer: vi.fn(),
+    };
+
+    render(
+      React.createElement(
+        AppShell,
+        appShellProps,
+        React.createElement('div', null, 'Child'),
+      ),
+    );
+
+    expect(screen.queryByRole('button', { name: 'Switch character' })).toBeNull();
+    expect(screen.queryByText('Permanent Realm')).toBeNull();
   });
 });

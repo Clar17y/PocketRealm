@@ -10,9 +10,10 @@ import { WorldTab } from './admin/WorldTab';
 import { ZonesTab } from './admin/ZonesTab';
 import { ResourcesTab } from './admin/ResourcesTab';
 import { GuildTab } from './admin/GuildTab';
+import { SeasonsTab } from './admin/SeasonsTab';
 import { AnalyticsTab } from './admin/AnalyticsTab';
 
-type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources' | 'guild' | 'analytics';
+type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources' | 'guild' | 'seasons' | 'analytics';
 
 const TABS: ReadonlyArray<{ id: AdminTab; label: string }> = [
   { id: 'player', label: 'Player' },
@@ -21,6 +22,7 @@ const TABS: ReadonlyArray<{ id: AdminTab; label: string }> = [
   { id: 'zones', label: 'Zones' },
   { id: 'resources', label: 'Resources' },
   { id: 'guild', label: 'Guild' },
+  { id: 'seasons', label: 'Seasons' },
   { id: 'analytics', label: 'Analytics' },
 ];
 
@@ -66,6 +68,7 @@ export default function AdminScreen({
       {tab === 'zones' && <ZonesTab onStateUpdates={onStateUpdates} reloadZones={reloadZones} />}
       {tab === 'resources' && <ResourcesTab />}
       {tab === 'guild' && <GuildTab />}
+      {tab === 'seasons' && <SeasonsTab />}
       {tab === 'analytics' && <AnalyticsTab />}
     </ScreenContainer>
   );

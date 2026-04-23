@@ -38,7 +38,13 @@ describe('auth config', () => {
     vi.resetModules();
 
     const mod = await import('./auth.js');
-    const payload = { playerId: 'player-1', username: 'player', role: 'player' };
+    const payload = {
+      accountId: 'account-1',
+      playerId: 'player-1',
+      username: 'player',
+      seasonId: null,
+      role: 'player',
+    };
 
     const tokenA = mod.generateRefreshToken(payload);
     const tokenB = mod.generateRefreshToken(payload);
@@ -50,7 +56,13 @@ describe('auth config', () => {
     vi.resetModules();
 
     const mod = await import('./auth.js');
-    const payload = { playerId: 'player-1', username: 'player', role: 'player' };
+    const payload = {
+      accountId: 'account-1',
+      playerId: 'player-1',
+      username: 'player',
+      seasonId: 'season-1',
+      role: 'player',
+    };
 
     const refreshToken = mod.generateRefreshToken(payload);
     const verified = mod.verifyRefreshToken(refreshToken);

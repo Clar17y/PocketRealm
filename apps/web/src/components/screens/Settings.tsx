@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { changeEmail, changePassword, resendVerification } from '@/lib/api';
+import { changeEmail, changePassword, resendVerification, type CharacterSummary, type SeasonArchiveSummary } from '@/lib/api';
 import type { ConfirmRarity } from '@/lib/rarity';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import { RaritySelector } from '../common/RaritySelector';
@@ -37,6 +37,13 @@ interface SettingsProps {
   emailVerified: boolean;
   isPremium: boolean;
   premiumExpiresAt: string | null;
+  seasonArchives: SeasonArchiveSummary[];
+  realmLabel: string;
+  realmEndsAt: string | Date | null;
+  activePlayerId: string | null;
+  characters: CharacterSummary[];
+  switchingPlayerId: string | null;
+  onSwitchPlayer?: (playerId: string) => void;
   onAccountRefresh: () => Promise<void>;
   onForceRelogin: () => void;
 
@@ -110,12 +117,50 @@ const primaryButtonClassName =
 const secondaryButtonClassName =
   'rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] px-4 py-2 text-xs font-bold text-[var(--rpg-text-primary)] transition-colors hover:bg-[var(--rpg-border)] disabled:cursor-not-allowed disabled:opacity-60';
 
+const realmSectionButtonClassName =
+  'w-full rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-3 text-left text-sm text-[var(--rpg-text-primary)] transition-colors hover:border-[var(--rpg-gold)] hover:bg-[var(--rpg-surface)] disabled:cursor-not-allowed disabled:opacity-60';
+
+function countEntries(value: unknown): number {
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  if (value && typeof value === 'object') {
+    return Object.keys(value).length;
+  }
+  return 0;
+}
+
+function formatRealmEndsAt(value: string | Date | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
 export function Settings({
   username,
   email,
   emailVerified,
   isPremium,
   premiumExpiresAt,
+  seasonArchives,
+  realmLabel,
+  realmEndsAt,
+  activePlayerId,
+  characters,
+  switchingPlayerId,
+  onSwitchPlayer,
   onAccountRefresh,
   onForceRelogin,
   combatLogSpeedMs,
@@ -154,6 +199,7 @@ export function Settings({
   onLogout,
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<'account' | 'game'>('account');
+  const [isRealmSwitcherOpen, setIsRealmSwitcherOpen] = useState(false);
   const [emailForm, setEmailForm] = useState({ email, password: '' });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -164,6 +210,9 @@ export function Settings({
   const [accountError, setAccountError] = useState<string | null>(null);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [accountBusy, setAccountBusy] = useState<'email' | 'password' | 'verify' | null>(null);
+  const hasRealmSwitcher = characters.length > 1 && Boolean(onSwitchPlayer);
+  const currentRealmEndsAt = formatRealmEndsAt(realmEndsAt);
+  const isRealmSwitching = switchingPlayerId !== null;
 
   useEffect(() => {
     setEmailForm((prev) => ({ ...prev, email }));
@@ -244,10 +293,88 @@ export function Settings({
     onForceRelogin();
   };
 
+  const renderCharacterRealm = (character: CharacterSummary) => {
+    const nextRealmLabel = character.seasonName ?? 'Permanent Realm';
+    const isActiveCharacter = character.id === activePlayerId;
+    const rowLabel = `${character.username} · ${nextRealmLabel} · Level ${character.characterLevel}`;
+
+    return (
+      <button
+        key={character.id}
+        type="button"
+        disabled={isRealmSwitching || isActiveCharacter}
+        aria-label={rowLabel}
+        onClick={() => {
+          if (!isActiveCharacter) {
+            setIsRealmSwitcherOpen(false);
+            onSwitchPlayer?.(character.id);
+          }
+        }}
+        className={realmSectionButtonClassName}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate font-bold text-[var(--rpg-text-primary)]">{character.username}</p>
+            <p className="text-xs text-[var(--rpg-text-secondary)]">
+              {nextRealmLabel} · Level {character.characterLevel}
+            </p>
+          </div>
+          <span className="shrink-0 text-[10px] font-pixel uppercase tracking-wide text-[var(--rpg-gold)]">
+            {isActiveCharacter ? 'Current' : isRealmSwitching ? 'Switching' : 'Switch'}
+          </span>
+        </div>
+      </button>
+    );
+  };
+
   return (
     <ScreenContainer>
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Settings</h2>
-      <p className="text-[var(--rpg-text-secondary)]">Username: {username}</p>
+      <PixelCard className="space-y-3">
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--rpg-text-secondary)]">Username</p>
+          <p className="text-sm font-bold text-[var(--rpg-text-primary)]">{username}</p>
+        </div>
+        <div className="space-y-3 border-t border-[var(--rpg-border)] pt-3">
+          <div className="space-y-1 text-sm text-[var(--rpg-text-secondary)]">
+            <p className="text-xs font-bold uppercase tracking-wide">Current Realm</p>
+            {hasRealmSwitcher ? (
+              <button
+                type="button"
+                aria-label={`Current Realm: ${realmLabel}`}
+                aria-expanded={isRealmSwitcherOpen}
+                aria-controls="settings-realm-switcher"
+                onClick={() => setIsRealmSwitcherOpen((open) => !open)}
+                className={realmSectionButtonClassName}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-[var(--rpg-text-primary)]">{realmLabel}</p>
+                    {currentRealmEndsAt && (
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">Ends {currentRealmEndsAt}</p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-[10px] font-pixel uppercase tracking-wide text-[var(--rpg-gold)]">
+                    Switch
+                  </span>
+                </div>
+              </button>
+            ) : (
+              <div className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-3">
+                <p className="font-bold text-[var(--rpg-text-primary)]">{realmLabel}</p>
+                {currentRealmEndsAt && (
+                  <p className="text-xs text-[var(--rpg-text-secondary)]">Ends {currentRealmEndsAt}</p>
+                )}
+              </div>
+            )}
+          </div>
+          {hasRealmSwitcher && isRealmSwitcherOpen && (
+            <div id="settings-realm-switcher" className="space-y-2">
+              {characters.map((character) => renderCharacterRealm(character))}
+            </div>
+          )}
+        </div>
+      </PixelCard>
 
       <div role="tablist" aria-label="Settings sections" className="flex gap-2">
         <button
@@ -400,6 +527,52 @@ export function Settings({
             initialIsPremium={isPremium}
             initialPremiumExpiresAt={premiumExpiresAt}
           />
+
+          <PixelCard>
+            <h3 className="mb-3 text-sm font-bold text-[var(--rpg-text-primary)]">Season Archives</h3>
+            {seasonArchives.length === 0 ? (
+              <p className="text-sm text-[var(--rpg-text-secondary)]">No past seasons yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {seasonArchives.map((archive) => {
+                  const rewardCount = countEntries(archive.rewardsEarned);
+                  const rankCount = countEntries(archive.leaderboardRanks);
+
+                  return (
+                    <div
+                      key={archive.id}
+                      className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-[var(--rpg-text-primary)]">
+                            {archive.season.name}
+                          </p>
+                          <p className="text-xs text-[var(--rpg-text-secondary)]">
+                            {archive.username} · Level {archive.characterLevel}
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-pixel uppercase tracking-wide text-[var(--rpg-gold)]">
+                          Archived
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--rpg-text-secondary)]">
+                        <span className="rounded border border-[var(--rpg-border)] px-2 py-1">
+                          {rewardCount} rewards
+                        </span>
+                        <span className="rounded border border-[var(--rpg-border)] px-2 py-1">
+                          {rankCount} tracked ranks
+                        </span>
+                        <span className="rounded border border-[var(--rpg-border)] px-2 py-1">
+                          {archive.characterXp.toLocaleString()} XP
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </PixelCard>
 
           {onLogout && (
             <button

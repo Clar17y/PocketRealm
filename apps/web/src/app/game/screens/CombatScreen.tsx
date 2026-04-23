@@ -100,7 +100,7 @@ interface CombatScreenProps {
   templates?: CombatTemplateData[];
   onActivateTemplate?: (templateId: string) => void;
   onStateUpdates?: (updates: StateUpdates) => void;
-  refreshPendingEncounters?: () => void;
+  refreshPendingEncounters?: () => Promise<PendingEncounter[] | undefined>;
   setError?: (msg: string | null) => void;
   activeEncounterSiteId?: string | null;
   onActiveEncounterSiteIdChange?: (id: string | null) => void;
@@ -186,27 +186,28 @@ export function CombatScreen({
     setLastCombatCollapsed(false);
   }, [lastCombat]);
 
+  const buildActiveSiteCombat = (site: PendingEncounter, opts?: { resumeSession?: boolean }) => ({
+    siteId: site.encounterSiteId,
+    siteName: site.siteName,
+    mobFamilyName: site.mobFamilyName,
+    currentRoom: site.currentRoom,
+    totalRooms: site.totalRooms,
+    hasDecayedMobs: site.decayedMobs > 0,
+    mobs: (site.currentRoomMobs ?? []).map(m => ({
+      id: makeEncounterMobId(m.slot),
+      name: m.name,
+      prefix: m.prefix,
+      hp: m.hp,
+      maxHp: m.maxHp,
+      activeEffects: [],
+    })),
+    resumeSession: opts?.resumeSession,
+  });
+
   const displayedFight = lastCombat?.fights?.[lastCombatFightIndex] ?? lastCombat;
 
   const enterEncounterCombat = (site: PendingEncounter, opts?: { resumeSession?: boolean }) => {
-    setActiveSiteCombat({
-      siteId: site.encounterSiteId,
-      siteName: site.siteName,
-      mobFamilyName: site.mobFamilyName,
-      currentRoom: site.currentRoom,
-      totalRooms: site.totalRooms,
-      hasDecayedMobs: site.decayedMobs > 0,
-      mobs: (site.currentRoomMobs ?? []).map(m => ({
-        id: makeEncounterMobId(m.slot),
-        name: m.name,
-        prefix: m.prefix,
-        hp: m.hp,
-        maxHp: m.maxHp,
-        activeEffects: [],
-      })),
-      resumeSession: opts?.resumeSession,
-    });
-    onActiveEncounterSiteIdChange?.(site.encounterSiteId);
+    setActiveSiteCombat(buildActiveSiteCombat(site, opts));
   };
 
   const handleFightClick = (site: PendingEncounter) => {
@@ -347,6 +348,7 @@ export function CombatScreen({
             }}
             onStartRoom={async () => {
               const result = await startEncounterRoom(activeSiteCombat.siteId);
+              onActiveEncounterSiteIdChange?.(activeSiteCombat.siteId);
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
               return result;
             }}
@@ -361,31 +363,27 @@ export function CombatScreen({
               setActiveSiteCombat(null);
             }}
             onAdvanceRoom={async () => {
-              // Refetch site data by calling start-room for next room
-              const result = await startEncounterRoom(activeSiteCombat.siteId);
-              if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
-              // All remaining rooms decayed — site auto-cleared
-              if (result.siteAutoCleared) {
-                return {
-                  currentRoom: 0,
-                  mobs: [],
-                  playerState: { hp: 0, maxHp: 0, stamina: 0, maxStamina: 0, mana: 0, maxMana: 0, activeEffects: [] },
-                  hasDecayedMobs: false,
-                  siteAutoCleared: true,
-                };
+              onActiveEncounterSiteIdChange?.(null);
+              const refreshedSites = await refreshPendingEncounters?.();
+              const refreshedSite = refreshedSites?.find((site) => site.encounterSiteId === activeSiteCombat.siteId);
+              if (!refreshedSite) {
+                throw new Error('Encounter site is no longer available');
               }
+              const nextCombatState = buildActiveSiteCombat(refreshedSite);
+              setActiveSiteCombat(nextCombatState);
               return {
-                currentRoom: result.currentRoom,
-                mobs: result.mobs.map(m => ({
-                  id: m.mobId,
-                  name: m.name,
-                  prefix: m.prefix,
-                  hp: m.hp,
-                  maxHp: m.maxHp,
+                currentRoom: refreshedSite.currentRoom,
+                mobs: nextCombatState.mobs,
+                playerState: {
+                  hp: hpState.currentHp,
+                  maxHp: hpState.maxHp,
+                  stamina: staminaState?.current ?? 0,
+                  maxStamina: staminaState?.max ?? 0,
+                  mana: manaState?.current ?? 0,
+                  maxMana: manaState?.max ?? 0,
                   activeEffects: [],
-                })),
-                playerState: result.playerState,
-                hasDecayedMobs: false,
+                },
+                hasDecayedMobs: refreshedSite.decayedMobs > 0,
               };
             }}
             onComplete={(combatOutcome) => {

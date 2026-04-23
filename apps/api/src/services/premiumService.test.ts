@@ -15,6 +15,7 @@ import {
 import { retrieveStripeCheckoutSession } from './stripeService';
 
 const PLAYER_ID = 'player-1';
+const ACCOUNT_ID = 'account-1';
 const PAYMENT_INTENT_ID = 'pi_123';
 const SESSION_ID = 'cs_123';
 const NOW = new Date('2026-04-17T12:00:00.000Z');
@@ -52,9 +53,12 @@ describe('grantPremiumDays', () => {
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue(undefined),
       player: {
+        findUnique: vi.fn().mockResolvedValue({ accountId: ACCOUNT_ID }),
+      },
+      account: {
         findUnique: vi.fn().mockResolvedValue({ premiumExpiresAt: null }),
         update: vi.fn().mockResolvedValue({
-          id: PLAYER_ID,
+          id: ACCOUNT_ID,
           isPremium: true,
         }),
       },
@@ -114,12 +118,11 @@ describe('grantPremiumDays', () => {
       createdAt: NOW,
     };
 
-    vi.mocked(prisma.player.findUnique).mockResolvedValue({
-      premiumExpiresAt: null,
-    } as never);
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: ACCOUNT_ID } as never);
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({ premiumExpiresAt: null } as never);
     vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue(null);
-    vi.mocked(prisma.player.update).mockResolvedValue({
-      id: PLAYER_ID,
+    vi.mocked(prisma.account.update).mockResolvedValue({
+      id: ACCOUNT_ID,
       isPremium: true,
       premiumExpiresAt: expectedWindow.grantedUntil,
     } as never);
@@ -142,12 +145,18 @@ describe('grantPremiumDays', () => {
     expect(prisma.player.findUnique).toHaveBeenCalledWith({
       where: { id: PLAYER_ID },
       select: {
+        accountId: true,
+      },
+    });
+    expect(vi.mocked(prisma.player.findUnique).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(prisma.$queryRaw).mock.invocationCallOrder[0],
+    );
+    expect(prisma.account.findUnique).toHaveBeenCalledWith({
+      where: { id: ACCOUNT_ID },
+      select: {
         premiumExpiresAt: true,
       },
     });
-    expect(vi.mocked(prisma.$queryRaw).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(prisma.player.findUnique).mock.invocationCallOrder[0],
-    );
     expect(prisma.premiumPurchase.create).toHaveBeenCalledWith({
       data: {
         playerId: PLAYER_ID,
@@ -164,8 +173,8 @@ describe('grantPremiumDays', () => {
         metadata: { source: 'checkout' },
       },
     });
-    expect(prisma.player.update).toHaveBeenCalledWith({
-      where: { id: PLAYER_ID },
+    expect(prisma.account.update).toHaveBeenCalledWith({
+      where: { id: ACCOUNT_ID },
       data: {
         isPremium: true,
         premiumExpiresAt: expectedWindow.grantedUntil,
@@ -204,6 +213,8 @@ describe('grantPremiumDays', () => {
       createdAt: NOW,
     };
 
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: ACCOUNT_ID } as never);
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({ premiumExpiresAt: null } as never);
     vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue(existingPurchase as never);
 
     const result = await grantPremiumDays({
@@ -222,11 +233,11 @@ describe('grantPremiumDays', () => {
     expect(prisma.player.findUnique).toHaveBeenCalledWith({
       where: { id: PLAYER_ID },
       select: {
-        premiumExpiresAt: true,
+        accountId: true,
       },
     });
     expect(prisma.premiumPurchase.create).not.toHaveBeenCalled();
-    expect(prisma.player.update).not.toHaveBeenCalled();
+    expect(prisma.account.update).not.toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
@@ -249,9 +260,8 @@ describe('grantPremiumDays', () => {
     };
     const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
 
-    vi.mocked(prisma.player.findUnique).mockResolvedValue({
-      premiumExpiresAt: null,
-    } as never);
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: ACCOUNT_ID } as never);
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({ premiumExpiresAt: null } as never);
     vi.mocked(prisma.premiumPurchase.findUnique)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
@@ -272,7 +282,7 @@ describe('grantPremiumDays', () => {
 
     expect(result).toEqual(existingPurchase);
     expect(prisma.premiumPurchase.create).toHaveBeenCalledTimes(1);
-    expect(prisma.player.update).not.toHaveBeenCalled();
+    expect(prisma.account.update).not.toHaveBeenCalled();
     expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledTimes(3);
   });
 
@@ -294,9 +304,8 @@ describe('grantPremiumDays', () => {
       createdAt: NOW,
     };
 
-    vi.mocked(prisma.player.findUnique).mockResolvedValue({
-      premiumExpiresAt: null,
-    } as never);
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: ACCOUNT_ID } as never);
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({ premiumExpiresAt: null } as never);
     vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue(existingPurchase as never);
 
     const result = await grantPremiumDays({
@@ -312,7 +321,7 @@ describe('grantPremiumDays', () => {
 
     expect(result).toEqual(existingPurchase);
     expect(prisma.premiumPurchase.create).not.toHaveBeenCalled();
-    expect(prisma.player.update).not.toHaveBeenCalled();
+    expect(prisma.account.update).not.toHaveBeenCalled();
     expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledTimes(1);
     expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledWith({
       where: { providerSessionId: SESSION_ID },
@@ -320,9 +329,8 @@ describe('grantPremiumDays', () => {
   });
 
   it('rejects a Stripe session id that belongs to another player', async () => {
-    vi.mocked(prisma.player.findUnique).mockResolvedValue({
-      premiumExpiresAt: null,
-    } as never);
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: ACCOUNT_ID } as never);
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({ premiumExpiresAt: null } as never);
     vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue({
       id: 'purchase-3',
       playerId: 'player-2',
@@ -355,15 +363,14 @@ describe('grantPremiumDays', () => {
     });
 
     expect(prisma.premiumPurchase.create).not.toHaveBeenCalled();
-    expect(prisma.player.update).not.toHaveBeenCalled();
+    expect(prisma.account.update).not.toHaveBeenCalled();
   });
 
   it('rejects a Stripe payment-intent recovery that belongs to another player', async () => {
     const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
 
-    vi.mocked(prisma.player.findUnique).mockResolvedValue({
-      premiumExpiresAt: null,
-    } as never);
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: ACCOUNT_ID } as never);
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({ premiumExpiresAt: null } as never);
     vi.mocked(prisma.premiumPurchase.findUnique)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
@@ -401,7 +408,7 @@ describe('grantPremiumDays', () => {
     });
 
     expect(prisma.premiumPurchase.create).toHaveBeenCalledTimes(1);
-    expect(prisma.player.update).not.toHaveBeenCalled();
+    expect(prisma.account.update).not.toHaveBeenCalled();
     expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledTimes(3);
   });
 
@@ -443,15 +450,18 @@ describe('confirmSupportPocketrealmCheckoutSession', () => {
       },
     } as never);
     vi.mocked(prisma.player.findUnique)
-      .mockResolvedValueOnce({ premiumExpiresAt: null } as never)
+      .mockResolvedValueOnce({ accountId: ACCOUNT_ID } as never)
       .mockResolvedValueOnce({
         id: PLAYER_ID,
-        isPremium: true,
-        premiumExpiresAt: expectedWindow.grantedUntil,
+        account: {
+          isPremium: true,
+          premiumExpiresAt: expectedWindow.grantedUntil,
+        },
       } as never);
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({ premiumExpiresAt: null } as never);
     vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue(null);
-    vi.mocked(prisma.player.update).mockResolvedValue({
-      id: PLAYER_ID,
+    vi.mocked(prisma.account.update).mockResolvedValue({
+      id: ACCOUNT_ID,
       isPremium: true,
       premiumExpiresAt: expectedWindow.grantedUntil,
     } as never);

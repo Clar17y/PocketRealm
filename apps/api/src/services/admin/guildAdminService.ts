@@ -109,12 +109,22 @@ export async function fillAdminExpedition(playerId: string) {
       const bot = await tx.player.create({
         data: {
           username: botName,
-          email: `${botName}@bot.local`,
-          passwordHash: 'bot-no-login',
+          account: {
+            create: {
+              email: `${botName}@bot.local`,
+              passwordHash: 'bot-no-login',
+              lastActiveAt: new Date(),
+            },
+          },
           isBot: true,
           characterLevel: botLevel,
           attributes: botAttributes,
         },
+      });
+
+      await tx.account.update({
+        where: { id: bot.accountId },
+        data: { activePlayerId: bot.id },
       });
 
       await Promise.all([

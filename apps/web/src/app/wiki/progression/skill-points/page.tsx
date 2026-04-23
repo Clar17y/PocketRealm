@@ -50,7 +50,7 @@ export default function SkillPointsPage() {
       <p>
         Skill points are spent in four talent trees:{' '}
         <strong>Melee</strong>, <strong>Ranged</strong>,{' '}
-        <strong>Magic</strong>, and <strong>General</strong>. Each tree has
+        <strong>Magic</strong>, and <strong>Survival</strong>. Each tree has
         five tiers of nodes. Higher tiers require both sufficient invested
         points and a skill level gate.
       </p>

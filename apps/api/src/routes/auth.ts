@@ -6,9 +6,6 @@ import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_
 import { AppError } from '../middleware/errorHandler';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
 import {
-  generateAccessToken,
-  generateRefreshToken,
-  refreshTokenExpiresAt,
   verifyRefreshToken,
   authenticate,
 } from '../middleware/auth';
@@ -23,6 +20,8 @@ import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../s
 import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { logger } from '../logger';
 import { getIo } from '../socket';
+import { issueAccountSession } from '../services/authSessionService';
+import { SEASON_STATUSES } from '../services/season.constants';
 
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
@@ -65,6 +64,33 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(10).max(100),
 });
 
+const switchPlayerSchema = z.object({
+  playerId: z.string().uuid().or(z.string().min(1)),
+});
+
+const joinSeasonSchema = z.object({
+  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/),
+});
+
+interface CharacterSummary {
+  id: string;
+  username: string;
+  characterLevel: number;
+  seasonId: string | null;
+  seasonName: string | null;
+  seasonStatus: string | null;
+  seasonEndsAt: Date | null;
+}
+
+async function findPlayerByRealmUsername(username: string, seasonId: string | null) {
+  return prisma.player.findFirst({
+    where: {
+      username,
+      seasonId,
+    },
+    select: { id: true },
+  });
+}
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -77,16 +103,12 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   const now = new Date();
 
   // Check if user exists
-  const existing = await prisma.player.findFirst({
-    where: {
-      OR: [
-        { email: body.email },
-        { username: body.username },
-      ],
-    },
-  });
+  const [existingAccount, existingPlayer] = await Promise.all([
+    prisma.account.findUnique({ where: { email: body.email }, select: { id: true } }),
+    findPlayerByRealmUsername(body.username, null),
+  ]);
 
-  if (existing) {
+  if (existingAccount || existingPlayer) {
     throw new AppError(409, 'Username or email already taken', 'USER_EXISTS');
   }
 
@@ -113,12 +135,20 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   // Create player with all related records in a single transaction for atomicity.
   // If any step fails, the entire registration is rolled back so retries won't
   // hit USER_EXISTS (409) for an incomplete player.
-  const player = await prisma.$transaction(async (tx) => {
-    const created = await tx.player.create({
+  const registration = await prisma.$transaction(async (tx) => {
+    const account = await tx.account.create({
       data: {
-        username: body.username,
         email: body.email,
         passwordHash,
+        role: 'player',
+        lastActiveAt: now,
+      },
+    });
+
+    const player = await tx.player.create({
+      data: {
+        accountId: account.id,
+        username: body.username,
         lastActiveAt: now,
         currentZoneId: startingZone.id,
         lastTravelledFromZoneId: starterTown.id,
@@ -144,12 +174,12 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
     });
 
     // Ensure equipment slots
-    await ensureEquipmentSlots(created.id, tx);
+    await ensureEquipmentSlots(player.id, tx);
 
     // Create starter off-hand item and equip it
     const starterOffHand = await tx.item.create({
       data: {
-        ownerId: created.id,
+        ownerId: player.id,
         templateId: starterOffHandTemplate.id,
         rarity: 'common',
         quantity: 1,
@@ -159,61 +189,55 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
       select: { id: true },
     });
     await tx.playerEquipment.upsert({
-      where: { playerId_slot: { playerId: created.id, slot: 'off_hand' } },
-      create: { playerId: created.id, slot: 'off_hand', itemId: starterOffHand.id },
+      where: { playerId_slot: { playerId: player.id, slot: 'off_hand' } },
+      create: { playerId: player.id, slot: 'off_hand', itemId: starterOffHand.id },
       update: { itemId: starterOffHand.id },
     });
 
     // Create initial zone discovery records
-    await ensureStarterDiscoveries(created.id, tx);
+    await ensureStarterDiscoveries(player.id, tx);
 
     // Seed starter resource nodes and encounter site
-    await ensureStarterEncounterAndNodes(created.id, tx);
+    await ensureStarterEncounterAndNodes(player.id, tx);
 
-    return created;
+    await tx.account.update({
+      where: { id: account.id },
+      data: { activePlayerId: player.id },
+    });
+
+    return {
+      account,
+      player,
+    };
   });
 
-  // Generate tokens
-  const payload = { playerId: player.id, username: player.username, role: player.role };
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
+  const { accessToken, refreshToken } = await issueAccountSession(
+    registration.account.id,
+    registration.account.role,
+    registration.player,
+    now,
+  );
 
-  // Store refresh token and opportunistically clear expired sessions.
-  await prisma.$transaction([
-    prisma.refreshToken.deleteMany({
-      where: {
-        playerId: player.id,
-        expiresAt: { lt: now },
-      },
-    }),
-    prisma.refreshToken.create({
-      data: {
-        playerId: player.id,
-        token: refreshToken,
-        expiresAt: refreshTokenExpiresAt(now.getTime()),
-      },
-    }),
-  ]);
-
-  logger.info({ playerId: player.id, username: player.username }, 'Player registered');
+  logger.info({ playerId: registration.player.id, username: registration.player.username }, 'Player registered');
 
   res.status(201).json({
     player: {
-      id: player.id,
-      username: player.username,
-      email: player.email,
-      role: player.role,
+      id: registration.player.id,
+      username: registration.player.username,
+      email: registration.account.email,
+      role: registration.account.role,
       emailVerified: false,
-      isPremium: player.isPremium,
-      premiumExpiresAt: player.premiumExpiresAt,
+      seasonId: registration.player.seasonId,
+      isPremium: registration.account.isPremium,
+      premiumExpiresAt: registration.account.premiumExpiresAt,
     },
     accessToken,
     refreshToken,
   });
 
   // Fire-and-forget: don't block registration on email send
-  createEmailVerificationToken(player.id)
-    .then(({ rawToken }) => sendVerificationEmail(player.email, rawToken, player.username))
+  createEmailVerificationToken(registration.account.id)
+    .then(({ rawToken }) => sendVerificationEmail(registration.account.email, rawToken, registration.player.username))
     .catch((err) => logger.error({ err }, 'Failed to send verification email'));
 }));
 
@@ -221,34 +245,47 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const body = loginSchema.parse(req.body);
   const now = new Date();
 
-  const player = await prisma.player.findUnique({
+  const account = await prisma.account.findUnique({
     where: { email: body.email },
     select: {
       id: true,
-      username: true,
       email: true,
       role: true,
       passwordHash: true,
-      isBot: true,
       emailVerified: true,
       isPremium: true,
       premiumExpiresAt: true,
+      activePlayer: {
+        select: {
+          id: true,
+          username: true,
+          seasonId: true,
+          isBot: true,
+        },
+      },
+      players: {
+        where: { isBot: false },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: {
+          id: true,
+          username: true,
+          seasonId: true,
+          isBot: true,
+        },
+      },
     },
   });
 
-  if (!player) {
+  if (!account) {
     throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
   }
 
-  if (player.isBot) {
-    throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
-  }
+  const locked = await isLockedOut(account.id);
 
-  const locked = await isLockedOut(player.id);
-
-  const validPassword = await bcrypt.compare(body.password, player.passwordHash);
+  const validPassword = await bcrypt.compare(body.password, account.passwordHash);
   if (!validPassword) {
-    await recordFailedLogin(player.id);
+    await recordFailedLogin(account.id);
     throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
   }
 
@@ -256,54 +293,48 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     throw new AppError(423, 'Account temporarily locked, try again later', 'ACCOUNT_LOCKED');
   }
 
-  await clearLockout(player.id);
+  const activePlayer = account.activePlayer ?? account.players[0] ?? null;
+  if (!activePlayer || activePlayer.isBot) {
+    throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
+  }
+
+  await clearLockout(account.id);
 
   // Update last active
-  await prisma.player.update({
-    where: { id: player.id },
-    data: { lastActiveAt: now },
+  await prisma.account.update({
+    where: { id: account.id },
+    data: {
+      lastActiveAt: now,
+      ...(account.activePlayer?.id === activePlayer.id ? {} : { activePlayerId: activePlayer.id }),
+    },
   });
 
-  // Generate tokens
-  const payload = { playerId: player.id, username: player.username, role: player.role };
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
+  const { accessToken, refreshToken } = await issueAccountSession(
+    account.id,
+    account.role,
+    activePlayer,
+    now,
+  );
 
-  // Store refresh token and opportunistically clear expired sessions.
-  await prisma.$transaction([
-    prisma.refreshToken.deleteMany({
-      where: {
-        playerId: player.id,
-        expiresAt: { lt: now },
-      },
-    }),
-    prisma.refreshToken.create({
-      data: {
-        playerId: player.id,
-        token: refreshToken,
-        expiresAt: refreshTokenExpiresAt(now.getTime()),
-      },
-    }),
-  ]);
-
-  logger.info({ playerId: player.id, username: player.username }, 'Player logged in');
+  logger.info({ playerId: activePlayer.id, username: activePlayer.username }, 'Player logged in');
 
   res.json({
     player: {
-      id: player.id,
-      username: player.username,
-      email: player.email,
-      role: player.role,
-      emailVerified: player.emailVerified,
-      isPremium: player.isPremium,
-      premiumExpiresAt: player.premiumExpiresAt,
+      id: activePlayer.id,
+      username: activePlayer.username,
+      email: account.email,
+      role: account.role,
+      emailVerified: account.emailVerified,
+      seasonId: activePlayer.seasonId,
+      isPremium: account.isPremium,
+      premiumExpiresAt: account.premiumExpiresAt,
     },
     accessToken,
     refreshToken,
   });
 
   void checkAndSpawnEvents(getIo()).catch((err) => {
-    logger.warn({ err, playerId: player.id }, 'Post-login world event catch-up failed');
+    logger.warn({ err, playerId: activePlayer.id }, 'Post-login world event catch-up failed');
   });
 }));
 
@@ -315,21 +346,36 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   const payload = verifyRefreshToken(refreshToken);
 
   // Require token to exist in DB and not be expired (no activity-window bypass)
-  const [storedToken, player] = await Promise.all([
+  const [storedToken, account, player] = await Promise.all([
     prisma.refreshToken.findUnique({
       where: { token: refreshToken },
     }),
-    prisma.player.findUnique({
-      where: { id: payload.playerId },
-      select: { id: true, role: true },
+    prisma.account.findUnique({
+      where: { id: payload.accountId },
+      select: {
+        id: true,
+        role: true,
+      },
+    }),
+    prisma.player.findFirst({
+      where: {
+        id: payload.playerId,
+        accountId: payload.accountId,
+        isBot: false,
+      },
+      select: {
+        id: true,
+        username: true,
+        seasonId: true,
+      },
     }),
   ]);
 
-  if (!player) {
+  if (!account || !player) {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 
-  if (!storedToken || storedToken.expiresAt < now) {
+  if (!storedToken || storedToken.accountId !== payload.accountId || storedToken.expiresAt < now) {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 
@@ -338,31 +384,20 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
     where: { token: refreshToken },
   });
 
-  // Generate new tokens with fresh role from DB
-  const freshPayload = { ...payload, role: player.role ?? 'player' };
-  const newAccessToken = generateAccessToken(freshPayload);
-  const newRefreshToken = generateRefreshToken(freshPayload);
-
-  // Store new refresh token and keep activity timestamp fresh.
-  await prisma.$transaction([
-    prisma.refreshToken.deleteMany({
-      where: {
-        playerId: payload.playerId,
-        expiresAt: { lt: now },
-      },
-    }),
-    prisma.refreshToken.create({
-      data: {
-        playerId: payload.playerId,
-        token: newRefreshToken,
-        expiresAt: refreshTokenExpiresAt(now.getTime()),
-      },
-    }),
-    prisma.player.update({
-      where: { id: payload.playerId },
-      data: { lastActiveAt: now },
-    }),
-  ]);
+  const {
+    payload: freshPayload,
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  } = await issueAccountSession(
+    account.id,
+    account.role,
+    player,
+    now,
+  );
+  await prisma.account.update({
+    where: { id: payload.accountId },
+    data: { lastActiveAt: now },
+  });
 
   res.json({
     accessToken: newAccessToken,
@@ -370,7 +405,301 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   });
 
   void checkAndSpawnEvents(getIo()).catch((err) => {
-    logger.warn({ err, playerId: payload.playerId }, 'Post-refresh world event catch-up failed');
+    logger.warn({ err, playerId: freshPayload.playerId }, 'Post-refresh world event catch-up failed');
+  });
+}));
+
+authRouter.get('/characters', authenticate, asyncHandler(async (req, res) => {
+  const players = await prisma.player.findMany({
+    where: {
+      accountId: req.player!.accountId,
+      isBot: false,
+    },
+    select: {
+      id: true,
+      username: true,
+      characterLevel: true,
+      seasonId: true,
+      season: {
+        select: {
+          name: true,
+          status: true,
+          endsAt: true,
+        },
+      },
+    },
+    orderBy: [
+      { seasonId: 'asc' },
+      { createdAt: 'asc' },
+    ],
+  });
+
+  const characters: CharacterSummary[] = players.map((player) => ({
+    id: player.id,
+    username: player.username,
+    characterLevel: player.characterLevel,
+    seasonId: player.seasonId,
+    seasonName: player.season?.name ?? null,
+    seasonStatus: player.season?.status ?? null,
+    seasonEndsAt: player.season?.endsAt ?? null,
+  }));
+
+  res.json({
+    characters,
+    activePlayerId: req.player!.playerId,
+  });
+}));
+
+authRouter.get('/season-archives', authenticate, asyncHandler(async (req, res) => {
+  const archives = await prisma.seasonArchive.findMany({
+    where: { accountId: req.player!.accountId },
+    select: {
+      id: true,
+      username: true,
+      characterLevel: true,
+      characterXp: true,
+      attributes: true,
+      skills: true,
+      stats: true,
+      combatTemplates: true,
+      leaderboardRanks: true,
+      rewardsEarned: true,
+      mergeLog: true,
+      createdAt: true,
+      season: {
+        select: {
+          id: true,
+          name: true,
+          startsAt: true,
+          endsAt: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json({
+    archives: archives.map((archive) => ({
+      id: archive.id,
+      username: archive.username,
+      characterLevel: archive.characterLevel,
+      characterXp: Number(archive.characterXp),
+      attributes: archive.attributes,
+      skills: archive.skills,
+      stats: archive.stats,
+      combatTemplates: archive.combatTemplates,
+      leaderboardRanks: archive.leaderboardRanks,
+      rewardsEarned: archive.rewardsEarned,
+      mergeLog: archive.mergeLog,
+      createdAt: archive.createdAt,
+      season: archive.season,
+    })),
+  });
+}));
+
+authRouter.post('/switch-player', authenticate, asyncHandler(async (req, res) => {
+  const { playerId } = switchPlayerSchema.parse(req.body);
+
+  const player = await prisma.player.findFirst({
+    where: {
+      id: playerId,
+      accountId: req.player!.accountId,
+      isBot: false,
+    },
+    select: {
+      id: true,
+      username: true,
+      seasonId: true,
+      season: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Character not found', 'NOT_FOUND');
+  }
+
+  if (player.season && player.season.status !== SEASON_STATUSES.ACTIVE) {
+    throw new AppError(400, 'This seasonal character is no longer playable', 'SEASON_CHARACTER_UNPLAYABLE');
+  }
+
+  const account = await prisma.account.update({
+    where: { id: req.player!.accountId },
+    data: { activePlayerId: player.id },
+    select: {
+      id: true,
+      role: true,
+    },
+  });
+
+  const { accessToken, refreshToken } = await issueAccountSession(
+    req.player!.accountId,
+    account.role,
+    player,
+    new Date(),
+    { revokeExisting: true },
+  );
+
+  res.json({
+    player: {
+      id: player.id,
+      username: player.username,
+    },
+    accessToken,
+    refreshToken,
+  });
+}));
+
+authRouter.post('/join-season', authenticate, asyncHandler(async (req, res) => {
+  const { username } = joinSeasonSchema.parse(req.body);
+  const now = new Date();
+
+  const activeSeason = await prisma.season.findFirst({
+    where: { status: 'active' },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!activeSeason) {
+    throw new AppError(400, 'No active season', 'NO_ACTIVE_SEASON');
+  }
+
+  const existingCharacter = await prisma.player.findFirst({
+    where: {
+      accountId: req.player!.accountId,
+      seasonId: activeSeason.id,
+    },
+    select: { id: true },
+  });
+
+  if (existingCharacter) {
+    throw new AppError(409, 'Already have a character for this season', 'SEASON_CHARACTER_EXISTS');
+  }
+
+  const usernameTaken = await findPlayerByRealmUsername(username, activeSeason.id);
+
+  if (usernameTaken) {
+    throw new AppError(409, 'Username already taken', 'USERNAME_TAKEN');
+  }
+
+  const starterTown = await prisma.zone.findFirst({
+    where: {
+      isStarter: true,
+      seasonId: activeSeason.id,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!starterTown) {
+    throw new AppError(500, 'No starter zone configured', 'NO_STARTER_ZONE');
+  }
+
+  const firstWildConnection = await prisma.zoneConnection.findFirst({
+    where: { fromId: starterTown.id, toZone: { zoneType: 'wild' } },
+    include: { toZone: true },
+  });
+  const startingZone = firstWildConnection?.toZone ?? starterTown;
+
+  const starterOffHandTemplate = await prisma.itemTemplate.findUnique({
+    where: { id: STARTER_LOADOUT.tutorialOffHandTemplateId },
+    select: { id: true, maxDurability: true },
+  });
+  if (!starterOffHandTemplate) {
+    throw new AppError(500, 'Starter off-hand template is missing', 'MISSING_STARTER_ITEM');
+  }
+
+  const seasonJoin = await prisma.$transaction(async (tx) => {
+    const createdPlayer = await tx.player.create({
+      data: {
+        username,
+        accountId: req.player!.accountId,
+        seasonId: activeSeason.id,
+        lastActiveAt: now,
+        currentZoneId: startingZone.id,
+        lastTravelledFromZoneId: starterTown.id,
+        homeTownId: starterTown.id,
+        attributePoints: CHARACTER_CONSTANTS.STARTING_ATTRIBUTE_POINTS,
+        turnBank: {
+          create: {
+            currentTurns: TURN_CONSTANTS.STARTING_TURNS,
+          },
+        },
+        skills: {
+          create: ALL_SKILLS.map((skill: string) => ({
+            skillType: skill,
+            level: 1,
+            xp: BigInt(0),
+          })),
+        },
+      },
+      select: {
+        id: true,
+        username: true,
+        seasonId: true,
+      },
+    });
+
+    await ensureEquipmentSlots(createdPlayer.id, tx);
+
+    const starterOffHand = await tx.item.create({
+      data: {
+        ownerId: createdPlayer.id,
+        templateId: starterOffHandTemplate.id,
+        rarity: 'common',
+        quantity: 1,
+        maxDurability: starterOffHandTemplate.maxDurability,
+        currentDurability: starterOffHandTemplate.maxDurability,
+      },
+      select: { id: true },
+    });
+    await tx.playerEquipment.upsert({
+      where: { playerId_slot: { playerId: createdPlayer.id, slot: 'off_hand' } },
+      create: { playerId: createdPlayer.id, slot: 'off_hand', itemId: starterOffHand.id },
+      update: { itemId: starterOffHand.id },
+    });
+
+    await ensureStarterDiscoveries(createdPlayer.id, tx);
+    await ensureStarterEncounterAndNodes(createdPlayer.id, tx);
+
+    const account = await tx.account.update({
+      where: { id: req.player!.accountId },
+      data: { activePlayerId: createdPlayer.id },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    return {
+      player: createdPlayer,
+      account,
+    };
+  });
+
+  const { accessToken, refreshToken } = await issueAccountSession(
+    req.player!.accountId,
+    seasonJoin.account.role,
+    seasonJoin.player,
+    now,
+    { revokeExisting: true },
+  );
+
+  res.status(201).json({
+    player: {
+      id: seasonJoin.player.id,
+      username: seasonJoin.player.username,
+    },
+    seasonId: activeSeason.id,
+    accessToken,
+    refreshToken,
   });
 }));
 
@@ -406,23 +735,27 @@ authRouter.post('/verify-email', asyncHandler(async (req, res) => {
 }));
 
 authRouter.post('/resend-verification', authenticate, resendVerificationLimiter, asyncHandler(async (req, res) => {
-  const playerId = req.player!.playerId;
+  const accountId = req.player!.accountId;
 
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { email: true, username: true, emailVerified: true },
+  const account = await prisma.account.findUnique({
+    where: { id: accountId },
+    select: {
+      email: true,
+      emailVerified: true,
+      activePlayer: { select: { username: true } },
+    },
   });
 
-  if (!player) {
-    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  if (!account) {
+    throw new AppError(404, 'Account not found', 'NOT_FOUND');
   }
 
-  if (player.emailVerified) {
+  if (account.emailVerified) {
     throw new AppError(400, 'Email is already verified', 'ALREADY_VERIFIED');
   }
 
-  const { rawToken } = await createEmailVerificationToken(playerId);
-  await sendVerificationEmail(player.email, rawToken, player.username);
+  const { rawToken } = await createEmailVerificationToken(accountId);
+  await sendVerificationEmail(account.email, rawToken, account.activePlayer?.username ?? 'Adventurer');
 
   res.json({ message: 'Verification email sent' });
 }));
@@ -434,16 +767,20 @@ authRouter.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (r
   res.json({ message: 'If that email is verified with us, we\'ve sent a reset link.' });
 
   // Process asynchronously after response is sent
-  const player = await prisma.player.findUnique({
+  const account = await prisma.account.findUnique({
     where: { email },
-    select: { id: true, username: true, emailVerified: true },
+    select: {
+      id: true,
+      emailVerified: true,
+      activePlayer: { select: { username: true } },
+    },
   });
 
-  if (player?.emailVerified) {
+  if (account?.emailVerified) {
     const allowed = await checkEmailRateLimit(email);
     if (allowed) {
-      const { rawToken } = await createPasswordResetToken(player.id);
-      sendPasswordResetEmail(email, rawToken, player.username).catch((err) =>
+      const { rawToken } = await createPasswordResetToken(account.id);
+      sendPasswordResetEmail(email, rawToken, account.activePlayer?.username ?? 'Adventurer').catch((err) =>
         logger.error({ err }, 'Failed to send password reset email'),
       );
     }
@@ -477,13 +814,13 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
       throw new AppError(400, 'Invalid or expired reset token', 'INVALID_TOKEN');
     }
 
-    await tx.player.update({
-      where: { id: tokenRecord.playerId },
+    await tx.account.update({
+      where: { id: tokenRecord.accountId },
       data: { passwordHash },
     });
 
     await tx.refreshToken.deleteMany({
-      where: { playerId: tokenRecord.playerId },
+      where: { accountId: tokenRecord.accountId },
     });
   });
 
@@ -492,7 +829,7 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
 
 authRouter.post('/change-email', authenticate, asyncHandler(async (req, res) => {
   const body = changeEmailSchema.parse(req.body);
-  await changePlayerEmail(req.player!.playerId, body.email, body.password);
+  await changePlayerEmail(req.player!.accountId, body.email, body.password);
   res.json({ message: 'Email updated. Check your inbox to verify your new address.' });
 }));
 
@@ -502,6 +839,6 @@ authRouter.post('/change-password', authenticate, asyncHandler(async (req, res) 
   if (!passwordCheck.valid) {
     throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
   }
-  await changePlayerPassword(req.player!.playerId, body.currentPassword, body.newPassword);
+  await changePlayerPassword(req.player!.accountId, body.currentPassword, body.newPassword);
   res.json({ message: 'Password updated. Please log in again.' });
 }));

@@ -4,6 +4,7 @@ import {
   resolveAchievementTitleDisplay,
 } from '@pocketrealm/shared';
 import { safeUpsert } from '../../utils/safeUpsert';
+import { getPlayerRole } from './playerRole';
 
 export function computeBracketBounds(rating: number): { lower: number; upper: number } {
   const percentLower = Math.floor(rating * (1 - PVP_CONSTANTS.BRACKET_RANGE));
@@ -33,10 +34,12 @@ export async function getOrCreateRating(playerId: string) {
 export async function getLadder(playerId: string) {
   const myRating = await getOrCreateRating(playerId);
   const { lower: lowerBound, upper: upperBound } = computeBracketBounds(myRating.rating);
-  const isAdmin = (await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { role: true },
-  }))?.role === 'admin';
+  const isAdmin = getPlayerRole((
+    await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { account: { select: { role: true } } },
+    })
+  ) ?? {}) === 'admin';
 
   const cooldowns = isAdmin
     ? []
@@ -57,7 +60,14 @@ export async function getLadder(playerId: string) {
       player: { characterLevel: { gte: PVP_CONSTANTS.MIN_CHARACTER_LEVEL } },
     },
     include: {
-      player: { select: { username: true, characterLevel: true, role: true, activeTitle: true } },
+      player: {
+        select: {
+          username: true,
+          characterLevel: true,
+          activeTitle: true,
+          account: { select: { role: true } },
+        },
+      },
     },
     orderBy: { rating: 'desc' },
   });
@@ -69,7 +79,7 @@ export async function getLadder(playerId: string) {
       username: candidate.player.username,
       rating: candidate.rating,
       characterLevel: candidate.player.characterLevel,
-      isAdmin: candidate.player.role === 'admin',
+      isAdmin: getPlayerRole(candidate.player) === 'admin',
       ...resolveAchievementTitleDisplay(candidate.player.activeTitle),
     }));
 

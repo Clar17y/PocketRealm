@@ -1,9 +1,19 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { screenBackgroundSrc, zoneImageSrc, type ExpeditionContext } from '@/lib/assets';
+import {
+  getActiveSeason,
+  getCharacters,
+  getSeasonArchives,
+  joinSeason,
+  switchPlayer,
+  type ActiveSeasonResponse,
+  type CharacterSummary,
+  type SeasonArchiveSummary,
+} from '@/lib/api';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
@@ -26,6 +36,7 @@ import { TutorialBanner } from '@/components/TutorialBanner';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { TutorialDialog } from '@/components/TutorialDialog';
 import { StarterWeaponPopup } from '@/components/StarterWeaponPopup';
+import { JoinSeasonBanner } from '@/components/common/JoinSeasonBanner';
 import type { SkillType } from '@pocketrealm/shared';
 import { calculateEfficiency } from '@pocketrealm/game-engine';
 import {
@@ -46,13 +57,41 @@ import { PASSWORD_UPDATED_RELOGIN_MESSAGE, RELOGIN_MESSAGE_KEY } from '../login/
 
 export default function GamePage() {
   const router = useRouter();
-  const { player, isLoading, isAuthenticated, logout, refreshPlayer } = useAuth();
+  const { player, isLoading, isAuthenticated, logout, refreshPlayer, storeTokens } = useAuth();
+  const [characters, setCharacters] = useState<CharacterSummary[]>([]);
+  const [seasonArchives, setSeasonArchives] = useState<SeasonArchiveSummary[]>([]);
+  const [activeSeason, setActiveSeason] = useState<ActiveSeasonResponse | null>(null);
+  const [realmActionError, setRealmActionError] = useState<string | null>(null);
+  const [switchingPlayerId, setSwitchingPlayerId] = useState<string | null>(null);
+  const [joiningSeason, setJoiningSeason] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
   }, [isLoading, isAuthenticated, router]);
+
+  const loadRealmData = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    const [archivesRes, charactersRes, activeSeasonRes] = await Promise.all([
+      getSeasonArchives(),
+      getCharacters(),
+      getActiveSeason(),
+    ]);
+
+    if (archivesRes.data) {
+      setSeasonArchives(archivesRes.data.archives);
+    }
+
+    if (charactersRes.data) {
+      setCharacters(charactersRes.data.characters);
+    }
+
+    if (activeSeasonRes.data) {
+      setActiveSeason(activeSeasonRes.data.season);
+    }
+  }, [isAuthenticated]);
 
   const gc = useGameController({ isAuthenticated });
   const {
@@ -80,7 +119,14 @@ export default function GamePage() {
     confirmAbandonLoot, abandonLootAndTravel, cancelAbandonLoot,
     lootRevealItems, handleDismissLootReveal,
     inventoryCapacity, inventoryUsedSlots,
+    loadAll,
   } = gc;
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      void loadRealmData();
+    }
+  }, [isLoading, isAuthenticated, loadRealmData, player?.id]);
 
   useRateLimitToast();
   useErrorToast(gc.isOffline);
@@ -173,6 +219,69 @@ export default function GamePage() {
     return tabs.size > 0 ? tabs : undefined;
   }, [achievementUnclaimedCount, quests, incomingFriendRequestCount, mailUnreadCount]);
 
+  const activeCharacter = useMemo(
+    () => characters.find((character) => character.id === player?.id) ?? null,
+    [characters, player?.id],
+  );
+
+  const hasCharacterInActiveSeason = useMemo(
+    () => activeSeason ? characters.some((character) => character.seasonId === activeSeason.id) : false,
+    [activeSeason, characters],
+  );
+
+  const showJoinSeasonBanner = Boolean(activeSeason && !hasCharacterInActiveSeason && player);
+  const showRealmErrorBanner = Boolean(realmActionError && !showJoinSeasonBanner);
+
+  const syncSession = useCallback(async (accessToken: string, refreshToken: string) => {
+    storeTokens(accessToken, refreshToken);
+    await Promise.all([
+      refreshPlayer(),
+      loadRealmData(),
+      loadAll(),
+    ]);
+  }, [loadAll, loadRealmData, refreshPlayer, storeTokens]);
+
+  const handleSwitchPlayer = useCallback(async (playerId: string) => {
+    setRealmActionError(null);
+    setSwitchingPlayerId(playerId);
+
+    const response = await switchPlayer(playerId);
+    if (!response.data) {
+      setRealmActionError(response.error?.message ?? 'Failed to switch characters.');
+      setSwitchingPlayerId(null);
+      return;
+    }
+
+    try {
+      await syncSession(response.data.accessToken, response.data.refreshToken);
+    } catch {
+      setRealmActionError('Character switched, but account refresh failed.');
+    } finally {
+      setSwitchingPlayerId(null);
+    }
+  }, [syncSession]);
+
+  const handleJoinSeason = useCallback(async (username: string) => {
+    setRealmActionError(null);
+    setJoiningSeason(true);
+
+    const response = await joinSeason(username);
+    if (!response.data) {
+      setRealmActionError(response.error?.message ?? 'Failed to join the season.');
+      setJoiningSeason(false);
+      return;
+    }
+
+    try {
+      await syncSession(response.data.accessToken, response.data.refreshToken);
+      setActiveScreen('home');
+    } catch {
+      setRealmActionError('Season character created, but account refresh failed.');
+    } finally {
+      setJoiningSeason(false);
+    }
+  }, [setActiveScreen, syncSession]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
@@ -212,21 +321,37 @@ export default function GamePage() {
         />
       )}
       <AppShell
-  turns={turns}
-  username={player?.username}
-  mailUnreadCount={mailUnreadCount}
-  onMailClick={() => setActiveScreen('mail')}
-  onSettings={() => handleNavigate('settings')}
-  onLogout={() => { logout(); router.push('/'); }}
-  onWhatsNew={openChangelog}
-  hasUnseenChangelog={showChangelog}
-  backgroundSrc={
-    screenBackgroundSrc(activeScreen, activeCraftingSkill, expeditionContext ?? undefined)
-    ?? (['home', 'explore', 'combat', 'gathering', 'rest'].includes(activeScreen) && currentZone?.name && currentZone.name !== '???'
-      ? zoneImageSrc(currentZone.name)
-      : undefined)
-  }
->
+        turns={turns}
+        username={player?.username}
+        mailUnreadCount={mailUnreadCount}
+        onMailClick={() => setActiveScreen('mail')}
+        onSettings={() => handleNavigate('settings')}
+        onLogout={() => { logout(); router.push('/'); }}
+        onWhatsNew={openChangelog}
+        hasUnseenChangelog={showChangelog}
+        backgroundSrc={
+          screenBackgroundSrc(activeScreen, activeCraftingSkill, expeditionContext ?? undefined)
+          ?? (['home', 'explore', 'combat', 'gathering', 'rest'].includes(activeScreen) && currentZone?.name && currentZone.name !== '???'
+            ? zoneImageSrc(currentZone.name)
+            : undefined)
+        }
+      >
+        {showJoinSeasonBanner && activeSeason && player && (
+          <JoinSeasonBanner
+            seasonName={activeSeason.name}
+            seasonEndsAt={activeSeason.endsAt}
+            suggestedUsername={player.username}
+            isJoining={joiningSeason}
+            error={realmActionError}
+            onJoin={handleJoinSeason}
+          />
+        )}
+
+        {showRealmErrorBanner ? (
+          <div className="mb-3 rounded-lg border border-[var(--rpg-red)] bg-[var(--rpg-red)]/10 p-2 text-sm text-[var(--rpg-red)]">
+            {realmActionError}
+          </div>
+        ) : null}
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
           if (!e.item) return false;
@@ -359,6 +484,13 @@ export default function GamePage() {
         <GameScreenRenderer
           gc={gc}
           player={player}
+          seasonArchives={seasonArchives}
+          realmLabel={activeCharacter?.seasonName ?? 'Permanent Realm'}
+          realmEndsAt={activeCharacter?.seasonEndsAt ?? null}
+          activePlayerId={player?.id ?? null}
+          characters={characters}
+          switchingPlayerId={switchingPlayerId}
+          onSwitchPlayer={(playerId) => void handleSwitchPlayer(playerId)}
           casinoSocket={casinoSocket}
           achievementCategory={achievementCategory}
           setAchievementCategory={setAchievementCategory}

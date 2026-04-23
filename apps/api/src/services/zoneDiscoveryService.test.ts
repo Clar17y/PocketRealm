@@ -12,22 +12,38 @@ import {
 } from './zoneDiscoveryService';
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+    homeTownId: 'town-1',
+    seasonId: null,
+  });
+  mockPrisma.zone.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+    id: where.id,
+    isStarter: true,
+    seasonId: null,
+  }));
 });
 
 // ---------------------------------------------------------------------------
 // ensureStarterDiscoveries (existing tests preserved + new edge cases)
 // ---------------------------------------------------------------------------
 describe('ensureStarterDiscoveries', () => {
-  it('does nothing when no starter zones exist', async () => {
-    mockPrisma.zone.findMany.mockResolvedValue([]);
+  it('does nothing when player starter context cannot be resolved', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: null,
+      seasonId: null,
+    });
+    mockPrisma.zone.findFirst.mockResolvedValue(null);
 
     await ensureStarterDiscoveries('p1');
     expect(mockPrisma.playerZoneDiscovery.createMany).not.toHaveBeenCalled();
   });
 
   it('discovers starter zones and their connections', async () => {
-    mockPrisma.zone.findMany.mockResolvedValue([{ id: 'zone-1' }]);
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'zone-1',
+      seasonId: null,
+    });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([
       { toId: 'zone-2' },
       { toId: 'zone-3' },
@@ -49,7 +65,10 @@ describe('ensureStarterDiscoveries', () => {
   });
 
   it('deduplicates when starter zone connects to itself', async () => {
-    mockPrisma.zone.findMany.mockResolvedValue([{ id: 'zone-1' }]);
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'zone-1',
+      seasonId: null,
+    });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([
       { toId: 'zone-1' },
     ]);
@@ -62,8 +81,11 @@ describe('ensureStarterDiscoveries', () => {
     expect(new Set(zoneIds).size).toBe(zoneIds.length);
   });
 
-  it('handles multiple starter zones', async () => {
-    mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1' }, { id: 'z2' }]);
+  it('handles multiple starter connections from the player home town', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'z1',
+      seasonId: null,
+    });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([
       { toId: 'z3' },
       { toId: 'z4' },
@@ -75,15 +97,18 @@ describe('ensureStarterDiscoveries', () => {
     const call = mockPrisma.playerZoneDiscovery.createMany.mock.calls[0][0];
     const zoneIds = call.data.map((d: { zoneId: string }) => d.zoneId);
     expect(zoneIds).toContain('z1');
-    expect(zoneIds).toContain('z2');
     expect(zoneIds).toContain('z3');
     expect(zoneIds).toContain('z4');
   });
 
-  it('deduplicates overlapping connections from multiple starters', async () => {
-    mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1' }, { id: 'z2' }]);
+  it('deduplicates overlapping connections from the player home town', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'z1',
+      seasonId: null,
+    });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([
-      { toId: 'z2' }, // z2 is both a starter and a connection target
+      { toId: 'z2' },
+      { toId: 'z2' },
       { toId: 'z3' },
     ]);
     mockPrisma.playerZoneDiscovery.createMany.mockResolvedValue({ count: 3 });
@@ -97,7 +122,10 @@ describe('ensureStarterDiscoveries', () => {
   });
 
   it('handles starter zone with no connections', async () => {
-    mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1' }]);
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'z1',
+      seasonId: null,
+    });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
     mockPrisma.playerZoneDiscovery.createMany.mockResolvedValue({ count: 1 });
 
@@ -109,7 +137,10 @@ describe('ensureStarterDiscoveries', () => {
   });
 
   it('passes correct playerId to createMany', async () => {
-    mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1' }]);
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'z1',
+      seasonId: null,
+    });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
     mockPrisma.playerZoneDiscovery.createMany.mockResolvedValue({ count: 1 });
 
@@ -118,6 +149,129 @@ describe('ensureStarterDiscoveries', () => {
     const call = mockPrisma.playerZoneDiscovery.createMany.mock.calls[0][0];
     expect(call.data[0].playerId).toBe('player-42');
   });
+
+  it('seasonal discovery seeding only seeds the player realm starter zones', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'season-town',
+      seasonId: 'season-1',
+    });
+    mockPrisma.zone.findUnique.mockResolvedValue({
+      id: 'season-town',
+      isStarter: true,
+      seasonId: 'season-1',
+    });
+    mockPrisma.zoneConnection.findMany.mockImplementation(async ({ where }: { where: { fromId: string } }) => {
+      if (where.fromId === 'season-town') {
+        return [{ toId: 'season-wild' }];
+      }
+
+      return [
+        { toId: 'permanent-wild' },
+        { toId: 'season-wild' },
+      ];
+    });
+    mockPrisma.playerZoneDiscovery.createMany.mockResolvedValue({ count: 2 });
+
+    await ensureStarterDiscoveries('seasonal-player');
+
+    expect(mockPrisma.zoneConnection.findMany).toHaveBeenCalledWith({
+      where: { fromId: 'season-town' },
+      select: { toId: true },
+    });
+
+    const call = mockPrisma.playerZoneDiscovery.createMany.mock.calls[0][0];
+    expect(call.data).toEqual([
+      { playerId: 'seasonal-player', zoneId: 'season-town' },
+      { playerId: 'seasonal-player', zoneId: 'season-wild' },
+    ]);
+  });
+
+  it('falls back to the player season starter when homeTownId is missing', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: null,
+      seasonId: 'season-1',
+    });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'season-town' });
+    mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'season-wild' }]);
+    mockPrisma.playerZoneDiscovery.createMany.mockResolvedValue({ count: 2 });
+
+    await ensureStarterDiscoveries('seasonal-player');
+
+    expect(mockPrisma.zone.findFirst).toHaveBeenCalledWith({
+      where: { isStarter: true, seasonId: 'season-1' },
+      select: { id: true },
+    });
+    expect(mockPrisma.zoneConnection.findMany).toHaveBeenCalledWith({
+      where: { fromId: 'season-town' },
+      select: { toId: true },
+    });
+  });
+
+  it('falls back to the realm starter when homeTownId points at a later non-starter town', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'thornwall',
+      seasonId: null,
+    });
+    mockPrisma.zone.findUnique.mockResolvedValue({
+      id: 'thornwall',
+      isStarter: false,
+      seasonId: null,
+    });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'millbrook' });
+    mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'forest-edge' }]);
+    mockPrisma.playerZoneDiscovery.createMany.mockResolvedValue({ count: 2 });
+
+    await ensureStarterDiscoveries('permanent-player');
+
+    expect(mockPrisma.zone.findUnique).toHaveBeenCalledWith({
+      where: { id: 'thornwall' },
+      select: { id: true, isStarter: true, seasonId: true },
+    });
+    expect(mockPrisma.zone.findFirst).toHaveBeenCalledWith({
+      where: { isStarter: true, seasonId: null },
+      select: { id: true },
+    });
+    expect(mockPrisma.playerZoneDiscovery.createMany).toHaveBeenCalledWith({
+      data: [
+        { playerId: 'permanent-player', zoneId: 'millbrook' },
+        { playerId: 'permanent-player', zoneId: 'forest-edge' },
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('guards against Pathfinder over-seeding by creating exactly two starter discoveries for a fresh seasonal player', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'season-town',
+      seasonId: 'season-1',
+    });
+    mockPrisma.zone.findUnique.mockResolvedValue({
+      id: 'season-town',
+      isStarter: true,
+      seasonId: 'season-1',
+    });
+    mockPrisma.zoneConnection.findMany.mockImplementation(async ({ where }: { where: { fromId: string } }) => {
+      if (where.fromId === 'season-town') {
+        return [{ toId: 'season-wild' }];
+      }
+
+      return [
+        { toId: 'permanent-wild' },
+        { toId: 'season-wild' },
+        { toId: 'event-wild' },
+      ];
+    });
+    mockPrisma.playerZoneDiscovery.createMany.mockResolvedValue({ count: 2 });
+
+    await ensureStarterDiscoveries('seasonal-player');
+
+    const call = mockPrisma.playerZoneDiscovery.createMany.mock.calls[0][0];
+    expect(call.data).toHaveLength(2);
+    expect(call.data.map((entry: { zoneId: string }) => entry.zoneId)).toEqual([
+      'season-town',
+      'season-wild',
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -125,6 +279,10 @@ describe('ensureStarterDiscoveries', () => {
 // ---------------------------------------------------------------------------
 describe('ensureStarterEncounterAndNodes', () => {
   it('does nothing when no starter town exists', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: null,
+      seasonId: null,
+    });
     mockPrisma.zone.findFirst.mockResolvedValue(null);
 
     await ensureStarterEncounterAndNodes('p1');
@@ -133,7 +291,6 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('does nothing when starter town has no connections', async () => {
-    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'town-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
 
     await ensureStarterEncounterAndNodes('p1');
@@ -143,9 +300,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('does nothing when no connected wild zone exists', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' }) // starter town
-      .mockResolvedValueOnce(null); // no wild zone found
+    mockPrisma.zone.findFirst.mockResolvedValue(null);
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'town-2' }]);
 
     await ensureStarterEncounterAndNodes('p1');
@@ -154,9 +309,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('creates resource nodes when both ore and log nodes exist', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' }) // starter town
-      .mockResolvedValueOnce({ id: 'wild-1' }); // wild zone
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce({ id: 'ore-node-1' }) // Copper Ore
@@ -176,9 +329,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('creates only ore node when log node is missing', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce({ id: 'ore-node-1' }) // Copper Ore
@@ -195,9 +346,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('skips creating nodes that player already has', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce({ id: 'ore-node-1' })
@@ -216,9 +365,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('skips creating nodes when player already has one of two', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce({ id: 'ore-node-1' })
@@ -238,9 +385,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('skips node creation when no resource nodes exist in wild zone', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce(null) // no ore
@@ -254,9 +399,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('skips encounter site creation when player already has one in the zone', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce(null)
@@ -270,9 +413,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('skips encounter site when no mob family in zone', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce(null)
@@ -287,9 +428,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('skips encounter site when Field Mouse mob template not found', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce(null)
@@ -307,9 +446,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('creates encounter site with correct data when all preconditions met', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce(null)
@@ -341,9 +478,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('creates both resource nodes and encounter site in full setup', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce({ id: 'ore-1' })
@@ -368,9 +503,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('queries Field Mouse with correct zone filter', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce(null)
@@ -391,9 +524,7 @@ describe('ensureStarterEncounterAndNodes', () => {
   });
 
   it('queries zoneMobFamily ordered by discoveryWeight desc', async () => {
-    mockPrisma.zone.findFirst
-      .mockResolvedValueOnce({ id: 'town-1' })
-      .mockResolvedValueOnce({ id: 'wild-1' });
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'wild-1' });
     mockPrisma.zoneConnection.findMany.mockResolvedValue([{ toId: 'wild-1' }]);
     mockPrisma.resourceNode.findFirst
       .mockResolvedValueOnce(null)
@@ -407,6 +538,107 @@ describe('ensureStarterEncounterAndNodes', () => {
       expect.objectContaining({
         where: { zoneId: 'wild-1' },
         orderBy: { discoveryWeight: 'desc' },
+      }),
+    );
+  });
+
+  it('seasonal encounter and resource seeding uses the player realm starter context', async () => {
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      homeTownId: 'season-town',
+      seasonId: 'season-1',
+    });
+    mockPrisma.zone.findUnique.mockResolvedValue({
+      id: 'season-town',
+      isStarter: true,
+      seasonId: 'season-1',
+    });
+    mockPrisma.zone.findFirst.mockImplementation(async ({ where }: { where?: { id?: { in: string[] } } }) => {
+      if (where?.id?.in?.includes('season-wild')) {
+        return { id: 'season-wild' };
+      }
+
+      if (where?.id?.in?.includes('permanent-wild')) {
+        return { id: 'permanent-wild' };
+      }
+
+      return null;
+    });
+    mockPrisma.zoneConnection.findMany.mockImplementation(async ({ where }: { where: { fromId: string } }) => {
+      if (where.fromId === 'season-town') {
+        return [{ toId: 'season-wild' }];
+      }
+
+      return [{ toId: 'permanent-wild' }];
+    });
+    mockPrisma.resourceNode.findFirst.mockImplementation(async ({ where }: { where: { zoneId: string; resourceType: string } }) => {
+      if (where.zoneId === 'season-wild' && where.resourceType === 'Copper Ore') {
+        return { id: 'season-ore' };
+      }
+
+      if (where.zoneId === 'season-wild' && where.resourceType === 'Oak Log') {
+        return { id: 'season-log' };
+      }
+
+      if (where.zoneId === 'permanent-wild' && where.resourceType === 'Copper Ore') {
+        return { id: 'permanent-ore' };
+      }
+
+      if (where.zoneId === 'permanent-wild' && where.resourceType === 'Oak Log') {
+        return { id: 'permanent-log' };
+      }
+
+      return null;
+    });
+    mockPrisma.playerResourceNode.findMany.mockResolvedValue([]);
+    mockPrisma.playerResourceNode.createMany.mockResolvedValue({ count: 2 });
+    mockPrisma.encounterSite.findFirst.mockResolvedValue(null);
+    mockPrisma.zoneMobFamily.findFirst.mockImplementation(async ({ where }: { where: { zoneId: string } }) => ({
+      mobFamilyId: `${where.zoneId}-family`,
+      mobFamily: { name: 'Rodents', siteNounSmall: 'Burrow' },
+    }));
+    mockPrisma.mobTemplate.findFirst.mockImplementation(async ({ where }: { where: { zoneId: string; name: string } }) => {
+      if (where.zoneId === 'season-wild' && where.name === 'Field Mouse') {
+        return { id: 'season-field-mouse' };
+      }
+
+      if (where.zoneId === 'permanent-wild' && where.name === 'Field Mouse') {
+        return { id: 'permanent-field-mouse' };
+      }
+
+      return null;
+    });
+    mockPrisma.encounterSite.create.mockResolvedValue({});
+
+    await ensureStarterEncounterAndNodes('seasonal-player');
+
+    expect(mockPrisma.zoneConnection.findMany).toHaveBeenCalledWith({
+      where: { fromId: 'season-town' },
+      select: { toId: true },
+    });
+    expect(mockPrisma.playerResourceNode.createMany).toHaveBeenCalledWith({
+      data: [
+        { playerId: 'seasonal-player', resourceNodeId: 'season-ore', remainingCapacity: 6, decayedCapacity: 0 },
+        { playerId: 'seasonal-player', resourceNodeId: 'season-log', remainingCapacity: 6, decayedCapacity: 0 },
+      ],
+    });
+    expect(mockPrisma.encounterSite.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          zoneId: 'season-wild',
+          mobFamilyId: 'season-wild-family',
+          mobs: {
+            mobs: [
+              {
+                slot: 0,
+                mobTemplateId: 'season-field-mouse',
+                role: 'trash',
+                prefix: null,
+                status: 'alive',
+                room: 1,
+              },
+            ],
+          },
+        }),
       }),
     );
   });

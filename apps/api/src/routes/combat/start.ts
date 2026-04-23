@@ -62,6 +62,7 @@ import { getCachedMobTemplatesByZone } from '../../services/staticDataCacheServi
 import { createEndpointLimiter } from '../../middleware/rateLimiter';
 import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 import { logger } from '../../logger';
+import { requireActiveSeason } from '../../middleware/seasonGuard';
 
 const combatLimiter = createEndpointLimiter('combat', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.COMBAT_MAX);
 
@@ -73,7 +74,7 @@ export function registerStartRoutes(router: Router): void {
    * Spend turns and run zone combat (single mob).
    * Encounter site combat uses dedicated routes in sites.ts.
    */
-  router.post('/start', combatLimiter, asyncHandler(async (req, res) => {
+  router.post('/start', requireActiveSeason, combatLimiter, asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       await checkActivityLockout(playerId);
       const body = startSchema.parse(req.body);

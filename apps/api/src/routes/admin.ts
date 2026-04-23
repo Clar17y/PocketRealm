@@ -6,12 +6,14 @@ import { registerEventAdminRoutes } from './admin/events';
 import { registerGuildAdminRoutes } from './admin/guild';
 import { registerItemAdminRoutes } from './admin/items';
 import { registerPlayerAdminRoutes } from './admin/player';
+import { registerSeasonAdminRoutes } from './admin/seasons';
 import { registerWorldAdminRoutes } from './admin/world';
 
 export const adminRouter = Router();
 
 adminRouter.use(authenticate, requireAdmin);
 
+registerSeasonAdminRoutes(adminRouter);
 registerPlayerAdminRoutes(adminRouter);
 registerItemAdminRoutes(adminRouter);
 registerEventAdminRoutes(adminRouter);

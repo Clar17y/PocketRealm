@@ -228,8 +228,10 @@ describe('getPlayerCapacity', () => {
 
   it('includes Champion bonus slots for premium players', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      },
     });
     mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
 
@@ -238,8 +240,10 @@ describe('getPlayerCapacity', () => {
 
   it('does not include Champion bonus slots when premium entitlement is expired', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+      },
     });
     mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
 

@@ -429,7 +429,15 @@ export async function getLeaderboardCategories() {
   return fetchApi<LeaderboardCategoriesResponse>('/api/v1/leaderboard/categories');
 }
 
-export async function getLeaderboard(category: string, aroundMe = false) {
-  const params = aroundMe ? '?around_me=true' : '';
-  return fetchApi<LeaderboardResponse>(`/api/v1/leaderboard/${category}${params}`);
+export async function getLeaderboard(category: string, aroundMe = false, seasonId?: string | null) {
+  const params = new URLSearchParams();
+  if (aroundMe) {
+    params.set('around_me', 'true');
+  }
+  if (seasonId) {
+    params.set('seasonId', seasonId);
+  }
+
+  const query = params.size > 0 ? `?${params.toString()}` : '';
+  return fetchApi<LeaderboardResponse>(`/api/v1/leaderboard/${category}${query}`);
 }

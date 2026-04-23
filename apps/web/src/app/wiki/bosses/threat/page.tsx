@@ -2,14 +2,14 @@ import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
-import { BOSS_ENCOUNTER_CONSTANTS } from '@pocketrealm/shared';
+import { BOSS_ENCOUNTER_CONSTANTS, PREMIUM_CONSTANTS, WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
 
 export const metadata: Metadata = {
   title: 'Threat & Contribution - Pocketrealm Wiki',
   description:
-    'How threat accumulation, taunt mechanics, and contribution scoring work in boss encounters.',
+    'How threat accumulation, taunt mechanics, contribution scoring, and boss reward multipliers work.',
 };
 
 const bossRelated = [
@@ -22,7 +22,7 @@ export default function ThreatPage() {
   return (
     <WikiSection
       title="Threat & Contribution"
-      summary="Threat determines which player the boss targets with single-target attacks. Contribution determines how loot rewards are distributed after the boss is defeated."
+      summary="Threat determines which player the boss targets with single-target attacks. Contribution determines how boss loot and boss XP are scaled after the boss is defeated."
       related={bossRelated}
     >
       <h2>Threat Accumulation</h2>
@@ -47,7 +47,7 @@ export default function ThreatPage() {
 
       <h2>Taunt Mechanics</h2>
       <p>
-        The <strong>Taunt</strong> ability (from the General talent tree) forces
+        The <strong>Taunt</strong> ability (from the Survival talent tree) forces
         the boss to target the taunting player for{' '}
         {BOSS_ENCOUNTER_CONSTANTS.TAUNT_DEFAULT_DURATION} rounds. Taunt also
         adds a flat{' '}
@@ -94,7 +94,7 @@ export default function ThreatPage() {
       <h2>Contribution Scoring</h2>
       <p>
         When a boss is defeated, each participant receives a contribution score
-        that determines their share of the loot:
+        that feeds into their final reward multiplier:
       </p>
       <FormulaBlock>
         <Out>score</Out> <Op>=</Op> <Var>damage</Var> <Op>&times;</Op>{' '}
@@ -113,16 +113,38 @@ export default function ThreatPage() {
         meaningful contribution.
       </p>
 
-      <h2>Loot Distribution</h2>
+      <h2>Reward Multipliers</h2>
       <p>
-        Each player&rsquo;s loot share is proportional to their contribution
-        score relative to the total. Higher contribution means better chances
-        at rare drops and more materials.
+        Boss loot and boss XP do not use raw contribution ratio directly.
+        Instead, each player&rsquo;s ratio is converted into a reward multiplier
+        with a floor and ceiling:
       </p>
       <FormulaBlock>
-        <Out>lootShare</Out> <Op>=</Op> <Var>playerScore</Var> <Op>/</Op>{' '}
-        <Var>totalScore</Var>
+        <Out>contributionRatio</Out> <Op>=</Op> <Var>playerScore</Var>{' '}
+        <Op>/</Op> <Var>totalScore</Var>
       </FormulaBlock>
+      <FormulaBlock>
+        <Out>baseRewardMultiplier</Out> <Op>=</Op> clamp<Op>(</Op>
+        <Var>contributionRatio</Var> <Op>&times;</Op>{' '}
+        <Var>participantCount</Var><Op>,</Op>{' '}
+        <Const>{WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR}</Const><Op>,</Op>{' '}
+        <Const>2</Const><Op>)</Op>
+      </FormulaBlock>
+      <FormulaBlock>
+        <Out>effectiveRewardMultiplier</Out> <Op>=</Op>{' '}
+        <Var>baseRewardMultiplier</Var> <Op>&times;</Op>{' '}
+        <Var>championMultiplier</Var>
+        <Comment>
+          {' '}{'//'} championMultiplier = 1 or {PREMIUM_CONSTANTS.BONUS_MULTIPLIER}
+        </Comment>
+      </FormulaBlock>
+      <p>
+        Champion supporters multiply the final boss reward multiplier by{' '}
+        <strong>{PREMIUM_CONSTANTS.BONUS_MULTIPLIER}x</strong>. The same
+        effective multiplier is applied to both loot rolls and boss XP awards.
+        Every participant receives at least the floor multiplier, while strong
+        contributors can reach 2x before the Champion bonus is applied.
+      </p>
 
       <h2>Constants Reference</h2>
       <ConstantsTable
@@ -166,6 +188,16 @@ export default function ThreatPage() {
             name: 'CONTRIBUTION_SURVIVAL_FLAT_BONUS',
             value: BOSS_ENCOUNTER_CONSTANTS.CONTRIBUTION_SURVIVAL_FLAT_BONUS,
             description: 'Flat contribution points per round survived',
+          },
+          {
+            name: 'BOSS_CONTRIBUTION_FLOOR',
+            value: WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR,
+            description: 'Minimum boss loot and XP multiplier before Champion bonus',
+          },
+          {
+            name: 'BONUS_MULTIPLIER',
+            value: `${PREMIUM_CONSTANTS.BONUS_MULTIPLIER}x`,
+            description: 'Champion multiplier applied to final boss loot and XP rewards',
           },
         ]}
       />

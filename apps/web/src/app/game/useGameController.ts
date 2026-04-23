@@ -560,6 +560,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     },
     updateQuestProgress,
     reloadZones,
+    refreshCraftingRecipes,
   });
 
   const travelActions = useTravelActions({

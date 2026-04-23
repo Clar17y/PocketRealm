@@ -9,6 +9,7 @@ export async function getPlayer() {
       email: string;
       role: string;
       emailVerified: boolean;
+      seasonId: string | null;
       isPremium: boolean;
       premiumExpiresAt: string | null;
       createdAt: string;

@@ -12,20 +12,20 @@ function mockRes() {
 
 describe('requireAdmin', () => {
   it('calls next() without error when DB confirms admin role', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({ role: 'admin' });
-    const req = { player: { playerId: 'p1', username: 'admin', role: 'admin' } } as any;
+    mockPrisma.account.findUnique.mockResolvedValue({ role: 'admin' });
+    const req = { player: { accountId: 'account-1', playerId: 'p1', username: 'admin', role: 'admin' } } as any;
     const next = vi.fn();
     await requireAdmin(req, mockRes(), next);
     expect(next).toHaveBeenCalledWith();
-    expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
-      where: { id: 'p1' },
+    expect(mockPrisma.account.findUnique).toHaveBeenCalledWith({
+      where: { id: 'account-1' },
       select: { role: true },
     });
   });
 
   it('passes 403 error to next when DB role is not admin despite JWT claiming admin', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
-    const req = { player: { playerId: 'p1', username: 'user', role: 'admin' } } as any;
+    mockPrisma.account.findUnique.mockResolvedValue({ role: 'player' });
+    const req = { player: { accountId: 'account-1', playerId: 'p1', username: 'user', role: 'admin' } } as any;
     const next = vi.fn();
     await requireAdmin(req, mockRes(), next);
     expect(next).toHaveBeenCalledWith(expect.any(AppError));
@@ -42,8 +42,8 @@ describe('requireAdmin', () => {
   });
 
   it('passes 403 error to next when player not found in DB', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue(null);
-    const req = { player: { playerId: 'p1', username: 'user', role: 'admin' } } as any;
+    mockPrisma.account.findUnique.mockResolvedValue(null);
+    const req = { player: { accountId: 'account-1', playerId: 'p1', username: 'user', role: 'admin' } } as any;
     const next = vi.fn();
     await requireAdmin(req, mockRes(), next);
     expect(next).toHaveBeenCalledWith(expect.any(AppError));

@@ -58,7 +58,11 @@ export async function createSupportPocketrealmCheckoutSession(input: { playerId:
   const player = await prisma.player.findUnique({
     where: { id: input.playerId },
     select: {
-      email: true,
+      account: {
+        select: {
+          email: true,
+        },
+      },
     },
   });
 
@@ -70,7 +74,7 @@ export async function createSupportPocketrealmCheckoutSession(input: { playerId:
     mode: 'payment',
     success_url: `${getAppUrl()}${SUCCESS_PATH}`,
     cancel_url: `${getAppUrl()}${CANCEL_PATH}`,
-    ...(player.email ? { customer_email: player.email } : {}),
+    ...(player.account.email ? { customer_email: player.account.email } : {}),
     submit_type: 'donate',
     metadata: {
       playerId: input.playerId,

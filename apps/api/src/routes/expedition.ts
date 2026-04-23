@@ -28,6 +28,7 @@ import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { paginationSchema, buildPagination } from '../utils/routeHelpers';
 import { EXPEDITION_THEMES } from '@pocketrealm/shared';
 import { getIo } from '../socket';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const expeditionRouter = Router();
 expeditionRouter.use(authenticate);
@@ -139,7 +140,7 @@ expeditionRouter.get('/shop', asyncHandler(async (req, res) => {
 // POST /shop/purchase
 const purchaseSchema = z.object({ itemId: z.string() });
 
-expeditionRouter.post('/shop/purchase', asyncHandler(async (req, res) => {
+expeditionRouter.post('/shop/purchase', requireActiveSeason, asyncHandler(async (req, res) => {
   const { itemId } = purchaseSchema.parse(req.body);
   const result = await purchaseShopItem(req.player!.playerId, itemId);
   res.json(result);
@@ -189,14 +190,14 @@ const launchSchema = z.object({
   tier: z.number().int().min(1).max(3),
 });
 
-expeditionRouter.post('/launch', asyncHandler(async (req, res) => {
+expeditionRouter.post('/launch', requireActiveSeason, asyncHandler(async (req, res) => {
   const body = launchSchema.parse(req.body);
   const expedition = await launchExpedition(req.player!.playerId, body.tier);
   res.status(201).json({ expedition });
 }));
 
 // POST /:id/signup
-expeditionRouter.post('/:id/signup', asyncHandler(async (req, res) => {
+expeditionRouter.post('/:id/signup', requireActiveSeason, asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   const playerId = req.player!.playerId;
   const member = await signUpForExpedition(id, playerId);
@@ -205,14 +206,14 @@ expeditionRouter.post('/:id/signup', asyncHandler(async (req, res) => {
 }));
 
 // POST /:id/force-start
-expeditionRouter.post('/:id/force-start', asyncHandler(async (req, res) => {
+expeditionRouter.post('/:id/force-start', requireActiveSeason, asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   const result = await forceStartExpedition(id, req.player!.playerId);
   res.json(result);
 }));
 
 // POST /:id/force-round
-expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
+expeditionRouter.post('/:id/force-round', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { id } = expeditionIdSchema.parse(req.params);
 
@@ -256,7 +257,7 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
 }));
 
 // POST /:id/auto-resolve (same auth pattern as force-round)
-expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
+expeditionRouter.post('/:id/auto-resolve', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { id } = expeditionIdSchema.parse(req.params);
 
@@ -291,7 +292,7 @@ expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
 }));
 
 // POST /:id/abandon
-expeditionRouter.post('/:id/abandon', asyncHandler(async (req, res) => {
+expeditionRouter.post('/:id/abandon', requireActiveSeason, asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   await abandonExpedition(id, req.player!.playerId);
   res.json({ data: { success: true } });
@@ -300,7 +301,7 @@ expeditionRouter.post('/:id/abandon', asyncHandler(async (req, res) => {
 // PATCH /:id/target
 const targetSchema = z.object({ targetMobId: z.string().nullable() });
 
-expeditionRouter.patch('/:id/target', asyncHandler(async (req, res) => {
+expeditionRouter.patch('/:id/target', requireActiveSeason, asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   const { targetMobId } = targetSchema.parse(req.body);
   await setTargetMob(id, req.player!.playerId, targetMobId);
@@ -310,7 +311,7 @@ expeditionRouter.patch('/:id/target', asyncHandler(async (req, res) => {
 // PATCH /:id/heal-target
 const healTargetSchema = z.object({ healTargetPlayerId: z.string().uuid().nullable() });
 
-expeditionRouter.patch('/:id/heal-target', asyncHandler(async (req, res) => {
+expeditionRouter.patch('/:id/heal-target', requireActiveSeason, asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   const { healTargetPlayerId } = healTargetSchema.parse(req.body);
   await setHealTarget(id, req.player!.playerId, healTargetPlayerId ?? null);
@@ -318,7 +319,7 @@ expeditionRouter.patch('/:id/heal-target', asyncHandler(async (req, res) => {
 }));
 
 // POST /:id/recover
-expeditionRouter.post('/:id/recover', asyncHandler(async (req, res) => {
+expeditionRouter.post('/:id/recover', requireActiveSeason, asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   const playerId = req.player!.playerId;
   const member = await recoverFromKO(id, playerId);

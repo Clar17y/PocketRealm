@@ -17,8 +17,12 @@ leaderboardRouter.get('/:category', asyncHandler(async (req, res) => {
   const { category } = req.params;
   const aroundMe = req.query.around_me === 'true';
   const playerId = req.player?.playerId;
+  const seasonId =
+    typeof req.query.seasonId === 'string'
+      ? req.query.seasonId
+      : (req.player?.seasonId ?? null);
 
-  const result = await getLeaderboard(category, playerId, aroundMe);
+  const result = await getLeaderboard(category, playerId, aroundMe, seasonId);
 
   // Strip playerId and isAdmin from public entries to prevent UUID enumeration
   res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PRIVATE_SHORT);

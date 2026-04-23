@@ -32,6 +32,10 @@ Legend: `[ ]` pending | `[~]` in progress | `[x]` completed
 - [x] Web screen split: decompose `apps/web/src/components/screens/Casino.tsx`
 - [x] Game controller subphase C: extract bootstrap and loader orchestration from `apps/web/src/app/game/useGameController.ts`
 - [x] Re-audit remaining oversized files and classify data-heavy or rule-constrained files for no-op disposition
+- [x] Merge latest `origin/main` seasonal architecture work into `codex/maintainability-audit`
+- [x] Preserve refactor seams for new admin season endpoints by extracting `apps/api/src/routes/admin/seasons.ts` and `apps/api/src/services/admin/seasonAdminService.ts`
+- [x] Preserve refactor seams for the new admin seasons UI by extracting `apps/web/src/components/screens/admin/SeasonsTab.tsx`
+- [x] Port account-role PvP changes from main into the split PvP modules
 
 ## Completed Verification
 
@@ -54,13 +58,21 @@ Legend: `[ ]` pending | `[~]` in progress | `[x]` completed
 - `npm run build -w packages/game-engine`
 - `npm run test -w @pocketrealm/web`
 - `npm run build:web`
+- `npm run test -w @pocketrealm/api -- src/routes/admin.seasons.test.ts src/services/pvpService.test.ts`
+- `npm run test -w @pocketrealm/web -- src/components/screens/AdminScreen.test.tsx src/app/game/GameScreenRenderer.test.ts`
 
 ## Current Focus
 
-- Audit execution complete; remaining large files are tracked with explicit disposition notes instead of open refactor work
+- Latest main merge is resolved locally and focused tests are passing.
+- Current follow-up: simplify touched merge/refactor code, run focused verification again, then commit and push.
 
 ## Next Queue
 
+- `apps/api/src/routes/auth.ts`: new seasonal character/session endpoints make the route too broad; extract realm/session endpoints into route registrars backed by an auth/realm service.
+- `apps/web/src/components/screens/Settings.tsx`: new realm switcher and season archive UI make the screen mixed; extract `RealmSwitcherPanel` and `SeasonArchivesPanel` before changing behavior.
+- `apps/api/src/services/leaderboardService.ts`: seasonal scoping added repeated refresh and read paths; extract board refresh registration/error handling and realm-aware Redis read helpers.
+- `apps/api/src/services/seasonMergeService.ts`: large but coherent workflow; split after coverage review into player transfer, archive creation, leaderboard snapshot, and merge orchestration modules.
+- `apps/api/src/services/seasonBootstrapService.ts`: large clone pipeline; split clone data builders by entity type if future season template work changes it often.
 - `packages/shared/src/constants/npcDialogue.ts`: large primarily because of authored dialogue content; optional future split by town/vendor if content churn rises, but no behavior-bearing structural problem remains
 - `packages/shared/src/constants/gameConstants.ts`: intentionally centralized by project rule; keep in place
 - `packages/shared/src/constants/achievementDefinitions.ts`: static definition payload; no current maintainability win from splitting

@@ -40,6 +40,13 @@ import type { GameScreenRendererProps } from './renderers/gameScreenRenderer.typ
 export function GameScreenRenderer({
   gc,
   player,
+  seasonArchives,
+  realmLabel,
+  realmEndsAt,
+  activePlayerId,
+  characters,
+  switchingPlayerId,
+  onSwitchPlayer,
   casinoSocket,
   achievementCategory,
   setAchievementCategory,
@@ -85,6 +92,13 @@ export function GameScreenRenderer({
         <SettingsScreenRenderer
           gc={gc}
           player={player}
+          seasonArchives={seasonArchives}
+          realmLabel={realmLabel}
+          realmEndsAt={realmEndsAt}
+          activePlayerId={activePlayerId}
+          characters={characters}
+          switchingPlayerId={switchingPlayerId}
+          onSwitchPlayer={onSwitchPlayer}
           pushState={pushState}
           pushToggle={pushToggle}
           onLogout={onLogout}

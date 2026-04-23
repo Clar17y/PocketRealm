@@ -10,6 +10,7 @@ import type { RouletteBetType } from '@pocketrealm/shared';
 import { trackProgress } from '../services/progressService';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
 import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 const casinoLimiter = createEndpointLimiter('casino', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.CASINO_MAX);
 
@@ -31,7 +32,7 @@ const exchangeSchema = z.object({
   turns: z.number().int().positive(),
 });
 
-casinoRouter.post('/exchange', casinoLimiter, asyncHandler(async (req, res) => {
+casinoRouter.post('/exchange', requireActiveSeason, casinoLimiter, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { turns } = exchangeSchema.parse(req.body);
   await assertInTown(playerId);
@@ -55,7 +56,7 @@ casinoRouter.get('/roulette/round', asyncHandler(async (_req, res) => {
   res.json(round);
 }));
 
-casinoRouter.post('/roulette/bet', casinoLimiter, asyncHandler(async (req, res) => {
+casinoRouter.post('/roulette/bet', requireActiveSeason, casinoLimiter, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { betType, betValue, amount } = betSchema.parse(req.body);
   await assertInTown(playerId);

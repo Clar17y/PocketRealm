@@ -54,7 +54,7 @@ describe('requestLogger', () => {
   });
 
   it('logs request on response finish with correct fields', () => {
-    const req = createMockReq({ player: { playerId: 'p1', username: 'hero', role: 'user' } as any });
+    const req = createMockReq({ player: { accountId: 'account-1', playerId: 'p1', username: 'hero', seasonId: null, role: 'user' } as any });
     const res = createMockRes();
     const next = vi.fn();
 

@@ -17,6 +17,13 @@ import type { GameControllerState, GameScreenPlayer, GameScreenRendererProps, Ma
 export function SettingsScreenRenderer({
   gc,
   player,
+  seasonArchives,
+  realmLabel,
+  realmEndsAt,
+  activePlayerId,
+  characters,
+  switchingPlayerId,
+  onSwitchPlayer,
   pushState,
   pushToggle,
   onLogout,
@@ -25,6 +32,13 @@ export function SettingsScreenRenderer({
 }: {
   gc: GameControllerState;
   player: GameScreenPlayer | null;
+  seasonArchives: GameScreenRendererProps['seasonArchives'];
+  realmLabel: string;
+  realmEndsAt: string | Date | null;
+  activePlayerId: string | null;
+  characters: GameScreenRendererProps['characters'];
+  switchingPlayerId: string | null;
+  onSwitchPlayer: (playerId: string) => void;
   pushState: GameScreenRendererProps['pushState'];
   pushToggle: GameScreenRendererProps['pushToggle'];
   onLogout: () => void;
@@ -38,6 +52,13 @@ export function SettingsScreenRenderer({
       emailVerified={player?.emailVerified ?? false}
       isPremium={player?.isPremium ?? false}
       premiumExpiresAt={player?.premiumExpiresAt ?? null}
+      seasonArchives={seasonArchives}
+      realmLabel={realmLabel}
+      realmEndsAt={realmEndsAt}
+      activePlayerId={activePlayerId}
+      characters={characters}
+      switchingPlayerId={switchingPlayerId}
+      onSwitchPlayer={onSwitchPlayer}
       combatLogSpeedMs={gc.combatLogSpeedMs}
       onCombatLogSpeedChange={gc.setCombatLogSpeedMs}
       onCombatLogSpeedCommit={gc.handleSetCombatLogSpeed}
@@ -246,5 +267,5 @@ export function AdminScreenRenderer({ gc }: { gc: GameControllerState }) {
 }
 
 export function LeaderboardScreenRenderer({ player }: { player: GameScreenPlayer | null }) {
-  return <Leaderboard playerId={player?.id ?? null} />;
+  return <Leaderboard playerId={player?.id ?? null} currentSeasonId={player?.seasonId ?? null} />;
 }

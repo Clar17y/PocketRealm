@@ -87,7 +87,7 @@ describe('grantCacheLootTx', () => {
     mockTxAny.itemTemplate = { findMany: vi.fn() };
     mockTxAny.craftingRecipe = { findMany: vi.fn() };
     mockTxAny.player = {
-      findUnique: vi.fn().mockResolvedValue({ isPremium: false, premiumExpiresAt: null }),
+      findUnique: vi.fn().mockResolvedValue({ account: { isPremium: false, premiumExpiresAt: null } }),
     };
     (mockTx.item.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
   });
@@ -307,7 +307,12 @@ describe('grantCacheLootTx', () => {
     boostedTxAny.itemTemplate = { findMany: vi.fn() };
     boostedTxAny.craftingRecipe = { findMany: vi.fn() };
     boostedTxAny.player = {
-      findUnique: vi.fn().mockResolvedValue({ isPremium: true, premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z') }),
+      findUnique: vi.fn().mockResolvedValue({
+        account: {
+          isPremium: true,
+          premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+        },
+      }),
     };
     setupMiningZone(boostedTxAny);
     const boosted = await grantCacheLootTx(boostedTx, params);

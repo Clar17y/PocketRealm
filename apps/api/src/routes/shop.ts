@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getShopItems, purchaseItem } from '../services/questShopService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const shopRouter = Router();
 shopRouter.use(authenticate);
@@ -26,7 +27,7 @@ const purchaseBodySchema = z.object({
   targetContractId: z.string().uuid().optional(),
 }).default({});
 
-shopRouter.post('/purchase/:itemId', asyncHandler(async (req, res) => {
+shopRouter.post('/purchase/:itemId', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { itemId } = purchaseParamsSchema.parse(req.params);
   const body = purchaseBodySchema.parse(req.body);

@@ -27,7 +27,6 @@
 | **Admin Panel** | `admin-panel-design`, `admin-panel-plan` | `routes/admin.ts`, `middleware/admin.ts` |
 | **Auth & Landing** | `auth-pages-design`, `landing-page-design`, `landing-page-plan` | `routes/auth.ts`, `app/login/`, `app/register/` |
 | **UI/UX** | `screen-specific-backgrounds-design`, `hp-bar-actions-design`, `in-game-changelog`, `preferences-design` | `components/screens/`, `components/common/` |
-| **E2E Testing** | `playwright-e2e-testing-design`, `playwright-e2e-implementation` | `tests/e2e/` |
 | **Quests (planned)** | `quest-system-design`, `quest-system-plan` | Not yet implemented |
 
 Design/spec docs are in `docs/superpowers/specs/` and plan/implementation docs are in `docs/superpowers/plans/`, both with `2026-MM-DD-` prefix. Design docs describe intent; implementation/plan docs describe execution steps.

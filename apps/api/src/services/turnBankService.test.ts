@@ -49,8 +49,10 @@ describe('getTurnState', () => {
 
   it('uses Champion regen rate and bank cap for premium players', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date(now.getTime() + 60_000),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date(now.getTime() + 60_000),
+      },
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: PREMIUM_CONSTANTS.TURN_BANK_CAP - 2,
@@ -65,8 +67,10 @@ describe('getTurnState', () => {
 
   it('falls back to free turn settings when premium entitlement is expired', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date(now.getTime() - 60_000),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date(now.getTime() - 60_000),
+      },
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP - 1,
@@ -197,8 +201,10 @@ describe('refundPlayerTurns', () => {
 
   it('refunds premium players up to the Champion bank cap', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date(now.getTime() + 60_000),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date(now.getTime() + 60_000),
+      },
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: PREMIUM_CONSTANTS.TURN_BANK_CAP - 20,
@@ -213,8 +219,10 @@ describe('refundPlayerTurns', () => {
 
   it('refunds expired premium players using the free bank cap', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date(now.getTime() - 60_000),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date(now.getTime() - 60_000),
+      },
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP - 20,
@@ -229,8 +237,10 @@ describe('refundPlayerTurns', () => {
 
   it('preserves premium fractional progress when spending turns', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date(now.getTime() + 60_000),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date(now.getTime() + 60_000),
+      },
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 100,

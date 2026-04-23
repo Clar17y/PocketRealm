@@ -132,8 +132,10 @@ describe('createTemplate', () => {
 
   it('allows Champion players up to the Champion template limit', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      },
     });
     mockPrisma.combatTemplate.count.mockResolvedValue(PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE);
     mockPrisma.combatTemplate.create.mockResolvedValue(makeRecord({ isActive: false }));
@@ -145,8 +147,10 @@ describe('createTemplate', () => {
 
   it('rejects Champion players when over Champion template limit', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      },
     });
     mockPrisma.combatTemplate.count.mockResolvedValue(PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION);
 
@@ -157,8 +161,10 @@ describe('createTemplate', () => {
 
   it('treats expired premium players as free for template limits', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+      },
     });
     mockPrisma.combatTemplate.count.mockResolvedValue(PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE);
 

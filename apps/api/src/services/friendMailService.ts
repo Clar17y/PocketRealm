@@ -4,9 +4,24 @@ import { AppError } from '../middleware/errorHandler';
 import { isBlocked } from './blockService';
 import { sanitizeUserText } from '../utils/sanitize';
 
+async function getPlayerSummary(playerId: string): Promise<{
+  id: string;
+  accountId: string;
+  username: string;
+} | null> {
+  return prisma.player.findUnique({
+    where: { id: playerId },
+    select: {
+      id: true,
+      accountId: true,
+      username: true,
+    },
+  });
+}
+
 const MAIL_INCLUDE = {
-  sender: { select: { username: true } },
-  recipient: { select: { username: true } },
+  sender: { select: { activePlayer: { select: { id: true, username: true } } } },
+  recipient: { select: { activePlayer: { select: { id: true, username: true } } } },
 } as const;
 
 function toMailEntry(mail: {
@@ -19,15 +34,15 @@ function toMailEntry(mail: {
   isSystem: boolean;
   isRead: boolean;
   createdAt: Date;
-  sender: { username: string };
-  recipient: { username: string };
+  sender: { activePlayer: { id: string; username: string } | null };
+  recipient: { activePlayer: { id: string; username: string } | null };
 }): FriendMailEntry {
   return {
     id: mail.id,
-    senderId: mail.senderId,
-    senderName: mail.sender.username,
-    recipientId: mail.recipientId,
-    recipientName: mail.recipient.username,
+    senderId: mail.sender.activePlayer?.id ?? mail.senderId,
+    senderName: mail.sender.activePlayer?.username ?? 'Unknown',
+    recipientId: mail.recipient.activePlayer?.id ?? mail.recipientId,
+    recipientName: mail.recipient.activePlayer?.username ?? 'Unknown',
     subject: mail.subject,
     body: mail.body,
     goldCost: mail.goldCost,
@@ -47,13 +62,24 @@ export async function sendMail(
     throw new AppError(400, 'Cannot send mail to yourself', 'SELF_MAIL');
   }
 
+  const [sender, recipient] = await Promise.all([
+    getPlayerSummary(senderId),
+    getPlayerSummary(recipientId),
+  ]);
+  if (!sender || !recipient) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+  if (sender.accountId === recipient.accountId) {
+    throw new AppError(400, 'Cannot send mail to yourself', 'SELF_MAIL');
+  }
+
   // Check friendship (either direction)
   const friendship = await prisma.friendship.findFirst({
     where: {
       status: 'accepted',
       OR: [
-        { senderId, receiverId: recipientId },
-        { senderId: recipientId, receiverId: senderId },
+        { senderId: sender.accountId, receiverId: recipient.accountId },
+        { senderId: recipient.accountId, receiverId: sender.accountId },
       ],
     },
     select: { id: true },
@@ -83,8 +109,8 @@ export async function sendMail(
     // Create mail
     const created = await tx.friendMail.create({
       data: {
-        senderId,
-        recipientId,
+        senderId: sender.accountId,
+        recipientId: recipient.accountId,
         subject: truncatedSubject,
         body: truncatedBody,
         goldCost: MAIL_CONSTANTS.GOLD_COST,
@@ -95,11 +121,11 @@ export async function sendMail(
 
     // Prune recipient inbox if over limit (soft-delete oldest)
     const inboxCount = await tx.friendMail.count({
-      where: { recipientId, isDeletedByRecipient: false },
+      where: { recipientId: recipient.accountId, isDeletedByRecipient: false },
     });
     if (inboxCount > MAIL_CONSTANTS.MAX_INBOX_SIZE) {
       const oldest = await tx.friendMail.findMany({
-        where: { recipientId, isDeletedByRecipient: false },
+        where: { recipientId: recipient.accountId, isDeletedByRecipient: false },
         orderBy: { createdAt: 'asc' },
         take: inboxCount - MAIL_CONSTANTS.MAX_INBOX_SIZE,
         select: { id: true },
@@ -114,11 +140,11 @@ export async function sendMail(
 
     // Prune sender's sent mail if over limit (soft-delete oldest)
     const sentCount = await tx.friendMail.count({
-      where: { senderId, isDeletedBySender: false, isSystem: false },
+      where: { senderId: sender.accountId, isDeletedBySender: false, isSystem: false },
     });
     if (sentCount > MAIL_CONSTANTS.MAX_SENT_SIZE) {
       const oldestSent = await tx.friendMail.findMany({
-        where: { senderId, isDeletedBySender: false, isSystem: false },
+        where: { senderId: sender.accountId, isDeletedBySender: false, isSystem: false },
         orderBy: { createdAt: 'asc' },
         take: sentCount - MAIL_CONSTANTS.MAX_SENT_SIZE,
         select: { id: true },
@@ -143,13 +169,21 @@ export async function sendSystemMail(
   subject: string,
   body: string,
 ): Promise<FriendMailEntry> {
+  const [sender, recipient] = await Promise.all([
+    getPlayerSummary(senderId),
+    getPlayerSummary(recipientId),
+  ]);
+  if (!sender || !recipient) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
   const truncatedSubject = sanitizeUserText(subject).slice(0, MAIL_CONSTANTS.MAX_SUBJECT_LENGTH);
   const truncatedBody = sanitizeUserText(body).slice(0, MAIL_CONSTANTS.MAX_BODY_LENGTH);
 
   const mail = await prisma.friendMail.create({
     data: {
-      senderId,
-      recipientId,
+      senderId: sender.accountId,
+      recipientId: recipient.accountId,
       subject: truncatedSubject,
       body: truncatedBody,
       goldCost: 0,
@@ -166,7 +200,12 @@ export async function getInbox(
   page = 1,
   pageSize = 20,
 ): Promise<{ mails: FriendMailEntry[]; total: number }> {
-  const where = { recipientId: playerId, isDeletedByRecipient: false };
+  const player = await getPlayerSummary(playerId);
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  const where = { recipientId: player.accountId, isDeletedByRecipient: false };
 
   const [mails, total] = await Promise.all([
     prisma.friendMail.findMany({
@@ -187,7 +226,12 @@ export async function getSentMail(
   page = 1,
   pageSize = 20,
 ): Promise<{ mails: FriendMailEntry[]; total: number }> {
-  const where = { senderId: playerId, isDeletedBySender: false, isSystem: false };
+  const player = await getPlayerSummary(playerId);
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  const where = { senderId: player.accountId, isDeletedBySender: false, isSystem: false };
 
   const [mails, total] = await Promise.all([
     prisma.friendMail.findMany({
@@ -207,12 +251,17 @@ export async function readMail(
   playerId: string,
   mailId: string,
 ): Promise<FriendMailEntry> {
+  const player = await getPlayerSummary(playerId);
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
   const mail = await prisma.friendMail.findFirst({
     where: {
       id: mailId,
       OR: [
-        { recipientId: playerId, isDeletedByRecipient: false },
-        { senderId: playerId, isDeletedBySender: false },
+        { recipientId: player.accountId, isDeletedByRecipient: false },
+        { senderId: player.accountId, isDeletedBySender: false },
       ],
     },
     include: MAIL_INCLUDE,
@@ -223,7 +272,7 @@ export async function readMail(
   }
 
   // Mark as read if recipient is reading and not yet read
-  if (mail.recipientId === playerId && !mail.isRead) {
+  if (mail.recipientId === player.accountId && !mail.isRead) {
     await prisma.friendMail.update({
       where: { id: mailId },
       data: { isRead: true },
@@ -238,10 +287,15 @@ export async function deleteMail(
   playerId: string,
   mailId: string,
 ): Promise<void> {
+  const player = await getPlayerSummary(playerId);
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
   const mail = await prisma.friendMail.findFirst({
     where: {
       id: mailId,
-      OR: [{ senderId: playerId }, { recipientId: playerId }],
+      OR: [{ senderId: player.accountId }, { recipientId: player.accountId }],
     },
     select: {
       id: true,
@@ -256,8 +310,8 @@ export async function deleteMail(
     throw new AppError(404, 'Mail not found', 'NOT_FOUND');
   }
 
-  const isSender = mail.senderId === playerId;
-  const isRecipient = mail.recipientId === playerId;
+  const isSender = mail.senderId === player.accountId;
+  const isRecipient = mail.recipientId === player.accountId;
   const otherSideDeleted = isSender ? mail.isDeletedByRecipient : mail.isDeletedBySender;
 
   // If other side already deleted (or same player is both — shouldn't happen), hard-delete
@@ -281,7 +335,12 @@ export async function deleteMail(
 }
 
 export async function getUnreadCount(playerId: string): Promise<number> {
+  const player = await getPlayerSummary(playerId);
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
   return prisma.friendMail.count({
-    where: { recipientId: playerId, isRead: false, isDeletedByRecipient: false },
+    where: { recipientId: player.accountId, isRead: false, isDeletedByRecipient: false },
   });
 }
