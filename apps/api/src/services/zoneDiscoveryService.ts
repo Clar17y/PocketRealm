@@ -11,31 +11,88 @@ interface EncounterSiteMob {
   room?: number;
 }
 
+interface StarterContext {
+  starterTownId: string;
+  connectedZoneIds: string[];
+  firstWildZoneId: string | null;
+}
+
+async function resolveStarterTownId(
+  homeTownId: string | null,
+  seasonId: string | null,
+  db: Prisma.TransactionClient | typeof prisma,
+): Promise<string | null> {
+  if (homeTownId) {
+    const homeTown = await db.zone.findUnique({
+      where: { id: homeTownId },
+      select: { id: true, isStarter: true, seasonId: true },
+    });
+
+    if (homeTown?.isStarter && homeTown.seasonId === seasonId) {
+      return homeTown.id;
+    }
+  }
+
+  return (
+    await db.zone.findFirst({
+      where: { isStarter: true, seasonId },
+      select: { id: true },
+    })
+  )?.id ?? null;
+}
+
+async function getStarterContextForPlayer(
+  playerId: string,
+  db: Prisma.TransactionClient | typeof prisma,
+): Promise<StarterContext | null> {
+  const player = await db.player.findUniqueOrThrow({
+    where: { id: playerId },
+    select: { homeTownId: true, seasonId: true },
+  });
+
+  const starterTownId = await resolveStarterTownId(player.homeTownId, player.seasonId, db);
+  if (!starterTownId) return null;
+
+  const connections = await db.zoneConnection.findMany({
+    where: { fromId: starterTownId },
+    select: { toId: true },
+  });
+  const connectedZoneIds = connections.map((connection: { toId: string }) => connection.toId);
+
+  if (connectedZoneIds.length === 0) {
+    return {
+      starterTownId,
+      connectedZoneIds,
+      firstWildZoneId: null,
+    };
+  }
+
+  const firstWildZone = await db.zone.findFirst({
+    where: {
+      id: { in: connectedZoneIds },
+      zoneType: 'wild',
+    },
+    select: { id: true },
+  });
+
+  return {
+    starterTownId,
+    connectedZoneIds,
+    firstWildZoneId: firstWildZone?.id ?? null,
+  };
+}
+
 /** Ensure starter zone + town-adjacent discoveries exist for a player. */
 export async function ensureStarterDiscoveries(
   playerId: string,
   tx?: Prisma.TransactionClient,
 ): Promise<void> {
   const db = tx ?? prisma;
-  const starterZones = await db.zone.findMany({
-    where: { isStarter: true },
-    select: { id: true },
-  });
-
-  if (starterZones.length === 0) return;
-
-  const starterIds: string[] = starterZones.map((z: { id: string }) => z.id);
-
-  // Get all connections from starter zones
-  const connections = await db.zoneConnection.findMany({
-    where: { fromId: { in: starterIds } },
-    select: { toId: true },
-  });
-
-  const connectedIds: string[] = connections.map((c: { toId: string }) => c.toId);
+  const starterContext = await getStarterContextForPlayer(playerId, db);
+  if (!starterContext) return;
 
   // Combine starter zones + connected zones, deduplicate
-  const allZoneIds = [...new Set([...starterIds, ...connectedIds])];
+  const allZoneIds = [...new Set([starterContext.starterTownId, ...starterContext.connectedZoneIds])];
 
   await db.playerZoneDiscovery.createMany({
     data: allZoneIds.map((zoneId: string) => ({ playerId, zoneId })),
@@ -49,32 +106,17 @@ export async function ensureStarterEncounterAndNodes(
   tx?: Prisma.TransactionClient,
 ): Promise<void> {
   const db = tx ?? prisma;
-  // Find the starter town and its first connected wild zone
-  const starterTown = await db.zone.findFirst({ where: { isStarter: true }, select: { id: true } });
-  if (!starterTown) return;
-
-  const connections = await db.zoneConnection.findMany({
-    where: { fromId: starterTown.id },
-    select: { toId: true },
-  });
-  if (connections.length === 0) return;
-
-  const wildZone = await db.zone.findFirst({
-    where: {
-      id: { in: connections.map((c: { toId: string }) => c.toId) },
-      zoneType: 'wild',
-    },
-    select: { id: true },
-  });
-  if (!wildZone) return;
+  const starterContext = await getStarterContextForPlayer(playerId, db);
+  if (!starterContext?.firstWildZoneId) return;
+  const wildZoneId = starterContext.firstWildZoneId;
 
   // --- Resource nodes ---
   const oreNode = await db.resourceNode.findFirst({
-    where: { zoneId: wildZone.id, resourceType: 'Copper Ore' },
+    where: { zoneId: wildZoneId, resourceType: 'Copper Ore' },
     select: { id: true },
   });
   const logNode = await db.resourceNode.findFirst({
-    where: { zoneId: wildZone.id, resourceType: 'Oak Log' },
+    where: { zoneId: wildZoneId, resourceType: 'Oak Log' },
     select: { id: true },
   });
 
@@ -101,13 +143,13 @@ export async function ensureStarterEncounterAndNodes(
   // --- Encounter site ---
   // Only create if player has no encounter sites in this zone yet
   const existingSite = await db.encounterSite.findFirst({
-    where: { playerId, zoneId: wildZone.id },
+    where: { playerId, zoneId: wildZoneId },
     select: { id: true },
   });
   if (existingSite) return;
 
   const zoneMobFamily = await db.zoneMobFamily.findFirst({
-    where: { zoneId: wildZone.id },
+    where: { zoneId: wildZoneId },
     orderBy: { discoveryWeight: 'desc' },
     select: { mobFamilyId: true, mobFamily: { select: { name: true, siteNounSmall: true } } },
   });
@@ -116,7 +158,7 @@ export async function ensureStarterEncounterAndNodes(
   // Use a single Field Mouse specifically for tutorial seeding so the first
   // guaranteed encounter site stays safe even if other starter mobs are retuned later.
   const fieldMouse = await db.mobTemplate.findFirst({
-    where: { zoneId: wildZone.id, name: 'Field Mouse' },
+    where: { zoneId: wildZoneId, name: 'Field Mouse' },
     select: { id: true },
   });
   if (!fieldMouse) return;
@@ -130,7 +172,7 @@ export async function ensureStarterEncounterAndNodes(
   await db.encounterSite.create({
     data: {
       playerId,
-      zoneId: wildZone.id,
+      zoneId: wildZoneId,
       mobFamilyId: zoneMobFamily.mobFamilyId,
       name: siteName,
       size: 'small',
