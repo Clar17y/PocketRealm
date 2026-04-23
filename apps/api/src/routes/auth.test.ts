@@ -75,7 +75,7 @@ function mockRes() {
 
 function setupSuccessfulRegisterState() {
   mockPrisma.account.findUnique.mockResolvedValue(null);
-  mockPrisma.player.findUnique.mockResolvedValue(null);
+  mockPrisma.player.findFirst.mockResolvedValue(null);
   mockPrisma.zone.findFirst.mockResolvedValue({ id: 'starter-town' });
   mockPrisma.zoneConnection.findFirst.mockResolvedValue({
     toZone: { id: 'forest-edge' },
@@ -107,6 +107,10 @@ function setupSuccessfulRegisterState() {
             id: 'player-1', username: 'Rook', seasonId: null,
           });
         }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          homeTownId: 'starter-town',
+          seasonId: null,
+        }),
       };
       if (prop === 'playerEquipment') return {
         findMany: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.findMany'); return Promise.resolve([]); }),
@@ -119,12 +123,34 @@ function setupSuccessfulRegisterState() {
       if (prop === 'zone') return {
         findMany: vi.fn().mockImplementation(() => { txCalls.push('zone.findMany'); return Promise.resolve([{ id: 'starter-town' }]); }),
         findFirst: vi.fn().mockImplementation(() => { txCalls.push('zone.findFirst'); return Promise.resolve({ id: 'starter-town' }); }),
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'starter-town',
+          isStarter: true,
+          seasonId: null,
+        }),
       };
       if (prop === 'zoneConnection') return {
         findMany: vi.fn().mockImplementation(() => { txCalls.push('zoneConnection.findMany'); return Promise.resolve([]); }),
       };
       if (prop === 'playerZoneDiscovery') return {
         createMany: vi.fn().mockImplementation(() => { txCalls.push('playerZoneDiscovery.createMany'); return Promise.resolve({}); }),
+      };
+      if (prop === 'resourceNode') return {
+        findFirst: vi.fn().mockResolvedValue(null),
+      };
+      if (prop === 'playerResourceNode') return {
+        findMany: vi.fn().mockResolvedValue([]),
+        createMany: vi.fn().mockResolvedValue({}),
+      };
+      if (prop === 'encounterSite') return {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({}),
+      };
+      if (prop === 'zoneMobFamily') return {
+        findFirst: vi.fn().mockResolvedValue(null),
+      };
+      if (prop === 'mobTemplate') return {
+        findFirst: vi.fn().mockResolvedValue(null),
       };
       return new Proxy({}, { get: () => vi.fn().mockResolvedValue(null) });
     },
@@ -210,6 +236,44 @@ describe('POST /register', () => {
       },
     });
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('allows registration when the username only exists in a seasonal realm', async () => {
+    mockPrisma.account.findUnique.mockResolvedValue(null);
+    mockPrisma.player.findFirst.mockResolvedValue(null);
+    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'starter-town' });
+    mockPrisma.zoneConnection.findFirst.mockResolvedValue({
+      toZone: { id: 'forest-edge' },
+    });
+    mockPrisma.itemTemplate.findUnique.mockResolvedValue({
+      id: STARTER_LOADOUT.tutorialOffHandTemplateId,
+      maxDurability: 40,
+    });
+
+    const txCalls = setupSuccessfulRegisterState();
+    const req = {
+      body: {
+        username: 'Rook',
+        email: 'rook@example.com',
+        password: 'supersecure',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/register');
+    await handler(req, res, next);
+
+    expect(mockPrisma.player.findFirst).toHaveBeenCalledWith({
+      where: {
+        username: 'Rook',
+        seasonId: null,
+      },
+      select: { id: true },
+    });
+    expect(txCalls).toContain('player.create');
+    expect(res.status).toHaveBeenCalledWith(201);
     expect(next).not.toHaveBeenCalled();
   });
 });
