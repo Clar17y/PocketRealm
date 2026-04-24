@@ -37,7 +37,6 @@ interface CrownRow {
     characterLevel: number;
     isBot: boolean;
     activeTitle: string | null;
-    account: { role: string };
   };
 }
 
@@ -57,7 +56,6 @@ function crownRow(
       characterLevel: 10,
       isBot,
       activeTitle: null,
-      account: { role: 'player' },
     },
   };
 }
@@ -87,7 +85,7 @@ function cachedSnapshot(entries: CrownCollectorSnapshotEntry[]) {
 
 describe('crownLeaderboardService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.redis.set.mockResolvedValue('OK');
     mocks.redis.del.mockResolvedValue(1);
     mocks.redis.eval.mockResolvedValue(1);
@@ -180,6 +178,67 @@ describe('crownLeaderboardService', () => {
 
     expect(result.entries.map((entry) => entry.rank)).toEqual([18, 19, 20, 21, 22]);
     expect(result.myRank?.rank).toBe(20);
+  });
+
+  it('around_me fills the page when the authenticated player is near the bottom', async () => {
+    const entries = Array.from({ length: 5 }, (_, index) =>
+      cachedCollectorRow(`p${index + 1}`, index + 1, `Player ${index + 1}`));
+    mocks.redis.get.mockResolvedValue(cachedSnapshot(entries));
+
+    const result = await getCrownCollectorLeaderboard('p5', true, 3);
+
+    expect(result.entries.map((entry) => entry.rank)).toEqual([3, 4, 5]);
+    expect(result.myRank?.rank).toBe(5);
+  });
+
+  it('returns empty cached rows for malformed JSON without rebuilding', async () => {
+    mocks.redis.get.mockResolvedValue('{not-json');
+
+    const rows = await getCachedCrownCollectorRows(10);
+
+    expect(rows).toEqual([]);
+    expect(mocks.prisma.playerCrown.findMany).not.toHaveBeenCalled();
+    expect(mocks.redis.set).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty leaderboard for malformed snapshot shape without crashing', async () => {
+    mocks.redis.get.mockResolvedValue(JSON.stringify({ entries: null }));
+    mocks.redis.set.mockResolvedValue(null);
+
+    const result = await getCrownCollectorLeaderboard('p1');
+
+    expect(result).toEqual({
+      entries: [],
+      myRank: null,
+      totalPlayers: 0,
+      lastRefreshedAt: null,
+    });
+    expect(mocks.prisma.playerCrown.findMany).not.toHaveBeenCalled();
+  });
+
+  it('waits briefly for a snapshot when another request holds the refresh lock', async () => {
+    mocks.redis.get
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(cachedSnapshot([cachedCollectorRow('p1', 1, 'Alice')]));
+    mocks.redis.set.mockResolvedValue(null);
+
+    const result = await getCrownCollectorLeaderboard();
+
+    expect(result.entries.map((entry) => entry.username)).toEqual(['Alice']);
+    expect(mocks.prisma.playerCrown.findMany).not.toHaveBeenCalled();
+    expect(mocks.redis.get).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns empty after bounded lock-contention retries when the snapshot stays missing', async () => {
+    mocks.redis.get.mockResolvedValue(null);
+    mocks.redis.set.mockResolvedValue(null);
+
+    const result = await getCrownCollectorLeaderboard();
+
+    expect(result.entries).toEqual([]);
+    expect(result.totalPlayers).toBe(0);
+    expect(mocks.redis.get).toHaveBeenCalledTimes(4);
   });
 
   it('getCachedCrownCollectorRows returns empty rows without rebuilding when the snapshot is missing', async () => {

@@ -11,6 +11,8 @@ import { redis } from '../redis';
 const SNAPSHOT_KEY = 'leaderboard:crowns:lifetime:snapshot';
 const LOCK_KEY = 'leaderboard:crowns:lifetime:refresh_lock';
 const LOCK_TTL_MS = 30_000;
+const LOCK_WAIT_ATTEMPTS = 3;
+const LOCK_WAIT_DELAY_MS = 10;
 const RELEASE_LOCK_LUA = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
 
 export interface CrownRankBreakdown {
@@ -48,19 +50,6 @@ export interface CrownCollectorSnapshot {
   lastRefreshedAt: string;
 }
 
-interface CrownSourceRow {
-  playerId: string;
-  category: string;
-  rank: number;
-  player: {
-    username: string;
-    characterLevel: number;
-    isBot: boolean;
-    activeTitle: string | null;
-    account: { role: string };
-  };
-}
-
 interface CollectorAggregate {
   playerId: string;
   username: string;
@@ -71,6 +60,7 @@ interface CollectorAggregate {
 }
 
 type CrownGroup = keyof typeof CROWN_CONSTANTS.CATEGORY_GROUPS;
+type CrownSourceRow = Awaited<ReturnType<typeof readCrownRows>>[number];
 
 function groupForCategory(category: string): string | null {
   for (const group of Object.keys(CROWN_CONSTANTS.CATEGORY_GROUPS) as CrownGroup[]) {
@@ -107,13 +97,66 @@ function toPublicEntry(entry: CrownCollectorSnapshotEntry): CrownCollectorEntry 
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isOptionalNumber(value: unknown): value is number | undefined {
+  return value === undefined || isNumber(value);
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === 'string';
+}
+
+function isCrownBreakdown(value: unknown): value is CrownRankBreakdown {
+  return isRecord(value) &&
+    isNumber(value.gold) &&
+    isNumber(value.silver) &&
+    isNumber(value.bronze) &&
+    isNumber(value.total);
+}
+
+function isTopGroup(value: unknown): value is { group: string; count: number } {
+  return isRecord(value) &&
+    typeof value.group === 'string' &&
+    isNumber(value.count);
+}
+
+function isSnapshotEntry(value: unknown): value is CrownCollectorSnapshotEntry {
+  return isRecord(value) &&
+    typeof value.playerId === 'string' &&
+    isNumber(value.rank) &&
+    typeof value.username === 'string' &&
+    isNumber(value.characterLevel) &&
+    isOptionalString(value.title) &&
+    isOptionalNumber(value.titleTier) &&
+    isOptionalString(value.titleStyle) &&
+    isCrownBreakdown(value.crowns) &&
+    Array.isArray(value.topGroups) &&
+    value.topGroups.every(isTopGroup);
+}
+
+function isSnapshot(value: unknown): value is CrownCollectorSnapshot {
+  return isRecord(value) &&
+    Array.isArray(value.entries) &&
+    value.entries.every(isSnapshotEntry) &&
+    isNumber(value.totalPlayers) &&
+    typeof value.lastRefreshedAt === 'string';
+}
+
 function parseSnapshot(raw: string | null): CrownCollectorSnapshot | null {
   if (!raw) {
     return null;
   }
 
   try {
-    return JSON.parse(raw) as CrownCollectorSnapshot;
+    const parsed: unknown = JSON.parse(raw);
+    return isSnapshot(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -159,8 +202,26 @@ async function readSnapshot(): Promise<CrownCollectorSnapshot | null> {
   return parseSnapshot(await redis.get(SNAPSHOT_KEY));
 }
 
-export async function rebuildCrownCollectorSnapshot(): Promise<CrownCollectorSnapshot> {
-  const rows = await prisma.playerCrown.findMany({
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForSnapshot(): Promise<CrownCollectorSnapshot | null> {
+  for (let attempt = 0; attempt < LOCK_WAIT_ATTEMPTS; attempt++) {
+    await sleep(LOCK_WAIT_DELAY_MS);
+    const snapshot = await readSnapshot();
+    if (snapshot) {
+      return snapshot;
+    }
+  }
+
+  return null;
+}
+
+async function readCrownRows() {
+  return prisma.playerCrown.findMany({
     select: {
       playerId: true,
       category: true,
@@ -171,14 +232,17 @@ export async function rebuildCrownCollectorSnapshot(): Promise<CrownCollectorSna
           characterLevel: true,
           isBot: true,
           activeTitle: true,
-          account: { select: { role: true } },
         },
       },
     },
     where: {
       player: { isBot: false },
     },
-  }) as CrownSourceRow[];
+  });
+}
+
+export async function rebuildCrownCollectorSnapshot(): Promise<CrownCollectorSnapshot> {
+  const rows = await readCrownRows();
 
   const aggregates = new Map<string, CollectorAggregate>();
   for (const row of rows) {
@@ -239,7 +303,7 @@ export async function getCrownCollectorLeaderboard(
         await redis.eval(RELEASE_LOCK_LUA, 1, LOCK_KEY, lockToken);
       }
     } else {
-      snapshot = await readSnapshot();
+      snapshot = await waitForSnapshot();
     }
   }
 
@@ -251,9 +315,9 @@ export async function getCrownCollectorLeaderboard(
     ? snapshot.entries.find((entry) => entry.playerId === playerId) ?? null
     : null;
   const myIndex = mySnapshotRank ? mySnapshotRank.rank - 1 : -1;
-  const start = aroundMe && myIndex >= 0
-    ? Math.max(0, myIndex - Math.floor(pageSize / 2))
-    : 0;
+  const centeredStart = Math.max(0, myIndex - Math.floor(pageSize / 2));
+  const maxStart = Math.max(snapshot.entries.length - pageSize, 0);
+  const start = aroundMe && myIndex >= 0 ? Math.min(centeredStart, maxStart) : 0;
   const entries = snapshot.entries.slice(start, start + pageSize).map(toPublicEntry);
 
   return {
