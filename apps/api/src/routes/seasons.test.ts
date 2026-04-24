@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('@pocketrealm/database', () => import('../__mocks__/database.js'));
 
@@ -16,6 +17,7 @@ function findHandler(method: string, path: string) {
 
 function mockRes() {
   const res: any = {};
+  res.set = vi.fn().mockReturnValue(res);
   res.json = vi.fn().mockReturnValue(res);
   return res;
 }
@@ -58,6 +60,46 @@ describe('seasons routes', () => {
     });
   });
 
+  it('returns public archived season summaries', async () => {
+    mockPrisma.season.findMany.mockResolvedValue([
+      {
+        id: 'season-2',
+        name: 'Season 2',
+        status: 'archived',
+        startsAt: new Date('2026-06-01T00:00:00.000Z'),
+        endsAt: new Date('2026-07-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const handler = findHandler('get', '/archives');
+    const res = mockRes();
+    await handler({} as any, res, vi.fn());
+
+    expect(mockPrisma.season.findMany).toHaveBeenCalledWith({
+      where: {
+        status: { in: ['ended', 'archived'] },
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        startsAt: true,
+        endsAt: true,
+      },
+      orderBy: { endsAt: 'desc' },
+    });
+    expect(res.set).toHaveBeenCalledWith('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+    expect(res.json).toHaveBeenCalledWith({
+      archives: [
+        expect.objectContaining({
+          id: 'season-2',
+          name: 'Season 2',
+          status: 'archived',
+        }),
+      ],
+    });
+  });
+
   it('returns ordered hall-of-fame entries for a season', async () => {
     mockPrisma.hallOfFameEntry.findMany.mockResolvedValue([
       {
@@ -89,6 +131,7 @@ describe('seasons routes', () => {
         { rank: 'asc' },
       ],
     });
+    expect(res.set).toHaveBeenCalledWith('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
     expect(res.json).toHaveBeenCalledWith({
       entries: [
         expect.objectContaining({

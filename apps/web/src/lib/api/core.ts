@@ -7,6 +7,10 @@ export interface ApiResponse<T> {
   error?: { message: string; code: string };
 }
 
+export type ApiRequestOptions = RequestInit & {
+  auth?: 'include' | 'omit';
+};
+
 export interface TurnStateResponse {
   currentTurns: number;
   timeToCapMs: number | null;
@@ -91,39 +95,41 @@ async function refreshTokens(): Promise<RefreshOutcome> {
 
 export async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
   attempt = 0
 ): Promise<ApiResponse<T>> {
+  const { auth = 'include', ...requestOptions } = options;
+  const includeAuth = auth === 'include';
   // Only skip token refresh for unauthenticated auth endpoints (login, register, refresh, etc.)
   // Authenticated auth endpoints (resend-verification, change-email, change-password) need refresh.
   const AUTH_NO_REFRESH = ['/api/v1/auth/login', '/api/v1/auth/register', '/api/v1/auth/refresh', '/api/v1/auth/logout', '/api/v1/auth/forgot-password', '/api/v1/auth/reset-password', '/api/v1/auth/verify-email'];
   const isAuthEndpoint = AUTH_NO_REFRESH.some(p => endpoint === p);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const token = includeAuth && typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
-    if (!isAuthEndpoint && token) {
-      const expMs = getJwtExpMs(token);
-      const shouldRefreshSoon = typeof expMs === 'number' && expMs - Date.now() < 60_000;
-      if (shouldRefreshSoon) {
-        await refreshTokens();
-      }
+  if (includeAuth && !isAuthEndpoint && token) {
+    const expMs = getJwtExpMs(token);
+    const shouldRefreshSoon = typeof expMs === 'number' && expMs - Date.now() < 60_000;
+    if (shouldRefreshSoon) {
+      await refreshTokens();
     }
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...((options.headers as Record<string, string>) || {}),
+    ...((requestOptions.headers as Record<string, string>) || {}),
   };
 
-  const latestToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : token;
+  const latestToken = includeAuth && typeof window !== 'undefined' ? localStorage.getItem('accessToken') : token;
   if (latestToken) {
     headers['Authorization'] = `Bearer ${latestToken}`;
   }
 
   try {
     const res = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
+      ...requestOptions,
       headers,
-      credentials: options.credentials ?? 'include',
+      credentials: includeAuth ? requestOptions.credentials ?? 'include' : 'omit',
     });
 
     let jsonParsed = false;
@@ -138,7 +144,7 @@ export async function fetchApi<T>(
     }
 
     if (!res.ok) {
-      if (!isAuthEndpoint && res.status === 401 && attempt === 0) {
+      if (includeAuth && !isAuthEndpoint && res.status === 401 && attempt === 0) {
         const refreshed = await refreshTokens();
         if (refreshed?.ok) {
           return fetchApi<T>(endpoint, options, attempt + 1);

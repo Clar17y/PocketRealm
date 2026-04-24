@@ -1,5 +1,5 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs } from './core';
-export type { ApiResponse, TaxInfo } from './core';
+export type { ApiRequestOptions, ApiResponse, TaxInfo } from './core';
 
 export {
   register,
@@ -18,8 +18,8 @@ export {
 } from './auth';
 export type { CharacterSummary, SeasonArchiveSummary } from './auth';
 
-export { getActiveSeason, getHallOfFame } from './seasons';
-export type { ActiveSeasonResponse, HallOfFameEntryResponse } from './seasons';
+export { getActiveSeason, getHallOfFame, getPublicSeasonArchives } from './seasons';
+export type { ActiveSeasonResponse, HallOfFameEntryResponse, PublicSeasonArchiveSummary } from './seasons';
 
 export {
   getPlayer,

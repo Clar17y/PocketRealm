@@ -12,12 +12,12 @@ import {
   getHallOfFame,
   getLeaderboard,
   getLeaderboardCategories,
-  getSeasonArchives,
+  getPublicSeasonArchives,
   type HallOfFameEntryResponse,
   type LeaderboardCategoryGroup,
   type LeaderboardPeriod,
   type LeaderboardResponse,
-  type SeasonArchiveSummary,
+  type PublicSeasonArchiveSummary,
 } from '@/lib/api';
 import type { ActiveSeasonResponse } from '@/lib/api/seasons';
 import type { CrownCollectorsResponse } from '@/lib/api/social';
@@ -40,7 +40,7 @@ function updateTabQuery(tab: PublicRankingsTab) {
 
 function seasonOptionsFromArchives(
   activeSeason: ActiveSeasonResponse | null,
-  archives: SeasonArchiveSummary[],
+  archives: PublicSeasonArchiveSummary[],
 ): SeasonOption[] {
   const options = new Map<string, SeasonOption>();
 
@@ -52,9 +52,9 @@ function seasonOptionsFromArchives(
   }
 
   for (const archive of archives) {
-    options.set(archive.season.id, {
-      id: archive.season.id,
-      name: archive.season.name,
+    options.set(archive.id, {
+      id: archive.id,
+      name: archive.name,
     });
   }
 
@@ -91,7 +91,7 @@ export function PublicRankings({ initialTab = 'crowns' }: PublicRankingsProps) {
       const [categoriesRes, activeSeasonRes, archivesRes] = await Promise.all([
         getLeaderboardCategories(),
         getActiveSeason(),
-        getSeasonArchives(),
+        getPublicSeasonArchives(),
       ]);
 
       if (categoriesRes.data?.groups.length) {

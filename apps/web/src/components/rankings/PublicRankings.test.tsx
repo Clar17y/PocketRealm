@@ -11,7 +11,7 @@ vi.mock('@/lib/api', async () => {
     getHallOfFame: vi.fn(),
     getLeaderboard: vi.fn(),
     getLeaderboardCategories: vi.fn(),
-    getSeasonArchives: vi.fn(),
+    getPublicSeasonArchives: vi.fn(),
   };
 });
 
@@ -21,7 +21,7 @@ import {
   getHallOfFame,
   getLeaderboard,
   getLeaderboardCategories,
-  getSeasonArchives,
+  getPublicSeasonArchives,
 } from '@/lib/api';
 import { PublicRankings } from './PublicRankings';
 
@@ -67,7 +67,7 @@ function primeApi() {
     },
     error: null,
   });
-  vi.mocked(getSeasonArchives).mockResolvedValue({ data: { archives: [] }, error: null });
+  vi.mocked(getPublicSeasonArchives).mockResolvedValue({ data: { archives: [] }, error: null });
   vi.mocked(getCrownCollectors).mockResolvedValue({
     data: {
       entries: [crownEntry('Arden')],
@@ -120,6 +120,30 @@ describe('PublicRankings', () => {
 
     await waitFor(() => expect(getLeaderboard).toHaveBeenCalledWith('character_xp', false, null, 'weekly'));
     expect(screen.getByText('XP Hero')).toBeTruthy();
+  });
+
+  it('loads hall of fame season options from the public archives endpoint', async () => {
+    vi.mocked(getActiveSeason).mockResolvedValue({ data: { season: null }, error: null });
+    vi.mocked(getPublicSeasonArchives).mockResolvedValue({
+      data: {
+        archives: [
+          {
+            id: 'season-2',
+            name: 'Season 2',
+            status: 'archived',
+            startsAt: '2026-06-01T00:00:00.000Z',
+            endsAt: '2026-07-01T00:00:00.000Z',
+          },
+        ],
+      },
+      error: null,
+    });
+
+    render(<PublicRankings initialTab="hallOfFame" />);
+
+    await waitFor(() => expect(getPublicSeasonArchives).toHaveBeenCalled());
+    await waitFor(() => expect(getHallOfFame).toHaveBeenCalledWith('season-2'));
+    expect(screen.getByRole('option', { name: 'Season 2' })).toBeTruthy();
   });
 
   it('can request the signed-in crown collector rank', async () => {

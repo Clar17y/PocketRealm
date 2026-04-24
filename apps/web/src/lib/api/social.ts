@@ -470,7 +470,7 @@ export interface LeaderboardCategoriesResponse {
 }
 
 export async function getLeaderboardCategories() {
-  return fetchApi<LeaderboardCategoriesResponse>('/api/v1/leaderboard/categories');
+  return fetchApi<LeaderboardCategoriesResponse>('/api/v1/leaderboard/categories', { auth: 'omit' });
 }
 
 export async function getLeaderboard(
@@ -508,5 +508,5 @@ export async function getCrownCollectors(aroundMe = false, limit?: number) {
 }
 
 export async function getPublicLeaderboardSummary() {
-  return fetchApi<PublicLeaderboardSummaryResponse>('/api/v1/leaderboard/public-summary');
+  return fetchApi<PublicLeaderboardSummaryResponse>('/api/v1/leaderboard/public-summary', { auth: 'omit' });
 }

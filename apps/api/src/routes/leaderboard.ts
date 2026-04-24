@@ -3,7 +3,7 @@ import { CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
 import { optionalAuthenticate } from '../middleware/auth';
 import { getCategories, getLeaderboard } from '../services/leaderboardService';
 import { getPlayerCrownCollection } from '../services/crownService';
-import { getCrownCollectorLeaderboard } from '../services/crownLeaderboardService';
+import { getCrownCollectorLeaderboard, type CrownCollectorEntry } from '../services/crownLeaderboardService';
 import { getPublicLeaderboardSummary } from '../services/publicLeaderboardSummaryService';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -26,13 +26,17 @@ function optionalPositiveInt(value: unknown): number | undefined {
   return parsed > 0 ? parsed : undefined;
 }
 
-function stripPlayerIds<TEntry extends object>(
-  entries: TEntry[],
-): Array<Omit<TEntry & { playerId?: unknown }, 'playerId'>> {
-  return entries.map((entry) => {
-    const { playerId: _playerId, ...publicEntry } = entry as TEntry & { playerId?: unknown };
-    return publicEntry;
-  });
+function toPublicCrownEntry(entry: CrownCollectorEntry): CrownCollectorEntry {
+  return {
+    rank: entry.rank,
+    username: entry.username,
+    characterLevel: entry.characterLevel,
+    title: entry.title,
+    titleTier: entry.titleTier,
+    titleStyle: entry.titleStyle,
+    crowns: entry.crowns,
+    topGroups: entry.topGroups,
+  };
 }
 
 leaderboardRouter.get('/categories', (_req, res) => {
@@ -49,7 +53,8 @@ leaderboardRouter.get('/crowns', asyncHandler(async (req, res) => {
   res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PRIVATE_SHORT);
   res.json({
     ...result,
-    entries: stripPlayerIds(result.entries),
+    entries: result.entries.map(toPublicCrownEntry),
+    myRank: result.myRank ? toPublicCrownEntry(result.myRank) : null,
   });
 }));
 

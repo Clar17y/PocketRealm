@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '@pocketrealm/database';
+import { CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
+import { getPublicSeasonArchives } from '../services/seasonPublicService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const seasonsRouter = Router();
@@ -22,6 +24,12 @@ seasonsRouter.get('/active', asyncHandler(async (_req, res) => {
   res.json({ season });
 }));
 
+seasonsRouter.get('/archives', asyncHandler(async (_req, res) => {
+  const archives = await getPublicSeasonArchives();
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+  res.json({ archives });
+}));
+
 seasonsRouter.get('/:id/hall-of-fame', asyncHandler(async (req, res) => {
   const entries = await prisma.hallOfFameEntry.findMany({
     where: { seasonId: req.params.id },
@@ -39,5 +47,6 @@ seasonsRouter.get('/:id/hall-of-fame', asyncHandler(async (req, res) => {
     ],
   });
 
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
   res.json({ entries });
 }));
