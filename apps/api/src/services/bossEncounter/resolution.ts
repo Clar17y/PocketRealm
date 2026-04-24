@@ -537,11 +537,13 @@ async function resolveBossRoundInner(
 
     const killerName = (await resolveUsername(killedBy)) ?? 'unknown';
     const zoneName = encounter.event.zone?.name ?? 'unknown';
-    await broadcastBossDefeatActivity({
+    void broadcastBossDefeatActivity({
       zoneId: encounter.event.zoneId,
       zoneName,
       bossName: encounter.mobTemplate.name,
       killerName,
+    }).catch((error: unknown) => {
+      logger.error({ err: error, bossEncounterId: encounterId }, 'Boss defeat activity broadcast failed');
     });
 
     for (const playerId of contributorMap.keys()) {

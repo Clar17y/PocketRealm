@@ -63,7 +63,9 @@ export function formatChatActivityMessage(
     case 'achievement':
       return `${actor} earned the achievement ${subject}.`;
     case 'boss_defeat':
-      return `${subject} has been defeated.`;
+      return activity.actorUsername
+        ? `${subject} has been defeated. ${actor} dealt the final blow.`
+        : `${subject} has been defeated.`;
     case 'server_milestone':
       return subject;
   }

@@ -131,10 +131,53 @@ describe('chatActivityService', () => {
       zoneId: 'zone-1',
       zoneName: 'Iron Hollow',
       bossName: 'The Molten Hart',
-      killerName: null,
+      killerName: 'Hero',
     });
 
     expect(mockRedis.set).not.toHaveBeenCalled();
+    expect(mockEmitSystemMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      'world',
+      'world',
+      'The Molten Hart in Iron Hollow has been defeated. Hero dealt the final blow.',
+    );
+    expect(mockEmitSystemMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      'zone',
+      'zone:zone-1',
+      'The Molten Hart has been defeated. Hero dealt the final blow.',
+    );
+    expect(mockPrisma.chatActivity.create).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.chatActivity.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        eventType: 'boss_defeat',
+        scope: 'global',
+        zoneId: 'zone-1',
+        actorPlayerId: null,
+        actorUsername: 'Hero',
+      }),
+    });
+    expect(mockPrisma.chatActivity.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        eventType: 'boss_defeat',
+        scope: 'zone',
+        zoneId: 'zone-1',
+        actorPlayerId: null,
+        actorUsername: 'Hero',
+      }),
+    });
+  });
+
+  it('broadcasts boss defeats without killer info when no killer is known', async () => {
+    await broadcastBossDefeatActivity({
+      zoneId: 'zone-1',
+      zoneName: 'Iron Hollow',
+      bossName: 'The Molten Hart',
+      killerName: null,
+    });
+
     expect(mockEmitSystemMessage).toHaveBeenNthCalledWith(
       1,
       expect.anything(),
@@ -149,25 +192,6 @@ describe('chatActivityService', () => {
       'zone:zone-1',
       'The Molten Hart has been defeated.',
     );
-    expect(mockPrisma.chatActivity.create).toHaveBeenCalledTimes(2);
-    expect(mockPrisma.chatActivity.create).toHaveBeenNthCalledWith(1, {
-      data: expect.objectContaining({
-        eventType: 'boss_defeat',
-        scope: 'global',
-        zoneId: 'zone-1',
-        actorPlayerId: null,
-        actorUsername: null,
-      }),
-    });
-    expect(mockPrisma.chatActivity.create).toHaveBeenNthCalledWith(2, {
-      data: expect.objectContaining({
-        eventType: 'boss_defeat',
-        scope: 'zone',
-        zoneId: 'zone-1',
-        actorPlayerId: null,
-        actorUsername: null,
-      }),
-    });
   });
 
   it('broadcasts boss defeats globally only when no zone is known', async () => {

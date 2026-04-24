@@ -6,6 +6,9 @@ vi.mock('./systemMessageService.js', () => ({
     createdAt: new Date('2026-02-04T12:00:00Z'),
   }),
 }));
+vi.mock('./chatActivityService.js', () => ({
+  broadcastBossDefeatActivity: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('./turnBankService.js', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue(undefined),
 }));
@@ -95,6 +98,7 @@ import {
   getActiveBossEncounters,
   getBossHistory,
 } from './bossEncounterService';
+import { broadcastBossDefeatActivity } from './chatActivityService';
 import { emitSystemMessage } from './systemMessageService';
 import { setHp, enterRecoveringState } from './hpService';
 import { distributeBossLoot } from './bossLootService';
@@ -181,6 +185,7 @@ describe('bossEncounterService', () => {
     vi.clearAllMocks();
     // Restore default engine mock for each test (clearAllMocks only clears call history)
     vi.mocked(resolveBossRoundEngine).mockReturnValue(defaultEngineResult as any);
+    vi.mocked(broadcastBossDefeatActivity).mockResolvedValue(undefined);
     vi.mocked(initThreatTable).mockReturnValue([{ playerId: 'p1', threat: 0, tauntRoundsRemaining: 0 }]);
     vi.mocked(calculateFleeWithGold).mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 } as any);
     // Guild XP: resolveBossRound looks up guild memberships for participating players
@@ -1142,7 +1147,7 @@ describe('bossEncounterService', () => {
       });
     });
 
-    it('emits world and zone defeat messages with killer name', async () => {
+    it('broadcasts structured boss defeat activity with killer name', async () => {
       const io = {} as any;
       vi.mocked(resolveBossRoundEngine).mockReturnValue({
         ...defaultEngineResult,
@@ -1159,13 +1164,17 @@ describe('bossEncounterService', () => {
 
       await resolveBossRound('enc-1', io);
 
-      expect(emitSystemMessage).toHaveBeenCalledWith(
-        io, 'world', 'world',
-        expect.stringContaining('Hero dealt the final blow'),
-      );
-      expect(emitSystemMessage).toHaveBeenCalledWith(
-        io, 'zone', 'zone:zone-1',
-        expect.stringContaining('has been slain'),
+      expect(broadcastBossDefeatActivity).toHaveBeenCalledWith({
+        zoneId: 'zone-1',
+        zoneName: 'Dark Forest',
+        bossName: 'Stone Colossus',
+        killerName: 'Hero',
+      });
+      expect(emitSystemMessage).not.toHaveBeenCalledWith(
+        io,
+        'world',
+        'world',
+        expect.stringContaining('final blow'),
       );
     });
 
@@ -1186,10 +1195,42 @@ describe('bossEncounterService', () => {
 
       await resolveBossRound('enc-1', io);
 
-      expect(emitSystemMessage).toHaveBeenCalledWith(
-        io, 'world', 'world',
-        expect.stringContaining('unknown dealt the final blow'),
+      expect(broadcastBossDefeatActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ killerName: 'unknown' }),
       );
+    });
+
+    it('continues boss defeat resolution when activity broadcast fails', async () => {
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+      vi.mocked(broadcastBossDefeatActivity).mockRejectedValueOnce(new Error('chat activity failed'));
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      setupBasicRound();
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()])
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      const result = await resolveBossRound('enc-1', null);
+      await Promise.resolve();
+
+      expect(result!.bossDefeated).toBe(true);
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ rewardsByPlayer: expect.anything() }),
+        }),
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ bossEncounterId: 'enc-1', err: expect.any(Error) }),
+        'Boss defeat activity broadcast failed',
+      );
+
+      errorSpy.mockRestore();
     });
 
     it('saves rewardsByPlayer to encounter on defeat', async () => {
@@ -1298,7 +1339,7 @@ describe('bossEncounterService', () => {
       );
     });
 
-    it('skips zone defeat message when zoneId is null', async () => {
+    it('passes null zone id to structured boss defeat activity', async () => {
       const io = {} as any;
       vi.mocked(resolveBossRoundEngine).mockReturnValue({
         ...defaultEngineResult,
@@ -1317,9 +1358,12 @@ describe('bossEncounterService', () => {
 
       await resolveBossRound('enc-1', io);
 
-      // Only world message, no zone message
-      expect(emitSystemMessage).toHaveBeenCalledTimes(1);
-      expect(emitSystemMessage).toHaveBeenCalledWith(io, 'world', 'world', expect.any(String));
+      expect(broadcastBossDefeatActivity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          zoneId: null,
+          zoneName: 'unknown',
+        }),
+      );
     });
 
     // --- Participant resource building ---

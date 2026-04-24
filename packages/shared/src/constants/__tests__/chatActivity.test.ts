@@ -54,6 +54,26 @@ describe('chatActivity constants', () => {
     expect(formatChatActivityMessage('craft_crit', craftActivity)).toBe('Kael crafted an Epic Steel Greatsword.');
   });
 
+  it('formats boss defeat messages with final blow context when present', () => {
+    expect(formatChatActivityMessage('boss_defeat', {
+      ...craftActivity,
+      eventType: 'boss_defeat',
+      actorUsername: 'Hero',
+      subjectName: 'The Molten Hart in Iron Hollow',
+      subjectRarity: null,
+    })).toBe('The Molten Hart in Iron Hollow has been defeated. Hero dealt the final blow.');
+  });
+
+  it('formats boss defeat messages without final blow context when actor is unknown', () => {
+    expect(formatChatActivityMessage('boss_defeat', {
+      ...craftActivity,
+      eventType: 'boss_defeat',
+      actorUsername: null,
+      subjectName: 'The Molten Hart in Iron Hollow',
+      subjectRarity: null,
+    })).toBe('The Molten Hart in Iron Hollow has been defeated.');
+  });
+
   it('formats activity messages with grammar-safe articles', () => {
     expect(formatChatActivityMessage('rare_loot', {
       ...craftActivity,
