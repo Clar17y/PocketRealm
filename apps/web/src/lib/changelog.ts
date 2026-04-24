@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.54',
+    date: '2026-04-24',
+    title: 'Seasonal Realms Foundation',
+    summary:
+      'Pocketrealm now has the foundation for limited-time seasonal realms. Permanent characters continue as normal, but when a season is opened you will be able to create a fresh seasonal character, switch between realms in Settings, and compete on season-specific leaderboards. Seasons now have their own starter content, Hall of Fame archives, end-of-season rewards, and merge support for carrying eligible progress back to the permanent realm. Seasons may not be open immediately, but the groundwork for fresh-start races and separate seasonal progression is now in place.',
+  },
+  {
     version: '0.53',
     date: '2026-04-20',
     title: 'Support Pocketrealm & Champion Perks',
