@@ -186,7 +186,11 @@ export async function runWeeklyLeaderboardJob(now = new Date()): Promise<void> {
     }
 
     if (crownCount > 0) {
-      await rebuildCrownCollectorSnapshot();
+      try {
+        await rebuildCrownCollectorSnapshot();
+      } catch (err) {
+        logger.warn({ err }, 'Failed to rebuild crown collector snapshot after weekly crown awards');
+      }
     }
 
     if (crownCount > 0) {

@@ -1,6 +1,7 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { characterLevelFromXp, levelFromXp } from '@pocketrealm/game-engine';
 import { redis } from '../redis';
+import { logger } from '../logger';
 import { getCategories } from './leaderboardService';
 import { refreshSeasonCache } from './seasonCacheService';
 import { leaderboardKey } from './leaderboardKeys';
@@ -70,6 +71,14 @@ function runSerializableTransaction<T>(
   }
 
   return prisma.$transaction(operation, { isolationLevel });
+}
+
+async function invalidateCrownCollectorSnapshotBestEffort(): Promise<void> {
+  try {
+    await invalidateCrownCollectorSnapshot();
+  } catch (err) {
+    logger.warn({ err }, 'Failed to invalidate crown collector snapshot after seasonal crown transfer');
+  }
 }
 
 async function mergeSeasonalPlayerTx(
@@ -390,7 +399,7 @@ export async function mergeSeasonalPlayer(
     mergeSeasonalPlayerTx(tx, seasonalPlayerId, permanentPlayerId, seasonId));
 
   if (log.crowns.merged > 0) {
-    await invalidateCrownCollectorSnapshot();
+    await invalidateCrownCollectorSnapshotBestEffort();
   }
 
   return log;
@@ -608,10 +617,10 @@ export async function runSeasonMerge(seasonId: string): Promise<{ merged: number
     });
 
     await refreshSeasonCache();
+  }
 
-    if (crownCollectorsChanged) {
-      await invalidateCrownCollectorSnapshot();
-    }
+  if (crownCollectorsChanged) {
+    await invalidateCrownCollectorSnapshotBestEffort();
   }
 
   return { merged, errors };

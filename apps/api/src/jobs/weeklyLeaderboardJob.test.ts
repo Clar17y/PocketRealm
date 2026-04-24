@@ -24,6 +24,11 @@ const mocks = vi.hoisted(() => ({
     totalPlayers: 0,
     lastRefreshedAt: '2026-04-24T12:00:00.000Z',
   }),
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
 }));
 
 vi.mock('../redis', () => ({ redis: mocks.redis }));
@@ -38,6 +43,7 @@ vi.mock('../services/leaderboardService', () => ({
 vi.mock('../services/crownLeaderboardService', () => ({
   rebuildCrownCollectorSnapshot: mocks.rebuildCrownCollectorSnapshot,
 }));
+vi.mock('../logger', () => ({ logger: mocks.logger }));
 
 import { isWeeklyLeaderboardWindow, runWeeklyLeaderboardJob } from './weeklyLeaderboardJob';
 
@@ -137,5 +143,30 @@ describe('weeklyLeaderboardJob', () => {
     await runWeeklyLeaderboardJob(new Date('2026-04-27T00:00:30.000Z'));
 
     expect(mocks.rebuildCrownCollectorSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('continues the weekly job lifecycle when crown collector snapshot rebuild fails', async () => {
+    const err = new Error('snapshot unavailable');
+    mocks.rebuildCrownCollectorSnapshot.mockRejectedValue(err);
+
+    await expect(runWeeklyLeaderboardJob(new Date('2026-04-27T00:00:30.000Z'))).resolves.toBeUndefined();
+
+    expect(mocks.rebuildCrownCollectorSnapshot).toHaveBeenCalledTimes(1);
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      { err },
+      'Failed to rebuild crown collector snapshot after weekly crown awards',
+    );
+    expect(mocks.emitSystemMessage).toHaveBeenCalledWith(
+      null,
+      'world',
+      'world',
+      expect.any(String),
+    );
+    expect(mocks.redis.set).toHaveBeenCalledWith(
+      'leaderboard:weekly_job_ran:2026-04-27',
+      '1',
+      'EX',
+      604800,
+    );
   });
 });
