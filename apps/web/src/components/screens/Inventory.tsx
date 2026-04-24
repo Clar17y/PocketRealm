@@ -1,65 +1,25 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PixelCard } from '@/components/PixelCard';
 import { ItemCard } from '@/components/ItemCard';
-import { PixelButton } from '@/components/PixelButton';
-import { StatBar } from '@/components/StatBar';
-import { X, Coins } from 'lucide-react';
-import { CRAFTING_CONSTANTS, repairTurnCost } from '@pocketrealm/shared';
-import { useBatchMode } from '@/hooks/useBatchMode';
-import { BatchActionBar, BatchCheckboxOverlay, BatchDimOverlay } from '@/components/common/BatchActionBar';
-import { titleCaseFromSnake, fmtDur } from '@/lib/format';
-import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass, statEntries, statDisplayMeta } from '@/lib/statFormat';
+import { Coins } from 'lucide-react';
+import { CRAFTING_CONSTANTS } from '@pocketrealm/shared';
 import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
-import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rarity';
+import { rarityMeetsThreshold, type ConfirmRarity } from '@/lib/rarity';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
-import { ModalOverlay } from '@/components/common/ModalOverlay';
-import { StashTutorial } from '@/components/common/StashTutorial';
-import { getStaggerDelay } from '@/lib/animations';
-import { ItemIcon } from '@/components/common/ItemIcon';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
-
-interface Item {
-  id: string;
-  name: string;
-  icon?: string;
-  imageSrc?: string;
-  quantity: number;
-  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  description: string;
-  type: string;
-  weightClass?: 'heavy' | 'medium' | 'light' | null;
-  tier?: number;
-  slot?: string | null;
-  equippedSlot?: string | null;
-  durability?: { current: number; max: number } | null;
-  baseStats?: Record<string, unknown>;
-  bonusStats?: Record<string, unknown> | null;
-  requiredSkill?: string | null;
-  requiredLevel?: number | null;
-  salvageCost: number | null;
-  sellPrice?: number | null;
-}
-
-interface StashItem {
-  id: string;
-  name: string;
-  imageSrc?: string;
-  quantity: number;
-  rarity: Rarity;
-  type: string;
-  durability?: { current: number; max: number } | null;
-  sellPrice: number | null;
-  salvageCost: number | null;
-}
+import { useInventoryBatchModes } from './inventory/useInventoryBatchModes';
+import { BackpackPanel } from './inventory/BackpackPanel';
+import { InventoryItemModal } from './inventory/InventoryItemModal';
+import { StashPanel } from './inventory/StashPanel';
+import type { InventoryItem, InventoryStashItem } from './inventory/inventory.types';
 
 interface InventoryProps {
-  items: Item[];
+  items: InventoryItem[];
   capacity: number;
   usedSlots: number;
   gold: number;
@@ -85,11 +45,6 @@ interface InventoryProps {
   skillLevels?: Map<string, number>;
 }
 
-function prettySlot(slot: string) {
-  return titleCaseFromSnake(slot);
-}
-
-
 export function Inventory({
   items, capacity, usedSlots, gold, isInTown,
   onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onSellBatch, onDeposit, onDepositBatch, onWithdraw, onWithdrawBatch,
@@ -97,7 +52,7 @@ export function Inventory({
   characterLevel, skillLevels,
 }: InventoryProps) {
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
@@ -109,39 +64,39 @@ export function Inventory({
   const SALVAGE_LIMIT = CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT;
   const BATCH_LIMIT = 50;
 
-  const salvageBatch = useBatchMode(SALVAGE_LIMIT);
-  const stashBatch = useBatchMode(BATCH_LIMIT);
-  const sellBatchMode = useBatchMode(BATCH_LIMIT);
-  const withdrawBatchMode = useBatchMode(BATCH_LIMIT);
-  const stashSellBatch = useBatchMode(BATCH_LIMIT);
-  const stashSalvageBatch = useBatchMode(SALVAGE_LIMIT);
-
   const [activeTab, setActiveTab] = useState<'backpack' | 'stash'>('backpack');
-  const [stashItems, setStashItems] = useState<StashItem[]>([]);
+  const [stashItems, setStashItems] = useState<InventoryStashItem[]>([]);
   const [stashLoading, setStashLoading] = useState(false);
-  const [selectedStashItem, setSelectedStashItem] = useState<StashItem | null>(null);
+  const [selectedStashItem, setSelectedStashItem] = useState<InventoryStashItem | null>(null);
+  const clearSelectedItem = useCallback(() => {
+    setSelectedItem(null);
+  }, []);
+  const clearSelectedStashItem = useCallback(() => {
+    setSelectedStashItem(null);
+  }, []);
+  const {
+    salvageBatch,
+    stashBatch,
+    sellBatchMode,
+    withdrawBatchMode,
+    stashSellBatch,
+    stashSalvageBatch,
+    backpackBatchActive,
+    stashBatchActive,
+    activateBackpackMode,
+    resetAllBackpackModes,
+    activateStashMode,
+    resetAllStashModes,
+  } = useInventoryBatchModes({
+    batchLimit: BATCH_LIMIT,
+    salvageLimit: SALVAGE_LIMIT,
+    clearSelectedItem,
+    clearSelectedStashItem,
+  });
 
   // Keep a stable ref for getSalvageCost so loadStash doesn't need it as a dependency
   const getSalvageCostRef = useRef(getSalvageCost);
   getSalvageCostRef.current = getSalvageCost;
-
-  // Mutual exclusion helpers — activate one mode, reset all others in the same tab
-  const backpackModes = [salvageBatch, stashBatch, sellBatchMode];
-  const stashModes = [withdrawBatchMode, stashSellBatch, stashSalvageBatch];
-
-  const activateBackpackMode = (mode: typeof salvageBatch) => {
-    for (const m of backpackModes) { if (m !== mode) m.reset(); }
-    mode.activate();
-    setSelectedItem(null);
-  };
-  const resetAllBackpackModes = () => { for (const m of backpackModes) m.reset(); };
-
-  const activateStashMode = (mode: typeof withdrawBatchMode) => {
-    for (const m of stashModes) { if (m !== mode) m.reset(); }
-    mode.activate();
-    setSelectedStashItem(null);
-  };
-  const resetAllStashModes = () => { for (const m of stashModes) m.reset(); };
 
   const loadStash = useCallback(async () => {
     setStashLoading(true);
@@ -200,7 +155,7 @@ export function Inventory({
     }
   };
 
-  const tryAction = (type: 'drop' | 'salvage' | 'sell', item: Item) => {
+  const tryAction = (type: 'drop' | 'salvage' | 'sell', item: InventoryItem) => {
     if (rarityMeetsThreshold(item.rarity, confirmRarity)) {
       setConfirmAction({ type, itemId: item.id, itemName: item.name, rarity: item.rarity });
     } else {
@@ -220,7 +175,6 @@ export function Inventory({
   const totalSellGold = backpackItems
     .filter((i) => sellBatchMode.selection.has(i.id))
     .reduce((sum, i) => sum + (i.sellPrice ?? 0) * i.quantity, 0);
-  const backpackBatchActive = salvageBatch.active || stashBatch.active || sellBatchMode.active;
 
   const sellableStashIds = stashItems.filter((i) => i.sellPrice != null && i.sellPrice > 0).map((i) => i.id);
   const totalStashSellGold = stashItems
@@ -230,47 +184,7 @@ export function Inventory({
   const totalStashSalvageCost = stashItems
     .filter((i) => stashSalvageBatch.selection.has(i.id))
     .reduce((sum, i) => sum + (i.salvageCost ?? 0), 0);
-  const stashBatchActive = withdrawBatchMode.active || stashSellBatch.active || stashSalvageBatch.active;
-
-  const baseEntries = statEntries(selectedItem?.baseStats as Record<string, unknown> | undefined)
-    .filter(([stat]) => stat !== 'inventorySlots');
-  const inventorySlots = numStat((selectedItem?.baseStats as Record<string, unknown> | undefined)?.inventorySlots);
-  const bonusEntries = statEntries(selectedItem?.bonusStats as Record<string, unknown> | undefined);
-
-  const isBackpack = selectedItem?.slot === 'backpack';
-  const hasAnyStats = baseEntries.length > 0 || (typeof inventorySlots === 'number' && inventorySlots !== 0);
-  const hasAnyBonusStats = bonusEntries.length > 0;
-  const itemType = selectedItem?.type ?? '';
-  const isEquipment = itemType === 'weapon' || itemType === 'armor';
-  const isConsumable = itemType === 'consumable';
-  const isEquippable = Boolean(selectedItem?.slot && isEquipment);
-  const isEquipped = Boolean(selectedItem?.equippedSlot);
-
-  const meetsRequirements = (() => {
-    if (!selectedItem) return true;
-    const reqLevel = selectedItem.requiredLevel ?? 0;
-    if (reqLevel <= 0) return true;
-    if (selectedItem.type === 'armor') {
-      return (characterLevel ?? 1) >= reqLevel;
-    }
-    if (selectedItem.requiredSkill) {
-      return (skillLevels?.get(selectedItem.requiredSkill) ?? 1) >= reqLevel;
-    }
-    return true;
-  })();
-
-  const canRepair = Boolean(
-    onRepair && isEquipment && selectedItem?.durability &&
-    selectedItem.durability.current < selectedItem.durability.max
-  );
-  const canEquip = Boolean(onEquip && isEquippable && !isEquipped && meetsRequirements);
-  const canUnequip = Boolean(onUnequip && isEquippable && isEquipped);
   const noFacility = zoneCraftingLevel === 0;
-  const canSalvage = Boolean(onSalvage && isEquipment && !isEquipped && !noFacility);
-  const canDrop = Boolean(onDrop && !isEquipped);
-  const canUse = Boolean(onUse && isConsumable);
-  const canSell = Boolean(onSell && isInTown && !isEquipped && selectedItem?.sellPrice && selectedItem.sellPrice > 0);
-  const canDeposit = Boolean(onDeposit && isInTown && !isEquipped);
 
   return (
     <ScreenContainer>
@@ -316,7 +230,7 @@ export function Inventory({
         <div className="flex gap-2 border-b border-[var(--rpg-border)]">
           <button
             type="button"
-            onClick={() => { setActiveTab('backpack'); setSelectedStashItem(null); resetAllStashModes(); }}
+            onClick={() => { setActiveTab('backpack'); clearSelectedStashItem(); resetAllStashModes(); }}
             className={`px-3 py-1.5 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'backpack'
                 ? 'text-[var(--rpg-gold)] border-[var(--rpg-gold)]'
@@ -341,694 +255,93 @@ export function Inventory({
 
       {/* Stash Tab */}
       {activeTab === 'stash' && isInTown && (
-        <div className="space-y-2">
-          <StashTutorial />
-
-          {/* Stash Batch Mode Toggles + Actions */}
-          {withdrawBatchMode.active ? (
-            <BatchActionBar
-              batch={withdrawBatchMode}
-              limit={BATCH_LIMIT}
-              eligibleIds={stashItems.map((i) => i.id)}
-              actionLabel="Withdraw Selected"
-              disabledLabel="Backpack Full"
-              actionDisabled={usedSlots >= capacity}
-              onAction={async () => {
-                if (!onWithdrawBatch) return;
-                withdrawBatchMode.setBusy(true);
-                setBatchError(null);
-                try {
-                  await onWithdrawBatch([...withdrawBatchMode.selection]);
-                  withdrawBatchMode.reset();
-                  await loadStash();
-                } catch (err: unknown) {
-                  setBatchError(err instanceof Error ? err.message : 'Withdraw failed');
-                } finally {
-                  withdrawBatchMode.setBusy(false);
-                }
-              }}
-            />
-          ) : stashSellBatch.active ? (
-            <BatchActionBar
-              batch={stashSellBatch}
-              limit={BATCH_LIMIT}
-              eligibleIds={sellableStashIds}
-              actionLabel="Sell Selected"
-              counterSuffix={
-                stashSellBatch.selection.size > 0 && totalStashSellGold > 0
-                  ? `(${totalStashSellGold} gold)`
-                  : undefined
-              }
-              onAction={async () => {
-                if (!onSellBatch) return;
-                stashSellBatch.setBusy(true);
-                setBatchError(null);
-                try {
-                  await onSellBatch([...stashSellBatch.selection]);
-                  stashSellBatch.reset();
-                  await loadStash();
-                } catch (err: unknown) {
-                  setBatchError(err instanceof Error ? err.message : 'Sell failed');
-                } finally {
-                  stashSellBatch.setBusy(false);
-                }
-              }}
-            />
-          ) : stashSalvageBatch.active ? (
-            <BatchActionBar
-              batch={stashSalvageBatch}
-              limit={SALVAGE_LIMIT}
-              eligibleIds={salvageableStashIds}
-              actionLabel="Salvage All"
-              counterSuffix={
-                stashSalvageBatch.selection.size > 0
-                  ? totalStashSalvageCost > 0 ? `(${totalStashSalvageCost} turns)` : '(Free)'
-                  : undefined
-              }
-              onAction={async () => {
-                if (!onSalvageBatch) return;
-                stashSalvageBatch.setBusy(true);
-                setBatchError(null);
-                try {
-                  await onSalvageBatch([...stashSalvageBatch.selection]);
-                  stashSalvageBatch.reset();
-                  await loadStash();
-                } catch (err: unknown) {
-                  setBatchError(err instanceof Error ? err.message : 'Salvage failed');
-                } finally {
-                  stashSalvageBatch.setBusy(false);
-                }
-              }}
-            />
-          ) : stashItems.length > 0 ? (
-            <div className="flex justify-end gap-2">
-              {onSellBatch && (
-                <PixelButton
-                  variant="gold"
-                  size="sm"
-                  onClick={() => activateStashMode(stashSellBatch)}
-                >
-                  Sell Mode
-                </PixelButton>
-              )}
-              {onWithdrawBatch && (
-                <PixelButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => activateStashMode(withdrawBatchMode)}
-                >
-                  Withdraw Mode
-                </PixelButton>
-              )}
-              {onSalvageBatch && (
-                <PixelButton
-                  variant="primary"
-                  size="sm"
-                  onClick={() => activateStashMode(stashSalvageBatch)}
-                >
-                  Salvage Mode
-                </PixelButton>
-              )}
-            </div>
-          ) : null}
-
-          {/* Stash Items */}
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
-              Stash ({stashItems.length} {stashItems.length === 1 ? 'item' : 'items'})
-            </div>
-          {stashLoading ? (
-            <div className="text-sm text-[var(--rpg-text-secondary)]">Loading stash...</div>
-          ) : stashItems.length === 0 ? (
-            <div className="text-sm text-[var(--rpg-text-secondary)]">Your stash is empty. Deposit items from your backpack.</div>
-          ) : (
-            <div className="grid grid-cols-6 gap-2">
-              {stashItems.map((item) => {
-                const isSellable = stashSellBatch.active && item.sellPrice != null && item.sellPrice > 0;
-                const isSalvageable = stashSalvageBatch.active && item.salvageCost !== null;
-                const isSelectable = withdrawBatchMode.active || isSellable || isSalvageable;
-                const isSelected = (withdrawBatchMode.active && withdrawBatchMode.selection.has(item.id))
-                  || (stashSellBatch.active && stashSellBatch.selection.has(item.id))
-                  || (stashSalvageBatch.active && stashSalvageBatch.selection.has(item.id));
-                return (
-                  <div key={item.id} className="relative">
-                    <ItemCard
-                      name={item.name}
-                      imageSrc={item.imageSrc}
-                      quantity={item.quantity}
-                      rarity={item.rarity}
-                      durability={item.durability}
-                      onClick={() => {
-                        if (withdrawBatchMode.active) {
-                          withdrawBatchMode.toggle(item.id);
-                        } else if (stashSellBatch.active) {
-                          if (isSellable) stashSellBatch.toggle(item.id);
-                        } else if (stashSalvageBatch.active) {
-                          if (isSalvageable) stashSalvageBatch.toggle(item.id);
-                        } else {
-                          setSelectedStashItem(item);
-                        }
-                      }}
-                    />
-                    {stashBatchActive && isSelectable && (
-                      <BatchCheckboxOverlay selected={isSelected} />
-                    )}
-                    {stashBatchActive && !isSelectable && (
-                      <BatchDimOverlay />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          </div>
-
-          {/* Stash item withdraw modal */}
-          {!stashBatchActive && selectedStashItem && (
-            <ModalOverlay opacity={80} onClose={() => setSelectedStashItem(null)}>
-              <PixelCard className="max-w-sm w-full">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    {selectedStashItem.imageSrc && (
-                      <ItemIcon imageSrc={selectedStashItem.imageSrc} name={selectedStashItem.name} size="xl" />
-                    )}
-                    <div>
-                      <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">{selectedStashItem.name}</h3>
-                      <div className="text-xs text-[var(--rpg-text-secondary)] capitalize">
-                        {selectedStashItem.rarity} {selectedStashItem.type}
-                        {selectedStashItem.quantity > 1 && ` x${selectedStashItem.quantity}`}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedStashItem(null)}
-                    className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
-                    aria-label="Close"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <PixelButton
-                  variant="primary"
-                  size="sm"
-                  className="w-full"
-                  disabled={busy || usedSlots >= capacity}
-                  onClick={async () => {
-                    if (!onWithdraw) return;
-                    setBusy(true);
-                    try {
-                      await onWithdraw(selectedStashItem.id);
-                      setSelectedStashItem(null);
-                      await loadStash();
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  {usedSlots >= capacity ? 'Backpack Full' : 'Withdraw'}
-                </PixelButton>
-              </PixelCard>
-            </ModalOverlay>
-          )}
-        </div>
+        <StashPanel
+          items={stashItems}
+          loading={stashLoading}
+          selectedItem={selectedStashItem}
+          usedSlots={usedSlots}
+          capacity={capacity}
+          busy={busy}
+          batch={{
+            withdraw: withdrawBatchMode,
+            sell: stashSellBatch,
+            salvage: stashSalvageBatch,
+            active: stashBatchActive,
+            batchLimit: BATCH_LIMIT,
+            salvageLimit: SALVAGE_LIMIT,
+            sellableIds: sellableStashIds,
+            salvageableIds: salvageableStashIds,
+            totalSellGold: totalStashSellGold,
+            totalSalvageCost: totalStashSalvageCost,
+            activateMode: activateStashMode,
+          }}
+          actions={{
+            onSelectItem: setSelectedStashItem,
+            onCloseSelectedItem: clearSelectedStashItem,
+            onBatchError: setBatchError,
+            onBusyChange: setBusy,
+            refresh: loadStash,
+            onWithdraw,
+            onWithdrawBatch,
+            onSellBatch,
+            onSalvageBatch,
+          }}
+        />
       )}
 
       {/* Backpack Tab */}
       {activeTab === 'backpack' && (
-        <>
-          {/* Batch Mode Toggles + Actions */}
-          {salvageBatch.active ? (
-            <BatchActionBar
-              batch={salvageBatch}
-              limit={SALVAGE_LIMIT}
-              eligibleIds={salvageableIds}
-              actionLabel="Salvage All"
-              counterSuffix={
-                salvageBatch.selection.size > 0
-                  ? totalSalvageCost > 0 ? `(${totalSalvageCost} turns)` : '(Free)'
-                  : undefined
-              }
-              onAction={async () => {
-                if (!onSalvageBatch) return;
-                salvageBatch.setBusy(true);
-                setBatchError(null);
-                try {
-                  await onSalvageBatch([...salvageBatch.selection]);
-                  salvageBatch.reset();
-                } catch (err: unknown) {
-                  setBatchError(err instanceof Error ? err.message : 'Salvage failed');
-                } finally {
-                  salvageBatch.setBusy(false);
-                }
-              }}
-            />
-          ) : stashBatch.active ? (
-            <BatchActionBar
-              batch={stashBatch}
-              limit={BATCH_LIMIT}
-              eligibleIds={stashableIds}
-              actionLabel="Stash Selected"
-              onAction={async () => {
-                if (!onDepositBatch) return;
-                stashBatch.setBusy(true);
-                setBatchError(null);
-                try {
-                  await onDepositBatch([...stashBatch.selection]);
-                  stashBatch.reset();
-                } catch (err: unknown) {
-                  setBatchError(err instanceof Error ? err.message : 'Stash failed');
-                } finally {
-                  stashBatch.setBusy(false);
-                }
-              }}
-            />
-          ) : sellBatchMode.active ? (
-            <BatchActionBar
-              batch={sellBatchMode}
-              limit={BATCH_LIMIT}
-              eligibleIds={sellableBackpackIds}
-              actionLabel="Sell Selected"
-              counterSuffix={
-                sellBatchMode.selection.size > 0 && totalSellGold > 0
-                  ? `(${totalSellGold} gold)`
-                  : undefined
-              }
-              onAction={async () => {
-                if (!onSellBatch) return;
-                sellBatchMode.setBusy(true);
-                setBatchError(null);
-                try {
-                  await onSellBatch([...sellBatchMode.selection]);
-                  sellBatchMode.reset();
-                } catch (err: unknown) {
-                  setBatchError(err instanceof Error ? err.message : 'Sell failed');
-                } finally {
-                  sellBatchMode.setBusy(false);
-                }
-              }}
-            />
-          ) : (
-            <div className="flex justify-end gap-2">
-              {onSellBatch && isInTown && (
-                <PixelButton
-                  variant="gold"
-                  size="sm"
-                  onClick={() => activateBackpackMode(sellBatchMode)}
-                >
-                  Sell Mode
-                </PixelButton>
-              )}
-              {onDepositBatch && isInTown && (
-                <PixelButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => activateBackpackMode(stashBatch)}
-                >
-                  Stash Mode
-                </PixelButton>
-              )}
-              {onSalvageBatch && !noFacility && (
-                <PixelButton
-                  variant="primary"
-                  size="sm"
-                  onClick={() => activateBackpackMode(salvageBatch)}
-                >
-                  Salvage Mode
-                </PixelButton>
-              )}
-            </div>
-          )}
-
-          {/* Backpack Items */}
-          <div className="space-y-2">
-            <div className={`text-sm font-semibold ${usedSlots > capacity ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
-              Backpack ({usedSlots}/{capacity}){usedSlots > capacity && ' — Over-encumbered!'}
-            </div>
-            <div className="grid grid-cols-6 gap-2">
-              {backpackItems.map((item, index) => {
-                const isSalvageable = salvageBatch.active && item.salvageCost !== null;
-                const isStashable = stashBatch.active && !item.equippedSlot;
-                const isSellable = sellBatchMode.active && !item.equippedSlot && item.sellPrice != null && item.sellPrice > 0;
-                const isSelectable = isSalvageable || isStashable || isSellable;
-                const isSelected = (salvageBatch.active && salvageBatch.selection.has(item.id))
-                  || (stashBatch.active && stashBatch.selection.has(item.id))
-                  || (sellBatchMode.active && sellBatchMode.selection.has(item.id));
-                return (
-                  <div key={item.id} className="rpg-stagger-item relative" style={{ animationDelay: getStaggerDelay(index) }}>
-                    <ItemCard
-                      name={item.name}
-                      icon={item.icon}
-                      imageSrc={item.imageSrc}
-                      quantity={item.quantity}
-                      rarity={item.rarity}
-                      durability={item.durability}
-                      onClick={() => {
-                        if (salvageBatch.active) {
-                          if (isSalvageable) salvageBatch.toggle(item.id);
-                        } else if (stashBatch.active) {
-                          if (isStashable) stashBatch.toggle(item.id);
-                        } else if (sellBatchMode.active) {
-                          if (isSellable) sellBatchMode.toggle(item.id);
-                        } else {
-                          setSelectedItem(item);
-                        }
-                      }}
-                    />
-                    {backpackBatchActive && isSelectable && (
-                      <BatchCheckboxOverlay selected={isSelected} />
-                    )}
-                    {backpackBatchActive && !isSelectable && (
-                      <BatchDimOverlay />
-                    )}
-                  </div>
-                );
-              })}
-              {/* Empty slots */}
-              {Array.from({ length: Math.max(0, capacity - usedSlots) }).map((_, idx) => (
-                <div
-                  key={`empty-${idx}`}
-                  className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
-                />
-              ))}
-            </div>
-          </div>
-        </>
+        <BackpackPanel
+          items={backpackItems}
+          capacity={capacity}
+          usedSlots={usedSlots}
+          isInTown={isInTown}
+          noFacility={noFacility}
+          batch={{
+            salvage: salvageBatch,
+            stash: stashBatch,
+            sell: sellBatchMode,
+            active: backpackBatchActive,
+            salvageLimit: SALVAGE_LIMIT,
+            batchLimit: BATCH_LIMIT,
+            salvageableIds,
+            stashableIds,
+            sellableIds: sellableBackpackIds,
+            totalSalvageCost,
+            totalSellGold,
+            activateMode: activateBackpackMode,
+          }}
+          actions={{
+            onSelectItem: setSelectedItem,
+            onBatchError: setBatchError,
+            onSalvageBatch,
+            onDepositBatch,
+            onSellBatch,
+          }}
+        />
       )}
 
       {/* Item Detail Modal */}
       {!backpackBatchActive && selectedItem && activeTab === 'backpack' && (
-        <ModalOverlay opacity={80} onClose={() => setSelectedItem(null)}>
-          <PixelCard className="max-w-sm w-full">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-16 h-16 rounded-lg border-2 flex items-center justify-center text-3xl flex-shrink-0"
-                  style={{
-                    borderColor:
-                      selectedItem.rarity === 'legendary'
-                        ? 'var(--rpg-gold)'
-                        : selectedItem.rarity === 'epic'
-                        ? 'var(--rpg-purple)'
-                        : selectedItem.rarity === 'rare'
-                        ? 'var(--rpg-blue-light)'
-                        : selectedItem.rarity === 'uncommon'
-                        ? 'var(--rpg-green-light)'
-                        : 'var(--rpg-border)',
-                  }}
-                >
-                  <ItemIcon imageSrc={selectedItem.imageSrc} name={selectedItem.name} size="2xl" fallback={selectedItem.icon} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedItem.name}</h3>
-                  {selectedItem.equippedSlot && (
-                    <div className="text-xs text-[var(--rpg-gold)] mt-0.5">
-                      Equipped: {prettySlot(selectedItem.equippedSlot)}
-                    </div>
-                  )}
-                  <div className="text-xs text-[var(--rpg-text-secondary)] capitalize">
-                    {selectedItem.rarity} &bull; {isBackpack ? 'backpack' : selectedItem.type}
-                  </div>
-                  {selectedItem.weightClass && (
-                    <div className="text-xs text-[var(--rpg-gold)]">
-                      {prettyWeightClass(selectedItem.weightClass)}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <p className={`text-sm text-[var(--rpg-text-secondary)] mb-4 ${
-  selectedItem.description !== selectedItem.type ? 'italic' : ''
-}`}>{selectedItem.description}</p>
-
-            {(selectedItem.durability || hasAnyStats || hasAnyBonusStats || selectedItem.requiredSkill || (selectedItem.type === 'armor' && (selectedItem.requiredLevel ?? 0) > 0)) && (
-              <div className="space-y-3 mb-4">
-                {selectedItem.durability && selectedItem.durability.max > 0 && (
-                  <div>
-                    <div className="flex items-baseline justify-between text-xs mb-1">
-                      <span className="text-[var(--rpg-text-secondary)]">Durability</span>
-                      {selectedItem.durability.current <= 0 ? (
-                        <span className="text-[var(--rpg-red)] font-pixel text-[8px]">BROKEN</span>
-                      ) : (
-                        <span className={`font-pixel text-[8px] ${
-                          (selectedItem.durability.current / selectedItem.durability.max) < 0.10
-                            ? 'text-[var(--rpg-gold)]'
-                            : 'text-[var(--rpg-text-primary)]'
-                        }`}>
-                          {fmtDur(selectedItem.durability.current)}/{selectedItem.durability.max}
-                        </span>
-                      )}
-                    </div>
-                    <StatBar
-                      current={selectedItem.durability.current}
-                      max={selectedItem.durability.max}
-                      color="durability"
-                      size="sm"
-                      showNumbers={false}
-                    />
-                  </div>
-                )}
-
-                {hasAnyStats && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {baseEntries.map(([stat, value]) => {
-                      const { icon: Icon, cssClass, label } = statDisplayMeta(stat);
-                      return (
-                        <div key={stat} className="flex items-center gap-2 text-sm">
-                          <Icon size={16} className={cssClass} />
-                          <span className="text-[var(--rpg-text-secondary)]">{label}</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(value, cssClass)}`}>
-                            {formatSignedStatValue(stat, value)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {typeof inventorySlots === 'number' && inventorySlots !== 0 && (() => {
-                      const slotsMeta = statDisplayMeta('inventorySlots');
-                      const SlotIcon = slotsMeta.icon;
-                      const rarityBonus = isBackpack
-                        ? ({ common: 0, uncommon: 2, rare: 4, epic: 6, legendary: 8 }[selectedItem?.rarity ?? 'common'] ?? 0)
-                        : 0;
-                      const totalSlots = inventorySlots + rarityBonus;
-                      return (
-                        <div className="flex items-center gap-2 text-sm">
-                          <SlotIcon size={16} className={slotsMeta.cssClass} />
-                          <span className="text-[var(--rpg-text-secondary)]">{slotsMeta.label}</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${slotsMeta.cssClass}`}>
-                            +{totalSlots}{rarityBonus > 0 && <span className="text-xs text-[var(--rpg-text-secondary)]"> ({inventorySlots}+{rarityBonus})</span>}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {hasAnyBonusStats && (
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-[var(--rpg-gold)]">Bonus Stats</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {bonusEntries.map(([stat, value]) => {
-                        const { icon: Icon, cssClass, label } = statDisplayMeta(stat);
-                        return (
-                          <div key={stat} className="flex items-center gap-2 text-sm">
-                            <Icon size={16} className={cssClass} />
-                            <span className="text-[var(--rpg-text-secondary)]">{label}</span>
-                            <span className={`ml-auto font-pixel text-[12px] ${value < 0 ? 'text-[var(--rpg-red)]' : cssClass}`}>
-                              {formatSignedStatValue(stat, value)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {selectedItem.requiredSkill ? (
-                  <div className={`text-xs ${meetsRequirements ? 'text-[var(--rpg-text-secondary)]' : 'text-[var(--rpg-red)]'}`}>
-                    Requires {selectedItem.requiredSkill} level {selectedItem.requiredLevel ?? 1}
-                  </div>
-                ) : selectedItem.type === 'armor' && (selectedItem.requiredLevel ?? 0) > 0 ? (
-                  <div className={`text-xs ${meetsRequirements ? 'text-[var(--rpg-text-secondary)]' : 'text-[var(--rpg-red)]'}`}>
-                    Requires character level {selectedItem.requiredLevel}
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {/* Sell price display */}
-            {canSell && selectedItem.sellPrice != null && selectedItem.sellPrice > 0 && (
-              <div className="flex items-center gap-1 text-xs text-[var(--rpg-text-secondary)] mb-3">
-                <Coins size={12} className="text-[var(--rpg-gold)]" />
-                <span>Sell value: <span className="text-[var(--rpg-gold)] font-pixel text-[8px]">{selectedItem.sellPrice * selectedItem.quantity}</span> gold{selectedItem.quantity > 1 && <span className="text-[var(--rpg-text-secondary)]"> ({selectedItem.sellPrice} ea)</span>}</span>
-              </div>
-            )}
-
-            {/* Context-sensitive action buttons */}
-            {isEquipment && (
-              <div className="grid grid-cols-4 gap-2">
-                <PixelButton
-                  variant="primary"
-                  size="sm"
-                  className="flex-1"
-                  disabled={busy || !canRepair}
-                  onClick={async () => {
-                    if (!onRepair) return;
-                    setBusy(true);
-                    try {
-                      await onRepair(selectedItem.id);
-                      setSelectedItem(null);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  {selectedItem.durability && selectedItem.durability.current <= 0
-                    ? `Fix (${repairTurnCost(selectedItem.tier ?? 1, true)})`
-                    : `Repair (${repairTurnCost(selectedItem.tier ?? 1, false)})`}
-                </PixelButton>
-
-                <PixelButton
-                  variant="gold"
-                  size="sm"
-                  className="flex-1"
-                  disabled={busy || (!canEquip && !canUnequip)}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      if (selectedItem.equippedSlot) {
-                        if (!onUnequip) return;
-                        await onUnequip(selectedItem.equippedSlot);
-                      } else {
-                        if (!onEquip || !selectedItem.slot) return;
-                        await onEquip(selectedItem.id, selectedItem.slot);
-                      }
-                      setSelectedItem(null);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  {selectedItem.equippedSlot ? 'Unequip' : 'Equip'}
-                </PixelButton>
-
-                <PixelButton
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  disabled={busy || !canSalvage}
-                  onClick={() => tryAction('salvage', selectedItem)}
-                >
-                  {noFacility
-                    ? 'No Facility'
-                    : selectedItem.salvageCost === 0
-                      ? 'Salvage (Free)'
-                      : selectedItem.salvageCost != null
-                        ? `Salvage (${selectedItem.salvageCost})`
-                        : 'Salvage'}
-                </PixelButton>
-
-                <PixelButton
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  disabled={busy || !canDrop}
-                  onClick={() => tryAction('drop', selectedItem)}
-                >
-                  Drop
-                </PixelButton>
-              </div>
-            )}
-
-            {/* Sell + Deposit row */}
-            {(canSell || canDeposit) && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {canSell && (
-                  <PixelButton
-                    variant="gold"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => tryAction('sell', selectedItem)}
-                  >
-                    Sell
-                  </PixelButton>
-                )}
-                {canDeposit && (
-                  <PixelButton
-                    variant="secondary"
-                    size="sm"
-                    disabled={busy}
-                    onClick={async () => {
-                      if (!onDeposit) return;
-                      setBusy(true);
-                      try {
-                        await onDeposit(selectedItem.id);
-                        setSelectedItem(null);
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                  >
-                    Stash
-                  </PixelButton>
-                )}
-              </div>
-            )}
-
-            {isConsumable && (
-              <div className="grid grid-cols-2 gap-2">
-                <PixelButton
-                  variant="primary"
-                  size="sm"
-                  className="flex-1"
-                  disabled={busy || !canUse}
-                  onClick={async () => {
-                    if (!onUse) return;
-                    setBusy(true);
-                    try {
-                      await onUse(selectedItem.id);
-                      setSelectedItem(null);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  Use
-                </PixelButton>
-
-                <PixelButton
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  disabled={busy || !canDrop}
-                  onClick={() => tryAction('drop', selectedItem)}
-                >
-                  Drop
-                </PixelButton>
-              </div>
-            )}
-
-            {!isEquipment && !isConsumable && !canSell && !canDeposit && (
-              <div className="grid grid-cols-1 gap-2">
-                <PixelButton
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  disabled={busy || !canDrop}
-                  onClick={() => tryAction('drop', selectedItem)}
-                >
-                  Drop
-                </PixelButton>
-              </div>
-            )}
-          </PixelCard>
-        </ModalOverlay>
+        <InventoryItemModal
+          item={selectedItem}
+          busy={busy}
+          isInTown={isInTown}
+          noFacility={noFacility}
+          characterLevel={characterLevel}
+          skillLevels={skillLevels}
+          onClose={clearSelectedItem}
+          onBusyChange={setBusy}
+          onTryAction={tryAction}
+          onDrop={onDrop}
+          onSalvage={onSalvage}
+          onRepair={onRepair}
+          onEquip={onEquip}
+          onUnequip={onUnequip}
+          onUse={onUse}
+          onSell={onSell}
+          onDeposit={onDeposit}
+        />
       )}
 
       {confirmAction && (

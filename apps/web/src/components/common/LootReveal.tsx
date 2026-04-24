@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { RARITY_COLORS, RARITY_GLOW, RARITY_RANK } from '@/lib/rarity';
+import { RARITY_COLORS, RARITY_GLOW, RARITY_RANK, type Rarity } from '@/lib/rarity';
 import { getStaggerDelay } from '@/lib/animations';
 import { PixelButton } from '@/components/PixelButton';
 import { PixelCard } from '@/components/PixelCard';
@@ -7,7 +7,7 @@ import { ModalOverlay } from '@/components/common/ModalOverlay';
 
 export interface LootRevealItem {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
+  rarity: Rarity;
   quantity: number;
   imageSrc?: string;
 }
@@ -18,6 +18,7 @@ interface LootRevealProps {
 }
 
 const TITLE_BY_RARITY: Record<LootRevealItem['rarity'], string> = {
+  common: 'Loot Found!',
   uncommon: 'Uncommon Loot!',
   rare: 'Rare Find!',
   epic: 'Epic Discovery!',
@@ -25,7 +26,7 @@ const TITLE_BY_RARITY: Record<LootRevealItem['rarity'], string> = {
 };
 
 function highestRarity(items: LootRevealItem[]): LootRevealItem['rarity'] {
-  let best: LootRevealItem['rarity'] = 'uncommon';
+  let best: LootRevealItem['rarity'] = 'common';
   for (const item of items) {
     if ((RARITY_RANK[item.rarity] ?? 0) > (RARITY_RANK[best] ?? 0)) {
       best = item.rarity;

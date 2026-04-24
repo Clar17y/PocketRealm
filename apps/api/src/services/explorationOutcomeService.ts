@@ -1,45 +1,15 @@
-import { prisma } from '@pocketrealm/database';
 import {
-  applyMobEventModifiers,
-  applyMobPrefix,
-  buildPlayerCombatStats,
-  filterAndWeightMobsByTier,
-  mobToTemplateCombatant,
-  rollMobPrefix,
-  runTemplateCombat,
-  selectTierWithBleedthrough,
-} from '@pocketrealm/game-engine';
-import {
-  DURABILITY_CONSTANTS,
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
-  type MobTemplate,
-  type PotionConsumed,
-  type QuestProgressUpdate,
-  type CombatPotion,
-  type CombatTemplateSlotData,
-  type PerActionScaling,
-  type WorldEventData,
 } from '@pocketrealm/shared';
-import { setHp, enterRecoveringState } from './hpService';
-import { degradeEquippedDurability } from './durabilityService';
-import { applyCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges, type CombatBuffBadge } from './buffService';
-import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from './combatOrchestrationService';
-import { persistMobHp } from './persistedMobService';
-import { discoverZone, respawnToHomeTown } from './zoneDiscoveryService';
+import { prisma } from '@pocketrealm/database';
+import { discoverZone } from './zoneDiscoveryService';
 import { createBossEncounter } from './bossEncounterService';
 import { spawnWorldEvent, computeZoneModifiers, filterEventModifiers } from './worldEventService';
 import { getCachedBossMobTemplates } from './staticDataCacheService';
 import { getIo } from '../socket';
 import { emitSystemMessage } from './systemMessageService';
-import { mapTemplateCombatLog } from './combatLogMapper';
-import { serializeXpGrant, toMobTemplate, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
 import { applyTrackedFamilyWeightBias } from './explorationTrackingService';
-import type { GrantXpResult } from './xpService';
-import type { PlayerProgressionState } from './attributesService';
-import type { EquipmentStats } from './equipmentService';
-import type { PlayerGuildModifiers } from './guildUpgradeService';
-import type { AttackSkill } from './combatStatsService';
 import {
   pickWeighted,
   randomIntInclusive,
@@ -54,85 +24,9 @@ import {
   buildEncounterSiteMobs,
   getNodeSizeName,
 } from '../routes/exploration/helpers';
-
-export interface ExplorationOutcomeContext {
-  playerId: string;
-  username: string;
-  zoneId: string;
-  zone: { id: string; name: string; difficulty: number };
-  hpState: { currentHp: number; maxHp: number };
-  combatPrep: {
-    attackSkill: AttackSkill;
-    attackLevel: number;
-    guildMods: PlayerGuildModifiers;
-    perActionScaling: PerActionScaling;
-    playerTemplate: CombatTemplateSlotData[];
-    potionPool: CombatPotion[];
-    resources: {
-      stamina: number;
-      maxStamina: number;
-      staminaRegenPerRound: number;
-      mana: number;
-      maxMana: number;
-      manaRegenPerRound: number;
-    };
-    unlockedActions: string[];
-  };
-  combatBuffs: { damageBoost: number; defenceBoost: number; durabilityShield: number };
-  buffUsesLeft: { damage: number; defence: number; durability: number };
-  progression: PlayerProgressionState;
-  equipmentStats: EquipmentStats;
-  mobTemplates: unknown[];
-  zoneFamilies: ZoneFamilyRow[];
-  zoneTiers: Record<string, number> | null;
-  selectedTier: number;
-  explorationProgress: { percent: number; turnsExplored: number; turnsToExplore: number | null };
-  zoneModifiers: ReturnType<typeof computeZoneModifiers>;
-  spawnMods: {
-    global: number;
-    byFamily: Map<string, number>;
-  };
-  mobToFamilyMap: Map<string, string>;
-  trackingFamilyId: string | null;
-  cachedZoneEvents: WorldEventData[];
-  cachedWorldEvents: WorldEventData[];
-  isTutorialExplore: boolean;
-  resourceNodes: Array<{
-    id: string;
-    discoveryWeight: number;
-    resourceType: string;
-    minCapacity: number;
-    maxCapacity: number;
-  }>;
-  undiscoveredNeighbors: Array<{ id: string; name: string }>;
-  thresholdByToId: Map<string, number>;
-}
-
-export interface ExplorationOutcomeResult {
-  events: NarrativeEvent[];
-  pendingResources: PendingResourceDiscovery[];
-  pendingSites: PendingEncounterSiteDiscovery[];
-  pendingCombatLogs: PendingAmbushCombatLog[];
-  pendingCacheLoot: Array<{ turnOccurred: number; mobFamilyId: string }>;
-  hiddenCaches: Array<{
-    turnOccurred: number;
-    loot?: Array<{ itemTemplateId: string; name: string; quantity: number }>;
-    soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
-  }>;
-  allPotionsConsumed: PotionConsumed[];
-  ambushPendingLootSessionIds: string[];
-  allNewItemIds: string[];
-  allUpdatedItemIds: string[];
-  allQuestProgress: QuestProgressUpdate[];
-  currentHp: number;
-  currentStamina: number;
-  currentMana: number;
-  aborted: boolean;
-  abortedAtTurn: number | null;
-  wasKnockedOut: boolean;
-  respawnedTo: { townId: string; townName: string } | null;
-  zoneExitDiscovered: boolean;
-}
+import { processAmbushOutcome } from './explorationOutcome/ambush';
+import type { ExplorationOutcomeContext, ExplorationOutcomeResult } from './explorationOutcome/types';
+export type { ExplorationOutcomeContext, ExplorationOutcomeResult } from './explorationOutcome/types';
 
 export async function processExplorationOutcomes(
   ctx: ExplorationOutcomeContext,
@@ -140,14 +34,10 @@ export async function processExplorationOutcomes(
 ): Promise<ExplorationOutcomeResult> {
   const {
     playerId,
-    username,
     zoneId,
     zone,
     hpState,
     combatPrep,
-    combatBuffs,
-    progression,
-    equipmentStats,
     mobTemplates,
     zoneFamilies,
     zoneTiers,
@@ -157,12 +47,10 @@ export async function processExplorationOutcomes(
     trackingFamilyId,
     cachedZoneEvents,
     cachedWorldEvents,
-    isTutorialExplore,
     resourceNodes,
     thresholdByToId,
   } = ctx;
-
-  const { attackSkill, attackLevel, perActionScaling, playerTemplate, resources, unlockedActions: explorationUnlockedActions } = combatPrep;
+  const { resources } = combatPrep;
 
   // Mutable copies of the state that changes across the loop
   let { buffUsesLeft } = ctx;
@@ -179,11 +67,11 @@ export async function processExplorationOutcomes(
     loot?: Array<{ itemTemplateId: string; name: string; quantity: number }>;
     soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
   }> = [];
-  const allPotionsConsumed: PotionConsumed[] = [];
+  const allPotionsConsumed = [] as ExplorationOutcomeResult['allPotionsConsumed'];
   const ambushPendingLootSessionIds: string[] = [];
   const allNewItemIds: string[] = [];
   const allUpdatedItemIds: string[] = [];
-  const allQuestProgress: QuestProgressUpdate[] = [];
+  const allQuestProgress = [] as ExplorationOutcomeResult['allQuestProgress'];
 
   let currentHp = hpState.currentHp;
   let currentStamina = resources.stamina;
@@ -205,287 +93,29 @@ export async function processExplorationOutcomes(
     if (aborted) break;
 
     if (outcome.type === 'ambush' && mobTemplates.length > 0) {
-      let baseMob: MobTemplate;
-      let prefixedMob: ReturnType<typeof applyMobPrefix>;
-
-      if (isTutorialExplore) {
-        // Tutorial: guaranteed Field Mouse with no prefix
-        const fieldMouse = mobTemplates.find((m) => (m as { name: string }).name === 'Field Mouse')
-          ?? mobTemplates[0]!;
-        baseMob = toMobTemplate(fieldMouse as Parameters<typeof toMobTemplate>[0]);
-        prefixedMob = applyMobPrefix(baseMob, null);
-      } else {
-        const tieredMobs = filterAndWeightMobsByTier(
-          mobTemplates.map((m) => ({ ...(m as object), explorationTier: (m as { explorationTier?: number }).explorationTier ?? 1 })) as Parameters<typeof filterAndWeightMobsByTier>[0],
-          explorationProgress.percent,
-          zoneTiers,
-        );
-        if (tieredMobs.length === 0) continue;
-
-        // Apply tier bleedthrough: select a target tier, filter to it, fall back to lower tiers
-        const targetTier = selectTierWithBleedthrough(selectedTier, zoneTiers);
-        let candidates = tieredMobs.filter((m) => m.explorationTier === targetTier);
-        if (candidates.length === 0) {
-          for (let t = targetTier - 1; t >= 1; t--) {
-            candidates = tieredMobs.filter((m) => m.explorationTier === t);
-            if (candidates.length > 0) break;
-          }
-        }
-        if (candidates.length === 0) candidates = tieredMobs;
-
-        // Boost encounter weights for mobs in families affected by spawn rate events
-        const weightedCandidates = candidates.map((c) => {
-          let weightMod = spawnMods.global;
-          for (const [familyId, mod] of spawnMods.byFamily) {
-            const family = zoneFamilies.find((f: ZoneFamilyRow) => f.mobFamilyId === familyId);
-            if (family?.mobFamily?.members?.some((m: ZoneFamilyMember) => m.mobTemplate.id === (c as { id: string }).id)) {
-              weightMod *= mod;
-              break;
-            }
-          }
-          return weightMod !== 1 ? { ...c, encounterWeight: (c as { encounterWeight: number }).encounterWeight * weightMod } : c;
-        });
-        const trackedWeightedCandidates = applyTrackedFamilyWeightBias(
-          weightedCandidates.map((c) => ({
-            ...c,
-            mobFamilyId: ctx.mobToFamilyMap.get((c as { id: string }).id) ?? '',
-          })) as Array<(typeof weightedCandidates)[number] & { mobFamilyId: string }>,
-          trackingFamilyId,
-          'encounterWeight',
-        );
-
-        const mob = pickWeighted(trackedWeightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
-        if (!mob) continue;
-
-        baseMob = toMobTemplate(mob as Parameters<typeof toMobTemplate>[0]);
-
-        const ambushFamilyId = ctx.mobToFamilyMap.get(baseMob.id);
-        const ambushModifiers = ambushFamilyId
-          ? computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushFamilyId })
-          : ctx.zoneModifiers;
-        const modifiedMob = applyMobEventModifiers(baseMob, ambushModifiers);
-        prefixedMob = applyMobPrefix(modifiedMob, rollMobPrefix());
-      }
-
-      const playerStats = buildPlayerCombatStats(
+      const ambushResult = await processAmbushOutcome({
+        ctx,
+        outcome,
         currentHp,
-        hpState.maxHp,
-        {
-          attackStyle: attackSkill,
-          skillLevel: attackLevel,
-          attributes: progression.attributes,
-        },
-        equipmentStats,
-      );
-
-      // Apply quest shop combat buffs
-      const mobBuffs = {
-        damageBoost: buffUsesLeft.damage > 0 ? combatBuffs.damageBoost : 0,
-        defenceBoost: buffUsesLeft.defence > 0 ? combatBuffs.defenceBoost : 0,
-      };
-      applyCombatBuffs(playerStats, mobBuffs);
-
-      const combatOptions = buildPveCombatOptions(potionPool);
-
-      const combatantA = buildPlayerTemplateCombatant({
-        playerId,
-        username,
-        playerStats,
-        template: playerTemplate,
-        stamina: currentStamina,
-        maxStamina: resources.maxStamina,
-        staminaRegenPerRound: resources.staminaRegenPerRound,
-        mana: currentMana,
-        maxMana: resources.maxMana,
-        manaRegenPerRound: resources.manaRegenPerRound,
-        unlockedActions: explorationUnlockedActions,
-        perActionScaling,
+        currentStamina,
+        currentMana,
+        buffUsesLeft,
+        potionPool,
+        events,
+        pendingCombatLogs,
+        allPotionsConsumed,
+        ambushPendingLootSessionIds,
+        allNewItemIds,
+        allUpdatedItemIds,
+        allQuestProgress,
       });
-      const combatantB = mobToTemplateCombatant(prefixedMob);
-      const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
-
-      // Remove consumed potions from the shared pool
-      for (const consumed of combatResult.potionsConsumed) {
-        const idx = potionPool.findIndex((p) => p.templateId === consumed.templateId);
-        if (idx !== -1) potionPool.splice(idx, 1);
-        allPotionsConsumed.push(consumed);
-      }
-
-      const explDurabilityMult = prefixedMob.mobPrefix
-        ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
-        : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
-      const durabilityLost = buffUsesLeft.durability > 0
-        ? []
-        : await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', explDurabilityMult);
-      for (const d of durabilityLost) allUpdatedItemIds.push(d.itemId);
-
-      // Consume combat buff charges per ambush mob
-      await prisma.$transaction(async (tx) => {
-        await consumeBuffChargesPerMob(tx, playerId, buffUsesLeft);
-      });
-
-      // Determine mob family once for event modifier badges (used in both victory and defeat paths)
-      const ambushMobFamily = zoneFamilies.find((f: ZoneFamilyRow) =>
-        f.mobFamily.members.some((m: ZoneFamilyMember) => m.mobTemplate.id === prefixedMob.id),
-      );
-      const ambushEventModifiers = ambushMobFamily
-        ? filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushMobFamily.mobFamilyId })
-        : [];
-
-      // Build buff badges for this ambush (reflect state at time of fight)
-      const shieldWasActive = buffUsesLeft.durability + 1 > 0 && combatBuffs.durabilityShield > 0 && durabilityLost.length === 0;
-      const ambushBuffBadges: CombatBuffBadge[] = buildCombatBuffBadges({
-        damageBoost: mobBuffs.damageBoost,
-        defenceBoost: mobBuffs.defenceBoost,
-        durabilityShield: shieldWasActive ? combatBuffs.durabilityShield : 0,
-      });
-
-      let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
-      let xpGain = 0;
-      let xpGrants: GrantXpResult[] = [];
-
-      if (combatResult.outcome === 'victory') {
-        currentHp = combatResult.combatantAHpRemaining;
-        currentStamina = combatResult.combatantAStaminaRemaining;
-        currentMana = combatResult.combatantAManaRemaining;
-        await setHp(playerId, currentHp);
-
-        const rewards = await processCombatVictoryRewards({
-          playerId,
-          mob: prefixedMob,
-          attackSkill,
-          damageByScalingStat: combatResult.damageByScalingStat,
-          resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
-        });
-        loot = rewards.loot;
-        allNewItemIds.push(...rewards.newItemIds);
-        allUpdatedItemIds.push(...rewards.updatedItemIds);
-        if (rewards.pendingLootSessionId) {
-          ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
-        }
-        allQuestProgress.push(...rewards.questProgress);
-        xpGrants = rewards.xpGrants;
-        xpGain = xpGrants.reduce((sum, g) => sum + g.boostedXpAfterEfficiency, 0);
-
-        pendingCombatLogs.push({
-          turnsSpent: 0,
-          result: buildCombatLogResult({
-            zoneId,
-            zoneName: zone.name,
-            mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
-            source: 'exploration_ambush',
-            encounterSiteId: null,
-            attackSkill,
-            combatResult,
-            rewards: {
-              xp: prefixedMob.xpReward,
-              baseXp: prefixedMob.xpReward,
-              loot,
-              durabilityLost,
-              skillXpGrants: xpGrants.map(serializeXpGrant),
-            },
-            eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
-          }),
-        });
-
-        events.push({
-          turn: outcome.turnOccurred,
-          type: 'ambush_victory',
-          description: `A ${prefixedMob.mobDisplayName} ambushed you - you defeated it! (+${xpGain} XP)`,
-          details: {
-            mobTemplateId: prefixedMob.id,
-            mobName: baseMob.name,
-            mobPrefix: prefixedMob.mobPrefix,
-            mobDisplayName: prefixedMob.mobDisplayName,
-            outcome: combatResult.outcome,
-            playerMaxHp: combatResult.combatantAMaxHp,
-            mobMaxHp: combatResult.combatantBMaxHp,
-            log: mapTemplateCombatLog(combatResult.log),
-            playerHpRemaining: currentHp,
-            xp: xpGain,
-            loot,
-            durabilityLost,
-            eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
-          },
-        });
-      } else {
-        currentStamina = combatResult.combatantAStaminaRemaining;
-        currentMana = combatResult.combatantAManaRemaining;
-
-        const fleeResult = await calculateFleeWithGold(playerId, {
-          evasionLevel: progression.attributes.evasion,
-          mobLevel: prefixedMob.level,
-          maxHp: hpState.maxHp,
-        });
-
-        if (fleeResult.outcome === 'knockout') {
-          currentHp = 0;
-          wasKnockedOut = true;
-          await enterRecoveringState(playerId, hpState.maxHp);
-          respawnedTo = await respawnToHomeTown(playerId);
-        } else {
-          currentHp = fleeResult.remainingHp;
-          await setHp(playerId, currentHp);
-        }
-
-        // Persist the mob's remaining HP for potential reencounter
-        if (combatResult.combatantBHpRemaining > 0) {
-          await persistMobHp(playerId, prefixedMob.id, zoneId, combatResult.combatantBHpRemaining, prefixedMob.hp);
-        }
-
-        const defeatDescription = fleeResult.outcome === 'knockout'
-          ? `A ${prefixedMob.mobDisplayName} ambushed you - you were defeated and knocked out!`
-          : `A ${prefixedMob.mobDisplayName} ambushed you - you were defeated but escaped with ${fleeResult.remainingHp} HP.`;
-
-        pendingCombatLogs.push({
-          turnsSpent: 0,
-          result: buildCombatLogResult({
-            zoneId,
-            zoneName: zone.name,
-            mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
-            source: 'exploration_ambush',
-            encounterSiteId: null,
-            attackSkill,
-            combatResult,
-            rewards: {
-              xp: 0,
-              baseXp: 0,
-              loot: [],
-              durabilityLost,
-              skillXpGrants: [],
-            },
-            eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
-          }),
-        });
-
-        events.push({
-          turn: outcome.turnOccurred,
-          type: 'ambush_defeat',
-          description: defeatDescription,
-          details: {
-            mobTemplateId: prefixedMob.id,
-            mobName: baseMob.name,
-            mobPrefix: prefixedMob.mobPrefix,
-            mobDisplayName: prefixedMob.mobDisplayName,
-            outcome: combatResult.outcome,
-            playerMaxHp: combatResult.combatantAMaxHp,
-            mobMaxHp: combatResult.combatantBMaxHp,
-            log: mapTemplateCombatLog(combatResult.log),
-            playerHpRemaining: currentHp,
-            fleeResult: {
-              outcome: fleeResult.outcome,
-              remainingHp: fleeResult.remainingHp,
-              goldLost: fleeResult.goldLost,
-              recoveryCost: fleeResult.recoveryCost,
-            },
-            durabilityLost,
-            eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
-          },
-        });
-
-        aborted = true;
-        abortedAtTurn = outcome.turnOccurred;
-      }
+      currentHp = ambushResult.currentHp;
+      currentStamina = ambushResult.currentStamina;
+      currentMana = ambushResult.currentMana;
+      aborted = ambushResult.aborted;
+      abortedAtTurn = ambushResult.abortedAtTurn;
+      wasKnockedOut = ambushResult.wasKnockedOut;
+      respawnedTo = ambushResult.respawnedTo;
 
       continue;
     }

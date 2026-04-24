@@ -7,6 +7,9 @@ import { GameScreenRenderer } from './GameScreenRenderer';
 const { dashboardSpy } = vi.hoisted(() => ({
   dashboardSpy: vi.fn(),
 }));
+const { inventorySpy } = vi.hoisted(() => ({
+  inventorySpy: vi.fn(),
+}));
 
 vi.mock('@/components/screens/Dashboard', () => ({
   Dashboard: (props: unknown) => {
@@ -15,8 +18,16 @@ vi.mock('@/components/screens/Dashboard', () => ({
   },
 }));
 
+vi.mock('@/components/screens/Inventory', () => ({
+  Inventory: (props: unknown) => {
+    inventorySpy(props);
+    return null;
+  },
+}));
+
 afterEach(() => {
   dashboardSpy.mockReset();
+  inventorySpy.mockReset();
 });
 
 function createBaseGc() {
@@ -212,9 +223,12 @@ function createBaseGc() {
   };
 }
 
-function renderGameScreen(player: { isPremium?: boolean; premiumExpiresAt?: string | null } | null) {
+function renderGameScreen(
+  player: { isPremium?: boolean; premiumExpiresAt?: string | null } | null,
+  gcOverrides: Partial<ReturnType<typeof createBaseGc>> = {},
+) {
   render(React.createElement(GameScreenRenderer, {
-    gc: createBaseGc(),
+    gc: { ...createBaseGc(), ...gcOverrides },
     player,
     casinoSocket: {
       liveBets: [],
@@ -266,6 +280,48 @@ describe('GameScreenRenderer', () => {
         maxTurns: TURN_CONSTANTS.BANK_CAP,
         turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
       },
+    });
+  });
+
+  it('routes the inventory screen and passes inventory capacity props through', () => {
+    renderGameScreen(null, {
+      activeScreen: 'inventory',
+      inventory: [
+        {
+          id: 'item-1',
+          quantity: 1,
+          rarity: 'common',
+          currentDurability: null,
+          maxDurability: null,
+          bonusStats: null,
+          equippedSlot: null,
+          template: {
+            id: 'template-1',
+            name: 'Torch',
+            itemType: 'resource',
+            weightClass: null,
+            slot: null,
+            tier: 1,
+            baseStats: {},
+            requiredSkill: null,
+            requiredLevel: 1,
+            maxDurability: 0,
+            stackable: true,
+            sellPrice: 2,
+            flavorText: null,
+          },
+        },
+      ],
+      inventoryCapacity: 24,
+      inventoryUsedSlots: 1,
+      gold: 500,
+    });
+
+    expect(inventorySpy).toHaveBeenCalledTimes(1);
+    expect(inventorySpy.mock.calls[0][0]).toMatchObject({
+      capacity: 24,
+      usedSlots: 1,
+      gold: 500,
     });
   });
 });

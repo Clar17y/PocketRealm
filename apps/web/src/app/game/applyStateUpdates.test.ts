@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
-import type { StateUpdates } from '@pocketrealm/shared';
+import type { InventoryItemDTO, StateUpdates } from '@pocketrealm/shared';
 
 function makeSetters(): StateSetters {
   return {
@@ -25,7 +25,7 @@ function makeSetters(): StateSetters {
   };
 }
 
-const mockItem = {
+const mockItem: InventoryItemDTO = {
   id: 'item-1',
   templateId: 'tpl-1',
   ownerId: 'player-1',
@@ -56,6 +56,12 @@ describe('applyStateUpdates', () => {
     const setters = makeSetters();
     applyStateUpdates({ inventoryAdded: [mockItem] }, setters);
     expect(setters.setInventory).toHaveBeenCalled();
+  });
+
+  it('notifies callers about inventory additions for action side effects', () => {
+    const setters = { ...makeSetters(), onInventoryAdded: vi.fn() };
+    applyStateUpdates({ inventoryAdded: [mockItem] }, setters);
+    expect(setters.onInventoryAdded).toHaveBeenCalledWith([mockItem]);
   });
 
   it('removes inventory items by ID', () => {

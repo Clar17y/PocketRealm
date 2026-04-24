@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { updatePlayerSettings, type PlayerSettings } from '@/lib/api';
 import type { ConfirmRarity } from '@/lib/rarity';
 
@@ -102,7 +102,7 @@ export function usePlayerSettings() {
 
   // --- server hydration ---------------------------------------------------------
 
-  const initSettingsFromServer = (s: ServerSettingsPayload) => {
+  const initSettingsFromServer = useCallback((s: ServerSettingsPayload) => {
     setCombatLogSpeedMs(s.combatLogSpeedMs ?? 800);
     setExplorationSpeedMs(s.explorationSpeedMs ?? 800);
     setAutoSkipKnownCombat(s.autoSkipKnownCombat ?? false);
@@ -126,7 +126,7 @@ export function usePlayerSettings() {
       notifyExpeditionStarted: s.notifyExpeditionStarted ?? true,
       notifyExpeditionFinished: s.notifyExpeditionFinished ?? true,
     });
-  };
+  }, []);
 
   return {
     // Values

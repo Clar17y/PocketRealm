@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameController } from './useGameController';
 import { getZoneEvents, getZones } from '@/lib/api';
+import type { InventoryItemDTO } from '@pocketrealm/shared';
 
 vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
@@ -9,7 +10,7 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 vi.mock('@/lib/assets', () => ({
-  itemImageSrc: vi.fn(),
+  itemImageSrc: vi.fn((name: string) => `/items/${name}`),
 }));
 
 vi.mock('@/lib/changelog', () => ({
@@ -18,7 +19,7 @@ vi.mock('@/lib/changelog', () => ({
 }));
 
 vi.mock('@/lib/rarity', () => ({
-  RARITY_RANK: {},
+  RARITY_RANK: { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 },
 }));
 
 vi.mock('@/hooks/useCombatLogPrefetch', () => ({
@@ -270,6 +271,42 @@ vi.mock('./hooks/useTravelActions', () => ({
   })),
 }));
 
+function makeInventoryItem(
+  overrides: Partial<InventoryItemDTO> & {
+    template?: Partial<InventoryItemDTO['template']>;
+  },
+): InventoryItemDTO {
+  return {
+    id: 'item-1',
+    templateId: 'tpl-1',
+    ownerId: 'player-1',
+    rarity: 'common',
+    currentDurability: null,
+    maxDurability: null,
+    quantity: 1,
+    bonusStats: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    equippedSlot: null,
+    ...overrides,
+    template: {
+      id: 'tpl-1',
+      name: 'Iron Ore',
+      itemType: 'resource',
+      weightClass: null,
+      slot: null,
+      tier: 1,
+      baseStats: {},
+      requiredSkill: null,
+      requiredLevel: 1,
+      maxDurability: 0,
+      stackable: true,
+      sellPrice: 5,
+      flavorText: null,
+      ...overrides.template,
+    },
+  };
+}
+
 describe('useGameController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -320,5 +357,37 @@ describe('useGameController', () => {
 
     expect(hook.result.current.activeZoneId).toBe('zone-cave');
     expect(getZoneEvents).not.toHaveBeenCalled();
+  });
+
+  it('reveals action-added loot at or above the configured rarity threshold', () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+    const commonOre = makeInventoryItem({ id: 'common-ore', rarity: 'common' });
+    const rareBoots = makeInventoryItem({
+      id: 'rare-boots',
+      rarity: 'rare',
+      template: {
+        id: 'tpl-boar-hide-boots',
+        name: 'Boar Hide Boots',
+        itemType: 'armor',
+        stackable: false,
+        maxDurability: 60,
+      },
+    });
+    const stateSetters = hook.result.current.stateSetters as typeof hook.result.current.stateSetters & {
+      onInventoryAdded?: (items: InventoryItemDTO[]) => void;
+    };
+
+    act(() => {
+      stateSetters.onInventoryAdded?.([commonOre, rareBoots]);
+    });
+
+    expect(hook.result.current.lootRevealItems).toEqual([
+      {
+        name: 'Boar Hide Boots',
+        rarity: 'rare',
+        quantity: 1,
+        imageSrc: '/items/Boar Hide Boots',
+      },
+    ]);
   });
 });

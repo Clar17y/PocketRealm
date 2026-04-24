@@ -2,15 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trackEvent, trackOnce } from '@/lib/analytics';
 import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
-import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { useVisibleInterval } from '@/hooks/usePageVisible';
+import { RARITY_RANK } from '@/lib/rarity';
 import type { ForgeResultData } from '@/components/ForgeResultToast';
-import { updateTutorialStep, claimStarterWeapon } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
   TUTORIAL_STEP_STARTER_WEAPON,
-  TUTORIAL_STEP_SKILL_POINTS,
   TUTORIAL_STEP_SAVE_TEMPLATE,
   TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
@@ -30,35 +28,17 @@ import {
 import {
   allocatePlayerAttribute,
   craft,
-  getCraftingRecipes,
-  getEquipment,
   getHpState,
-  getInventory,
-  getPlayer,
-  getPlayerGuild,
-  getPvpNotificationCount,
-  getSkills,
-  getTurns,
-  getZones,
-  getZoneEvents,
   mine,
   rest,
   restEstimate,
   getResources,
-  getSkillPointState,
-  allocateSkillPoint,
-  respecSkillPoints,
-  getTemplates,
   activateTemplate,
   type ApiResponse,
   type WorldEventResponse,
   type SkillPointState,
   exchangeGold,
   placeRouletteBet,
-  getIncomingFriendRequests,
-  getFriendMailUnreadCount,
-  getPlayerBuffs,
-  getExpeditionCooldowns,
 } from '@/lib/api';
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
@@ -83,28 +63,22 @@ import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
 import { runSimpleAction } from './simpleAction';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
+import { SCREEN_POLL_NEEDS, useGamePolling } from './hooks/useGamePolling';
 import { useInventoryActions } from './hooks/useInventoryActions';
 import { useLootActions } from './hooks/useLootActions';
 import { useExplorationActions } from './hooks/useExplorationActions';
+import { useSocialCounts } from './hooks/useSocialCounts';
+import { useTutorialProgression } from './hooks/useTutorialProgression';
 import { useTravelActions } from './hooks/useTravelActions';
+import { useGameBootstrap } from './hooks/useGameBootstrap';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
-const SCREEN_POLL_NEEDS: Record<string, string[]> = {
-  explore: ['turns', 'hp', 'resources'],
-  combat: ['turns', 'hp', 'resources'],
-  rest: ['turns', 'hp', 'resources'],
-  home: ['turns', 'hp', 'resources'],
-  arena: ['turns', 'hp', 'resources'],
-  travel: ['turns', 'hp', 'resources'],
-  gathering: ['turns'],
-  crafting: ['turns'],
-  forge: ['turns'],
-  casino: ['turns'],
-  skills: ['turns'],
-  zones: ['turns'],
-  bestiary: ['turns'],
-  training: ['turns'],
+type LootRevealItem = {
+  name: string;
+  rarity: InventoryItemDTO['rarity'];
+  quantity: number;
+  imageSrc?: string;
 };
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -253,12 +227,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const playerCreatedAtRef = useRef<string | null>(null);
   const lootRevealRarityRef = useRef(lootRevealRarity);
   lootRevealRarityRef.current = lootRevealRarity;
-  const [lootRevealItems, setLootRevealItems] = useState<Array<{
-    name: string;
-    rarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
-    quantity: number;
-    imageSrc?: string;
-  }> | null>(null);
+  const [lootRevealItems, setLootRevealItems] = useState<LootRevealItem[] | null>(null);
   const hpStateRef = useRef(hpState);
   useEffect(() => {
     hpStateRef.current = hpState;
@@ -279,6 +248,25 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     manaStateRef.current = manaState;
   }, [manaState]);
+
+  const showLootRevealForItems = useCallback((items: InventoryItemDTO[]) => {
+    for (const item of items) {
+      prevInventoryIdsRef.current.add(item.id);
+    }
+
+    if (lootRevealRarityRef.current === 'none') return;
+
+    const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? RARITY_RANK.uncommon;
+    const notableItems = items.filter((item) => (RARITY_RANK[item.rarity] ?? -1) >= minRank);
+    if (notableItems.length === 0) return;
+
+    setLootRevealItems(notableItems.map((item) => ({
+      name: item.template.name,
+      rarity: item.rarity,
+      quantity: item.quantity,
+      imageSrc: itemImageSrc(item.template.name, item.template.itemType),
+    })));
+  }, [lootRevealRarityRef, prevInventoryIdsRef]);
 
   const activeScreenRef = useRef(activeScreen);
   useEffect(() => { activeScreenRef.current = activeScreen; }, [activeScreen]);
@@ -322,6 +310,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const stateSetters = useMemo<StateSetters>(() => ({
     setInventory: (updater) => setInventory(updater),
+    onInventoryAdded: showLootRevealForItems,
     setInventoryCapacity,
     setInventoryUsedSlots,
     setEquipment: (eq) => setEquipment(
@@ -352,8 +341,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setMaterialTotals,
     setActiveEncounterSiteId,
     setActiveZoneId: setActiveZoneIdImmediate,
-  }), [setActiveZoneIdImmediate]);
-  // State setters are stable; only the ref-synchronizing zone setter needs to stay in deps.
+  }), [setActiveZoneIdImmediate, showLootRevealForItems]);
+  // State setters are stable; only ref-synchronizing callbacks need to stay in deps.
 
   const runAction = async (actionName: string, fn: () => Promise<void>) => {
     if (busyAction) return;
@@ -389,234 +378,85 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const pollScreenData = useCallback(async () => {
-    const needs = SCREEN_POLL_NEEDS[activeScreenRef.current] ?? ['turns'];
-    const fetches: Promise<void>[] = [];
+  const pollScreenData = useGamePolling({
+    activeScreenRef,
+    hpStateRef,
+    staminaStateRef,
+    manaStateRef,
+    setTurns,
+    setHpState,
+    setStaminaState,
+    setManaState,
+  });
 
-    fetches.push(getTurns().then(res => {
-      if (res.data) {
-        setTurns(res.data.currentTurns);
-        window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: true } }));
-      } else {
-        window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: false } }));
-        window.dispatchEvent(new CustomEvent('api:error', {
-          detail: { message: res.error?.message ?? 'Network error', code: res.error?.code ?? 'UNKNOWN' }
-        }));
-      }
-    }));
+  const { loadPvpNotificationCount, loadFriendCounts } = useSocialCounts({
+    setPvpNotificationCount,
+    setIncomingFriendRequestCount,
+    setMailUnreadCount,
+  });
 
-    if (needs.includes('hp') && hpStateRef.current.currentHp < hpStateRef.current.maxHp) {
-      fetches.push(getHpState().then(res => {
-        if (res.data) { setHpState(res.data); hpStateRef.current = res.data; }
-      }));
-    }
-
-    if (needs.includes('resources')) {
-      const staminaFull = staminaStateRef.current.current >= staminaStateRef.current.max;
-      const manaFull = manaStateRef.current.current >= manaStateRef.current.max;
-      if (!staminaFull || !manaFull) {
-        fetches.push(getResources().then(res => {
-          if (res.data) { setStaminaState(res.data.stamina); setManaState(res.data.mana); }
-        }));
-      }
-    }
-
-    await Promise.all(fetches);
-  }, []); // stable — no deps that change
-
-  const refreshCraftingRecipes = useCallback(async () => {
-    const res = await getCraftingRecipes();
-    if (res.data) {
-      setCraftingRecipes(res.data.recipes);
-      setZoneCraftingLevel(res.data.zoneCraftingLevel);
-      setZoneCraftingName(res.data.zoneName);
-    }
+  const syncHpState = useCallback((nextState: HpState) => {
+    setHpState(nextState);
+    hpStateRef.current = nextState;
   }, []);
 
-  const loadPvpNotificationCount = useCallback(async () => {
-    const result = await getPvpNotificationCount();
-    if (result.data) {
-      setPvpNotificationCount(result.data.count);
-    } else {
-      window.dispatchEvent(new CustomEvent('api:error', {
-        detail: { message: result.error?.message ?? 'Network error', code: result.error?.code ?? 'UNKNOWN' }
-      }));
-    }
+  const syncStaminaState = useCallback((nextState: ResourceState) => {
+    setStaminaState(nextState);
+    staminaStateRef.current = nextState;
   }, []);
 
-  const loadFriendCounts = useCallback(async () => {
-    const [reqRes, mailRes] = await Promise.all([
-      getIncomingFriendRequests(),
-      getFriendMailUnreadCount(),
-    ]);
-    if (reqRes.data) setIncomingFriendRequestCount(reqRes.data.requests.length);
-    if (mailRes.data) setMailUnreadCount(mailRes.data.count);
-    // Dispatch error if both failed (if only one failed, partial success is OK)
-    if (!reqRes.data && !mailRes.data) {
-      window.dispatchEvent(new CustomEvent('api:error', {
-        detail: { message: 'Network error', code: 'NETWORK_ERROR' }
-      }));
-    }
+  const syncManaState = useCallback((nextState: ResourceState) => {
+    setManaState(nextState);
+    manaStateRef.current = nextState;
   }, []);
 
-  const handleLoadSkillPoints = useCallback(async () => {
-    const res = await getSkillPointState();
-    if (res.data) setSkillPointState(res.data);
-  }, []);
-
-  const handleAllocateSkillPoint = useCallback(async (nodeId: string) => {
-    const res = await allocateSkillPoint(nodeId);
-    if (res.data) {
-      setSkillPointState(res.data);
-      if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS && res.data.availablePoints === 0) {
-        const nextRes = await updateTutorialStep(TUTORIAL_STEP_SKILL_POINTS + 1);
-        if (nextRes.data) setTutorialStep(nextRes.data.tutorialStep);
-      }
-    }
-  }, [tutorialStep]);
-
-  const handleRespecSkillPoints = useCallback(async () => {
-    const res = await respecSkillPoints();
-    if (res.data) setSkillPointState(res.data);
-  }, []);
-
-  const handleLoadTemplates = useCallback(async () => {
-    const res = await getTemplates();
-    if (res.data) setTemplates(res.data.templates);
-  }, []);
-
-  const applyZonesData = useCallback((data: { zones: typeof zones; connections: typeof zoneConnections; undiscoveredZones?: typeof undiscoveredZones; currentZoneId: string }) => {
-    setZones(data.zones);
-    setZoneConnections(data.connections);
-    setUndiscoveredZones(data.undiscoveredZones ?? []);
-    setActiveZoneIdImmediate(data.currentZoneId);
-    if (data.currentZoneId) {
-      getZoneEvents(data.currentZoneId).then((res) => {
-        if (res.data) setActiveEvents(res.data.events);
-      });
-    }
-  }, [setActiveZoneIdImmediate]);
-
-  const reloadZones = useCallback(async (options?: { expectedActiveZoneId?: string | null }) => {
-    const zonesRes = await getZones({ fresh: true });
-    if (!zonesRes.data) return;
-    if (
-      options
-      && 'expectedActiveZoneId' in options
-      && activeZoneIdRef.current !== options.expectedActiveZoneId
-    ) {
-      return;
-    }
-    applyZonesData(zonesRes.data);
-  }, [applyZonesData]);
-
-  const loadAll = useCallback(async () => {
-    setActionError(null);
-
-    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, hpRes, resourceRes, skillPointRes, buffsRes] = await Promise.all([
-      getTurns(),
-      getPlayer(),
-      getSkills(),
-      getZones(),
-      getInventory(),
-      getEquipment(),
-      getHpState(),
-      getResources(),
-      getSkillPointState(),
-      getPlayerBuffs(),
-    ]);
-
-    if (turnRes.data) setTurns(turnRes.data.currentTurns);
-    if (playerRes.data) {
-      setCharacterProgression({
-        characterXp: playerRes.data.player.characterXp,
-        characterLevel: playerRes.data.player.characterLevel,
-        attributePoints: playerRes.data.player.attributePoints,
-        attributes: playerRes.data.player.attributes,
-      });
-      setGold(playerRes.data.player.gold ?? 0);
-      setActiveEncounterSiteId(playerRes.data.player.activeEncounterSiteId ?? null);
-      playerCreatedAtRef.current = playerRes.data.player.createdAt;
-      initSettingsFromServer(playerRes.data.player);
-      const serverTutorialStep = playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED;
-      setTutorialStep(serverTutorialStep);
-      // Don't show changelog to brand new players (step 0)
-      const latestVer = getLatestVersion();
-      if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
-        if (serverTutorialStep === 0) {
-          localStorage.setItem(CHANGELOG_STORAGE_KEY, latestVer);
-        } else {
-          setShowChangelog(true);
-        }
-      }
-    }
-    if (skillsRes.data) setSkills(skillsRes.data.skills);
-    if (hpRes.data) {
-      setHpState(hpRes.data);
-      hpStateRef.current = hpRes.data;
-    }
-    if (resourceRes.data) {
-      setStaminaState(resourceRes.data.stamina);
-      setManaState(resourceRes.data.mana);
-    }
-    if (skillPointRes.data) setSkillPointState(skillPointRes.data);
-    if (buffsRes.data) setActiveBuffs(buffsRes.data.buffs);
-
-    // Load expedition state for activity lock (non-blocking)
-    getExpeditionCooldowns().then((cdRes) => {
-      if (cdRes.data) setHasActiveExpedition(cdRes.data.hasActiveExpedition);
-    });
-
-    if (zonesRes.data) applyZonesData(zonesRes.data);
-    if (invRes.data) {
-      setInventory(invRes.data.items);
-      setInventoryCapacity(invRes.data.capacity ?? 24);
-      setInventoryUsedSlots(invRes.data.usedSlots ?? 0);
-      if (invRes.data.materialTotals) setMaterialTotals(invRes.data.materialTotals);
-      // Detect new notable items for loot reveal
-      if (hasLoadedOnceRef.current && lootRevealRarityRef.current !== 'none') {
-        const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? 1;
-        const newNotableItems = invRes.data.items.filter(
-          item => !prevInventoryIdsRef.current.has(item.id) && RARITY_RANK[item.rarity] >= minRank
-        );
-        if (newNotableItems.length > 0) {
-          setLootRevealItems(newNotableItems.map(i => ({
-            name: i.template.name,
-            rarity: i.rarity as 'uncommon' | 'rare' | 'epic' | 'legendary',
-            quantity: i.quantity,
-            imageSrc: itemImageSrc(i.template.name, i.template.itemType),
-          })));
-        }
-      }
-      prevInventoryIdsRef.current = new Set(invRes.data.items.map(i => i.id));
-      hasLoadedOnceRef.current = true;
-    }
-    if (equipRes.data) {
-      setEquipment(
-        equipRes.data.equipment.map((e) => ({
-          slot: e.slot,
-          itemId: e.itemId,
-          item: e.item
-            ? {
-                id: e.item.id,
-                rarity: e.item.rarity,
-                currentDurability: e.item.currentDurability,
-                maxDurability: e.item.maxDurability,
-                bonusStats: e.item.bonusStats ?? null,
-                template: e.item.template,
-              }
-            : null,
-        }))
-      );
-    }
-    void refreshCraftingRecipes();
-
-    // Fetch guild tax rate (non-blocking — don't delay initial load)
-    getPlayerGuild().then((guildRes) => {
-      if (guildRes.data?.guild) setGuildTaxRate(guildRes.data.guild.taxRate);
-      else setGuildTaxRate(0);
-    }).catch(() => setGuildTaxRate(0));
-  }, []);
+  const {
+    refreshCraftingRecipes,
+    handleLoadSkillPoints,
+    handleAllocateSkillPoint,
+    handleRespecSkillPoints,
+    handleLoadTemplates,
+    reloadZones,
+    loadAll,
+  } = useGameBootstrap({
+    tutorialStep,
+    activeZoneIdRef,
+    playerCreatedAtRef,
+    hasLoadedOnceRef,
+    prevInventoryIdsRef,
+    lootRevealRarityRef,
+    initSettingsFromServer,
+    setActionError,
+    setTurns,
+    setCharacterProgression,
+    setGold,
+    setActiveEncounterSiteId,
+    setTutorialStep,
+    setShowChangelog,
+    setSkills,
+    setHpState: syncHpState,
+    setStaminaState: syncStaminaState,
+    setManaState: syncManaState,
+    setSkillPointState,
+    setActiveBuffs,
+    setHasActiveExpedition,
+    setZones,
+    setZoneConnections,
+    setUndiscoveredZones,
+    setActiveZoneId: setActiveZoneIdImmediate,
+    setActiveEvents,
+    setInventory,
+    setInventoryCapacity,
+    setInventoryUsedSlots,
+    setMaterialTotals,
+    setLootRevealItems,
+    setEquipment,
+    setCraftingRecipes,
+    setZoneCraftingLevel,
+    setZoneCraftingName,
+    setTemplates,
+    setGuildTaxRate,
+  });
 
   const achievements = useAchievements(isAuthenticated, loadAll);
   const {
@@ -630,42 +470,20 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     loadQuests, handleClaimQuestReward, handleClaimDailyBonus, handleRerollQuest,
     updateQuestProgress,
   } = useQuests();
-
-  const advanceTutorial = useCallback(async (fromStep: number) => {
-    if (tutorialStep !== fromStep) return;
-    const nextStep = fromStep + 1;
-    const res = await updateTutorialStep(nextStep);
-    if (res.data) {
-      setTutorialStep(res.data.tutorialStep);
-      if (res.data.tutorialStep === TUTORIAL_COMPLETED) {
-        trackEvent('tutorial_complete');
-      }
-    }
-  }, [tutorialStep]);
-
-  const skipTutorial = useCallback(async () => {
-    const res = await updateTutorialStep(TUTORIAL_SKIPPED);
-    if (res.data) setTutorialStep(res.data.tutorialStep);
-  }, []);
-
-  const handleTemplateSaved = useCallback(async (templateId?: string) => {
-    if (templateId) {
-      await activateTemplate(templateId);
-      await handleLoadTemplates();
-    }
-    if (tutorialStep === TUTORIAL_STEP_SAVE_TEMPLATE) {
-      void advanceTutorial(TUTORIAL_STEP_SAVE_TEMPLATE);
-    }
-  }, [tutorialStep, advanceTutorial, handleLoadTemplates]);
-
-  const handleClaimStarterWeapon = useCallback(async (weaponType: 'melee' | 'ranged' | 'magic') => {
-    const res = await claimStarterWeapon(weaponType);
-    if (res.data?.success) {
-      setStarterWeaponType(weaponType);
-      await loadAll();
-      await advanceTutorial(TUTORIAL_STEP_STARTER_WEAPON);
-    }
-  }, [advanceTutorial, loadAll]);
+  const {
+    advanceTutorial,
+    skipTutorial,
+    handleTemplateSaved,
+    handleClaimStarterWeapon,
+  } = useTutorialProgression({
+    tutorialStep,
+    setTutorialStep,
+    setActiveGatheringSkill,
+    setActiveCraftingSkill,
+    setStarterWeaponType,
+    loadAll,
+    handleLoadTemplates,
+  });
 
   const combatPlayback = useCombatPlayback({
     combatLogPrefetch,
@@ -685,17 +503,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pendingCombatRewardsRef, siteJustClearedRef, combatPendingLootRef,
     handleCombatPlaybackComplete,
   } = combatPlayback;
-
-  // Default tabs during tutorial steps so the player sees the right content
-  useEffect(() => {
-    if (tutorialStep === TUTORIAL_STEP_GATHER) {
-      setActiveGatheringSkill('woodcutting');
-    } else if (tutorialStep === TUTORIAL_STEP_REFINE) {
-      setActiveCraftingSkill('refining');
-    } else if (tutorialStep === TUTORIAL_STEP_CRAFT) {
-      setActiveCraftingSkill('weaponsmithing');
-    }
-  }, [tutorialStep]);
 
   // Initial one-shot loads
   useEffect(() => {
