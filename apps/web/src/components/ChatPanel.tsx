@@ -115,60 +115,62 @@ export function ChatPanel({
     <div className="fixed bottom-16 left-0 right-0 z-30 flex justify-center pointer-events-none safe-area-bottom">
       <div className="w-full max-w-lg mx-4 pointer-events-auto flex flex-col bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-t-lg shadow-xl" style={{ maxHeight: '55vh' }}>
         {/* Header with tabs */}
-        <div role="tablist" aria-label="Chat channels" className="flex items-center border-b border-[var(--rpg-border)] px-2 py-1.5 shrink-0">
-          <button
-            role="tab"
-            aria-selected={activeChannel === 'world'}
-            onClick={() => setActiveChannel('world')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              activeChannel === 'world'
-                ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
-                : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
-            }`}
-          >
-            World{worldOnline > 0 ? ` (${worldOnline})` : ''}
-            {unreadWorld > 0 && activeChannel !== 'world' && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[var(--rpg-red)] text-[9px] text-white px-0.5">
-                {unreadWorld}
-              </span>
-            )}
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeChannel === 'zone'}
-            onClick={() => setActiveChannel('zone')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
-              activeChannel === 'zone'
-                ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
-                : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
-            }`}
-          >
-            {currentZoneName ?? 'Zone'}{zoneOnline > 0 ? ` (${zoneOnline})` : ''}
-            {unreadZone > 0 && activeChannel !== 'zone' && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[var(--rpg-red)] text-[9px] text-white px-0.5">
-                {unreadZone}
-              </span>
-            )}
-          </button>
-          {casinoActive && (
+        <div className="flex items-center border-b border-[var(--rpg-border)] px-2 py-1.5 shrink-0">
+          <div role="tablist" aria-label="Chat channels" className="flex items-center">
             <button
               role="tab"
-              aria-selected={activeChannel === 'casino'}
-              onClick={() => setActiveChannel('casino')}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
-                activeChannel === 'casino'
+              aria-selected={activeChannel === 'world'}
+              onClick={() => setActiveChannel('world')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                activeChannel === 'world'
                   ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
                   : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
               }`}
             >
-              Casino
-              {unreadCasino > 0 && activeChannel !== 'casino' && (
+              World{worldOnline > 0 ? ` (${worldOnline})` : ''}
+              {unreadWorld > 0 && activeChannel !== 'world' && (
                 <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[var(--rpg-red)] text-[9px] text-white px-0.5">
-                  {unreadCasino}
+                  {unreadWorld}
                 </span>
               )}
             </button>
-          )}
+            <button
+              role="tab"
+              aria-selected={activeChannel === 'zone'}
+              onClick={() => setActiveChannel('zone')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
+                activeChannel === 'zone'
+                  ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
+                  : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+              }`}
+            >
+              {currentZoneName ?? 'Zone'}{zoneOnline > 0 ? ` (${zoneOnline})` : ''}
+              {unreadZone > 0 && activeChannel !== 'zone' && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[var(--rpg-red)] text-[9px] text-white px-0.5">
+                  {unreadZone}
+                </span>
+              )}
+            </button>
+            {casinoActive && (
+              <button
+                role="tab"
+                aria-selected={activeChannel === 'casino'}
+                onClick={() => setActiveChannel('casino')}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
+                  activeChannel === 'casino'
+                    ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
+                    : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                }`}
+              >
+                Casino
+                {unreadCasino > 0 && activeChannel !== 'casino' && (
+                  <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[var(--rpg-red)] text-[9px] text-white px-0.5">
+                    {unreadCasino}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
           <button
             onClick={toggleChat}
             className="ml-auto p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors"

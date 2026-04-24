@@ -104,4 +104,34 @@ describe('ChatPanel', () => {
     expect(screen.getByText('The Ashen Herald has been defeated.')).toBeTruthy();
     expect(screen.getByLabelText('Chat activity')).toBeTruthy();
   });
+
+  it('keeps non-tab controls outside the channel tablist', () => {
+    render(
+      React.createElement(ChatPanel, {
+        isOpen: true,
+        toggleChat: vi.fn(),
+        activeChannel: 'world',
+        setActiveChannel: vi.fn(),
+        worldMessages: [],
+        globalActivityMessages: [],
+        zoneMessages: [],
+        casinoMessages: [],
+        presence: { worldOnline: 1, zoneOnline: {} },
+        unreadWorld: 0,
+        unreadZone: 0,
+        unreadCasino: 0,
+        casinoActive: false,
+        sendMessage: vi.fn(),
+        rateLimitError: null,
+        currentZoneId: null,
+        currentZoneName: null,
+        playerId: 'p2',
+        pinnedMessage: null,
+      }),
+    );
+
+    const channelTablist = screen.getByRole('tablist', { name: 'Chat channels' });
+
+    expect(channelTablist.querySelector('[aria-label="Close chat"]')).toBeNull();
+  });
 });
