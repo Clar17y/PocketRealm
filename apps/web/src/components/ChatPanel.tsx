@@ -13,6 +13,7 @@ interface ChatPanelProps {
   activeChannel: ChatChannel;
   setActiveChannel: (ch: ChatChannel) => void;
   worldMessages: ChatMessageEvent[];
+  globalActivityMessages: ChatMessageEvent[];
   zoneMessages: ChatMessageEvent[];
   casinoMessages: ChatMessageEvent[];
   presence: ChatPresenceEvent;
@@ -34,6 +35,7 @@ export function ChatPanel({
   activeChannel,
   setActiveChannel,
   worldMessages,
+  globalActivityMessages,
   zoneMessages,
   casinoMessages,
   presence,
@@ -56,6 +58,7 @@ export function ChatPanel({
   const messages = activeChannel === 'world' ? worldMessages
     : activeChannel === 'casino' ? casinoMessages
     : zoneMessages;
+  const visibleGlobalActivity = globalActivityMessages.slice(-3);
   const pinnedId = pinnedMessage?.id;
 
   // Reset dismiss when a new pin arrives
@@ -112,8 +115,10 @@ export function ChatPanel({
     <div className="fixed bottom-16 left-0 right-0 z-30 flex justify-center pointer-events-none safe-area-bottom">
       <div className="w-full max-w-lg mx-4 pointer-events-auto flex flex-col bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-t-lg shadow-xl" style={{ maxHeight: '55vh' }}>
         {/* Header with tabs */}
-        <div className="flex items-center border-b border-[var(--rpg-border)] px-2 py-1.5 shrink-0">
+        <div role="tablist" aria-label="Chat channels" className="flex items-center border-b border-[var(--rpg-border)] px-2 py-1.5 shrink-0">
           <button
+            role="tab"
+            aria-selected={activeChannel === 'world'}
             onClick={() => setActiveChannel('world')}
             className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
               activeChannel === 'world'
@@ -129,6 +134,8 @@ export function ChatPanel({
             )}
           </button>
           <button
+            role="tab"
+            aria-selected={activeChannel === 'zone'}
             onClick={() => setActiveChannel('zone')}
             className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
               activeChannel === 'zone'
@@ -145,6 +152,8 @@ export function ChatPanel({
           </button>
           {casinoActive && (
             <button
+              role="tab"
+              aria-selected={activeChannel === 'casino'}
               onClick={() => setActiveChannel('casino')}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
                 activeChannel === 'casino'
@@ -237,6 +246,21 @@ export function ChatPanel({
           })}
           <div ref={messagesEndRef} />
         </div>
+
+        {visibleGlobalActivity.length > 0 && (
+          <div
+            aria-label="Chat activity"
+            className="border-t border-[var(--rpg-border)] bg-[var(--rpg-background)]/40 px-3 py-2 space-y-1 shrink-0"
+          >
+            {visibleGlobalActivity.map((msg) => (
+              <div key={msg.id} className="text-[11px] leading-snug text-[var(--rpg-text-secondary)]">
+                <span className="text-[var(--rpg-gold)]">Activity</span>
+                <span className="text-[var(--rpg-text-secondary)]">: </span>
+                <span>{msg.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Rate limit error */}
         {rateLimitError && (

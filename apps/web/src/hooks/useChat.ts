@@ -15,6 +15,7 @@ interface UseChatParams {
 
 export interface UseChatReturn {
   worldMessages: ChatMessageEvent[];
+  globalActivityMessages: ChatMessageEvent[];
   zoneMessages: ChatMessageEvent[];
   casinoMessages: ChatMessageEvent[];
   activeChannel: ChatChannel;
@@ -39,6 +40,7 @@ export interface UseChatReturn {
 
 export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseChatReturn {
   const [worldMessages, setWorldMessages] = useState<ChatMessageEvent[]>([]);
+  const [globalActivityMessages, setGlobalActivityMessages] = useState<ChatMessageEvent[]>([]);
   const [zoneMessages, setZoneMessages] = useState<ChatMessageEvent[]>([]);
   const [activeChannel, setActiveChannelRaw] = useState<ChatChannel>('world');
   const [isOpen, setIsOpen] = useState(false);
@@ -64,6 +66,11 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
 
   const appendMessage = useCallback((msg: ChatMessageEvent) => {
     if (msg.channelType === 'world') {
+      if (msg.messageType === 'system') {
+        setGlobalActivityMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
+        return;
+      }
+
       setWorldMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
       if (!isOpenRef.current || activeChannelRef.current !== 'world') {
         setUnreadWorld((n) => n + 1);
@@ -113,7 +120,9 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     const onConnect = () => {
       getChatHistory('world', 'world').then((res) => {
         if (res.data) {
-          setWorldMessages(res.data.messages as ChatMessageEvent[]);
+          const messages = res.data.messages as ChatMessageEvent[];
+          setWorldMessages(messages.filter((msg) => msg.messageType !== 'system'));
+          setGlobalActivityMessages(messages.filter((msg) => msg.messageType === 'system'));
         }
       });
 
@@ -267,6 +276,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
 
   return {
     worldMessages,
+    globalActivityMessages,
     zoneMessages,
     casinoMessages,
     activeChannel,
