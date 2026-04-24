@@ -308,7 +308,7 @@ export async function getNpcActivityReaction(
     select: { activityId: true },
   });
   const reactedActivityIds = new Set(reactedRows.map((row) => row.activityId));
-  let skip = 0;
+  let cursorId: string | undefined;
 
   while (true) {
     const activityRows: ChatActivityRow[] = await prisma.chatActivity.findMany({
@@ -316,9 +316,9 @@ export async function getNpcActivityReaction(
         createdAt: { gte: since },
         expiresAt: { gte: now },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: NPC_ACTIVITY_REACTION_PAGE_SIZE,
-      skip,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     });
 
     if (activityRows.length === 0) {
@@ -363,6 +363,6 @@ export async function getNpcActivityReaction(
       return null;
     }
 
-    skip += NPC_ACTIVITY_REACTION_PAGE_SIZE;
+    cursorId = activityRows[activityRows.length - 1]!.id;
   }
 }

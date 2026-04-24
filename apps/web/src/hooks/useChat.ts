@@ -118,11 +118,15 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
 
     // Load world history on connect
     const onConnect = () => {
-      getChatHistory('world', 'world').then((res) => {
-        if (res.data) {
-          const messages = res.data.messages as ChatMessageEvent[];
-          setWorldMessages(messages.filter((msg) => msg.messageType !== 'activity'));
-          setGlobalActivityMessages(messages.filter((msg) => msg.messageType === 'activity'));
+      Promise.all([
+        getChatHistory('world', 'world', { messageType: 'non_activity' }),
+        getChatHistory('world', 'world', { messageType: 'activity' }),
+      ]).then(([worldRes, activityRes]) => {
+        if (worldRes.data) {
+          setWorldMessages(worldRes.data.messages as ChatMessageEvent[]);
+        }
+        if (activityRes.data) {
+          setGlobalActivityMessages(activityRes.data.messages as ChatMessageEvent[]);
         }
       });
 

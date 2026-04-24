@@ -104,11 +104,11 @@ import { setHp, enterRecoveringState } from './hpService';
 import { distributeBossLoot } from './bossLootService';
 import { logger } from '../logger';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
-import { resolveBossRound as resolveBossRoundEngine, initThreatTable } from '@pocketrealm/game-engine';
+import { resolveBossRound as resolveBossRoundEngine, initThreatTable, type BossRoundResult } from '@pocketrealm/game-engine';
 import { roundTimerRegistry } from './roundTimerRegistry';
 import { getIo } from '../socket';
 
-const defaultEngineResult = {
+const defaultEngineResult: BossRoundResult = {
   bossDefeated: false,
   allPlayersDead: false,
   bossHpAfter: 500,
@@ -184,7 +184,7 @@ describe('bossEncounterService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Restore default engine mock for each test (clearAllMocks only clears call history)
-    vi.mocked(resolveBossRoundEngine).mockReturnValue(defaultEngineResult as any);
+    vi.mocked(resolveBossRoundEngine).mockReturnValue(defaultEngineResult);
     vi.mocked(broadcastBossDefeatActivity).mockResolvedValue(undefined);
     vi.mocked(initThreatTable).mockReturnValue([{ playerId: 'p1', threat: 0, tauntRoundsRemaining: 0 }]);
     vi.mocked(calculateFleeWithGold).mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 } as any);
@@ -1207,7 +1207,7 @@ describe('bossEncounterService', () => {
         ...defaultEngineResult,
         bossDefeated: true,
         bossHpAfter: 0,
-      } as any);
+      });
       setupBasicRound();
       mockPrisma.bossParticipant.findMany
         .mockResolvedValueOnce([makeParticipantRow()])

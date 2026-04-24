@@ -125,10 +125,9 @@ describe('useChat', () => {
   });
 
   it('splits mixed world history into chat stream and global activity', async () => {
-    vi.mocked(getChatHistory).mockResolvedValue({
-      data: { messages: [worldPlayerMessage, worldSystemMessage, worldActivityMessage] },
-      error: null,
-    });
+    vi.mocked(getChatHistory)
+      .mockResolvedValueOnce({ data: { messages: [worldPlayerMessage, worldSystemMessage] }, error: null })
+      .mockResolvedValueOnce({ data: { messages: [worldActivityMessage] }, error: null });
 
     const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
 
@@ -136,12 +135,14 @@ describe('useChat', () => {
       expect(result.current.worldMessages).toEqual([worldPlayerMessage, worldSystemMessage]);
       expect(result.current.globalActivityMessages).toEqual([worldActivityMessage]);
     });
+    expect(getChatHistory).toHaveBeenCalledWith('world', 'world', { messageType: 'non_activity' });
+    expect(getChatHistory).toHaveBeenCalledWith('world', 'world', { messageType: 'activity' });
   });
 
   it('routes socket world activity messages to global activity without unread world count', async () => {
     const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
 
-    await waitFor(() => expect(getChatHistory).toHaveBeenCalledWith('world', 'world'));
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalledWith('world', 'world', { messageType: 'activity' }));
 
     act(() => {
       emitSocketEvent('chat:message', worldActivityMessage);
@@ -155,7 +156,7 @@ describe('useChat', () => {
   it('keeps socket world system messages inline and counts them as unread', async () => {
     const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
 
-    await waitFor(() => expect(getChatHistory).toHaveBeenCalledWith('world', 'world'));
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalledWith('world', 'world', { messageType: 'non_activity' }));
 
     act(() => {
       emitSocketEvent('chat:message', worldSystemMessage);

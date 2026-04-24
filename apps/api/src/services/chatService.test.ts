@@ -134,5 +134,35 @@ describe('chatService', () => {
         take: 50,
       });
     });
+
+    it('can query history without activity messages', async () => {
+      mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await getChannelHistory('world', 'world', { messageType: 'non_activity' });
+
+      expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: {
+          channelType: 'world',
+          channelId: 'world',
+          NOT: { messageType: 'activity' },
+        },
+      }));
+    });
+
+    it('can query only activity history', async () => {
+      mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await getChannelHistory('world', 'world', { messageType: 'activity' });
+
+      expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: {
+          channelType: 'world',
+          channelId: 'world',
+          messageType: 'activity',
+        },
+      }));
+    });
   });
 });

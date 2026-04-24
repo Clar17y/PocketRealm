@@ -13,6 +13,7 @@ chatRouter.use(authenticate);
 const historyQuerySchema = z.object({
   channelType: z.enum(['world', 'zone', 'guild', 'casino']),
   channelId: z.string().min(1).max(64),
+  messageType: z.enum(['player', 'system', 'activity', 'non_activity']).optional(),
 });
 
 const npcReactionQuerySchema = z.object({
@@ -26,8 +27,8 @@ chatRouter.get('/history', asyncHandler(async (req, res) => {
     return;
   }
 
-  const { channelType, channelId } = parsed.data;
-  const messages = await getChannelHistory(channelType, channelId);
+  const { channelType, channelId, messageType } = parsed.data;
+  const messages = await getChannelHistory(channelType, channelId, messageType ? { messageType } : {});
   res.json({ messages });
 }));
 

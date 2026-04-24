@@ -364,12 +364,14 @@ describe('chatActivityService', () => {
 
     expect(result?.activityId).toBe('activity-matching-page');
     expect(mockPrisma.chatActivity.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 25,
-      skip: 0,
     }));
     expect(mockPrisma.chatActivity.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      cursor: { id: 'activity-irrelevant-24' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 25,
-      skip: 25,
+      skip: 1,
     }));
   });
 
