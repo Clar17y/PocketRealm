@@ -1,7 +1,8 @@
 import express, { Router } from 'express';
 import type Stripe from 'stripe';
-import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { createEndpointLimiter } from '../middleware/rateLimiter';
 import { grantPremiumDays } from '../services/premiumService';
 import { parseStripeWebhookEvent } from '../services/stripeService';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -61,9 +62,16 @@ function isSupportPocketrealmSession(session: Stripe.Checkout.Session): boolean 
 }
 
 export const premiumWebhookRouter = Router();
+const stripeWebhookLimiter = createEndpointLimiter(
+  'stripe-webhook',
+  RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS,
+  RATE_LIMIT_CONSTANTS.STRIPE_WEBHOOK_MAX,
+  { message: 'Too many webhook requests, please try again later', passOnStoreError: false },
+);
 
 premiumWebhookRouter.post(
   '/stripe',
+  stripeWebhookLimiter,
   express.raw({ type: 'application/json' }),
   asyncHandler(async (req, res) => {
     const signature = getStripeSignature(req.headers['stripe-signature']);

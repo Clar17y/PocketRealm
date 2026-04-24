@@ -3,7 +3,7 @@ import { NPC_DIALOGUE, type NpcKey } from '@pocketrealm/shared';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { getNpcActivityReaction } from '../services/chatActivityService';
-import { getChannelHistory } from '../services/chatService';
+import { getAuthorizedChannelHistory } from '../services/chatService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const chatRouter = Router();
@@ -28,7 +28,12 @@ chatRouter.get('/history', asyncHandler(async (req, res) => {
   }
 
   const { channelType, channelId, messageType } = parsed.data;
-  const messages = await getChannelHistory(channelType, channelId, messageType ? { messageType } : {});
+  const messages = await getAuthorizedChannelHistory(
+    req.player!.playerId,
+    channelType,
+    channelId,
+    messageType ? { messageType } : {},
+  );
   res.json({ messages });
 }));
 

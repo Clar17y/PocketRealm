@@ -13,19 +13,26 @@ import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validatePassword } from '../utils/passwordValidation';
-import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToken, verifyPasswordResetToken } from '../services/authTokenService';
+import {
+  createEmailVerificationToken,
+  hashToken,
+  verifyEmailToken,
+  createPasswordResetToken,
+  verifyPasswordResetToken,
+} from '../services/authTokenService';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
 import { recordFailedLogin, isLockedOut, clearLockout, checkEmailRateLimit } from '../services/lockoutService';
 import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../services/authService';
 import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { logger } from '../logger';
-import { getIo } from '../socket';
+import { disconnectAccountSockets, disconnectPlayerSockets, getIo } from '../socket';
 import { issueAccountSession } from '../services/authSessionService';
 import { SEASON_STATUSES } from '../services/season.constants';
 
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
 const loginLimiter = createEndpointLimiter('login', RATE_LIMIT_CONSTANTS.LOGIN_WINDOW_MS, RATE_LIMIT_CONSTANTS.LOGIN_MAX, { message: 'Too many login attempts, please try again later' });
+const registerLimiter = createEndpointLimiter('register', RATE_LIMIT_CONSTANTS.REGISTER_WINDOW_MS, RATE_LIMIT_CONSTANTS.REGISTER_MAX, { message: 'Too many registration attempts, please try again later', passOnStoreError: false });
 
 export const authRouter = Router();
 
@@ -92,7 +99,7 @@ async function findPlayerByRealmUsername(username: string, seasonId: string | nu
   });
 }
 
-authRouter.post('/register', asyncHandler(async (req, res) => {
+authRouter.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
 
   const passwordCheck = validatePassword(body.password);
@@ -344,12 +351,9 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
 
   // Verify token
   const payload = verifyRefreshToken(refreshToken);
+  const refreshTokenHash = hashToken(refreshToken);
 
-  // Require token to exist in DB and not be expired (no activity-window bypass)
-  const [storedToken, account, player] = await Promise.all([
-    prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-    }),
+  const [account, player] = await Promise.all([
     prisma.account.findUnique({
       where: { id: payload.accountId },
       select: {
@@ -375,14 +379,17 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 
-  if (!storedToken || storedToken.accountId !== payload.accountId || storedToken.expiresAt < now) {
+  // Consume the verifier before minting a replacement so concurrent refreshes cannot both rotate it.
+  const consumedToken = await prisma.refreshToken.deleteMany({
+    where: {
+      tokenHash: refreshTokenHash,
+      accountId: payload.accountId,
+      expiresAt: { gte: now },
+    },
+  });
+  if (consumedToken.count !== 1) {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
-
-  // Best-effort delete to avoid race failures under concurrent refresh requests.
-  await prisma.refreshToken.deleteMany({
-    where: { token: refreshToken },
-  });
 
   const {
     payload: freshPayload,
@@ -707,9 +714,20 @@ authRouter.post('/logout', asyncHandler(async (req, res) => {
   const parsed = refreshSchema.safeParse(req.body);
 
   if (parsed.success) {
-    await prisma.refreshToken.deleteMany({
-      where: { token: parsed.data.refreshToken },
+    let playerIdToDisconnect: string | null = null;
+    try {
+      playerIdToDisconnect = verifyRefreshToken(parsed.data.refreshToken).playerId;
+    } catch {
+      playerIdToDisconnect = null;
+    }
+
+    const deletedToken = await prisma.refreshToken.deleteMany({
+      where: { tokenHash: hashToken(parsed.data.refreshToken) },
     });
+
+    if (playerIdToDisconnect && deletedToken.count > 0) {
+      disconnectPlayerSockets(playerIdToDisconnect, 'logout');
+    }
   }
 
   res.json({ success: true });
@@ -824,6 +842,8 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
     });
   });
 
+  disconnectAccountSockets(tokenRecord.accountId, 'password_reset');
+
   res.json({ message: 'Password reset successfully. Please log in with your new password.' });
 }));
 
@@ -840,5 +860,6 @@ authRouter.post('/change-password', authenticate, asyncHandler(async (req, res) 
     throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
   }
   await changePlayerPassword(req.player!.accountId, body.currentPassword, body.newPassword);
+  disconnectAccountSockets(req.player!.accountId, 'password_changed');
   res.json({ message: 'Password updated. Please log in again.' });
 }));

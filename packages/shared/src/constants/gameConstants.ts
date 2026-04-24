@@ -1554,6 +1554,8 @@ export const RATE_LIMIT_CONSTANTS = {
   DEFAULT_WINDOW_MS: 60_000,
   /** ms — login rate-limit window (15 minutes) */
   LOGIN_WINDOW_MS: 15 * 60_000,
+  /** ms — registration rate-limit window (15 minutes) */
+  REGISTER_WINDOW_MS: 15 * 60_000,
 
   /** Max requests per window — global */
   GLOBAL_MAX: 120,
@@ -1567,8 +1569,12 @@ export const RATE_LIMIT_CONSTANTS = {
   EXPLORATION_MAX: 30,
   /** Max requests per window — casino */
   CASINO_MAX: 30,
+  /** Max requests per window — Stripe webhook */
+  STRIPE_WEBHOOK_MAX: 60,
   /** Max requests per window — login */
   LOGIN_MAX: 10,
+  /** Max registration requests per window */
+  REGISTER_MAX: 5,
   /** ms — resend-verification rate-limit window (1 hour) */
   RESEND_VERIFICATION_WINDOW_MS: 60 * 60_000,
   /** Max resend-verification requests per window */

@@ -2,11 +2,8 @@ import { Router, type Request, type Response } from 'express';
 import {
   checkDatabase,
   checkRedis,
-  getSocketIoStats,
   isShuttingDown,
 } from '../services/healthChecks';
-import { getIo } from '../socket';
-import { APP_VERSION } from '../version';
 
 export const healthRouter = Router();
 
@@ -30,33 +27,21 @@ healthRouter.get('/health/ready', async (_req: Request, res: Response) => {
     return;
   }
   const [database, redis] = await Promise.all([checkDatabase(), checkRedis()]);
-  const socketio = getSocketIoStats(getIo());
   const ok = database === 'ok' && redis === 'ok';
   res.status(ok ? 200 : 503).json({
     status: ok ? 'ok' : 'error',
-    version: APP_VERSION,
-    dependencies: { database, redis, socketio },
   });
 });
 
 /**
- * Full health view — informational snapshot including version, uptime, socket count.
+ * Full health view — coarse informational snapshot.
  * Always returns 200 (use /health/ready for a hard gate).
  */
 healthRouter.get('/health', async (_req: Request, res: Response) => {
   const [database, redis] = await Promise.all([checkDatabase(), checkRedis()]);
-  const socketio = getSocketIoStats(getIo());
   const degraded = database !== 'ok' || redis !== 'ok';
 
   res.status(200).json({
     status: degraded ? 'degraded' : 'ok',
-    timestamp: new Date().toISOString(),
-    version: APP_VERSION,
-    uptime: Math.round(process.uptime()),
-    dependencies: {
-      database,
-      redis,
-      socketio,
-    },
   });
 });

@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import {
   createGuild, getPlayerGuild, getGuild, searchGuilds,
-  updateSettings, getGuildLog,
+  updateSettings, getGuildLog, requireGuildMember,
 } from '../services/guildService';
 import {
   joinGuild, leaveGuild, kickMember, promoteMember,
@@ -181,6 +181,7 @@ guildRouter.get('/:id/log', asyncHandler(async (req, res) => {
 
 // GET /:id/upgrades
 guildRouter.get('/:id/upgrades', asyncHandler(async (req, res) => {
+  await requireGuildMember(req.player!.playerId, req.params.id);
   const [active, available] = await Promise.all([
     getActiveUpgrades(req.params.id),
     getAvailableUpgrades(req.params.id),
@@ -199,6 +200,7 @@ guildRouter.post('/:id/upgrades/activate', asyncHandler(async (req, res) => {
 
 // GET /:id/contracts
 guildRouter.get('/:id/contracts', asyncHandler(async (req, res) => {
+  await requireGuildMember(req.player!.playerId, req.params.id);
   const contracts = await getActiveContracts(req.params.id);
   res.json({ contracts });
 }));
@@ -220,6 +222,7 @@ const contributeMaterialsSchema = z.object({
 
 // GET /:id/projects
 guildRouter.get('/:id/projects', asyncHandler(async (req, res) => {
+  await requireGuildMember(req.player!.playerId, req.params.id);
   const projects = await getGuildProjects(req.params.id);
   const available = await getAvailableProjects(req.params.id);
   res.json({ projects, available });
@@ -260,6 +263,7 @@ const selectSpecializationSchema = z.object({
 
 // GET /:id/specialization
 guildRouter.get('/:id/specialization', asyncHandler(async (req, res) => {
+  await requireGuildMember(req.player!.playerId, req.params.id);
   const result = await getSpecializationStatus(req.params.id);
   res.json(result);
 }));
