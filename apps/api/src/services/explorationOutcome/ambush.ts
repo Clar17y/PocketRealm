@@ -11,14 +11,17 @@ import {
 } from '@pocketrealm/game-engine';
 import {
   DURABILITY_CONSTANTS,
+  type LootDrop,
   type MobTemplate,
   type PotionConsumed,
   type QuestProgressUpdate,
 } from '@pocketrealm/shared';
 import { applyCombatBuffs, buildCombatBuffBadges, consumeBuffChargesPerMob, type CombatBuffBadge } from '../buffService';
+import { broadcastRareLootActivity } from '../chatActivityService';
 import { buildCombatLogResult, buildPlayerTemplateCombatant, processCombatVictoryRewards } from '../combatOrchestrationService';
 import { mapTemplateCombatLog } from '../combatLogMapper';
 import { degradeEquippedDurability } from '../durabilityService';
+import { enrichLootWithNames } from '../lootService';
 import { setHp, enterRecoveringState } from '../hpService';
 import { persistMobHp } from '../persistedMobService';
 import { applyTrackedFamilyWeightBias } from '../explorationTrackingService';
@@ -240,7 +243,7 @@ export async function processAmbushOutcome(args: {
     durabilityShield: shieldWasActive ? combatBuffs.durabilityShield : 0,
   });
 
-  let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
+  let loot: LootDrop[] = [];
   let xpGain = 0;
   let xpGrants: GrantXpResult[] = [];
   let aborted = false;
@@ -262,6 +265,13 @@ export async function processAmbushOutcome(args: {
       resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
     });
     loot = rewards.loot;
+    const lootWithNames = await enrichLootWithNames(loot);
+    void broadcastRareLootActivity({
+      zoneId,
+      actorPlayerId: playerId,
+      actorUsername: username,
+      loot: lootWithNames,
+    }).catch(() => {});
     allNewItemIds.push(...rewards.newItemIds);
     allUpdatedItemIds.push(...rewards.updatedItemIds);
     if (rewards.pendingLootSessionId) {

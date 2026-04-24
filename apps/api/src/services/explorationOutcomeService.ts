@@ -3,6 +3,7 @@ import {
   WORLD_EVENT_CONSTANTS,
 } from '@pocketrealm/shared';
 import { prisma } from '@pocketrealm/database';
+import { broadcastZoneDiscoveryActivity } from './chatActivityService';
 import { discoverZone } from './zoneDiscoveryService';
 import { createBossEncounter } from './bossEncounterService';
 import { spawnWorldEvent, computeZoneModifiers, filterEventModifiers } from './worldEventService';
@@ -34,6 +35,7 @@ export async function processExplorationOutcomes(
 ): Promise<ExplorationOutcomeResult> {
   const {
     playerId,
+    username,
     zoneId,
     zone,
     hpState,
@@ -257,6 +259,12 @@ export async function processExplorationOutcomes(
       const neighborIndex = randomIntInclusive(0, eligibleNeighbors.length - 1);
       const neighbor = eligibleNeighbors[neighborIndex]!;
       await discoverZone(playerId, neighbor.id);
+      void broadcastZoneDiscoveryActivity({
+        zoneId,
+        actorPlayerId: playerId,
+        actorUsername: username,
+        discoveredZoneName: neighbor.name,
+      }).catch(() => {});
       // Remove discovered neighbor so subsequent zone_exit rolls don't pick it again
       const origIndex = undiscoveredNeighbors.findIndex((n) => n.id === neighbor.id);
       if (origIndex !== -1) undiscoveredNeighbors.splice(origIndex, 1);

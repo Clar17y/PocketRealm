@@ -24,6 +24,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { calculateFleeWithGold, trackAchievements } from '../../utils/routeHelpers.js';
 import { parseBossEffects, parseBossRoundSummaries } from '../../utils/bossJsonSchemas';
+import { broadcastBossDefeatActivity } from '../chatActivityService';
 import { emitSystemMessage } from '../systemMessageService';
 import { getEquipmentStats } from '../equipmentService';
 import { getPlayerProgressionState } from '../attributesService';
@@ -536,20 +537,12 @@ async function resolveBossRoundInner(
 
     const killerName = (await resolveUsername(killedBy)) ?? 'unknown';
     const zoneName = encounter.event.zone?.name ?? 'unknown';
-    await emitSystemMessage(
-      io,
-      'world',
-      'world',
-      `${encounter.mobTemplate.name} in ${zoneName} has been slain! ${killerName} dealt the final blow.`,
-    );
-    if (encounter.event.zoneId) {
-      await emitSystemMessage(
-        io,
-        'zone',
-        `zone:${encounter.event.zoneId}`,
-        `${encounter.mobTemplate.name} has been slain! ${killerName} dealt the final blow.`,
-      );
-    }
+    await broadcastBossDefeatActivity({
+      zoneId: encounter.event.zoneId,
+      zoneName,
+      bossName: encounter.mobTemplate.name,
+      killerName,
+    });
 
     for (const playerId of contributorMap.keys()) {
       void sendPush(playerId, 'bossKilled', {

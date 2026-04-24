@@ -2,11 +2,15 @@ import { Router } from 'express';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { logger } from '../../logger';
 import { createActivityLog } from '../../services/activityLogService';
+import { broadcastCraftActivity } from '../../services/chatActivityService';
 import type { EventModifierBadge } from '../../services/worldEventService';
 import {
   CRAFTING_CONSTANTS,
+  CHAT_ACTIVITY_CONSTANTS,
   GUILD_CONSTANTS,
+  ITEM_RARITY_CONSTANTS,
   PREMIUM_CONSTANTS,
+  isRarityAtLeast,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
@@ -61,6 +65,13 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     await assertCanAct(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { username: true, currentZoneId: true },
+    });
+    if (!player?.currentZoneId) {
+      throw new AppError(400, 'You must be in a zone to craft', 'NO_ZONE');
+    }
     assertZoneAllowsCrafting(zone);
 
     const recipe = await prisma.craftingRecipe.findUnique({
@@ -332,6 +343,23 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         xp: serializeXpGrant(xpGrant),
       },
     });
+
+    const bestCraft = craftedItemDetails
+      .filter((item) => isRarityAtLeast(item.rarity, CHAT_ACTIVITY_CONSTANTS.MIN_CRAFT_RARITY))
+      .sort(
+        (a, b) => ITEM_RARITY_CONSTANTS.ORDER.indexOf(b.rarity) - ITEM_RARITY_CONSTANTS.ORDER.indexOf(a.rarity),
+      )[0];
+
+    if (bestCraft) {
+      void broadcastCraftActivity({
+        zoneId: player.currentZoneId,
+        actorPlayerId: playerId,
+        actorUsername: player.username,
+        itemName: recipe.resultTemplate.name,
+        rarity: bestCraft.rarity,
+        skillType: recipe.skillType,
+      }).catch(() => {});
+    }
 
     const craftingBuffBadges: EventModifierBadge[] = [];
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
