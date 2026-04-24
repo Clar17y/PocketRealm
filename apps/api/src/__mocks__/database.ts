@@ -49,6 +49,8 @@ export const prisma = {
   playerZoneDiscovery: mockModel(),
   playerZoneExploration: mockModel(),
   chatMessage: mockModel(),
+  chatActivity: mockModel(),
+  playerNpcActivityReaction: mockModel(),
   playerStats: mockModel(),
   playerAchievement: mockModel(),
   premiumPurchase: mockModel(),
