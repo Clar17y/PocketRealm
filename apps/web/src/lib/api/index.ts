@@ -131,6 +131,8 @@ export {
   setActiveTitle,
   getLeaderboardCategories,
   getLeaderboard,
+  getCrownCollectors,
+  getPublicLeaderboardSummary,
 } from './social';
 export type {
   PvpRatingResponse,
@@ -150,6 +152,12 @@ export type {
   AchievementRewardResponse,
   PlayerAchievementProgress,
   AchievementsResponse,
+  LeaderboardPeriod,
+  CrownCounts,
+  CrownCollectorEntry,
+  CrownCollectorsResponse,
+  PublicSummaryWeeklyLeader,
+  PublicLeaderboardSummaryResponse,
   LeaderboardEntry,
   LeaderboardResponse,
   LeaderboardCategoryGroup,
