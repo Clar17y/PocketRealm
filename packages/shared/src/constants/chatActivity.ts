@@ -6,6 +6,7 @@ export { CHAT_ACTIVITY_EVENT_TYPES } from '../types/chat.types';
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
 const METAL_CRAFT_NPC_KEYS = new Set<NpcKey>([
   'millbrook-blacksmith',
+  'thornwall-blacksmith',
   'thornwall-weaponsmithing',
   'thornwall-armorsmithing',
   'thornwall-refining',

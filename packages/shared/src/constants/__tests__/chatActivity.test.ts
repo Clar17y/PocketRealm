@@ -51,12 +51,14 @@ describe('chatActivity constants', () => {
     expect(line).toContain('Epic Steel Greatsword');
   });
 
-  it('marks Thornwall metal craft NPCs relevant and returns a reaction line', () => {
-    const relevance = getNpcActivityRelevance('thornwall-weaponsmithing', craftActivity);
-    const line = getNpcActivityReactionLine('thornwall-weaponsmithing', craftActivity);
+  it('marks Thornwall metal craft NPCs relevant and returns reaction lines', () => {
+    for (const npcKey of ['thornwall-blacksmith', 'thornwall-weaponsmithing'] as const) {
+      const relevance = getNpcActivityRelevance(npcKey, craftActivity);
+      const line = getNpcActivityReactionLine(npcKey, craftActivity);
 
-    expect(relevance).toEqual({ relevant: true, preferOwn: true });
-    expect(line).not.toBeNull();
-    expect(line).toContain('Epic Steel Greatsword');
+      expect(relevance).toEqual({ relevant: true, preferOwn: true });
+      expect(line).not.toBeNull();
+      expect(line).toContain('Epic Steel Greatsword');
+    }
   });
 });
