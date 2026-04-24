@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { login } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
 import { PixelButton } from '@/components/PixelButton';
 import { RELOGIN_MESSAGE_KEY } from './reloginMessage';
 
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const isHydrated = useIsHydrated();
 
   useEffect(() => {
     const loginMessage = sessionStorage.getItem(RELOGIN_MESSAGE_KEY);
@@ -113,7 +115,7 @@ export default function LoginPage() {
             <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
           )}
 
-          <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
+          <PixelButton type="submit" variant="primary" disabled={loading || !isHydrated} className="mt-2">
             {loading ? 'Logging in...' : 'Enter World'}
           </PixelButton>
         </form>

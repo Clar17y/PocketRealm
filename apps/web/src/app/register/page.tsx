@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { register } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
 import { PixelButton } from '@/components/PixelButton';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { trackEvent } from '@/lib/analytics';
@@ -17,11 +18,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
+  const isHydrated = useIsHydrated();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {

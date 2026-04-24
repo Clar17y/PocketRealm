@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderToString } from 'react-dom/server';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PASSWORD_UPDATED_RELOGIN_MESSAGE, RELOGIN_MESSAGE_KEY } from './reloginMessage';
@@ -36,6 +37,13 @@ afterEach(() => {
 });
 
 describe('LoginPage', () => {
+  it('renders the submit button disabled before hydration to avoid native GET form submits', () => {
+    const html = renderToString(React.createElement(LoginPage));
+
+    expect(html).toContain('type="submit"');
+    expect(html).toContain('disabled=""');
+  });
+
   it('shows and clears the relogin success message after a forced password reset logout', () => {
     sessionStorage.setItem(RELOGIN_MESSAGE_KEY, PASSWORD_UPDATED_RELOGIN_MESSAGE);
 
