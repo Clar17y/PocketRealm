@@ -1,27 +1,28 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
-import { PixelButton } from '@/components/PixelButton';
-import { Coins, Clock, History, Users } from 'lucide-react';
+import { Coins } from 'lucide-react';
 import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
-import * as api from '@/lib/api';
 import {
   CASINO_CONSTANTS,
-  getNumberColor,
   getNumbersForBet,
 } from '@pocketrealm/shared';
 import type {
   RouletteBetType,
-  RouletteRoundState,
-  RouletteHistoryEntry,
   RoulettePublicBet,
   CasinoResultEvent,
 } from '@pocketrealm/shared';
 import type { SessionBet } from '@/hooks/useCasinoSocket';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { GoldExchangeCard } from './casino/GoldExchangeCard';
+import { RouletteBoardCard } from './casino/RouletteBoardCard';
+import { CasinoHistoryPanels } from './casino/CasinoHistoryPanels';
+import { useRouletteRound } from './casino/useRouletteRound';
+import { buildChipMap, type SelectedRouletteBet } from './casino/casinoUtils';
+import { WinCelebration } from './casino/WinCelebration';
 
 interface CasinoProps {
   gold: number;
@@ -38,115 +39,6 @@ interface CasinoProps {
   trackBet: (betType: RouletteBetType, betValue: string, amount: number, roundId: string) => void;
   playerName: string | null;
   showNpcDialogue?: boolean;
-}
-
-// Helpers
-
-function colorClass(color: 'red' | 'black' | 'green'): string {
-  switch (color) {
-    case 'red': return 'bg-[var(--rpg-red)] text-white';
-    case 'black': return 'bg-[#1a1a2e] text-white';
-    case 'green': return 'bg-[var(--rpg-green-dark)] text-white';
-  }
-}
-
-function colorPipClass(color: 'red' | 'black' | 'green'): string {
-  switch (color) {
-    case 'red': return 'bg-[var(--rpg-red)]';
-    case 'black': return 'bg-[#1a1a2e]';
-    case 'green': return 'bg-[var(--rpg-green-dark)]';
-  }
-}
-
-interface ChipStack {
-  myAmount: number;
-  myCount: number;
-  otherCount: number;
-}
-
-function ChipStackIndicator({ myCount, otherCount }: ChipStack) {
-  const total = Math.min(myCount + otherCount, 3);
-  if (total === 0) return null;
-  const overflow = myCount + otherCount > 3 ? myCount + otherCount : 0;
-
-  return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="relative w-5 h-5">
-        {Array.from({ length: total }, (_, i) => {
-          const isMine = i < myCount;
-          return (
-            <img
-              key={i}
-              src={isMine ? '/assets/ui/chip-gold.svg' : '/assets/ui/chip-silver.svg'}
-              alt=""
-              className="absolute w-5 h-5 drop-shadow-sm"
-              style={{ top: `${-i * 2}px` }}
-            />
-          );
-        })}
-        {overflow > 0 && (
-          <span className="absolute -top-2 -right-1.5 text-[7px] text-white font-bold bg-black/60 rounded-full px-0.5 leading-tight">
-            x{overflow}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const COIN_POSITIONS = Array.from({ length: 20 }, () => ({
-  left: Math.random() * 100,
-  delay: Math.random() * 0.8,
-  duration: 1.5 + Math.random(),
-}));
-
-function WinCelebration({ payout, isBigWin }: { payout: number; isBigWin: boolean }) {
-  const coinCount = isBigWin ? 20 : 8;
-  return (
-    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-[var(--rpg-gold)]/10" style={{ animation: 'gold-shimmer 1.5s ease-out forwards' }} />
-      {COIN_POSITIONS.slice(0, coinCount).map((pos, i) => (
-        <div
-          key={i}
-          className="absolute text-lg"
-          style={{
-            left: `${pos.left}%`,
-            animationDelay: `${pos.delay}s`,
-            animation: `coin-fall ${pos.duration}s ease-in forwards`,
-          }}
-        >
-          {'🪙'}
-        </div>
-      ))}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-[24px] font-pixel text-[var(--rpg-gold)] animate-bounce">
-          +{payout.toLocaleString()}g
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Build the roulette board rows: 12 rows of [col1, col2, col3]
-const BOARD_ROWS: number[][] = [];
-for (let row = 0; row < 12; row++) {
-  BOARD_ROWS.push([row * 3 + 1, row * 3 + 2, row * 3 + 3]);
-}
-
-// Corner bet positions: each corner sits at the intersection of 4 adjacent numbers
-const CORNER_POSITIONS: { row: number; col: number; value: string; numbers: number[] }[] = [];
-for (let row = 0; row < 11; row++) {
-  const topLeft = row * 3 + 1;
-  CORNER_POSITIONS.push({
-    row, col: 0,
-    value: `${topLeft},${topLeft + 1},${topLeft + 3},${topLeft + 4}`,
-    numbers: [topLeft, topLeft + 1, topLeft + 3, topLeft + 4],
-  });
-  CORNER_POSITIONS.push({
-    row, col: 1,
-    value: `${topLeft + 1},${topLeft + 2},${topLeft + 4},${topLeft + 5}`,
-    numbers: [topLeft + 1, topLeft + 2, topLeft + 4, topLeft + 5],
-  });
 }
 
 export function Casino({
@@ -166,21 +58,23 @@ export function Casino({
   showNpcDialogue = true,
 }: CasinoProps) {
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
+  const {
+    roundState,
+    history,
+    showHeatMap,
+    setShowHeatMap,
+    numberStats,
+    refreshRound,
+  } = useRouletteRound();
 
-  // Gold exchange state
   const [exchangeTurns, setExchangeTurns] = useState(100);
   const [isExchanging, setIsExchanging] = useState(false);
-
-  // Roulette state
-  const [roundState, setRoundState] = useState<RouletteRoundState | null>(null);
   const [selectedBetType, setSelectedBetType] = useState<RouletteBetType | null>(null);
   const [selectedBetValue, setSelectedBetValue] = useState('');
   const [betAmount, setBetAmount] = useState(10);
   const [isBetting, setIsBetting] = useState(false);
-  const [history, setHistory] = useState<RouletteHistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [hoveredBet, setHoveredBet] = useState<{ type: RouletteBetType; value: string } | null>(null);
-  const [showHeatMap, setShowHeatMap] = useState(false);
+  const [hoveredBet, setHoveredBet] = useState<SelectedRouletteBet | null>(null);
   const [winAnimation, setWinAnimation] = useState<{ payout: number; isBigWin: boolean } | null>(null);
 
   const highlightedNumbers = useMemo(() => {
@@ -193,102 +87,12 @@ export function Casino({
     const polled = roundState?.bets ?? [];
     if (liveBets.length === 0) return polled;
     if (polled.length === 0) return liveBets;
-    // Merge: start with polled bets, append any live bets beyond that count
+
     return liveBets.length > polled.length ? [...polled, ...liveBets.slice(polled.length)] : polled;
   }, [liveBets, roundState?.bets]);
 
-  const chipMap = useMemo(() => {
-    const map = new Map<string, ChipStack>();
-    for (const bet of displayBets) {
-      const key = bet.betType === 'straight' ? `num:${bet.betValue}`
-        : bet.betType === 'corner' ? `corner:${bet.betValue}`
-        : `${bet.betType}:${bet.betValue}`;
-      const isMine = bet.playerName === playerName;
-      const existing = map.get(key) ?? { myAmount: 0, myCount: 0, otherCount: 0 };
-      if (isMine) {
-        existing.myAmount += bet.amount;
-        existing.myCount++;
-      } else {
-        existing.otherCount++;
-      }
-      map.set(key, existing);
-    }
-    return map;
-  }, [displayBets, playerName]);
+  const chipMap = useMemo(() => buildChipMap(displayBets, playerName), [displayBets, playerName]);
 
-  const [numberStats, setNumberStats] = useState<{ number: number; count: number }[] | null>(null);
-
-  // Fetch stats when toggled on
-  useEffect(() => {
-    if (!showHeatMap) { setNumberStats(null); return; }
-    let cancelled = false;
-    api.getRouletteStats().then((res) => {
-      if (cancelled) return;
-      if (res.data) setNumberStats(res.data.stats);
-    });
-    return () => { cancelled = true; };
-  }, [showHeatMap]);
-
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Fetch round state
-  const fetchRound = useCallback(async () => {
-    try {
-      const result = await api.getRouletteRound();
-      if (result.data) {
-        setRoundState(result.data);
-      }
-    } catch {
-      // Polling failure is non-critical; next poll will retry
-    }
-  }, []);
-
-  // Fetch history
-  const fetchHistory = useCallback(async () => {
-    try {
-      const result = await api.getRouletteHistory();
-      if (result.data) {
-        setHistory(result.data.history);
-      }
-    } catch {
-      // History fetch failure is non-critical
-    }
-  }, []);
-
-  // Initial load
-  useEffect(() => {
-    fetchRound();
-    fetchHistory();
-  }, [fetchRound, fetchHistory]);
-
-  // Polling: every 3s during betting/spinning, after a delay during result to auto-start next round
-  useEffect(() => {
-    const phase = roundState?.phase;
-    const interval = phase === 'result' ? 5000 : 3000;
-    const shouldPoll = phase === 'betting' || phase === 'spinning' || phase === 'result';
-
-    if (shouldPoll) {
-      pollRef.current = setInterval(() => {
-        fetchRound();
-      }, interval);
-    }
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [roundState?.phase, fetchRound]);
-
-  // When result phase appears, refresh history
-  useEffect(() => {
-    if (roundState?.phase === 'result') {
-      fetchHistory();
-    }
-  }, [roundState?.phase, fetchHistory]);
-
-  // Win animation trigger — only fires on new results, checks player's wins
   const lastResultRef = useRef<typeof lastResult>(null);
   useEffect(() => {
     if (!lastResult || lastResult === lastResultRef.current) return;
@@ -305,7 +109,6 @@ export function Casino({
       const timer = setTimeout(() => setWinAnimation(null), 2500);
       return () => clearTimeout(timer);
     } else {
-      // Player had bets but lost
       const myBets = sessionBets.filter((b) => b.payout === 0 || (b.payout !== null && b.payout < b.amount));
       if (myBets.length > 0) {
         triggerDialogueEvent('sell');
@@ -313,7 +116,6 @@ export function Casino({
     }
   }, [lastResult, playerName, sessionBets, triggerDialogueEvent]);
 
-  // Gold exchange handler
   const handleExchange = async () => {
     if (exchangeTurns <= 0 || exchangeTurns > turns) return;
     setIsExchanging(true);
@@ -326,21 +128,12 @@ export function Casino({
     setIsExchanging(false);
   };
 
-  // Select a number for straight bet
-  const handleNumberClick = (n: number) => {
-    setSelectedBetType('straight');
-    setSelectedBetValue(String(n));
-    setError(null);
-  };
-
-  // Select an outside bet
-  const handleOutsideBet = (type: RouletteBetType, value: string) => {
+  const handleSelectBet = (type: RouletteBetType, value: string) => {
     setSelectedBetType(type);
     setSelectedBetValue(value);
     setError(null);
   };
 
-  // Place bet handler
   const handlePlaceBet = async () => {
     if (!selectedBetType || betAmount <= 0 || betAmount > gold) return;
     setIsBetting(true);
@@ -348,8 +141,7 @@ export function Casino({
     try {
       await onPlaceBet(selectedBetType, selectedBetValue, betAmount);
       trackBet(selectedBetType, selectedBetValue, betAmount, roundState?.roundId ?? '');
-      // Refresh round after bet
-      await fetchRound();
+      await refreshRound();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to place bet');
     }
@@ -358,12 +150,6 @@ export function Casino({
 
   const myBetCount = useMemo(() => displayBets.filter((b) => b.playerName === playerName).length, [displayBets, playerName]);
   const atMaxBets = myBetCount >= CASINO_CONSTANTS.MAX_BETS_PER_ROUND;
-  const canBet = roundState?.phase === 'betting' && selectedBetType && betAmount > 0 && betAmount <= gold && !atMaxBets;
-
-  // Countdown display
-  const timeRemaining = roundState?.timeRemainingMs
-    ? Math.max(0, Math.ceil(roundState.timeRemainingMs / 1000))
-    : 0;
 
   if (!isInTown) {
     return (
@@ -414,500 +200,38 @@ export function Casino({
         </div>
       )}
 
-      {/* Gold Exchange */}
-      <PixelCard>
-        <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
-          <Coins size={18} className="text-[var(--rpg-gold)]" />
-          Gold Exchange
-        </h3>
-        <div className="flex items-center gap-2 text-xs text-[var(--rpg-text-secondary)] mb-3">
-          <span>Rate: <span className="font-pixel text-[8px]">{CASINO_CONSTANTS.GOLD_EXCHANGE_RATE}</span> turn = <span className="font-pixel text-[8px]">{CASINO_CONSTANTS.GOLD_EXCHANGE_RATE}</span> gold</span>
-          <span className="mx-1">|</span>
-          <span><span className="font-pixel text-[8px]">{turns.toLocaleString()}</span> turns available</span>
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            min={1}
-            max={turns}
-            value={exchangeTurns}
-            onChange={(e) => setExchangeTurns(Math.max(1, parseInt(e.target.value) || 0))}
-            className="flex-1 px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[12px] font-pixel"
-            placeholder="Turns to exchange"
-          />
-          <PixelButton
-            variant="gold"
-            size="sm"
-            onClick={handleExchange}
-            disabled={isExchanging || exchangeTurns <= 0 || exchangeTurns > turns}
-          >
-            {isExchanging ? 'Exchanging...' : `Exchange for ${(exchangeTurns * CASINO_CONSTANTS.GOLD_EXCHANGE_RATE).toLocaleString()} gold`}
-          </PixelButton>
-        </div>
-      </PixelCard>
-
-      {/* Round State */}
-      <PixelCard>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-[var(--rpg-text-primary)] flex items-center gap-2">
-            <Clock size={18} />
-            Roulette
-          </h3>
-          <RoundPhaseIndicator phase={roundState?.phase ?? 'idle'} timeRemaining={timeRemaining} />
-        </div>
-
-        {/* Result display */}
-        {roundState?.phase === 'result' && roundState.result !== null && (
-          <div className="text-center py-4 mb-3">
-            <div className="text-sm text-[var(--rpg-text-secondary)] mb-2">Result</div>
-            <div
-              className={`inline-flex items-center justify-center w-16 h-16 rounded-full text-2xl font-bold ${colorClass(getNumberColor(roundState.result))}`}
-            >
-              {roundState.result}
-            </div>
-          </div>
-        )}
-
-        {/* Spinning animation */}
-        {roundState?.phase === 'spinning' && (
-          <div className="text-center py-6 mb-3">
-            <div className="animate-spin inline-block w-12 h-12 rounded-full border-4 border-[var(--rpg-border)] border-t-[var(--rpg-gold)]" />
-            <div className="text-sm text-[var(--rpg-text-secondary)] mt-2 animate-pulse">
-              Spinning...
-            </div>
-          </div>
-        )}
-
-        {/* Roulette Board */}
-        <div className="overflow-x-auto">
-          <div className="min-w-[280px]">
-            {/* Zero */}
-            <button
-              onClick={() => handleNumberClick(0)}
-              className={`w-full h-9 rounded-t-lg text-sm font-bold transition-all border-2 ${
-                selectedBetType === 'straight' && selectedBetValue === '0'
-                  ? 'border-[var(--rpg-gold)] ring-2 ring-[var(--rpg-gold)]/50'
-                  : 'border-transparent'
-              } ${colorClass('green')} hover:opacity-80`}
-            >
-              0
-            </button>
-
-            {/* Number grid: 12 rows x 3 cols */}
-            <div className="relative">
-              <div className="grid grid-cols-3 gap-px bg-[var(--rpg-border)]">
-                {BOARD_ROWS.map((row) =>
-                  row.map((n) => {
-                    const color = getNumberColor(n);
-                    const isSelected = selectedBetType === 'straight' && selectedBetValue === String(n);
-                    const isResult = roundState?.phase === 'result' && roundState.result === n;
-                    const isHighlighted = highlightedNumbers.has(n);
-                    return (
-                      <button
-                        key={n}
-                        onClick={() => handleNumberClick(n)}
-                        className={`relative h-9 text-sm font-bold transition-all ${colorClass(color)} hover:opacity-80 ${
-                          isSelected
-                            ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
-                            : isHighlighted
-                              ? 'brightness-[1.35] ring-1 ring-[var(--rpg-gold)]/50 ring-inset'
-                              : ''
-                        } ${
-                          isResult
-                            ? 'ring-2 ring-[var(--rpg-gold)] animate-pulse'
-                            : ''
-                        }`}
-                      >
-                        {n}
-                        {chipMap.has(`num:${n}`) && <ChipStackIndicator {...chipMap.get(`num:${n}`)!} />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-              {/* Corner bet hit targets */}
-              {CORNER_POSITIONS.map((corner) => (
-                <button
-                  key={`corner-${corner.value}`}
-                  onClick={() => handleOutsideBet('corner', corner.value)}
-                  onMouseEnter={() => setHoveredBet({ type: 'corner', value: corner.value })}
-                  onMouseLeave={() => setHoveredBet(null)}
-                  className={`absolute w-5 h-5 rounded-full z-10 transition-colors ${
-                    selectedBetType === 'corner' && selectedBetValue === corner.value
-                      ? 'bg-[var(--rpg-gold)]/40 ring-1 ring-[var(--rpg-gold)]'
-                      : 'hover:bg-[var(--rpg-gold)]/20'
-                  }`}
-                  style={{
-                    left: `${((corner.col + 1) / 3) * 100}%`,
-                    top: `${((corner.row + 1) / 12) * 100}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                  title={`Corner: ${corner.numbers.join(', ')}`}
-                >
-                  {chipMap.has(`corner:${corner.value}`) && (
-                    <ChipStackIndicator {...chipMap.get(`corner:${corner.value}`)!} />
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Column bets */}
-            <div className="grid grid-cols-3 gap-1 mt-1">
-              {[1, 2, 3].map((col) => (
-                <button
-                  key={`col-${col}`}
-                  onClick={() => handleOutsideBet('column', `col${col}`)}
-                  onMouseEnter={() => setHoveredBet({ type: 'column', value: `col${col}` })}
-                  onMouseLeave={() => setHoveredBet(null)}
-                  className={`relative h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
-                    selectedBetType === 'column' && selectedBetValue === `col${col}`
-                      ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
-                      : 'border-[var(--rpg-border)]'
-                  } border`}
-                >
-                  Col {col}
-                  {chipMap.has(`column:col${col}`) && <ChipStackIndicator {...chipMap.get(`column:col${col}`)!} />}
-                </button>
-              ))}
-            </div>
-
-            {/* Dozen bets */}
-            <div className="grid grid-cols-3 gap-1 mt-1">
-              {[
-                { label: '1st 12', value: '1-12' },
-                { label: '2nd 12', value: '13-24' },
-                { label: '3rd 12', value: '25-36' },
-              ].map(({ label, value }) => (
-                <button
-                  key={`dozen-${value}`}
-                  onClick={() => handleOutsideBet('dozen', value)}
-                  onMouseEnter={() => setHoveredBet({ type: 'dozen', value })}
-                  onMouseLeave={() => setHoveredBet(null)}
-                  className={`relative h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
-                    selectedBetType === 'dozen' && selectedBetValue === value
-                      ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
-                      : 'border-[var(--rpg-border)]'
-                  } border`}
-                >
-                  {label}
-                  {chipMap.has(`dozen:${value}`) && <ChipStackIndicator {...chipMap.get(`dozen:${value}`)!} />}
-                </button>
-              ))}
-            </div>
-
-            {/* Even-money bets */}
-            <div className="grid grid-cols-4 gap-1 mt-1">
-              {([
-                { label: 'Red', type: 'red' as RouletteBetType, value: 'red', cls: 'bg-[var(--rpg-red)] text-white' },
-                { label: 'Black', type: 'black' as RouletteBetType, value: 'black', cls: 'bg-[#1a1a2e] text-white' },
-                { label: 'Odd', type: 'odd' as RouletteBetType, value: 'odd', cls: 'bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)]' },
-                { label: 'Even', type: 'even' as RouletteBetType, value: 'even', cls: 'bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)]' },
-              ]).map(({ label, type, value, cls }) => (
-                <button
-                  key={value}
-                  onClick={() => handleOutsideBet(type, value)}
-                  onMouseEnter={() => setHoveredBet({ type, value })}
-                  onMouseLeave={() => setHoveredBet(null)}
-                  className={`relative h-8 text-xs font-semibold ${cls} rounded transition-all hover:opacity-80 ${
-                    selectedBetType === type && selectedBetValue === value
-                      ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
-                      : 'border-[var(--rpg-border)]'
-                  } border`}
-                >
-                  {label}
-                  {chipMap.has(`${type}:${value}`) && <ChipStackIndicator {...chipMap.get(`${type}:${value}`)!} />}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Bet Controls */}
-        <div className="mt-4 space-y-3">
-          {/* Selected bet display */}
-          {selectedBetType && (
-            <div className="text-sm text-[var(--rpg-text-secondary)]">
-              Selected: <span className="text-[var(--rpg-text-primary)] font-semibold">{formatBet(selectedBetType, selectedBetValue)}</span>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-[var(--rpg-text-secondary)] mb-1 block">Bet Amount</label>
-              <input
-                type="number"
-                min={CASINO_CONSTANTS.ROULETTE_MIN_BET}
-                max={Math.min(CASINO_CONSTANTS.ROULETTE_MAX_BET, gold)}
-                value={betAmount}
-                onChange={(e) => setBetAmount(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-full px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[12px] font-pixel"
-              />
-            </div>
-            <div className="flex items-end gap-1">
-              {[10, 50, 100].map((preset) => (
-                <button
-                  key={preset}
-                  onClick={() => setBetAmount(Math.min(preset, gold))}
-                  className={`px-2 py-2 text-xs rounded border transition-all ${
-                    betAmount === preset
-                      ? 'border-[var(--rpg-gold)] text-[var(--rpg-gold)]'
-                      : 'border-[var(--rpg-border)] text-[var(--rpg-text-secondary)] hover:border-[var(--rpg-text-secondary)]'
-                  }`}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-[var(--rpg-text-secondary)]">
-            <span>Bets: <span className={atMaxBets ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-primary)]'}>{myBetCount}/{CASINO_CONSTANTS.MAX_BETS_PER_ROUND}</span></span>
-            <span>Max per bet: <span className="text-[var(--rpg-text-primary)]">{CASINO_CONSTANTS.ROULETTE_MAX_BET.toLocaleString()}g</span></span>
-          </div>
-
-          <PixelButton
-            variant="gold"
-            size="md"
-            className="w-full"
-            onClick={handlePlaceBet}
-            disabled={!canBet || isBetting}
-          >
-            {isBetting
-              ? 'Placing Bet...'
-              : roundState?.phase !== 'betting'
-                ? 'Waiting for betting phase...'
-                : atMaxBets
-                  ? `Max bets reached (${CASINO_CONSTANTS.MAX_BETS_PER_ROUND})`
-                  : !selectedBetType
-                    ? 'Select a bet'
-                    : betAmount > gold
-                      ? 'Not enough gold'
-                      : `Place Bet (${betAmount} gold)`}
-          </PixelButton>
-        </div>
-      </PixelCard>
-
-      {/* Live Bets */}
-      {displayBets.length > 0 && (
-          <PixelCard>
-            <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
-              <Users size={18} />
-              Live Bets ({displayBets.length})
-            </h3>
-            <div className="space-y-1.5 max-h-40 overflow-y-auto">
-              {displayBets.map((bet, i) => (
-                <div
-                  key={`${bet.playerName}-${i}`}
-                  className="flex items-center justify-between text-sm py-1 px-2 rounded bg-[var(--rpg-background)]"
-                >
-                  <span className="text-[var(--rpg-text-primary)] font-almendra truncate mr-2">{bet.playerName}</span>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs text-[var(--rpg-text-secondary)]">
-                      {formatBet(bet.betType, bet.betValue)}
-                    </span>
-                    <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">{bet.amount}g</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </PixelCard>
-      )}
-
-      {/* Session Bet History */}
-      {sessionBets.length > 0 && (
-        <PixelCard>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-[var(--rpg-text-primary)] text-sm">My Bets</h3>
-            <span className={`font-pixel text-[12px] ${
-              sessionProfit >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
-            }`}>
-              {sessionProfit >= 0 ? '+' : ''}{sessionProfit.toLocaleString()}g
-            </span>
-          </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {sessionBets.map((bet) => (
-              <div key={bet.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-[var(--rpg-background)]">
-                <span className="text-[var(--rpg-text-secondary)]">{formatBet(bet.betType, bet.betValue)}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[var(--rpg-text-secondary)] font-pixel text-[8px]">{bet.amount}g</span>
-                  {bet.payout === null ? (
-                    <span className="text-[var(--rpg-text-secondary)] italic">pending...</span>
-                  ) : bet.payout > 0 ? (
-                    <span className="text-[var(--rpg-green-light)] font-pixel text-[8px]">+{(bet.payout - bet.amount).toLocaleString()}g</span>
-                  ) : (
-                    <span className="text-[var(--rpg-red)] font-pixel text-[8px]">-{bet.amount.toLocaleString()}g</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </PixelCard>
-      )}
-
-      {/* Spin History */}
-      {history.length > 0 && (
-        <PixelCard>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-[var(--rpg-text-primary)] flex items-center gap-2">
-              <History size={18} />
-              Spin History
-            </h3>
-            <button
-              onClick={() => setShowHeatMap((v) => !v)}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
-                showHeatMap
-                  ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
-                  : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] border border-[var(--rpg-border)]'
-              }`}
-            >
-              Hot/Cold
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {history.map((entry) => {
-              const color = getNumberColor(entry.result);
-              return (
-                <div
-                  key={entry.spinNumber}
-                  className={`w-8 h-8 rounded flex items-center justify-center text-xs font-bold ${colorClass(color)}`}
-                  title={`Spin #${entry.spinNumber}`}
-                >
-                  {entry.result}
-                </div>
-              );
-            })}
-          </div>
-          {/* Color distribution */}
-          <div className="flex items-center gap-3 mt-3 text-xs text-[var(--rpg-text-secondary)]">
-            <span className="flex items-center gap-1">
-              <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('red')}`} />
-              <span className="font-pixel text-[8px]">{history.filter((h) => getNumberColor(h.result) === 'red').length}</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('black')}`} />
-              <span className="font-pixel text-[8px]">{history.filter((h) => getNumberColor(h.result) === 'black').length}</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('green')}`} />
-              <span className="font-pixel text-[8px]">{history.filter((h) => getNumberColor(h.result) === 'green').length}</span>
-            </span>
-          </div>
-        </PixelCard>
-      )}
-
-      {/* Hot/Cold Panel */}
-      {showHeatMap && numberStats && (
-        <PixelCard>
-          <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 text-sm">
-            Hot / Cold <span className="text-[var(--rpg-text-secondary)] font-normal">(last {CASINO_CONSTANTS.ROULETTE_STATS_DEPTH} spins)</span>
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-orange-400 font-semibold mb-1.5 flex items-center gap-1">
-                Hot
-              </div>
-              <div className="space-y-0.5">
-                {numberStats
-                  .filter((s) => s.number > 0)
-                  .sort((a, b) => b.count - a.count)
-                  .slice(0, 10)
-                  .map((s) => (
-                    <div key={`hot-${s.number}`} className="flex items-center gap-1.5">
-                      <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${colorClass(getNumberColor(s.number))}`}>
-                        {s.number}
-                      </div>
-                      <div className="flex-1 h-1.5 rounded-full bg-[var(--rpg-border)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-orange-400"
-                          style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
-                        />
-                      </div>
-                      <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-blue-400 font-semibold mb-1.5 flex items-center gap-1">
-                Cold
-              </div>
-              <div className="space-y-0.5">
-                {numberStats
-                  .filter((s) => s.number > 0)
-                  .sort((a, b) => a.count - b.count)
-                  .slice(0, 10)
-                  .map((s) => (
-                    <div key={`cold-${s.number}`} className="flex items-center gap-1.5">
-                      <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${colorClass(getNumberColor(s.number))}`}>
-                        {s.number}
-                      </div>
-                      <div className="flex-1 h-1.5 rounded-full bg-[var(--rpg-border)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-blue-400"
-                          style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
-                        />
-                      </div>
-                      <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        </PixelCard>
-      )}
-
+      <GoldExchangeCard
+        turns={turns}
+        exchangeTurns={exchangeTurns}
+        isExchanging={isExchanging}
+        onExchangeTurnsChange={setExchangeTurns}
+        onExchange={handleExchange}
+      />
+      <RouletteBoardCard
+        roundState={roundState}
+        selectedBetType={selectedBetType}
+        selectedBetValue={selectedBetValue}
+        betAmount={betAmount}
+        gold={gold}
+        isBetting={isBetting}
+        atMaxBets={atMaxBets}
+        myBetCount={myBetCount}
+        highlightedNumbers={highlightedNumbers}
+        chipMap={chipMap}
+        onSelectBet={handleSelectBet}
+        onSetHoveredBet={setHoveredBet}
+        onBetAmountChange={setBetAmount}
+        onPlaceBet={() => void handlePlaceBet()}
+      />
+      <CasinoHistoryPanels
+        displayBets={displayBets}
+        sessionBets={sessionBets}
+        sessionProfit={sessionProfit}
+        history={history}
+        showHeatMap={showHeatMap}
+        numberStats={numberStats}
+        onToggleHeatMap={() => setShowHeatMap(!showHeatMap)}
+      />
     </ScreenContainer>
   );
-}
-
-// Sub-components
-
-function RoundPhaseIndicator({ phase, timeRemaining }: { phase: string; timeRemaining: number }) {
-  switch (phase) {
-    case 'betting':
-      return (
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[var(--rpg-green-light)] animate-pulse" />
-          <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">{timeRemaining}s</span>
-          <span className="text-xs text-[var(--rpg-text-secondary)]">betting open</span>
-        </div>
-      );
-    case 'spinning':
-      return (
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[var(--rpg-gold)] animate-pulse" />
-          <span className="text-xs text-[var(--rpg-gold)]">Spinning...</span>
-        </div>
-      );
-    case 'result':
-      return (
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[var(--rpg-blue-light)]" />
-          <span className="text-xs text-[var(--rpg-blue-light)]">Result</span>
-        </div>
-      );
-    default:
-      return (
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[var(--rpg-text-secondary)]" />
-          <span className="text-xs text-[var(--rpg-text-secondary)]">Idle</span>
-        </div>
-      );
-  }
-}
-
-function formatBet(type: RouletteBetType, value: string): string {
-  switch (type) {
-    case 'straight': return `#${value}`;
-    case 'red': return 'Red';
-    case 'black': return 'Black';
-    case 'odd': return 'Odd';
-    case 'even': return 'Even';
-    case 'dozen':
-      return value === '1-12' ? '1st 12' : value === '13-24' ? '2nd 12' : '3rd 12';
-    case 'column': return `Column ${value.replace('col', '')}`;
-    case 'corner': return `Corner ${value}`;
-    case 'split': return `Split ${value}`;
-    default: return `${type} ${value}`;
-  }
 }
