@@ -4,11 +4,21 @@ import type { ChatActivityEventType, ChatActivityRecord } from '../types/chat.ty
 export { CHAT_ACTIVITY_EVENT_TYPES } from '../types/chat.types';
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+const METAL_CRAFT_NPC_KEYS = new Set<NpcKey>([
+  'millbrook-blacksmith',
+  'thornwall-weaponsmithing',
+  'thornwall-armorsmithing',
+  'thornwall-refining',
+] as const);
 
 type KnownRarity = (typeof RARITY_ORDER)[number];
 
 function isKnownRarity(value: string): value is KnownRarity {
   return RARITY_ORDER.includes(value as KnownRarity);
+}
+
+function isMetalCraftNpc(npcKey: NpcKey): boolean {
+  return npcKey.startsWith('kessa-') || METAL_CRAFT_NPC_KEYS.has(npcKey);
 }
 
 export function capitalise(value: string): string {
@@ -58,7 +68,7 @@ export function getNpcActivityRelevance(npcKey: NpcKey, activity: ChatActivityRe
   const skillType = typeof activity.metadata.skillType === 'string' ? activity.metadata.skillType : null;
 
   if (activity.eventType === 'craft_crit') {
-    if (npcKey.startsWith('kessa-') || npcKey === 'millbrook-blacksmith' || npcKey.startsWith('thornwall-blacksmith')) {
+    if (isMetalCraftNpc(npcKey)) {
       return { relevant: ['weaponsmithing', 'armorsmithing', 'refining'].includes(skillType ?? ''), preferOwn: true };
     }
     if (npcKey.includes('artisan')) {
@@ -91,7 +101,7 @@ export function getNpcActivityReactionLine(npcKey: NpcKey, activity: ChatActivit
   const rarity = activity.subjectRarity ? `${capitalise(activity.subjectRarity)} ` : '';
   const subject = `${rarity}${activity.subjectName ?? 'work'}`;
 
-  if (activity.eventType === 'craft_crit' && (npcKey.startsWith('kessa-') || npcKey === 'millbrook-blacksmith')) {
+  if (activity.eventType === 'craft_crit' && isMetalCraftNpc(npcKey)) {
     return `${subject}, was it? Good. Means somebody was listening at the anvil.`;
   }
   if (activity.eventType === 'craft_crit' && npcKey.includes('artisan')) {

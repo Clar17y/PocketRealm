@@ -50,4 +50,13 @@ describe('chatActivity constants', () => {
     const line = getNpcActivityReactionLine('kessa-weaponsmithing', craftActivity);
     expect(line).toContain('Epic Steel Greatsword');
   });
+
+  it('marks Thornwall metal craft NPCs relevant and returns a reaction line', () => {
+    const relevance = getNpcActivityRelevance('thornwall-weaponsmithing', craftActivity);
+    const line = getNpcActivityReactionLine('thornwall-weaponsmithing', craftActivity);
+
+    expect(relevance).toEqual({ relevant: true, preferOwn: true });
+    expect(line).not.toBeNull();
+    expect(line).toContain('Epic Steel Greatsword');
+  });
 });
