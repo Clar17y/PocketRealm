@@ -21,6 +21,11 @@ vi.mock('../../services/hpService', () => ({
 }));
 vi.mock('../../services/lootService', () => ({
   rollAndGrantLootWithCapacity: vi.fn().mockResolvedValue({ drops: [], pendingLootSessionId: null }),
+  enrichLootWithNames: vi.fn().mockResolvedValue([]),
+}));
+vi.mock('../../services/chatActivityService', () => ({
+  broadcastRareLootActivity: vi.fn().mockResolvedValue(undefined),
+  broadcastZoneDiscoveryActivity: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../services/xpService', () => ({
   grantSkillXp: vi.fn().mockResolvedValue({
@@ -194,7 +199,7 @@ vi.mock('../../services/combatOrchestrationService', () => ({
     actionDefinitions: {},
   })),
   processCombatVictoryRewards: vi.fn().mockResolvedValue({
-    loot: [], overflow: [], pendingLootSessionId: null, newItemIds: [], updatedItemIds: [], xpGrants: [{ skillType: 'melee', xpResult: { xpGained: 10, xpAfterEfficiency: 10, efficiency: 1, leveledUp: false, newLevel: 1, atDailyCap: false }, newTotalXp: 10, newDailyXpGained: 10, characterXpGain: 5, characterXpAfter: 5, characterLevelBefore: 1, characterLevelAfter: 1, attributePointsAfter: 0, characterLeveledUp: false }],
+    loot: [], overflow: [], pendingLootSessionId: null, newItemIds: [], updatedItemIds: [], xpGrants: [{ skillType: 'melee', xpResult: { xpGained: 10, xpAfterEfficiency: 10, efficiency: 1, leveledUp: false, newLevel: 1, atDailyCap: false }, boostedXpAfterEfficiency: 10, newTotalXp: 10, newDailyXpGained: 10, characterXpGain: 5, characterXpAfter: 5, characterLevelBefore: 1, characterLevelAfter: 1, attributePointsAfter: 0, characterLeveledUp: false }],
     questProgress: [],
   }),
   buildCombatLogResult: vi.fn(() => ({})),
