@@ -115,6 +115,13 @@ describe('PublicRankings', () => {
     expect(screen.getByText('XP Hero')).toBeTruthy();
   });
 
+  it('loads weekly rankings from the initial tab prop', async () => {
+    render(<PublicRankings initialTab="weekly" />);
+
+    await waitFor(() => expect(getLeaderboard).toHaveBeenCalledWith('character_xp', false, null, 'weekly'));
+    expect(screen.getByText('XP Hero')).toBeTruthy();
+  });
+
   it('can request the signed-in crown collector rank', async () => {
     vi.mocked(getCrownCollectors).mockResolvedValue({
       data: {

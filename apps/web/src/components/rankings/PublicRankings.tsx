@@ -28,15 +28,7 @@ interface SeasonOption {
   name: string;
 }
 
-const VALID_TABS: PublicRankingsTab[] = ['leaderboards', 'weekly', 'crowns', 'hallOfFame'];
 const DEFAULT_CATEGORY = 'character_xp';
-
-function getInitialTab(): PublicRankingsTab {
-  if (typeof window === 'undefined') return 'crowns';
-
-  const tab = new URLSearchParams(window.location.search).get('tab');
-  return VALID_TABS.includes(tab as PublicRankingsTab) ? (tab as PublicRankingsTab) : 'crowns';
-}
 
 function updateTabQuery(tab: PublicRankingsTab) {
   if (typeof window === 'undefined') return;
@@ -73,8 +65,12 @@ function periodForTab(tab: PublicRankingsTab): LeaderboardPeriod {
   return tab === 'weekly' ? 'weekly' : 'alltime';
 }
 
-export function PublicRankings() {
-  const [activeTab, setActiveTab] = useState<PublicRankingsTab>(getInitialTab);
+interface PublicRankingsProps {
+  initialTab?: PublicRankingsTab;
+}
+
+export function PublicRankings({ initialTab = 'crowns' }: PublicRankingsProps) {
+  const [activeTab, setActiveTab] = useState<PublicRankingsTab>(initialTab);
   const [groups, setGroups] = useState<LeaderboardCategoryGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState('Characters');
   const [activeCategory, setActiveCategory] = useState(DEFAULT_CATEGORY);
