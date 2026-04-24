@@ -839,6 +839,7 @@ model PlayerNpcActivityReaction {
 
   @@id([playerId, npcKey, activityId])
   @@index([playerId, npcKey, reactedAt])
+  @@index([activityId])
   @@map("player_npc_activity_reactions")
 }
 
