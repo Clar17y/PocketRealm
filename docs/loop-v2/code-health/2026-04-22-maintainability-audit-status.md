@@ -36,6 +36,7 @@ Legend: `[ ]` pending | `[~]` in progress | `[x]` completed
 - [x] Preserve refactor seams for new admin season endpoints by extracting `apps/api/src/routes/admin/seasons.ts` and `apps/api/src/services/admin/seasonAdminService.ts`
 - [x] Preserve refactor seams for the new admin seasons UI by extracting `apps/web/src/components/screens/admin/SeasonsTab.tsx`
 - [x] Port account-role PvP changes from main into the split PvP modules
+- [x] Fix post-merge web bootstrap request loop caused by unstable settings hydration callback
 
 ## Completed Verification
 
@@ -60,11 +61,13 @@ Legend: `[ ]` pending | `[~]` in progress | `[x]` completed
 - `npm run build:web`
 - `npm run test -w @pocketrealm/api -- src/routes/admin.seasons.test.ts src/services/pvpService.test.ts`
 - `npm run test -w @pocketrealm/web -- src/components/screens/AdminScreen.test.tsx src/app/game/GameScreenRenderer.test.ts`
+- `npm run test -w @pocketrealm/web -- src/app/game/hooks/usePlayerSettings.test.ts src/app/game/useGameController.test.ts src/app/game/page.test.tsx`
+- `npm run test -w @pocketrealm/web -- src/components/screens/Settings.test.ts src/app/game/GameScreenRenderer.test.ts`
 
 ## Current Focus
 
-- Latest main merge is resolved locally and focused tests are passing.
-- Current follow-up: simplify touched merge/refactor code, run focused verification again, then commit and push.
+- Latest main merge is resolved and the post-merge web bootstrap request loop is fixed locally.
+- Current follow-up: rerun focused verification/build, then commit and push.
 
 ## Next Queue
 
