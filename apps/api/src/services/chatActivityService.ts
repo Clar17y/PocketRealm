@@ -28,7 +28,7 @@ export interface LootActivityItem {
 }
 
 export interface BaseActivityInput {
-  zoneId: string;
+  zoneId: string | null;
   actorPlayerId: string | null;
   actorUsername: string | null;
 }
@@ -56,10 +56,10 @@ type BaseActivityCreateInput = {
   metadata?: Prisma.InputJsonObject;
 };
 
-type ActivityCreateInput = BaseActivityCreateInput & (
-  | { scope: 'zone'; zoneId: string }
-  | { scope: 'global'; zoneId: string | null }
-);
+type ActivityCreateInput = BaseActivityCreateInput & {
+  scope: ChatActivityScope;
+  zoneId: string | null;
+};
 
 const RARITY_ORDER = ITEM_RARITY_CONSTANTS.ORDER;
 const NPC_ACTIVITY_REACTION_PAGE_SIZE = 25;
@@ -77,11 +77,22 @@ function rarityRank(rarity: string | null | undefined): number {
 }
 
 function pickBestLootItem(items: LootActivityItem[]): LootActivityItem | null {
-  const eligibleItems = items.filter(
-    (item) => item.itemName && isRarityAtLeast(item.rarity, CHAT_ACTIVITY_CONSTANTS.MIN_LOOT_RARITY),
-  );
+  let bestItem: LootActivityItem | null = null;
+  let bestRank = -1;
 
-  return [...eligibleItems].sort((a, b) => rarityRank(b.rarity) - rarityRank(a.rarity))[0] ?? null;
+  for (const item of items) {
+    if (!item.itemName || !isRarityAtLeast(item.rarity, CHAT_ACTIVITY_CONSTANTS.MIN_LOOT_RARITY)) {
+      continue;
+    }
+
+    const rank = rarityRank(item.rarity);
+    if (rank > bestRank) {
+      bestItem = item;
+      bestRank = rank;
+    }
+  }
+
+  return bestItem;
 }
 
 function metadataRecord(metadata: unknown): Record<string, unknown> {

@@ -123,10 +123,10 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
         getChatHistory('world', 'world', { messageType: 'activity' }),
       ]).then(([worldRes, activityRes]) => {
         if (worldRes.data) {
-          setWorldMessages(worldRes.data.messages as ChatMessageEvent[]);
+          setWorldMessages(worldRes.data.messages);
         }
         if (activityRes.data) {
-          setGlobalActivityMessages(activityRes.data.messages as ChatMessageEvent[]);
+          setGlobalActivityMessages(activityRes.data.messages);
         }
       });
 
@@ -134,7 +134,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       if (currentZoneIdRef.current) {
         getChatHistory('zone', `zone:${currentZoneIdRef.current}`).then((res) => {
           if (res.data) {
-            setZoneMessages(res.data.messages as ChatMessageEvent[]);
+            setZoneMessages(res.data.messages);
           }
         });
       }
@@ -144,7 +144,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
         socket.emit('chat:join-casino');
         getChatHistory('casino', 'casino').then((res) => {
           if (res.data) {
-            setCasinoMessages(res.data.messages as ChatMessageEvent[]);
+            setCasinoMessages(res.data.messages);
           }
         });
       }
@@ -182,7 +182,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     getChatHistory('zone', `zone:${currentZoneId}`).then((res) => {
       if (cancelled) return;
       if (res.data) {
-        setZoneMessages(res.data.messages as ChatMessageEvent[]);
+        setZoneMessages(res.data.messages);
       }
     });
     return () => { cancelled = true; };
@@ -243,7 +243,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     }
     getChatHistory('casino', 'casino').then((res) => {
       if (res.data) {
-        setCasinoMessages(res.data.messages as ChatMessageEvent[]);
+        setCasinoMessages(res.data.messages);
       }
     });
   }, []);

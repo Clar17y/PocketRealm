@@ -259,7 +259,7 @@ describe('chatActivityService', () => {
       itemName: 'Steel Greatsword',
       rarity: 'epic',
       skillType: 'weaponsmithing',
-    } as unknown as Parameters<typeof broadcastCraftActivity>[0])).rejects.toThrow('zoneId is required');
+    })).rejects.toThrow('zoneId is required');
 
     expect(mockEmitSystemMessage).not.toHaveBeenCalled();
     expect(mockPrisma.chatActivity.create).not.toHaveBeenCalled();

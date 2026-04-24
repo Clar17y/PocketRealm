@@ -12,6 +12,8 @@ const METAL_CRAFT_NPC_KEYS = new Set<NpcKey>([
   'thornwall-armorsmithing',
   'thornwall-refining',
 ] as const);
+const METAL_CRAFT_SKILLS = new Set(['weaponsmithing', 'armorsmithing', 'refining'] as const);
+const ARTISAN_CRAFT_SKILLS = new Set(['leatherworking', 'tailoring', 'weaving', 'tanning'] as const);
 
 type KnownRarity = (typeof RARITY_ORDER)[number];
 
@@ -21,6 +23,10 @@ function isKnownRarity(value: string): value is KnownRarity {
 
 function isMetalCraftNpc(npcKey: NpcKey): boolean {
   return npcKey.startsWith('kessa-') || METAL_CRAFT_NPC_KEYS.has(npcKey);
+}
+
+function hasSkill(skills: ReadonlySet<string>, skillType: string | null): boolean {
+  return skillType !== null && skills.has(skillType);
 }
 
 export function capitalise(value: string): string {
@@ -89,10 +95,10 @@ export function getNpcActivityRelevance(npcKey: NpcKey, activity: ChatActivityRe
 
   if (activity.eventType === 'craft_crit') {
     if (isMetalCraftNpc(npcKey)) {
-      return { relevant: ['weaponsmithing', 'armorsmithing', 'refining'].includes(skillType ?? ''), preferOwn: true };
+      return { relevant: hasSkill(METAL_CRAFT_SKILLS, skillType), preferOwn: true };
     }
     if (npcKey.includes('artisan')) {
-      return { relevant: ['leatherworking', 'tailoring', 'weaving', 'tanning'].includes(skillType ?? ''), preferOwn: true };
+      return { relevant: hasSkill(ARTISAN_CRAFT_SKILLS, skillType), preferOwn: true };
     }
     if (npcKey.includes('jeweller')) {
       return { relevant: skillType === 'jewelcrafting', preferOwn: true };

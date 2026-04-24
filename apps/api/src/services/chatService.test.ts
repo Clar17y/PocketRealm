@@ -133,6 +133,7 @@ describe('chatService', () => {
         orderBy: { createdAt: 'desc' },
         take: 50,
       });
+      expect(mockPrisma.player.findMany).not.toHaveBeenCalled();
     });
 
     it('can query history without activity messages', async () => {

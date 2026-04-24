@@ -57,6 +57,9 @@ export async function getChannelHistory(
     orderBy: { createdAt: 'desc' },
     take: CHAT_CONSTANTS.HISTORY_LIMIT,
   });
+  if (rows.length === 0) {
+    return [];
+  }
 
   // Batch-lookup player titles for all unique player IDs
   const playerIds = [...new Set(rows.map((r) => r.playerId))];
