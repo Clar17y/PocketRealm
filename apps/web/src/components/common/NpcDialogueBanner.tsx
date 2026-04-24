@@ -23,7 +23,7 @@ export function NpcDialogueBanner({
   const name = getNpcName(npcKey);
   const [line, setLine] = useState<string | null>(null);
   const [expanded, setExpanded] = useSessionStorageToggle(`lore-collapsed:npc-banner:${npcKey}`, false);
-  const fetchedActivityLine = useNpcActivityReaction(npcKey, showDialogue);
+  const fetchedActivityLine = useNpcActivityReaction(npcKey, showDialogue && activityLineOverride == null);
   const activityLine = activityLineOverride ?? fetchedActivityLine;
   const displayLine = activityLine ?? line;
 

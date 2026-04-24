@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { ChatNpcActivityReactionResponse, StateUpdates, TitleStyleVariant } from '@pocketrealm/shared';
+import type { ChatNpcActivityReactionResponse, NpcKey, StateUpdates, TitleStyleVariant } from '@pocketrealm/shared';
 import type { CombatLogEntryResponse, CombatOutcomeResponse } from './combat';
 
 // PvP Arena
@@ -191,7 +191,7 @@ export async function getChatHistory(channelType: string, channelId: string) {
   }>(`/api/v1/chat/history?channelType=${encodeURIComponent(channelType)}&channelId=${encodeURIComponent(channelId)}`);
 }
 
-export async function getNpcActivityReaction(npcKey: string) {
+export async function getNpcActivityReaction(npcKey: NpcKey) {
   return fetchApi<ChatNpcActivityReactionResponse>(
     `/api/v1/chat/activity/npc-reaction?npcKey=${encodeURIComponent(npcKey)}`,
   );

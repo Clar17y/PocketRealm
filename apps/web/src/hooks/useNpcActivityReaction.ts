@@ -14,10 +14,16 @@ export function useNpcActivityReaction(npcKey: NpcKey, enabled: boolean): string
     }
 
     let cancelled = false;
-    getNpcActivityReaction(npcKey).then((res) => {
-      if (cancelled) return;
-      setLine(res.data?.reaction?.line ?? null);
-    });
+    setLine(null);
+    getNpcActivityReaction(npcKey)
+      .then((res) => {
+        if (cancelled) return;
+        setLine(res.data?.reaction?.line ?? null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLine(null);
+      });
 
     return () => {
       cancelled = true;
