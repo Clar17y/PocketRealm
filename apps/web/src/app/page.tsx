@@ -1,6 +1,6 @@
 import Image from 'next/image';
-import { ChampionBadge } from '@/components/common/ChampionBadge';
 import { pixelButtonBase, pixelButtonVariants, pixelButtonSizes } from '@/components/PixelButton';
+import { LandingRankingsPreview } from '@/components/rankings/LandingRankingsPreview';
 
 const linkPrimary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.primary}`;
 const linkSecondary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.secondary}`;
@@ -34,6 +34,7 @@ export default function Home() {
             <a href="/register" className={linkPrimary}>Play Free</a>
             <a href="#features" className={linkSecondary}>Learn More</a>
             <a href="/wiki" className={linkSecondary}>Game Wiki</a>
+            <a href="/rankings" className={linkSecondary}>Rankings</a>
           </div>
         </div>
       </section>
@@ -164,14 +165,7 @@ export default function Home() {
               One-time purchase. Grants 30 days of Champion. Stacks if purchased again.
             </p>
 
-            {/* Mock leaderboard preview */}
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-4 mb-8 flex items-center justify-center gap-3 text-sm flex-wrap">
-              <span className="text-[var(--rpg-text-secondary)]">#1</span>
-              <ChampionBadge size="sm" />
-              <span className="text-[var(--rpg-text-primary)] font-semibold">YourName</span>
-              <span className="rainbow-title">Champion</span>
-              <span className="text-[var(--rpg-text-secondary)]">Lv. 42</span>
-            </div>
+            <LandingRankingsPreview />
 
             {/* Perks grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 text-sm">

@@ -8,6 +8,10 @@ vi.mock('next/image', () => ({
     React.createElement('img', props),
 }));
 
+vi.mock('@/components/rankings/LandingRankingsPreview', () => ({
+  LandingRankingsPreview: () => React.createElement('div', null, 'landing rankings preview'),
+}));
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -22,5 +26,6 @@ describe('Home page', () => {
     expect(screen.getByText(/One-time purchase\. Grants 30 days of Champion\./i)).toBeTruthy();
     expect(screen.getByText(/Helps cover the server bill and gently pressures me into shipping more content\./i)).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'Support Pocketrealm' }).length).toBeGreaterThan(0);
+    expect(screen.getByText('landing rankings preview')).toBeTruthy();
   });
 });
