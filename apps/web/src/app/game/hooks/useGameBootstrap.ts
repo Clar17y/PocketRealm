@@ -95,7 +95,7 @@ type EquipmentState = Array<{
 
 type LootRevealItem = {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
+  rarity: InventoryItemDTO['rarity'];
   quantity: number;
   imageSrc?: string;
 };

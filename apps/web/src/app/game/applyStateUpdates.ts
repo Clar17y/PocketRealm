@@ -2,6 +2,7 @@ import type { StateUpdates, InventoryItemDTO, HpState, SkillStateDTO, PlayerBuff
 
 export interface StateSetters {
   setInventory: (updater: (prev: InventoryItemDTO[]) => InventoryItemDTO[]) => void;
+  onInventoryAdded?: (items: InventoryItemDTO[]) => void;
   setInventoryCapacity: (n: number) => void;
   setInventoryUsedSlots: (n: number) => void;
   setEquipment: (eq: Record<string, InventoryItemDTO | null>) => void;
@@ -40,6 +41,10 @@ export function applyStateUpdates(
       }
       return next;
     });
+
+    if (updates.inventoryAdded?.length) {
+      setters.onInventoryAdded?.(updates.inventoryAdded);
+    }
   }
 
   // Sync equipment state when inventoryUpdated includes equipped items (e.g. after repair)

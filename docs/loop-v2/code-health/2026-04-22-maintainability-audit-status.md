@@ -37,6 +37,7 @@ Legend: `[ ]` pending | `[~]` in progress | `[x]` completed
 - [x] Preserve refactor seams for the new admin seasons UI by extracting `apps/web/src/components/screens/admin/SeasonsTab.tsx`
 - [x] Port account-role PvP changes from main into the split PvP modules
 - [x] Fix post-merge web bootstrap request loop caused by unstable settings hydration callback
+- [x] Fix action-level loot reveal regression for cache/pending loot inventory additions
 
 ## Completed Verification
 
@@ -63,11 +64,15 @@ Legend: `[ ]` pending | `[~]` in progress | `[x]` completed
 - `npm run test -w @pocketrealm/web -- src/components/screens/AdminScreen.test.tsx src/app/game/GameScreenRenderer.test.ts`
 - `npm run test -w @pocketrealm/web -- src/app/game/hooks/usePlayerSettings.test.ts src/app/game/useGameController.test.ts src/app/game/page.test.tsx`
 - `npm run test -w @pocketrealm/web -- src/components/screens/Settings.test.ts src/app/game/GameScreenRenderer.test.ts`
+- `npm run test -w @pocketrealm/web -- src/app/game/applyStateUpdates.test.ts src/app/game/useGameController.test.ts src/app/game/hooks/useGameBootstrap.test.ts src/app/game/page.test.tsx`
+- `npm run build:web`
+- `npm run test -w @pocketrealm/web`
 
 ## Current Focus
 
-- Latest main merge is resolved and the post-merge web bootstrap request loop is fixed locally.
-- Current follow-up: rerun focused verification/build, then commit and push.
+- Latest main merge is resolved.
+- Post-merge web bootstrap request loop is fixed and pushed.
+- Action-level inventory additions now feed loot reveal state; current follow-up is commit and push this regression fix.
 
 ## Next Queue
 

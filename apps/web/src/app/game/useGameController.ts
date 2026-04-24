@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trackEvent, trackOnce } from '@/lib/analytics';
+import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { useVisibleInterval } from '@/hooks/usePageVisible';
+import { RARITY_RANK } from '@/lib/rarity';
 import type { ForgeResultData } from '@/components/ForgeResultToast';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -71,6 +73,13 @@ import { useTravelActions } from './hooks/useTravelActions';
 import { useGameBootstrap } from './hooks/useGameBootstrap';
 
 type AttributeType = keyof CharacterProgression['attributes'];
+
+type LootRevealItem = {
+  name: string;
+  rarity: InventoryItemDTO['rarity'];
+  quantity: number;
+  imageSrc?: string;
+};
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
@@ -218,12 +227,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const playerCreatedAtRef = useRef<string | null>(null);
   const lootRevealRarityRef = useRef(lootRevealRarity);
   lootRevealRarityRef.current = lootRevealRarity;
-  const [lootRevealItems, setLootRevealItems] = useState<Array<{
-    name: string;
-    rarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
-    quantity: number;
-    imageSrc?: string;
-  }> | null>(null);
+  const [lootRevealItems, setLootRevealItems] = useState<LootRevealItem[] | null>(null);
   const hpStateRef = useRef(hpState);
   useEffect(() => {
     hpStateRef.current = hpState;
@@ -244,6 +248,25 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     manaStateRef.current = manaState;
   }, [manaState]);
+
+  const showLootRevealForItems = useCallback((items: InventoryItemDTO[]) => {
+    for (const item of items) {
+      prevInventoryIdsRef.current.add(item.id);
+    }
+
+    if (lootRevealRarityRef.current === 'none') return;
+
+    const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? RARITY_RANK.uncommon;
+    const notableItems = items.filter((item) => (RARITY_RANK[item.rarity] ?? -1) >= minRank);
+    if (notableItems.length === 0) return;
+
+    setLootRevealItems(notableItems.map((item) => ({
+      name: item.template.name,
+      rarity: item.rarity,
+      quantity: item.quantity,
+      imageSrc: itemImageSrc(item.template.name, item.template.itemType),
+    })));
+  }, [lootRevealRarityRef, prevInventoryIdsRef]);
 
   const activeScreenRef = useRef(activeScreen);
   useEffect(() => { activeScreenRef.current = activeScreen; }, [activeScreen]);
@@ -287,6 +310,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const stateSetters = useMemo<StateSetters>(() => ({
     setInventory: (updater) => setInventory(updater),
+    onInventoryAdded: showLootRevealForItems,
     setInventoryCapacity,
     setInventoryUsedSlots,
     setEquipment: (eq) => setEquipment(
@@ -317,8 +341,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setMaterialTotals,
     setActiveEncounterSiteId,
     setActiveZoneId: setActiveZoneIdImmediate,
-  }), [setActiveZoneIdImmediate]);
-  // State setters are stable; only the ref-synchronizing zone setter needs to stay in deps.
+  }), [setActiveZoneIdImmediate, showLootRevealForItems]);
+  // State setters are stable; only ref-synchronizing callbacks need to stay in deps.
 
   const runAction = async (actionName: string, fn: () => Promise<void>) => {
     if (busyAction) return;
