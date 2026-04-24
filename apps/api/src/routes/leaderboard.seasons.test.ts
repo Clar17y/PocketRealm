@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import { CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
 
 const mocks = vi.hoisted(() => ({
   optionalAuthenticate: vi.fn((req: any, _res: any, next: any) => {
@@ -162,9 +163,12 @@ describe('leaderboard route seasonal realm selection', () => {
     mocks.getPublicLeaderboardSummary.mockResolvedValue(summary);
 
     const res = await request(buildApp())
-      .get('/api/v1/leaderboard/public-summary');
+      .get('/api/v1/leaderboard/public-summary')
+      .set('Authorization', 'Bearer token');
 
     expect(res.status).toBe(200);
+    expect(res.header['cache-control']).toBe(CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+    expect(mocks.optionalAuthenticate).not.toHaveBeenCalled();
     expect(mocks.getPublicLeaderboardSummary).toHaveBeenCalledTimes(1);
     expect(mocks.getLeaderboard).not.toHaveBeenCalled();
     expect(res.body).toEqual(summary);

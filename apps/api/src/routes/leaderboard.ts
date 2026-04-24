@@ -9,6 +9,12 @@ import { asyncHandler } from '../utils/asyncHandler';
 
 export const leaderboardRouter = Router();
 
+leaderboardRouter.get('/public-summary', asyncHandler(async (_req, res) => {
+  const result = await getPublicLeaderboardSummary();
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+  res.json(result);
+}));
+
 leaderboardRouter.use(optionalAuthenticate);
 
 function optionalPositiveInt(value: unknown): number | undefined {
@@ -50,12 +56,6 @@ leaderboardRouter.get('/crowns', asyncHandler(async (req, res) => {
 leaderboardRouter.get('/crowns/:playerId', asyncHandler(async (req, res) => {
   const result = await getPlayerCrownCollection(req.params.playerId);
   res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PRIVATE_SHORT);
-  res.json(result);
-}));
-
-leaderboardRouter.get('/public-summary', asyncHandler(async (_req, res) => {
-  const result = await getPublicLeaderboardSummary();
-  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
   res.json(result);
 }));
 
