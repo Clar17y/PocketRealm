@@ -10,7 +10,7 @@ export async function emitSystemMessage(
   channelType: ChatChannelType,
   channelId: string,
   message: string,
-): Promise<void> {
+): Promise<{ id: string; createdAt: Date }> {
   const row = await saveMessage({
     channelType,
     channelId,
@@ -20,7 +20,7 @@ export async function emitSystemMessage(
     messageType: 'system',
   });
 
-  if (!io) return;
+  if (!io) return row;
 
   const event: ChatMessageEvent = {
     id: row.id,
@@ -35,4 +35,5 @@ export async function emitSystemMessage(
 
   const room = `chat:${channelId}`;
   io.to(room).emit('chat:message', event);
+  return row;
 }

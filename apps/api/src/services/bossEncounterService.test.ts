@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./systemMessageService.js', () => ({
-  emitSystemMessage: vi.fn().mockResolvedValue(undefined),
+  emitSystemMessage: vi.fn().mockResolvedValue({
+    id: 'msg-1',
+    createdAt: new Date('2026-02-04T12:00:00Z'),
+  }),
 }));
 vi.mock('./turnBankService.js', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue(undefined),

@@ -20,7 +20,11 @@ describe('systemMessageService', () => {
       createdAt: new Date('2026-02-04T12:00:00Z'),
     });
 
-    await emitSystemMessage(null, 'world', 'world', 'Hello world');
+    const result = await emitSystemMessage(null, 'world', 'world', 'Hello world');
+    expect(result).toEqual({
+      id: 'msg-1',
+      createdAt: new Date('2026-02-04T12:00:00Z'),
+    });
 
     expect(mockSaveMessage).toHaveBeenCalledWith({
       channelType: 'world',
