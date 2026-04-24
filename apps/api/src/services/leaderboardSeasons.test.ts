@@ -11,8 +11,10 @@ vi.mock('../redis', () => ({
     zrevrank: vi.fn(),
     zrevrange: vi.fn(),
     zscore: vi.fn(),
+    exists: vi.fn(),
     hget: vi.fn(),
     hmget: vi.fn(),
+    pipeline: vi.fn(),
     zadd: vi.fn(),
     hset: vi.fn(),
     del: vi.fn(),
@@ -59,6 +61,7 @@ function stubRealmRefreshBase() {
 describe('leaderboardService seasonal realm support', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRedis.exists.mockResolvedValue(0);
   });
 
   it('uses the season-scoped Redis keys when fetching a seasonal leaderboard', async () => {

@@ -11,3 +11,19 @@ export function leaderboardKey(category: string, seasonId?: string | null): stri
 export function leaderboardMetaKey(category: string, seasonId?: string | null): string {
   return `leaderboard:meta:${leaderboardRealmId(seasonId)}:${category}`;
 }
+
+export function leaderboardWeeklyStartKey(category: string, seasonId?: string | null): string {
+  return `leaderboard:weekly_start:${leaderboardRealmId(seasonId)}:${category}`;
+}
+
+export function leaderboardWeeklyStartXpKey(category: string, seasonId?: string | null): string {
+  return `leaderboard:weekly_start_xp:${leaderboardRealmId(seasonId)}:${category}`;
+}
+
+export function leaderboardWeeklyDeltaKey(category: string, seasonId?: string | null): string {
+  return `leaderboard:weekly_delta:${leaderboardRealmId(seasonId)}:${category}`;
+}
+
+export function leaderboardWeeklySnapshotMarkerKey(seasonId?: string | null): string {
+  return `leaderboard:weekly_snapshot:${leaderboardRealmId(seasonId)}`;
+}

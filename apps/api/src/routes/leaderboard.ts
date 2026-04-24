@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
 import { optionalAuthenticate } from '../middleware/auth';
 import { getCategories, getLeaderboard } from '../services/leaderboardService';
-import { getPlayerCrownCollection } from '../services/crownService';
 import { getCrownCollectorLeaderboard, type CrownCollectorEntry } from '../services/crownLeaderboardService';
 import { getPublicLeaderboardSummary } from '../services/publicLeaderboardSummaryService';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -11,9 +10,14 @@ export const leaderboardRouter = Router();
 
 leaderboardRouter.get('/public-summary', asyncHandler(async (_req, res) => {
   const result = await getPublicLeaderboardSummary();
-  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_MEDIUM);
   res.json(result);
 }));
+
+leaderboardRouter.get('/categories', (_req, res) => {
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+  res.json(getCategories());
+});
 
 leaderboardRouter.use(optionalAuthenticate);
 
@@ -39,11 +43,6 @@ function toPublicCrownEntry(entry: CrownCollectorEntry): CrownCollectorEntry {
   };
 }
 
-leaderboardRouter.get('/categories', (_req, res) => {
-  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
-  res.json(getCategories());
-});
-
 leaderboardRouter.get('/crowns', asyncHandler(async (req, res) => {
   const result = await getCrownCollectorLeaderboard(
     req.player?.playerId,
@@ -56,12 +55,6 @@ leaderboardRouter.get('/crowns', asyncHandler(async (req, res) => {
     entries: result.entries.map(toPublicCrownEntry),
     myRank: result.myRank ? toPublicCrownEntry(result.myRank) : null,
   });
-}));
-
-leaderboardRouter.get('/crowns/:playerId', asyncHandler(async (req, res) => {
-  const result = await getPlayerCrownCollection(req.params.playerId);
-  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PRIVATE_SHORT);
-  res.json(result);
 }));
 
 leaderboardRouter.get('/:category', asyncHandler(async (req, res) => {

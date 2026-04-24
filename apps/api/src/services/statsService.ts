@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import { getAllMobPrefixes } from '@pocketrealm/shared';
+import { CROWN_CONSTANTS, getAllMobPrefixes } from '@pocketrealm/shared';
 
 // Counter-only keys that remain in the player_stats table
 type CounterKey =
@@ -23,7 +23,10 @@ export type DerivedStatKey =
   | 'highestCharacterLevel' | 'highestSkillLevel'
   | 'guildLevel' | 'guildContractsCompleted' | 'guildTurnsContributed' | 'guildMemberCount';
 
-export type StatKey = CounterKey | DerivedStatKey;
+type CrownGroup = keyof typeof CROWN_CONSTANTS.CATEGORY_GROUPS;
+type CrownStatKey = `crowns_${CrownGroup}`;
+
+export type StatKey = CounterKey | DerivedStatKey | CrownStatKey;
 
 export type ResolvedStats = Record<StatKey, number>;
 
@@ -100,9 +103,33 @@ async function resolveGuildStats(playerId: string): Promise<GuildStatRow> {
   return rows[0] ?? { guild_level: 0, guild_contracts_completed: 0, guild_turns_contributed: 0, guild_member_count: 0 };
 }
 
+export async function resolveCrownStats(playerId: string): Promise<Record<CrownStatKey, number>> {
+  const crowns = await prisma.playerCrown.findMany({
+    where: { playerId },
+    select: { category: true },
+  });
+
+  const counts = {} as Record<CrownStatKey, number>;
+  for (const group of Object.keys(CROWN_CONSTANTS.CATEGORY_GROUPS) as CrownGroup[]) {
+    const key = `crowns_${group}` as CrownStatKey;
+    counts[key] = 0;
+  }
+
+  for (const crown of crowns) {
+    for (const group of Object.keys(CROWN_CONSTANTS.CATEGORY_GROUPS) as CrownGroup[]) {
+      if (CROWN_CONSTANTS.CATEGORY_GROUPS[group].includes(crown.category)) {
+        counts[`crowns_${group}` as CrownStatKey]++;
+        break;
+      }
+    }
+  }
+
+  return counts;
+}
+
 /** Resolve all stats (derived + counters) for a player in a single call. */
 export async function resolveAllStats(playerId: string): Promise<ResolvedStats> {
-  const [derivedRows, counters, guildStats] = await Promise.all([
+  const [derivedRows, counters, guildStats, crownStats] = await Promise.all([
     prisma.$queryRaw<DerivedRow[]>(Prisma.sql`
       SELECT
         COALESCE((SELECT SUM(kills)::int FROM player_bestiary WHERE player_id = ${playerId}), 0) AS total_kills,
@@ -140,6 +167,7 @@ export async function resolveAllStats(playerId: string): Promise<ResolvedStats> 
     `),
     prisma.playerStats.findUnique({ where: { playerId } }),
     resolveGuildStats(playerId),
+    resolveCrownStats(playerId),
   ]);
 
   const d = derivedRows[0]!;
@@ -175,6 +203,7 @@ export async function resolveAllStats(playerId: string): Promise<ResolvedStats> 
     guildContractsCompleted: guildStats.guild_contracts_completed,
     guildTurnsContributed: guildStats.guild_turns_contributed,
     guildMemberCount: guildStats.guild_member_count,
+    ...crownStats,
   };
 }
 

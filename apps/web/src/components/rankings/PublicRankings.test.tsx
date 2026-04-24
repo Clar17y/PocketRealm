@@ -146,6 +146,14 @@ describe('PublicRankings', () => {
     expect(screen.getByRole('option', { name: 'Season 2' })).toBeTruthy();
   });
 
+  it('does not use the active season as a hall of fame archive', async () => {
+    render(<PublicRankings initialTab="hallOfFame" />);
+
+    await waitFor(() => expect(getPublicSeasonArchives).toHaveBeenCalled());
+    expect(getHallOfFame).not.toHaveBeenCalled();
+    expect(screen.getByText('No seasonal results are archived yet.')).toBeTruthy();
+  });
+
   it('can request the signed-in crown collector rank', async () => {
     vi.mocked(getCrownCollectors).mockResolvedValue({
       data: {

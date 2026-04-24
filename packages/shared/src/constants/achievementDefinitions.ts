@@ -890,6 +890,47 @@ const CASINO_ACHIEVEMENTS: AchievementDef[] = [
   },
 ];
 
+// --- Weekly crown achievements ---
+const CROWN_ACHIEVEMENT_GROUPS = [
+  { key: 'pvp', label: 'PvP', titles: ['Arena Contender', 'Arena Veteran', 'Arena King'] },
+  { key: 'combat', label: 'combat', titles: ['Weekly Warrior', 'Proven Slayer', 'Warlord'] },
+  { key: 'skills', label: 'skills', titles: ['Dedicated Student', 'Skillmaster', 'Grandmaster'] },
+  { key: 'crafting', label: 'crafting', titles: ['Apprentice Artisan', 'Master Crafter', 'Legendary Artisan'] },
+  { key: 'gathering', label: 'gathering', titles: ['Keen Forager', 'Resource Baron', "Land's Bounty"] },
+  { key: 'progression', label: 'progression', titles: ['Up and Comer', 'Ascendant', 'Transcendent'] },
+  { key: 'casino', label: 'casino', titles: ['Lucky Streak', 'High Roller', 'Casino Mogul'] },
+] as const;
+
+const CROWN_ACHIEVEMENT_TIERS = [
+  { threshold: 1, titleIndex: 0 },
+  { threshold: 3, titleIndex: 1, tier: 2 },
+  { threshold: 10, titleIndex: 2, tier: 3, attributePoints: 1 },
+] as const;
+
+const CROWN_ACHIEVEMENTS: AchievementDef[] = CROWN_ACHIEVEMENT_GROUPS.flatMap((group) =>
+  CROWN_ACHIEVEMENT_TIERS.map((tier) => {
+    const title = group.titles[tier.titleIndex];
+    const achievement: AchievementDef = {
+      id: `crowns_${group.key}_${tier.threshold}`,
+      category: 'crowns',
+      title,
+      description: `Earn ${tier.threshold} weekly ${group.label} crown${tier.threshold === 1 ? '' : 's'}`,
+      statKey: `crowns_${group.key}`,
+      threshold: tier.threshold,
+      titleReward: title,
+    };
+
+    if ('tier' in tier) {
+      achievement.tier = tier.tier;
+    }
+    if ('attributePoints' in tier) {
+      achievement.rewards = [{ type: 'attribute_points', amount: tier.attributePoints }];
+    }
+
+    return achievement;
+  }),
+);
+
 // --- Shop achievements (unlocked by quest shop purchase, not stats) ---
 const SHOP_ACHIEVEMENTS: AchievementDef[] = [
   {
@@ -933,6 +974,7 @@ export const ALL_ACHIEVEMENTS: AchievementDef[] = [
   ...FAMILY_ACHIEVEMENTS,
   ...GUILD_ACHIEVEMENTS,
   ...CASINO_ACHIEVEMENTS,
+  ...CROWN_ACHIEVEMENTS,
   ...SHOP_ACHIEVEMENTS,
 ];
 

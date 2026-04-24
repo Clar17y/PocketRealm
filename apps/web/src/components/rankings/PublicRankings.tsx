@@ -38,18 +38,8 @@ function updateTabQuery(tab: PublicRankingsTab) {
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-function seasonOptionsFromArchives(
-  activeSeason: ActiveSeasonResponse | null,
-  archives: PublicSeasonArchiveSummary[],
-): SeasonOption[] {
+function seasonOptionsFromArchives(archives: PublicSeasonArchiveSummary[]): SeasonOption[] {
   const options = new Map<string, SeasonOption>();
-
-  if (activeSeason) {
-    options.set(activeSeason.id, {
-      id: activeSeason.id,
-      name: activeSeason.name,
-    });
-  }
 
   for (const archive of archives) {
     options.set(archive.id, {
@@ -104,7 +94,7 @@ export function PublicRankings({ initialTab = 'crowns' }: PublicRankingsProps) {
       const season = activeSeasonRes.data?.season ?? null;
       setActiveSeason(season);
 
-      const hallOfFameOptions = seasonOptionsFromArchives(season, archivesRes.data?.archives ?? []);
+      const hallOfFameOptions = seasonOptionsFromArchives(archivesRes.data?.archives ?? []);
       setHallOfFameSeasons(hallOfFameOptions);
       setHallOfFameSeasonId((selected) => selected || hallOfFameOptions[0]?.id || '');
     })();

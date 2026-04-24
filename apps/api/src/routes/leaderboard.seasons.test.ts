@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
     next();
   }),
   getLeaderboard: vi.fn(),
-  getPlayerCrownCollection: vi.fn(),
   getCrownCollectorLeaderboard: vi.fn(),
   getPublicLeaderboardSummary: vi.fn(),
 }));
@@ -27,10 +26,6 @@ vi.mock('../middleware/auth', () => ({
 vi.mock('../services/leaderboardService', () => ({
   getCategories: vi.fn(() => ({ groups: [] })),
   getLeaderboard: mocks.getLeaderboard,
-}));
-
-vi.mock('../services/crownService', () => ({
-  getPlayerCrownCollection: mocks.getPlayerCrownCollection,
 }));
 
 vi.mock('../services/crownLeaderboardService', () => ({
@@ -98,21 +93,6 @@ describe('leaderboard route seasonal realm selection', () => {
     expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', undefined, false, 'season-1', 'weekly');
   });
 
-  it('returns a player crown collection before category routing', async () => {
-    mocks.getPlayerCrownCollection.mockResolvedValue({
-      crowns: [{ category: 'pvp_wins', realmId: 'permanent', rank: 1, weekStart: '2026-04-20' }],
-      totalByGroup: { pvp: 1 },
-    });
-
-    const res = await request(buildApp())
-      .get('/api/v1/leaderboard/crowns/player-1');
-
-    expect(res.status).toBe(200);
-    expect(mocks.getLeaderboard).not.toHaveBeenCalled();
-    expect(mocks.getPlayerCrownCollection).toHaveBeenCalledWith('player-1');
-    expect(res.body.totalByGroup.pvp).toBe(1);
-  });
-
   it('returns lifetime crown collectors before player crown collection routing', async () => {
     mocks.getCrownCollectorLeaderboard.mockResolvedValue({
       entries: [{
@@ -132,9 +112,17 @@ describe('leaderboard route seasonal realm selection', () => {
 
     expect(res.status).toBe(200);
     expect(mocks.getCrownCollectorLeaderboard).toHaveBeenCalledWith(undefined, false, 5);
-    expect(mocks.getPlayerCrownCollection).not.toHaveBeenCalled();
     expect(res.body.entries[0].username).toBe('Ada');
     expect(res.body.entries[0]).not.toHaveProperty('playerId');
+  });
+
+  it('does not expose player crown collections by UUID', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/crowns/player-1');
+
+    expect(res.status).toBe(404);
+    expect(mocks.getCrownCollectorLeaderboard).not.toHaveBeenCalled();
+    expect(mocks.getLeaderboard).not.toHaveBeenCalled();
   });
 
   it('passes authenticated playerId and around_me to crown collectors', async () => {
@@ -154,6 +142,16 @@ describe('leaderboard route seasonal realm selection', () => {
     expect(mocks.getCrownCollectorLeaderboard).toHaveBeenCalledWith(undefined, false, undefined);
   });
 
+  it('returns public categories without optional authentication', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/categories')
+      .set('Authorization', 'Bearer token');
+
+    expect(res.status).toBe(200);
+    expect(res.header['cache-control']).toBe(CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+    expect(mocks.optionalAuthenticate).not.toHaveBeenCalled();
+  });
+
   it('returns cache-only public summary', async () => {
     const summary = {
       crownCollectors: [{ rank: 1, username: 'Ada', totalCrowns: 7, crownsByGroup: { pvp: 7 } }],
@@ -167,7 +165,7 @@ describe('leaderboard route seasonal realm selection', () => {
       .set('Authorization', 'Bearer token');
 
     expect(res.status).toBe(200);
-    expect(res.header['cache-control']).toBe(CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+    expect(res.header['cache-control']).toBe(CACHE_HEADER_CONSTANTS.PUBLIC_MEDIUM);
     expect(mocks.optionalAuthenticate).not.toHaveBeenCalled();
     expect(mocks.getPublicLeaderboardSummary).toHaveBeenCalledTimes(1);
     expect(mocks.getLeaderboard).not.toHaveBeenCalled();

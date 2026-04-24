@@ -58,6 +58,7 @@ import { startMetricsLogger } from './services/metricsLogger';
 import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 import { refreshSeasonCache } from './services/seasonCacheService';
+import { isWeeklyLeaderboardWindow, runWeeklyLeaderboardJob } from './jobs/weeklyLeaderboardJob';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -185,6 +186,7 @@ createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
 let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
+let weeklyLeaderboardTimer: ReturnType<typeof setTimeout> | null = null;
 
 const PREMIUM_RECONCILIATION_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -194,6 +196,34 @@ async function runPremiumReconciliation(): Promise<void> {
   } catch (err) {
     logger.error({ err }, 'Premium reconciliation failed');
   }
+}
+
+function msUntilNextWeeklyLeaderboardWindow(now = new Date()): number {
+  if (isWeeklyLeaderboardWindow(now)) {
+    return 0;
+  }
+
+  const daysUntilMonday = (8 - now.getUTCDay()) % 7 || 7;
+  const nextMonday = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + daysUntilMonday,
+  ));
+
+  return Math.max(0, nextMonday.getTime() - now.getTime());
+}
+
+function scheduleWeeklyLeaderboardJob(): void {
+  weeklyLeaderboardTimer = setTimeout(() => {
+    const now = new Date();
+    void runWeeklyLeaderboardJob(now)
+      .catch((err) => {
+        logger.error({ err }, 'Weekly leaderboard crown job failed');
+      })
+      .finally(() => {
+        scheduleWeeklyLeaderboardJob();
+      });
+  }, msUntilNextWeeklyLeaderboardWindow());
 }
 
 function startServer(): void {
@@ -209,6 +239,7 @@ function startServer(): void {
     premiumReconciliationTimer = setInterval(() => {
       void runPremiumReconciliation();
     }, PREMIUM_RECONCILIATION_INTERVAL_MS);
+    scheduleWeeklyLeaderboardJob();
     stopMetricsLogger = startMetricsLogger(getIo);
   });
 }
@@ -222,6 +253,7 @@ process.on('SIGTERM', () => {
   markShuttingDown();
   stopMetricsLogger?.();
   if (premiumReconciliationTimer) clearInterval(premiumReconciliationTimer);
+  if (weeklyLeaderboardTimer) clearTimeout(weeklyLeaderboardTimer);
   const io = getIo();
   if (io) io.close();
   server.close(() => {

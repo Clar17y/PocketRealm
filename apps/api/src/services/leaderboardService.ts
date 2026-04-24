@@ -1,11 +1,18 @@
 import { randomUUID } from 'crypto';
 import { prisma, Prisma } from '@pocketrealm/database';
-import { LEADERBOARD_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
+import { CROWN_CONSTANTS, LEADERBOARD_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
 import type { TitleStyleVariant } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';
-import { leaderboardKey, leaderboardMetaKey } from './leaderboardKeys';
+import {
+  leaderboardKey,
+  leaderboardMetaKey,
+  leaderboardWeeklyDeltaKey,
+  leaderboardWeeklyStartKey,
+  leaderboardWeeklyStartXpKey,
+} from './leaderboardKeys';
+import { getCrownCountsForCategory, type CrownRankCounts } from './crownService';
 
 export const LEADERBOARD_LAST_REFRESH_KEY = 'leaderboard:last_refresh';
 const LAST_REFRESH_KEY = LEADERBOARD_LAST_REFRESH_KEY;
@@ -55,6 +62,7 @@ interface PlayerSkillRow {
   playerId: string;
   skillType: string;
   level: number;
+  xp: bigint;
   player: LeaderboardPlayerSummary;
 }
 interface BossParticipantRow {
@@ -72,8 +80,56 @@ interface GuildRow {
   _count: { members: number };
 }
 
+type LeaderboardWriteRow = {
+  playerId: string;
+  score: number;
+  username: string;
+  characterLevel: number;
+  isBot: boolean;
+  isAdmin: boolean;
+  title?: string;
+  titleTier?: number;
+  titleStyle?: TitleStyleVariant;
+};
+
+interface LeaderboardMeta {
+  username: string;
+  characterLevel: number;
+  isBot: boolean;
+  isAdmin: boolean;
+  title?: string;
+  titleTier?: number;
+  titleStyle?: TitleStyleVariant;
+  crowns?: CrownRankCounts;
+}
+
+type LeaderboardSourcePlayer = {
+  username: string;
+  characterLevel: number;
+  isBot: boolean;
+  activeTitle: string | null;
+  account?: { role?: string | null };
+  role?: string | null;
+};
+
 function getRole(player: { account?: { role?: string | null }; role?: string | null }): string | null {
   return player.account?.role ?? player.role ?? null;
+}
+
+function buildPlayerLeaderboardRow(
+  playerId: string,
+  score: number,
+  player: LeaderboardSourcePlayer,
+): LeaderboardWriteRow {
+  return {
+    playerId,
+    score,
+    username: player.username,
+    characterLevel: player.characterLevel,
+    isBot: player.isBot,
+    isAdmin: getRole(player) === 'admin',
+    ...resolveAchievementTitleDisplay(player.activeTitle),
+  };
 }
 
 /**
@@ -167,6 +223,8 @@ const ALL_CATEGORIES = [
 ];
 
 const VALID_SLUGS = new Set(ALL_CATEGORIES.map((c) => c.slug));
+const CROWN_CATEGORY_SLUGS = new Set<string>(Object.values(CROWN_CONSTANTS.CATEGORY_GROUPS).flat());
+type LeaderboardPeriod = 'alltime' | 'weekly';
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -200,14 +258,60 @@ interface LeaderboardEntry {
   title?: string;
   titleTier?: number;
   titleStyle?: TitleStyleVariant;
+  crowns?: CrownRankCounts;
 }
 
 interface LeaderboardResponse {
   category: string;
+  period: LeaderboardPeriod;
   entries: LeaderboardEntry[];
   myRank: LeaderboardEntry | null;
   totalPlayers: number;
   lastRefreshedAt: string | null;
+}
+
+const DEFAULT_META: LeaderboardMeta = {
+  username: 'Unknown',
+  characterLevel: 1,
+  isBot: false,
+  isAdmin: false,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCrownCounts(value: unknown): value is CrownRankCounts {
+  return isRecord(value) &&
+    typeof value.gold === 'number' &&
+    typeof value.silver === 'number' &&
+    typeof value.bronze === 'number';
+}
+
+function parseLeaderboardMeta(raw: string | null | undefined): LeaderboardMeta {
+  if (!raw) {
+    return DEFAULT_META;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) {
+      return DEFAULT_META;
+    }
+
+    return {
+      username: typeof parsed.username === 'string' ? parsed.username : DEFAULT_META.username,
+      characterLevel: typeof parsed.characterLevel === 'number' ? parsed.characterLevel : DEFAULT_META.characterLevel,
+      isBot: typeof parsed.isBot === 'boolean' ? parsed.isBot : DEFAULT_META.isBot,
+      isAdmin: typeof parsed.isAdmin === 'boolean' ? parsed.isAdmin : DEFAULT_META.isAdmin,
+      ...(typeof parsed.title === 'string' ? { title: parsed.title } : {}),
+      ...(typeof parsed.titleTier === 'number' ? { titleTier: parsed.titleTier } : {}),
+      ...(typeof parsed.titleStyle === 'string' ? { titleStyle: parsed.titleStyle as TitleStyleVariant } : {}),
+      ...(isCrownCounts(parsed.crowns) ? { crowns: parsed.crowns } : {}),
+    };
+  } catch {
+    return DEFAULT_META;
+  }
 }
 
 export async function getLeaderboard(
@@ -215,6 +319,7 @@ export async function getLeaderboard(
   playerId?: string,
   aroundMe = false,
   seasonId?: string | null,
+  period: LeaderboardPeriod = 'alltime',
 ): Promise<LeaderboardResponse> {
   if (!VALID_SLUGS.has(category)) {
     throw new AppError(400, `Invalid leaderboard category: ${category}`, 'INVALID_CATEGORY');
@@ -222,7 +327,9 @@ export async function getLeaderboard(
 
   await ensureLeaderboardsFresh();
 
-  const key = leaderboardKey(category, seasonId);
+  const key = period === 'weekly'
+    ? leaderboardWeeklyDeltaKey(category, seasonId)
+    : leaderboardKey(category, seasonId);
   const metaKey = leaderboardMetaKey(category, seasonId);
   const { PAGE_SIZE } = LEADERBOARD_CONSTANTS;
 
@@ -254,11 +361,10 @@ export async function getLeaderboard(
   }
 
   // Batch-fetch all metadata in one HMGET call
-  const DEFAULT_META = { username: 'Unknown', characterLevel: 1, isBot: false, isAdmin: false };
   const metaValues = playerIds.length > 0 ? await redis.hmget(metaKey, ...playerIds) : [];
 
   const entries: LeaderboardEntry[] = playerIds.map((pid, idx) => {
-    const meta = metaValues[idx] ? JSON.parse(metaValues[idx]!) : DEFAULT_META;
+    const meta = parseLeaderboardMeta(metaValues[idx]);
     return {
       rank: start + idx + 1,
       playerId: pid,
@@ -270,6 +376,7 @@ export async function getLeaderboard(
       title: meta.title,
       titleTier: meta.titleTier,
       titleStyle: meta.titleStyle,
+      ...(meta.crowns ? { crowns: meta.crowns } : {}),
     };
   });
 
@@ -277,8 +384,7 @@ export async function getLeaderboard(
   let myRank: LeaderboardEntry | null = null;
   if (playerId && myRankIndex !== null) {
     const myScore = await redis.zscore(key, playerId);
-    const metaStr = await redis.hget(metaKey, playerId);
-    const meta = metaStr ? JSON.parse(metaStr) : DEFAULT_META;
+    const meta = parseLeaderboardMeta(await redis.hget(metaKey, playerId));
     myRank = {
       rank: myRankIndex + 1,
       playerId,
@@ -290,10 +396,11 @@ export async function getLeaderboard(
       title: meta.title,
       titleTier: meta.titleTier,
       titleStyle: meta.titleStyle,
+      ...(meta.crowns ? { crowns: meta.crowns } : {}),
     };
   }
 
-  return { category, entries, myRank, totalPlayers, lastRefreshedAt };
+  return { category, period, entries, myRank, totalPlayers, lastRefreshedAt };
 }
 
 export async function ensureLeaderboardsFresh(): Promise<void> {
@@ -332,7 +439,7 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
 
 async function writeToZset(
   category: string,
-  rows: { playerId: string; score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }[],
+  rows: LeaderboardWriteRow[],
   seasonId?: string | null,
 ) {
   const key = leaderboardKey(category, seasonId);
@@ -346,8 +453,10 @@ async function writeToZset(
   // Write scores — ZADD key score1 member1 score2 member2 ...
   const zaddArgs: (string | number)[] = [];
   const metaArgs: string[] = [];
+  const crownCounts = await readCrownCountsForRows(category, rows);
 
   for (const row of rows) {
+    const crowns = crownCounts.get(row.playerId);
     zaddArgs.push(row.score, row.playerId);
     metaArgs.push(row.playerId, JSON.stringify({
       username: row.username,
@@ -357,6 +466,7 @@ async function writeToZset(
       title: row.title,
       titleTier: row.titleTier,
       titleStyle: row.titleStyle,
+      crowns,
     }));
   }
 
@@ -364,6 +474,66 @@ async function writeToZset(
   if (metaArgs.length > 0) {
     await redis.hset(metaKey, ...metaArgs);
   }
+}
+
+async function readCrownCountsForRows(
+  category: string,
+  rows: LeaderboardWriteRow[],
+): Promise<Map<string, CrownRankCounts>> {
+  if (!CROWN_CATEGORY_SLUGS.has(category) || rows.length === 0) {
+    return new Map();
+  }
+
+  try {
+    return await getCrownCountsForCategory(category, rows.map((row) => row.playerId));
+  } catch (err) {
+    logger.warn({ err, category }, 'Failed to include crown counts in leaderboard metadata');
+    return new Map();
+  }
+}
+
+async function computeWeeklyDelta(
+  category: string,
+  rows: Array<{ playerId: string; score: number }>,
+  seasonId?: string | null,
+  sourceScores?: Map<string, number>,
+): Promise<void> {
+  const snapshotKey = sourceScores
+    ? leaderboardWeeklyStartXpKey(category, seasonId)
+    : leaderboardWeeklyStartKey(category, seasonId);
+
+  const snapshotExists = await redis.exists(snapshotKey);
+  if (!snapshotExists) {
+    return;
+  }
+
+  const readPipeline = redis.pipeline();
+  for (const row of rows) {
+    readPipeline.zscore(snapshotKey, row.playerId);
+  }
+  const snapshotResults = await readPipeline.exec();
+
+  const deltaKey = leaderboardWeeklyDeltaKey(category, seasonId);
+  const writePipeline = redis.pipeline();
+  writePipeline.del(deltaKey);
+
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    const currentScore = sourceScores?.get(row.playerId) ?? row.score;
+    const snapshotRaw = snapshotResults?.[index]?.[1];
+    const snapshotScore = typeof snapshotRaw === 'number'
+      ? snapshotRaw
+      : typeof snapshotRaw === 'string'
+        ? Number(snapshotRaw)
+        : 0;
+    const delta = currentScore - snapshotScore;
+
+    if (delta >= CROWN_CONSTANTS.MIN_DELTA) {
+      writePipeline.zadd(deltaKey, delta, row.playerId);
+    }
+  }
+
+  await writePipeline.exec();
 }
 
 async function refreshPvp(seasonId?: string | null) {
@@ -401,19 +571,9 @@ async function refreshPvp(seasonId?: string | null) {
   ];
 
   for (const { slug, field } of fields) {
-    await writeToZset(
-      slug,
-      ratings.map((r) => ({
-        playerId: r.playerId,
-        score: r[field],
-        username: r.player.username,
-        characterLevel: r.player.characterLevel,
-        isBot: r.player.isBot,
-        isAdmin: getRole(r.player) === 'admin',
-        ...resolveAchievementTitleDisplay(r.player.activeTitle),
-      })),
-      seasonId,
-    );
+    const rows = ratings.map((r) => buildPlayerLeaderboardRow(r.playerId, r[field], r.player));
+    await writeToZset(slug, rows, seasonId);
+    await computeWeeklyDelta(slug, rows, seasonId);
   }
 }
 
@@ -437,33 +597,18 @@ async function refreshProgression(seasonId?: string | null) {
     },
   );
 
-  await writeToZset(
+  const characterLevelRows = players.map((p) => buildPlayerLeaderboardRow(p.id, p.characterLevel, p));
+  await writeToZset('character_level', characterLevelRows, seasonId);
+  await computeWeeklyDelta(
     'character_level',
-    players.map((p) => ({
-      playerId: p.id,
-      score: p.characterLevel,
-      username: p.username,
-      characterLevel: p.characterLevel,
-      isBot: p.isBot,
-      isAdmin: getRole(p) === 'admin',
-      ...resolveAchievementTitleDisplay(p.activeTitle),
-    })),
+    characterLevelRows,
     seasonId,
+    new Map(players.map((player) => [player.id, Number(player.characterXp)])),
   );
 
-  await writeToZset(
-    'character_xp',
-    players.map((p) => ({
-      playerId: p.id,
-      score: Number(p.characterXp),
-      username: p.username,
-      characterLevel: p.characterLevel,
-      isBot: p.isBot,
-      isAdmin: getRole(p) === 'admin',
-      ...resolveAchievementTitleDisplay(p.activeTitle),
-    })),
-    seasonId,
-  );
+  const characterXpRows = players.map((p) => buildPlayerLeaderboardRow(p.id, Number(p.characterXp), p));
+  await writeToZset('character_xp', characterXpRows, seasonId);
+  await computeWeeklyDelta('character_xp', characterXpRows, seasonId);
 }
 
 async function refreshSkills(seasonId?: string | null) {
@@ -481,6 +626,7 @@ async function refreshSkills(seasonId?: string | null) {
         playerId: true,
         skillType: true,
         level: true,
+        xp: true,
         player: {
           select: {
             username: true,
@@ -497,44 +643,33 @@ async function refreshSkills(seasonId?: string | null) {
   // Individual skill leaderboards
   for (const skillType of SKILL_TYPES) {
     const filtered = skills.filter((s) => s.skillType === skillType);
-    await writeToZset(
-      `skill_${skillType}`,
-      filtered.map((s) => ({
-        playerId: s.playerId,
-        score: s.level,
-        username: s.player.username,
-        characterLevel: s.player.characterLevel,
-        isBot: s.player.isBot,
-        isAdmin: getRole(s.player) === 'admin',
-        ...resolveAchievementTitleDisplay(s.player.activeTitle),
-      })),
+    const category = `skill_${skillType}`;
+    const rows = filtered.map((s) => buildPlayerLeaderboardRow(s.playerId, s.level, s.player));
+    await writeToZset(category, rows, seasonId);
+    await computeWeeklyDelta(
+      category,
+      rows,
       seasonId,
+      new Map(filtered.map((skill) => [skill.playerId, Number(skill.xp)])),
     );
   }
 
   // Total skill level — aggregate per player
-  const totals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }>();
+  const totals = new Map<string, LeaderboardWriteRow>();
+  const totalXp = new Map<string, number>();
   for (const s of skills) {
+    totalXp.set(s.playerId, (totalXp.get(s.playerId) ?? 0) + Number(s.xp));
     const existing = totals.get(s.playerId);
     if (existing) {
       existing.score += s.level;
     } else {
-      totals.set(s.playerId, {
-        score: s.level,
-        username: s.player.username,
-        characterLevel: s.player.characterLevel,
-        isBot: s.player.isBot,
-        isAdmin: getRole(s.player) === 'admin',
-        ...resolveAchievementTitleDisplay(s.player.activeTitle),
-      });
+      totals.set(s.playerId, buildPlayerLeaderboardRow(s.playerId, s.level, s.player));
     }
   }
 
-  await writeToZset(
-    'total_skill_level',
-    Array.from(totals.entries()).map(([playerId, data]) => ({ playerId, ...data })),
-    seasonId,
-  );
+  const totalRows = Array.from(totals.values());
+  await writeToZset('total_skill_level', totalRows, seasonId);
+  await computeWeeklyDelta('total_skill_level', totalRows, seasonId, totalXp);
 }
 
 async function refreshCombat(seasonId?: string | null) {
@@ -542,7 +677,7 @@ async function refreshCombat(seasonId?: string | null) {
   // PlayerBestiary has a composite PK (playerId + mobTemplateId),
   // incompatible with cursor pagination.
   const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
-  const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }>();
+  const killTotals = new Map<string, LeaderboardWriteRow>();
   let offset = 0;
   let batch;
   do {
@@ -574,24 +709,15 @@ async function refreshCombat(seasonId?: string | null) {
       if (existing) {
         existing.score += b.kills;
       } else {
-        killTotals.set(b.playerId, {
-          score: b.kills,
-          username: b.player.username,
-          characterLevel: b.player.characterLevel,
-          isBot: b.player.isBot,
-          isAdmin: getRole(b.player) === 'admin',
-          ...resolveAchievementTitleDisplay(b.player.activeTitle),
-        });
+        killTotals.set(b.playerId, buildPlayerLeaderboardRow(b.playerId, b.kills, b.player));
       }
     }
     offset += batchSize;
   } while (batch.length === batchSize);
 
-  await writeToZset(
-    'total_kills',
-    Array.from(killTotals.entries()).map(([playerId, data]) => ({ playerId, ...data })),
-    seasonId,
-  );
+  const killRows = Array.from(killTotals.values());
+  await writeToZset('total_kills', killRows, seasonId);
+  await computeWeeklyDelta('total_kills', killRows, seasonId);
 
   // Boss damage
   try {
@@ -621,28 +747,19 @@ async function refreshCombat(seasonId?: string | null) {
       },
     );
 
-    const dmgTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }>();
+    const dmgTotals = new Map<string, LeaderboardWriteRow>();
     for (const b of bossRaw) {
       const existing = dmgTotals.get(b.playerId);
       if (existing) {
         existing.score += b.totalDamage;
       } else {
-        dmgTotals.set(b.playerId, {
-          score: b.totalDamage,
-          username: b.player.username,
-          characterLevel: b.player.characterLevel,
-          isBot: b.player.isBot,
-          isAdmin: getRole(b.player) === 'admin',
-          ...resolveAchievementTitleDisplay(b.player.activeTitle),
-        });
+        dmgTotals.set(b.playerId, buildPlayerLeaderboardRow(b.playerId, b.totalDamage, b.player));
       }
     }
 
-    await writeToZset(
-      'boss_damage',
-      Array.from(dmgTotals.entries()).map(([playerId, data]) => ({ playerId, ...data })),
-      seasonId,
-    );
+    const damageRows = Array.from(dmgTotals.values());
+    await writeToZset('boss_damage', damageRows, seasonId);
+    await computeWeeklyDelta('boss_damage', damageRows, seasonId);
   } catch (err) {
     // Skip if table doesn't exist (migration not yet applied); re-throw other errors
     const isMissingTable =
@@ -660,44 +777,38 @@ async function refreshGuilds(seasonId?: string | null) {
     },
   );
 
-  await writeToZset(
-    'guild_level',
-    guilds.map((g) => ({
-      playerId: g.id,
-      score: g.level,
-      username: `[${g.tag}] ${g.name}`,
-      characterLevel: g.level,
-      isBot: false,
-      isAdmin: false,
-    })),
-    seasonId,
-  );
+  const guildLevelRows = guilds.map((g) => ({
+    playerId: g.id,
+    score: g.level,
+    username: `[${g.tag}] ${g.name}`,
+    characterLevel: g.level,
+    isBot: false,
+    isAdmin: false,
+  }));
+  await writeToZset('guild_level', guildLevelRows, seasonId);
+  await computeWeeklyDelta('guild_level', guildLevelRows, seasonId);
 
-  await writeToZset(
-    'guild_renown',
-    guilds.map((g) => ({
-      playerId: g.id,
-      score: g.renown,
-      username: `[${g.tag}] ${g.name}`,
-      characterLevel: g.level,
-      isBot: false,
-      isAdmin: false,
-    })),
-    seasonId,
-  );
+  const guildRenownRows = guilds.map((g) => ({
+    playerId: g.id,
+    score: g.renown,
+    username: `[${g.tag}] ${g.name}`,
+    characterLevel: g.level,
+    isBot: false,
+    isAdmin: false,
+  }));
+  await writeToZset('guild_renown', guildRenownRows, seasonId);
+  await computeWeeklyDelta('guild_renown', guildRenownRows, seasonId);
 
-  await writeToZset(
-    'guild_members',
-    guilds.map((g) => ({
-      playerId: g.id,
-      score: g._count.members,
-      username: `[${g.tag}] ${g.name}`,
-      characterLevel: g.level,
-      isBot: false,
-      isAdmin: false,
-    })),
-    seasonId,
-  );
+  const guildMemberRows = guilds.map((g) => ({
+    playerId: g.id,
+    score: g._count.members,
+    username: `[${g.tag}] ${g.name}`,
+    characterLevel: g.level,
+    isBot: false,
+    isAdmin: false,
+  }));
+  await writeToZset('guild_members', guildMemberRows, seasonId);
+  await computeWeeklyDelta('guild_members', guildMemberRows, seasonId);
 }
 
 async function refreshCasino(seasonId?: string | null): Promise<void> {
@@ -738,19 +849,16 @@ async function refreshCasino(seasonId?: string | null): Promise<void> {
         return [];
       }
 
-      return {
-        playerId: r.playerId,
-        score: scoreFn(r),
-        username: p.username,
-        characterLevel: p.characterLevel,
-        isBot: p.isBot,
-        isAdmin: getRole(p) === 'admin',
-        ...resolveAchievementTitleDisplay(p.activeTitle),
-      };
+      return buildPlayerLeaderboardRow(r.playerId, scoreFn(r), p);
     });
 
-  await writeToZset('casino_profit', buildRows((r) => r.totalPayout - r.totalWagered), seasonId);
-  await writeToZset('casino_wagered', buildRows((r) => r.totalWagered), seasonId);
+  const profitRows = buildRows((r) => r.totalPayout - r.totalWagered);
+  await writeToZset('casino_profit', profitRows, seasonId);
+  await computeWeeklyDelta('casino_profit', profitRows, seasonId);
+
+  const wageredRows = buildRows((r) => r.totalWagered);
+  await writeToZset('casino_wagered', wageredRows, seasonId);
+  await computeWeeklyDelta('casino_wagered', wageredRows, seasonId);
 }
 
 export async function refreshAllLeaderboards(): Promise<void> {

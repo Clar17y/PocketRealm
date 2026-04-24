@@ -9,6 +9,7 @@ export type AchievementCategory =
   | 'family'
   | 'guild'
   | 'casino'
+  | 'crowns'
   | 'shop';
 
 export type TitleStyleVariant = 'rainbow';
