@@ -78,7 +78,6 @@ export interface CasinoPhaseEvent {
 
 export interface CasinoBetEvent {
   playerName: string;
-  playerId: string;
   betType: RouletteBetType;
   betValue: string;
   amount: number;

@@ -5,6 +5,7 @@ vi.mock('../utils/passwordValidation', () => ({
 }));
 
 vi.mock('../services/authTokenService', () => ({
+  hashToken: vi.fn((token: string) => `hashed:${token}`),
   createEmailVerificationToken: vi.fn().mockResolvedValue({ rawToken: 'test-token' }),
   verifyEmailToken: vi.fn().mockResolvedValue(null),
   createPasswordResetToken: vi.fn().mockResolvedValue({ rawToken: 'reset-token' }),
@@ -48,6 +49,8 @@ vi.mock('../middleware/auth', () => ({
 
 vi.mock('../socket', () => ({
   getIo: vi.fn(() => null),
+  disconnectAccountSockets: vi.fn(),
+  disconnectPlayerSockets: vi.fn(),
 }));
 
 vi.mock('../services/equipmentService', () => ({
@@ -295,7 +298,7 @@ describe('POST /switch-player', () => {
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
         accountId: 'account-1',
-        token: 'refresh-token',
+        tokenHash: 'hashed:refresh-token',
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
     });

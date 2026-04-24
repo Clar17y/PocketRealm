@@ -128,6 +128,7 @@ app.set('trust proxy', 1);
 
 // Global rate limiter: 120 requests per minute per IP
 // Skip CORS preflight (OPTIONS) — they carry no payload and shouldn't count against the limit.
+// The Stripe webhook has a route-local limiter that runs before raw-body parsing.
 app.use('/api/v1/', createEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.GLOBAL_MAX, {
   skip: (req) => req.method === 'OPTIONS' || req.path === '/premium/webhook/stripe',
 }));

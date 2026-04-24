@@ -1,6 +1,7 @@
 import { prisma } from '@pocketrealm/database';
 import { CHAT_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
+import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
 
 export async function checkRateLimit(playerId: string, channelType: ChatChannelType): Promise<boolean> {
@@ -76,4 +77,71 @@ export async function getChannelHistory(
       createdAt: r.createdAt.toISOString(),
     };
   });
+}
+
+function parseScopedChannelId(channelType: 'zone' | 'guild', channelId: string): string | null {
+  const prefix = `${channelType}:`;
+  if (!channelId.startsWith(prefix)) {
+    return null;
+  }
+
+  const id = channelId.slice(prefix.length);
+  return id.length > 0 ? id : null;
+}
+
+async function assertCanReadChannelHistory(
+  playerId: string,
+  channelType: ChatChannelType,
+  channelId: string,
+): Promise<void> {
+  if (channelType === 'world') {
+    if (channelId === 'world') return;
+    throw new AppError(403, 'You cannot read that chat channel.', 'FORBIDDEN');
+  }
+
+  if (channelType === 'casino') {
+    if (channelId === 'casino') return;
+    throw new AppError(403, 'You cannot read that chat channel.', 'FORBIDDEN');
+  }
+
+  if (channelType === 'zone') {
+    const zoneId = parseScopedChannelId('zone', channelId);
+    if (!zoneId) {
+      throw new AppError(403, 'You cannot read that chat channel.', 'FORBIDDEN');
+    }
+
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { currentZoneId: true },
+    });
+    if (player?.currentZoneId === zoneId) {
+      return;
+    }
+
+    throw new AppError(403, 'You cannot read that chat channel.', 'FORBIDDEN');
+  }
+
+  const guildId = parseScopedChannelId('guild', channelId);
+  if (!guildId) {
+    throw new AppError(403, 'You cannot read that chat channel.', 'FORBIDDEN');
+  }
+
+  const membership = await prisma.guildMember.findUnique({
+    where: { playerId },
+    select: { guildId: true },
+  });
+  if (membership?.guildId === guildId) {
+    return;
+  }
+
+  throw new AppError(403, 'You cannot read that chat channel.', 'FORBIDDEN');
+}
+
+export async function getAuthorizedChannelHistory(
+  playerId: string,
+  channelType: ChatChannelType,
+  channelId: string,
+): Promise<ChatMessageEvent[]> {
+  await assertCanReadChannelHistory(playerId, channelType, channelId);
+  return getChannelHistory(channelType, channelId);
 }

@@ -11,13 +11,19 @@ function makeRedisStore(name: string) {
   });
 }
 
+interface EndpointLimiterOptions {
+  message?: string;
+  skip?: (req: Request) => boolean;
+  passOnStoreError?: boolean;
+}
+
 /**
  * Creates a Redis-backed rate limiter for a specific endpoint group.
- * Falls through if Redis is unavailable (passOnStoreError).
+ * Falls through if Redis is unavailable unless passOnStoreError is disabled.
  */
 export function createEndpointLimiter(
   name: string, windowMs: number, max: number,
-  options?: { message?: string; skip?: (req: Request) => boolean },
+  options?: EndpointLimiterOptions,
 ) {
   return rateLimit({
     windowMs,
@@ -25,7 +31,7 @@ export function createEndpointLimiter(
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: options?.message ?? 'Too many requests, please try again later', code: 'RATE_LIMITED' },
-    passOnStoreError: true,
+    passOnStoreError: options?.passOnStoreError ?? true,
     store: makeRedisStore(name),
     ...(options?.skip && { skip: options.skip }),
   });

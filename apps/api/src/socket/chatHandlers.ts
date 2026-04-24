@@ -4,8 +4,6 @@ import { CHAT_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/sha
 import type { ChatChannelType, ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import { checkRateLimit, saveMessage } from '../services/chatService';
 import { sanitizeUserText } from '../utils/sanitize';
-import { getPlayerGuildId } from '../services/guildService';
-import { getPlayerZoneId } from '../services/zoneService';
 
 // In-memory pinned messages keyed by channelId (ephemeral, lost on server restart)
 const pinnedMessages = new Map<string, ChatPinnedMessageEvent>();
@@ -40,8 +38,176 @@ function broadcastPresence(io: Server): void {
 
 const VALID_CHANNEL_TYPES = new Set<ChatChannelType>(['world', 'zone', 'guild', 'casino']);
 
+interface ScopedChatMembership {
+  currentZoneId: string | null;
+  guildId: string | null;
+}
+
+interface ChatRoomSocket {
+  data: {
+    playerId?: unknown;
+  };
+  leave(room: string): void | Promise<void>;
+}
+
+function parseScopedChannelId(channelType: 'zone' | 'guild', channelId: string): string | null {
+  const prefix = `${channelType}:`;
+  if (!channelId.startsWith(prefix)) {
+    return null;
+  }
+
+  const id = channelId.slice(prefix.length);
+  return id.length > 0 ? id : null;
+}
+
+function getMemberSocketPlayerId(socket: ChatRoomSocket): string | null {
+  return typeof socket.data.playerId === 'string' ? socket.data.playerId : null;
+}
+
+function reconcileRoomSet(socket: Socket, prefix: string, currentId: string | null): void {
+  const expectedRoom = currentId ? `${prefix}${currentId}` : null;
+
+  for (const room of socket.rooms) {
+    if (room.startsWith(prefix) && room !== expectedRoom) {
+      socket.leave(room);
+    }
+  }
+
+  if (expectedRoom && !socket.rooms.has(expectedRoom)) {
+    socket.join(expectedRoom);
+  }
+}
+
+async function reconcileSocketScopedRooms(socket: Socket, playerId: string): Promise<ScopedChatMembership> {
+  const [player, membership] = await Promise.all([
+    prisma.player.findUnique({
+      where: { id: playerId },
+      select: { currentZoneId: true },
+    }),
+    prisma.guildMember.findUnique({
+      where: { playerId },
+      select: { guildId: true },
+    }),
+  ]);
+
+  const scopedMembership = {
+    currentZoneId: player?.currentZoneId ?? null,
+    guildId: membership?.guildId ?? null,
+  };
+
+  reconcileRoomSet(socket, 'chat:zone:', scopedMembership.currentZoneId);
+  reconcileRoomSet(socket, 'chat:guild:', scopedMembership.guildId);
+
+  return scopedMembership;
+}
+
+function canSendToChannel(
+  channelType: ChatChannelType,
+  channelId: string,
+  room: string,
+  membership: ScopedChatMembership,
+  socket: Socket,
+): boolean {
+  if (channelType === 'world') {
+    return channelId === 'world';
+  }
+
+  if (channelType === 'casino') {
+    return channelId === 'casino' && socket.rooms.has(room);
+  }
+
+  if (channelType === 'zone') {
+    const zoneId = parseScopedChannelId('zone', channelId);
+    return zoneId !== null && membership.currentZoneId === zoneId;
+  }
+
+  const guildId = parseScopedChannelId('guild', channelId);
+  return guildId !== null && membership.guildId === guildId;
+}
+
+async function pruneUnauthorizedRoomMembers(
+  io: Server,
+  room: string,
+  channelType: ChatChannelType,
+  channelId: string,
+): Promise<void> {
+  if (channelType !== 'zone' && channelType !== 'guild') {
+    return;
+  }
+
+  const scopedId = parseScopedChannelId(channelType, channelId);
+  if (!scopedId) {
+    return;
+  }
+
+  const sockets = await io.in(room).fetchSockets() as ChatRoomSocket[];
+  const playerIds = sockets
+    .map(getMemberSocketPlayerId)
+    .filter((id): id is string => id !== null);
+  if (playerIds.length === 0) {
+    return;
+  }
+
+  const authorizedRows = channelType === 'zone'
+    ? await prisma.player.findMany({
+        where: {
+          id: { in: playerIds },
+          currentZoneId: scopedId,
+        },
+        select: { id: true },
+      })
+    : await prisma.guildMember.findMany({
+        where: {
+          playerId: { in: playerIds },
+          guildId: scopedId,
+        },
+        select: { playerId: true },
+      });
+
+  const authorizedIds = new Set(
+    authorizedRows.map((row) => ('id' in row ? row.id : row.playerId)),
+  );
+
+  await Promise.all(sockets.map(async (memberSocket) => {
+    const memberPlayerId = getMemberSocketPlayerId(memberSocket);
+    if (!memberPlayerId || !authorizedIds.has(memberPlayerId)) {
+      await memberSocket.leave(room);
+    }
+  }));
+}
+
+function inferScopedChannelType(channelId: string): ChatChannelType | null {
+  if (channelId.startsWith('zone:')) return 'zone';
+  if (channelId.startsWith('guild:')) return 'guild';
+  if (channelId === 'world') return 'world';
+  if (channelId === 'casino') return 'casino';
+  return null;
+}
+
+async function hasConfirmedAdminRole(accountId: string): Promise<boolean> {
+  try {
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: { role: true },
+    });
+
+    return account?.role === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+async function requireConfirmedAdmin(socket: Socket, accountId: string, action: 'pin' | 'unpin'): Promise<boolean> {
+  if (await hasConfirmedAdminRole(accountId)) {
+    return true;
+  }
+
+  socket.emit('chat:error', { code: 'FORBIDDEN', message: `Only admins can ${action} messages.` });
+  return false;
+}
+
 export function registerChatHandlers(io: Server, socket: Socket): void {
-  const { playerId, username, role } = socket.data;
+  const { accountId, playerId, username, role } = socket.data;
 
   // Join world room + emit current world pin if any
   socket.join('chat:world');
@@ -50,21 +216,13 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
     socket.emit('chat:pinned', worldPin);
   }
 
-  // Look up player's current zone and guild via Redis cache (avoids DB queries on every connect)
-  Promise.all([
-    getPlayerZoneId(playerId),
-    getPlayerGuildId(playerId),
-  ])
-    .then(([currentZoneId, guildId]) => {
+  reconcileSocketScopedRooms(socket, playerId)
+    .then(({ currentZoneId }) => {
       if (currentZoneId) {
-        socket.join(`chat:zone:${currentZoneId}`);
         const zonePin = pinnedMessages.get(`zone:${currentZoneId}`);
         if (zonePin) {
           socket.emit('chat:pinned', zonePin);
         }
-      }
-      if (guildId) {
-        socket.join(`chat:guild:${guildId}`);
       }
       schedulePresenceBroadcast(io);
     })
@@ -80,24 +238,17 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
     if (typeof channelType !== 'string' || typeof channelId !== 'string' || typeof message !== 'string') return;
     if (!VALID_CHANNEL_TYPES.has(channelType as ChatChannelType)) return;
 
-    // Derive the expected room and verify the socket is a member
+    const scopedMembership = await reconcileSocketScopedRooms(socket, playerId);
+
+    // Derive the expected room and verify the socket belongs to it now.
     const room = `chat:${channelId}`;
-    if (!socket.rooms.has(room)) {
+    if (!canSendToChannel(channelType as ChatChannelType, channelId, room, scopedMembership, socket)) {
       socket.emit('chat:error', { code: 'NOT_IN_CHANNEL', message: 'You are not in that channel.' });
       return;
     }
 
     const trimmed = sanitizeUserText(message.trim());
     if (!trimmed || trimmed.length > CHAT_CONSTANTS.MAX_MESSAGE_LENGTH) return;
-
-    // Guild chat: verify membership
-    if (channelType === 'guild') {
-      const membership = await prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } });
-      if (!membership || `guild:${membership.guildId}` !== channelId) {
-        socket.emit('chat:error', { code: 'NOT_IN_GUILD', message: 'You are not in this guild.' });
-        return;
-      }
-    }
 
     if (!(await checkRateLimit(playerId, channelType as ChatChannelType))) {
       socket.emit('chat:error', { code: 'RATE_LIMITED', message: 'Sending too fast, slow down.' });
@@ -127,6 +278,7 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
       role: role as ChatMessageEvent['role'],
     };
 
+    await pruneUnauthorizedRoomMembers(io, room, channelType as ChatChannelType, channelId);
     io.to(room).emit('chat:message', event);
   });
 
@@ -168,9 +320,8 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
   });
 
   // Pin a message (admin only)
-  socket.on('chat:pin', (payload: unknown) => {
-    if (role !== 'admin') {
-      socket.emit('chat:error', { code: 'FORBIDDEN', message: 'Only admins can pin messages.' });
+  socket.on('chat:pin', async (payload: unknown) => {
+    if (!(await requireConfirmedAdmin(socket, accountId, 'pin'))) {
       return;
     }
     if (!payload || typeof payload !== 'object') return;
@@ -184,13 +335,16 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
       channelId,
     };
     pinnedMessages.set(channelId, pinEvent);
+    const channelType = inferScopedChannelType(channelId);
+    if (channelType) {
+      await pruneUnauthorizedRoomMembers(io, `chat:${channelId}`, channelType, channelId);
+    }
     io.to(`chat:${channelId}`).emit('chat:pinned', pinEvent);
   });
 
   // Unpin a message (admin only)
-  socket.on('chat:unpin', (payload: unknown) => {
-    if (role !== 'admin') {
-      socket.emit('chat:error', { code: 'FORBIDDEN', message: 'Only admins can unpin messages.' });
+  socket.on('chat:unpin', async (payload: unknown) => {
+    if (!(await requireConfirmedAdmin(socket, accountId, 'unpin'))) {
       return;
     }
     if (!payload || typeof payload !== 'object') return;
@@ -204,6 +358,10 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
       pinnedBy: username,
       channelId,
     };
+    const channelType = inferScopedChannelType(channelId);
+    if (channelType) {
+      await pruneUnauthorizedRoomMembers(io, `chat:${channelId}`, channelType, channelId);
+    }
     io.to(`chat:${channelId}`).emit('chat:pinned', unpinEvent);
   });
 

@@ -48,6 +48,10 @@ beforeEach(() => {
   mockPrisma.zone.findUnique.mockResolvedValue({
     zoneExitChance: 0.01,
   });
+  mockPrisma.playerZoneDiscovery.findUnique.mockResolvedValue({
+    playerId: 'p1',
+    zoneId: '11111111-1111-1111-1111-111111111111',
+  });
   mockPrisma.player.findUnique.mockResolvedValue({
     account: {
       isPremium: true,
@@ -73,5 +77,34 @@ describe('GET /exploration/estimate', () => {
       1,
       EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * 1.1,
     );
+  });
+
+  it('rejects estimates for undiscovered zones before reading zone mechanics', async () => {
+    mockPrisma.playerZoneDiscovery.findUnique.mockResolvedValue(null);
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      query: { turns: '100', zoneId: '22222222-2222-2222-2222-222222222222' },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+    const handler = findHandler('get', '/estimate');
+
+    await handler(req, res, next);
+
+    expect(mockPrisma.playerZoneDiscovery.findUnique).toHaveBeenCalledWith({
+      where: {
+        playerId_zoneId: {
+          playerId: 'p1',
+          zoneId: '22222222-2222-2222-2222-222222222222',
+        },
+      },
+      select: { zoneId: true },
+    });
+    expect(mockPrisma.zone.findUnique).not.toHaveBeenCalled();
+    expect(mockEstimateExploration).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 403,
+      code: 'ZONE_NOT_DISCOVERED',
+    }));
   });
 });

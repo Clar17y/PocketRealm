@@ -699,7 +699,6 @@ describe('placeBet', () => {
     expect(mockTo).toHaveBeenCalledWith('chat:casino');
     expect(mockEmit).toHaveBeenCalledWith('casino:bet', {
       playerName: 'Bob',
-      playerId: 'p1',
       betType: 'straight',
       betValue: '17',
       amount: 100,
