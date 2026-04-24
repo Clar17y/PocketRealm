@@ -37,11 +37,11 @@ afterEach(() => {
 });
 
 describe('RegisterPage', () => {
-  it('renders the submit button disabled before hydration to avoid native GET form submits', () => {
+  it('renders the submit button inert before hydration to avoid native GET form submits', () => {
     const html = renderToString(React.createElement(RegisterPage));
 
-    expect(html).toContain('type="submit"');
-    expect(html).toContain('disabled=""');
+    expect(html).toContain('type="button"');
+    expect(html).not.toContain('disabled=""');
   });
 
   it('redirects to the game after successful registration even if analytics tracking fails', async () => {

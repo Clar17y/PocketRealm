@@ -80,7 +80,7 @@ export default function ForgotPasswordPage() {
               <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
             )}
 
-            <PixelButton type="submit" variant="primary" disabled={loading || !isHydrated} className="mt-2">
+            <PixelButton type={isHydrated ? 'submit' : 'button'} variant="primary" disabled={loading} className="mt-2">
               {loading ? 'Sending...' : 'Send Reset Link'}
             </PixelButton>
 

@@ -37,11 +37,11 @@ afterEach(() => {
 });
 
 describe('LoginPage', () => {
-  it('renders the submit button disabled before hydration to avoid native GET form submits', () => {
+  it('renders the submit button inert before hydration to avoid native GET form submits', () => {
     const html = renderToString(React.createElement(LoginPage));
 
-    expect(html).toContain('type="submit"');
-    expect(html).toContain('disabled=""');
+    expect(html).toContain('type="button"');
+    expect(html).not.toContain('disabled=""');
   });
 
   it('shows and clears the relogin success message after a forced password reset logout', () => {
