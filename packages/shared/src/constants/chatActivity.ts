@@ -1,9 +1,10 @@
 import type { NpcKey } from './npcDialogue';
+import { ITEM_RARITY_CONSTANTS } from './gameConstants';
 import type { ChatActivityEventType, ChatActivityRecord } from '../types/chat.types';
 
 export { CHAT_ACTIVITY_EVENT_TYPES } from '../types/chat.types';
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+const RARITY_ORDER = ITEM_RARITY_CONSTANTS.ORDER;
 const METAL_CRAFT_NPC_KEYS = new Set<NpcKey>([
   'millbrook-blacksmith',
   'thornwall-blacksmith',
@@ -26,6 +27,16 @@ export function capitalise(value: string): string {
   return value.length === 0 ? value : `${value[0]!.toUpperCase()}${value.slice(1)}`;
 }
 
+function formatSubjectPhrase(subjectName: string | null | undefined, subjectRarity: string | null | undefined): string {
+  const subject = subjectName ?? 'something noteworthy';
+  return subjectRarity ? `${capitalise(subjectRarity)} ${subject}` : subject;
+}
+
+function withIndefiniteArticle(nounPhrase: string): string {
+  const article = /^[aeiou]/i.test(nounPhrase) ? 'an' : 'a';
+  return `${article} ${nounPhrase}`;
+}
+
 export function isRarityAtLeast(rarity: string | null | undefined, minRarity: string): boolean {
   if (!rarity || !isKnownRarity(rarity) || !isKnownRarity(minRarity)) {
     return false;
@@ -40,15 +51,13 @@ export function formatChatActivityMessage(
 ): string {
   const actor = activity.actorUsername ?? 'Someone';
   const subject = activity.subjectName ?? 'something noteworthy';
-  const rarity = activity.subjectRarity ? `${capitalise(activity.subjectRarity)} ` : '';
+  const subjectPhrase = formatSubjectPhrase(activity.subjectName, activity.subjectRarity);
 
   switch (eventType) {
     case 'rare_loot':
-      return `${actor} found a ${rarity}${subject}.`;
+      return `${actor} found ${withIndefiniteArticle(subjectPhrase)}.`;
     case 'craft_crit':
-      return `${actor} crafted an ${rarity}${subject}.`
-        .replace(' an Rare ', ' a Rare ')
-        .replace(' an Legendary ', ' a Legendary ');
+      return `${actor} crafted ${withIndefiniteArticle(subjectPhrase)}.`;
     case 'zone_discovery':
       return `${actor} discovered a passage to the ${subject}.`;
     case 'achievement':
@@ -99,8 +108,7 @@ export function getNpcActivityRelevance(npcKey: NpcKey, activity: ChatActivityRe
 }
 
 export function getNpcActivityReactionLine(npcKey: NpcKey, activity: ChatActivityRecord): string | null {
-  const rarity = activity.subjectRarity ? `${capitalise(activity.subjectRarity)} ` : '';
-  const subject = `${rarity}${activity.subjectName ?? 'work'}`;
+  const subject = formatSubjectPhrase(activity.subjectName ?? 'work', activity.subjectRarity);
 
   if (activity.eventType === 'craft_crit' && isMetalCraftNpc(npcKey)) {
     return `${subject}, was it? Good. Means somebody was listening at the anvil.`;
@@ -110,6 +118,9 @@ export function getNpcActivityReactionLine(npcKey: NpcKey, activity: ChatActivit
   }
   if (activity.eventType === 'craft_crit' && npcKey.includes('jeweller')) {
     return `${subject}. Good stones deserve careful hands, and careful hands deserve witnesses.`;
+  }
+  if (activity.eventType === 'craft_crit' && npcKey.includes('herbalist')) {
+    return `${subject}. Label it cleanly and keep the stopper tight. Good remedies deserve both.`;
   }
   if (activity.eventType === 'rare_loot' && npcKey === 'millbrook-general-store') {
     return `${subject} from the wilds? Put it somewhere dry before it becomes my problem.`;

@@ -22,6 +22,16 @@ const craftActivity: ChatActivityRecord = {
   createdAt: '2026-04-24T10:00:00.000Z',
 };
 
+const alchemyActivity: ChatActivityRecord = {
+  ...craftActivity,
+  id: 'activity-2',
+  actorUsername: 'Mira',
+  subjectName: 'Healing Tonic',
+  subjectRarity: 'rare',
+  message: 'Mira crafted a Rare Healing Tonic.',
+  metadata: { skillType: 'alchemy' },
+};
+
 describe('chatActivity constants', () => {
   it('declares the first-pass activity event types', () => {
     expect(CHAT_ACTIVITY_EVENT_TYPES).toContain('rare_loot');
@@ -35,10 +45,42 @@ describe('chatActivity constants', () => {
   it('compares rarity using game rarity order', () => {
     expect(isRarityAtLeast('epic', 'rare')).toBe(true);
     expect(isRarityAtLeast('uncommon', 'rare')).toBe(false);
+    expect(isRarityAtLeast(null, 'rare')).toBe(false);
+    expect(isRarityAtLeast('mythic', 'rare')).toBe(false);
+    expect(isRarityAtLeast('epic', 'mythic')).toBe(false);
   });
 
   it('formats craft activity messages', () => {
     expect(formatChatActivityMessage('craft_crit', craftActivity)).toBe('Kael crafted an Epic Steel Greatsword.');
+  });
+
+  it('formats activity messages with grammar-safe articles', () => {
+    expect(formatChatActivityMessage('rare_loot', {
+      ...craftActivity,
+      eventType: 'rare_loot',
+      subjectName: 'Amulet',
+      subjectRarity: 'epic',
+    })).toBe('Kael found an Epic Amulet.');
+
+    expect(formatChatActivityMessage('craft_crit', {
+      ...craftActivity,
+      subjectRarity: 'rare',
+    })).toBe('Kael crafted a Rare Steel Greatsword.');
+
+    expect(formatChatActivityMessage('craft_crit', {
+      ...craftActivity,
+      subjectRarity: 'legendary',
+    })).toBe('Kael crafted a Legendary Steel Greatsword.');
+
+    expect(formatChatActivityMessage('craft_crit', {
+      ...craftActivity,
+      subjectRarity: 'common',
+    })).toBe('Kael crafted a Common Steel Greatsword.');
+
+    expect(formatChatActivityMessage('craft_crit', {
+      ...craftActivity,
+      subjectRarity: null,
+    })).toBe('Kael crafted a Steel Greatsword.');
   });
 
   it('marks Kessa variants relevant to weaponsmithing craft activity', () => {
@@ -60,5 +102,14 @@ describe('chatActivity constants', () => {
       expect(line).not.toBeNull();
       expect(line).toContain('Epic Steel Greatsword');
     }
+  });
+
+  it('marks herbalist alchemy craft activity relevant and returns a reaction line', () => {
+    const relevance = getNpcActivityRelevance('millbrook-herbalist', alchemyActivity);
+    const line = getNpcActivityReactionLine('millbrook-herbalist', alchemyActivity);
+
+    expect(relevance).toEqual({ relevant: true, preferOwn: true });
+    expect(line).not.toBeNull();
+    expect(line).toContain('Rare Healing Tonic');
   });
 });
