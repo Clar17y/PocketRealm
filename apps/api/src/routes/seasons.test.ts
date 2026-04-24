@@ -105,7 +105,6 @@ describe('seasons routes', () => {
       {
         category: 'pvp_rating',
         rank: 1,
-        accountId: 'account-1',
         username: 'Rook',
         value: 1500,
         createdAt: new Date('2026-06-01T00:00:00.000Z'),
@@ -121,7 +120,6 @@ describe('seasons routes', () => {
       select: {
         category: true,
         rank: true,
-        accountId: true,
         username: true,
         value: true,
         createdAt: true,

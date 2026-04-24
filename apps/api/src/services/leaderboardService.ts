@@ -345,7 +345,9 @@ export async function getLeaderboard(
   // If around_me, center the window on the player's rank
   if (aroundMe && playerId && myRankIndex !== null) {
     const half = Math.floor(PAGE_SIZE / 2);
-    start = Math.max(0, myRankIndex - half);
+    const centeredStart = Math.max(0, myRankIndex - half);
+    const maxStart = Math.max(totalPlayers - PAGE_SIZE, 0);
+    start = Math.min(centeredStart, maxStart);
     stop = start + PAGE_SIZE - 1;
   }
 

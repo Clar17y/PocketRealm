@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     prisma: {
       playerCrown: {
         createMany: vi.fn(),
+        createManyAndReturn: vi.fn(),
         findMany: vi.fn(),
         groupBy: vi.fn(),
       },
@@ -40,6 +41,7 @@ describe('crownService', () => {
     vi.clearAllMocks();
     mocks.checkAchievements.mockResolvedValue([]);
     mocks.prisma.playerCrown.createMany.mockResolvedValue({ count: 0 });
+    mocks.prisma.playerCrown.createManyAndReturn.mockResolvedValue([]);
   });
 
   describe('computeCrownWinners', () => {
@@ -94,6 +96,10 @@ describe('crownService', () => {
         [null, JSON.stringify({ isBot: true })],
         [null, JSON.stringify({ isBot: false })],
       ]);
+      mocks.prisma.playerCrown.createManyAndReturn.mockResolvedValueOnce([
+        { playerId: 'p1', rank: 1 },
+        { playerId: 'p2', rank: 2 },
+      ]);
 
       const winners = await awardCrownsForCategory('pvp_wins', weekStart, 'season-1');
 
@@ -108,7 +114,7 @@ describe('crownService', () => {
         'WITHSCORES',
       );
       expect(mocks.pipeline.hget).toHaveBeenCalledWith('leaderboard:meta:season-1:pvp_wins', 'p1');
-      expect(mocks.prisma.playerCrown.createMany).toHaveBeenCalledWith({
+      expect(mocks.prisma.playerCrown.createManyAndReturn).toHaveBeenCalledWith({
         data: [
           { playerId: 'p1', category: 'pvp_wins', realmId: 'season-1', rank: 1, weekStart },
           { playerId: 'p2', category: 'pvp_wins', realmId: 'season-1', rank: 2, weekStart },
@@ -135,6 +141,11 @@ describe('crownService', () => {
           [null, JSON.stringify({ isBot: false })],
           [null, JSON.stringify({ isBot: false })],
         ]);
+      mocks.prisma.playerCrown.createManyAndReturn.mockResolvedValueOnce([
+        { playerId: 'p1', rank: 1 },
+        { playerId: 'p2', rank: 2 },
+        { playerId: 'p3', rank: 3 },
+      ]);
 
       const winners = await awardCrownsForCategory('pvp_wins', weekStart);
 
@@ -149,6 +160,23 @@ describe('crownService', () => {
         { playerId: 'p2', rank: 2 },
         { playerId: 'p3', rank: 3 },
       ]);
+    });
+
+    it('returns no winners and emits no achievement checks when all crown rows already exist', async () => {
+      const weekStart = new Date('2026-04-20T00:00:00.000Z');
+      mocks.redis.zrevrange
+        .mockResolvedValueOnce(['p1', '50', 'p2', '30'])
+        .mockResolvedValueOnce([]);
+      mocks.pipeline.exec.mockResolvedValueOnce([
+        [null, JSON.stringify({ isBot: false })],
+        [null, JSON.stringify({ isBot: false })],
+      ]);
+      mocks.prisma.playerCrown.createManyAndReturn.mockResolvedValueOnce([]);
+
+      const winners = await awardCrownsForCategory('pvp_wins', weekStart);
+
+      expect(winners).toEqual([]);
+      expect(mocks.checkAchievements).not.toHaveBeenCalled();
     });
   });
 

@@ -36,7 +36,6 @@ seasonsRouter.get('/:id/hall-of-fame', asyncHandler(async (req, res) => {
     select: {
       category: true,
       rank: true,
-      accountId: true,
       username: true,
       value: true,
       createdAt: true,

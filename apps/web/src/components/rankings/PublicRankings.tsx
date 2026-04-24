@@ -310,7 +310,7 @@ export function PublicRankings({ initialTab = 'crowns' }: PublicRankingsProps) {
                 <div className="space-y-2">
                   {entries.map((entry) => (
                     <div
-                      key={`${entry.category}-${entry.rank}-${entry.accountId}`}
+                      key={`${entry.category}-${entry.rank}-${entry.username}`}
                       className="flex items-center justify-between gap-3 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2"
                     >
                       <div className="min-w-0">

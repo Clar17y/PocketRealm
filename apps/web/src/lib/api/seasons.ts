@@ -13,7 +13,6 @@ export interface ActiveSeasonResponse {
 export interface HallOfFameEntryResponse {
   category: string;
   rank: number;
-  accountId: string;
   username: string;
   value: number;
   createdAt: string;

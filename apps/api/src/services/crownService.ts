@@ -147,7 +147,7 @@ export async function awardCrownsForCategory(
   }
 
   const realmId = leaderboardRealmId(seasonId);
-  await prisma.playerCrown.createMany({
+  const insertedCrowns = await prisma.playerCrown.createManyAndReturn({
     data: winners.map((winner) => ({
       playerId: winner.playerId,
       category,
@@ -157,15 +157,22 @@ export async function awardCrownsForCategory(
     })),
     skipDuplicates: true,
   });
+  const insertedWinners = insertedCrowns.map((crown) => ({
+    playerId: crown.playerId,
+    rank: crown.rank,
+  }));
+  if (insertedWinners.length === 0) {
+    return [];
+  }
 
   const group = crownGroupForCategory(category);
   if (group) {
-    await Promise.all(winners.map((winner) =>
+    await Promise.all(insertedWinners.map((winner) =>
       checkAchievements(winner.playerId, { statKeys: [`crowns_${group}`] }).catch(() => []),
     ));
   }
 
-  return winners;
+  return insertedWinners;
 }
 
 export async function getCrownCountsForCategory(

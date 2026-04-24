@@ -298,6 +298,24 @@ describe('leaderboardService', () => {
       );
     });
 
+    it('clamps aroundMe start near the bottom to keep a full page when possible', async () => {
+      mockRedis.zcard.mockResolvedValue(100);
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.zrevrank.mockResolvedValue(98);
+      mockRedis.zrevrange.mockResolvedValue([]);
+      mockRedis.zscore.mockResolvedValue('10');
+      mockRedis.hget.mockResolvedValue(JSON.stringify({ username: 'Bottom', characterLevel: 1, isBot: false }));
+
+      await getLeaderboard('pvp_rating', 'bottom-id', true);
+
+      expect(mockRedis.zrevrange).toHaveBeenCalledWith(
+        'leaderboard:permanent:pvp_rating',
+        100 - LEADERBOARD_CONSTANTS.PAGE_SIZE,
+        99,
+        'WITHSCORES',
+      );
+    });
+
     it('ignores aroundMe when playerId is not provided', async () => {
       mockRedis.zcard.mockResolvedValue(100);
       mockRedis.get.mockResolvedValue(null);

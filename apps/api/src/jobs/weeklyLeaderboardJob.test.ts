@@ -143,6 +143,7 @@ describe('weeklyLeaderboardJob', () => {
     await runWeeklyLeaderboardJob(new Date('2026-04-27T00:00:30.000Z'));
 
     expect(mocks.rebuildCrownCollectorSnapshot).not.toHaveBeenCalled();
+    expect(mocks.emitSystemMessage).not.toHaveBeenCalled();
   });
 
   it('continues the weekly job lifecycle when crown collector snapshot rebuild fails', async () => {

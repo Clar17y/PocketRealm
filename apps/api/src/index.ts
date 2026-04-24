@@ -58,7 +58,8 @@ import { startMetricsLogger } from './services/metricsLogger';
 import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 import { refreshSeasonCache } from './services/seasonCacheService';
-import { isWeeklyLeaderboardWindow, runWeeklyLeaderboardJob } from './jobs/weeklyLeaderboardJob';
+import { runWeeklyLeaderboardJob } from './jobs/weeklyLeaderboardJob';
+import { msUntilNextWeeklyLeaderboardWindow } from './jobs/weeklyLeaderboardSchedule';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -198,22 +199,7 @@ async function runPremiumReconciliation(): Promise<void> {
   }
 }
 
-function msUntilNextWeeklyLeaderboardWindow(now = new Date()): number {
-  if (isWeeklyLeaderboardWindow(now)) {
-    return 0;
-  }
-
-  const daysUntilMonday = (8 - now.getUTCDay()) % 7 || 7;
-  const nextMonday = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() + daysUntilMonday,
-  ));
-
-  return Math.max(0, nextMonday.getTime() - now.getTime());
-}
-
-function scheduleWeeklyLeaderboardJob(): void {
+function scheduleWeeklyLeaderboardJob(skipCurrentWindow = false): void {
   weeklyLeaderboardTimer = setTimeout(() => {
     const now = new Date();
     void runWeeklyLeaderboardJob(now)
@@ -221,9 +207,9 @@ function scheduleWeeklyLeaderboardJob(): void {
         logger.error({ err }, 'Weekly leaderboard crown job failed');
       })
       .finally(() => {
-        scheduleWeeklyLeaderboardJob();
+        scheduleWeeklyLeaderboardJob(true);
       });
-  }, msUntilNextWeeklyLeaderboardWindow());
+  }, msUntilNextWeeklyLeaderboardWindow(new Date(), { includeCurrentWindow: !skipCurrentWindow }));
 }
 
 function startServer(): void {
