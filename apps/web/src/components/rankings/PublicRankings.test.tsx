@@ -1,0 +1,136 @@
+import React from 'react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
+  return {
+    ...actual,
+    getActiveSeason: vi.fn(),
+    getCrownCollectors: vi.fn(),
+    getHallOfFame: vi.fn(),
+    getLeaderboard: vi.fn(),
+    getLeaderboardCategories: vi.fn(),
+    getSeasonArchives: vi.fn(),
+  };
+});
+
+import {
+  getActiveSeason,
+  getCrownCollectors,
+  getHallOfFame,
+  getLeaderboard,
+  getLeaderboardCategories,
+  getSeasonArchives,
+} from '@/lib/api';
+import { PublicRankings } from './PublicRankings';
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  window.history.replaceState(null, '', '/');
+});
+
+function crownEntry(username: string, rank = 1) {
+  return {
+    rank,
+    username,
+    characterLevel: 12,
+    crowns: { gold: 1, silver: 1, bronze: 2, total: 4 },
+    topGroups: [{ group: 'PvP', count: 2 }],
+  };
+}
+
+function primeApi() {
+  vi.mocked(getLeaderboardCategories).mockResolvedValue({
+    data: {
+      groups: [
+        {
+          name: 'Characters',
+          categories: [{ slug: 'character_xp', label: 'Character XP' }],
+        },
+      ],
+    },
+    error: null,
+  });
+  vi.mocked(getActiveSeason).mockResolvedValue({
+    data: {
+      season: {
+        id: 'season-1',
+        name: 'Season 1',
+        status: 'active',
+        startsAt: '2026-04-01T00:00:00.000Z',
+        endsAt: '2026-05-01T00:00:00.000Z',
+        constantOverrides: null,
+        features: null,
+      },
+    },
+    error: null,
+  });
+  vi.mocked(getSeasonArchives).mockResolvedValue({ data: { archives: [] }, error: null });
+  vi.mocked(getCrownCollectors).mockResolvedValue({
+    data: {
+      entries: [crownEntry('Arden')],
+      myRank: null,
+      totalPlayers: 1,
+      lastRefreshedAt: '2026-04-20T00:00:00.000Z',
+    },
+    error: null,
+  });
+  vi.mocked(getLeaderboard).mockResolvedValue({
+    data: {
+      category: 'character_xp',
+      entries: [{ rank: 1, username: 'XP Hero', characterLevel: 30, score: 5000, isBot: false }],
+      myRank: null,
+      totalPlayers: 1,
+      lastRefreshedAt: '2026-04-20T00:00:00.000Z',
+      period: 'weekly',
+    },
+    error: null,
+  });
+  vi.mocked(getHallOfFame).mockResolvedValue({ data: { entries: [] }, error: null });
+}
+
+describe('PublicRankings', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/rankings');
+    primeApi();
+  });
+
+  it('defaults to the crowns tab', async () => {
+    render(<PublicRankings />);
+
+    await waitFor(() => expect(getCrownCollectors).toHaveBeenCalledWith(false));
+    expect(screen.getByRole('heading', { name: 'Realm Rankings' })).toBeTruthy();
+    expect(screen.getByText('Arden')).toBeTruthy();
+    expect(screen.getByText('4 crowns')).toBeTruthy();
+  });
+
+  it('loads weekly rankings when the weekly tab is selected', async () => {
+    render(<PublicRankings />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Weekly' }));
+
+    await waitFor(() => expect(getLeaderboard).toHaveBeenCalledWith('character_xp', false, null, 'weekly'));
+    expect(screen.getByText('XP Hero')).toBeTruthy();
+  });
+
+  it('can request the signed-in crown collector rank', async () => {
+    vi.mocked(getCrownCollectors).mockResolvedValue({
+      data: {
+        entries: [crownEntry('Arden')],
+        myRank: crownEntry('Meadow', 10),
+        totalPlayers: 10,
+        lastRefreshedAt: '2026-04-20T00:00:00.000Z',
+      },
+      error: null,
+    });
+
+    render(<PublicRankings />);
+
+    await screen.findByRole('button', { name: 'View My Rank' });
+    fireEvent.click(screen.getByRole('button', { name: 'View My Rank' }));
+
+    await waitFor(() => expect(getCrownCollectors).toHaveBeenCalledWith(true));
+  });
+});
