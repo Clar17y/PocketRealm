@@ -89,9 +89,20 @@ const worldSystemMessage: ChatMessageEvent = {
   channelId: 'world',
   playerId: 'system',
   username: 'System',
-  message: 'The Ashen Herald has been defeated.',
+  message: 'A boss has appeared in Iron Hollow: The Ashen Herald!',
   messageType: 'system',
   createdAt: '2026-04-18T12:01:00.000Z',
+};
+
+const worldActivityMessage: ChatMessageEvent = {
+  id: 'world-activity',
+  channelType: 'world',
+  channelId: 'world',
+  playerId: 'system',
+  username: 'System',
+  message: 'The Ashen Herald has been defeated.',
+  messageType: 'activity',
+  createdAt: '2026-04-18T12:02:00.000Z',
 };
 
 function emitSocketEvent<TEvent extends SocketEvent>(event: TEvent, payload: SocketEventMap[TEvent]) {
@@ -113,21 +124,35 @@ describe('useChat', () => {
     vi.mocked(getChatHistory).mockResolvedValue({ data: { messages: [] }, error: null });
   });
 
-  it('splits mixed world history into player stream and global activity', async () => {
+  it('splits mixed world history into chat stream and global activity', async () => {
     vi.mocked(getChatHistory).mockResolvedValue({
-      data: { messages: [worldPlayerMessage, worldSystemMessage] },
+      data: { messages: [worldPlayerMessage, worldSystemMessage, worldActivityMessage] },
       error: null,
     });
 
     const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
 
     await waitFor(() => {
-      expect(result.current.worldMessages).toEqual([worldPlayerMessage]);
-      expect(result.current.globalActivityMessages).toEqual([worldSystemMessage]);
+      expect(result.current.worldMessages).toEqual([worldPlayerMessage, worldSystemMessage]);
+      expect(result.current.globalActivityMessages).toEqual([worldActivityMessage]);
     });
   });
 
-  it('routes socket world system messages to global activity without unread world count', async () => {
+  it('routes socket world activity messages to global activity without unread world count', async () => {
+    const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
+
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalledWith('world', 'world'));
+
+    act(() => {
+      emitSocketEvent('chat:message', worldActivityMessage);
+    });
+
+    expect(result.current.worldMessages).toEqual([]);
+    expect(result.current.globalActivityMessages).toEqual([worldActivityMessage]);
+    expect(result.current.unreadWorld).toBe(0);
+  });
+
+  it('keeps socket world system messages inline and counts them as unread', async () => {
     const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
 
     await waitFor(() => expect(getChatHistory).toHaveBeenCalledWith('world', 'world'));
@@ -136,9 +161,9 @@ describe('useChat', () => {
       emitSocketEvent('chat:message', worldSystemMessage);
     });
 
-    expect(result.current.worldMessages).toEqual([]);
-    expect(result.current.globalActivityMessages).toEqual([worldSystemMessage]);
-    expect(result.current.unreadWorld).toBe(0);
+    expect(result.current.worldMessages).toEqual([worldSystemMessage]);
+    expect(result.current.globalActivityMessages).toEqual([]);
+    expect(result.current.unreadWorld).toBe(1);
   });
 
   it('keeps socket zone system messages inline in zone messages', async () => {

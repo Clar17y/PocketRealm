@@ -12,6 +12,7 @@ vi.mock('./systemMessageService', () => ({
   emitSystemMessage: vi.fn(),
 }));
 
+import { CHAT_CONSTANTS } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { mockPrisma } from '../__test__/setup';
 import { emitSystemMessage } from './systemMessageService';
@@ -58,6 +59,7 @@ describe('chatActivityService', () => {
       'zone',
       'zone:zone-1',
       'Mira found a Rare Willow Bark.',
+      'activity',
     );
     expect(mockPrisma.chatActivity.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -141,6 +143,7 @@ describe('chatActivityService', () => {
       'world',
       'world',
       'The Molten Hart in Iron Hollow has been defeated. Hero dealt the final blow.',
+      'activity',
     );
     expect(mockEmitSystemMessage).toHaveBeenNthCalledWith(
       2,
@@ -148,6 +151,7 @@ describe('chatActivityService', () => {
       'zone',
       'zone:zone-1',
       'The Molten Hart has been defeated. Hero dealt the final blow.',
+      'activity',
     );
     expect(mockPrisma.chatActivity.create).toHaveBeenCalledTimes(2);
     expect(mockPrisma.chatActivity.create).toHaveBeenNthCalledWith(1, {
@@ -157,6 +161,8 @@ describe('chatActivityService', () => {
         zoneId: 'zone-1',
         actorPlayerId: null,
         actorUsername: 'Hero',
+        subjectName: 'The Molten Hart',
+        metadata: { zoneName: 'Iron Hollow' },
       }),
     });
     expect(mockPrisma.chatActivity.create).toHaveBeenNthCalledWith(2, {
@@ -184,6 +190,7 @@ describe('chatActivityService', () => {
       'world',
       'world',
       'The Molten Hart in Iron Hollow has been defeated.',
+      'activity',
     );
     expect(mockEmitSystemMessage).toHaveBeenNthCalledWith(
       2,
@@ -191,6 +198,7 @@ describe('chatActivityService', () => {
       'zone',
       'zone:zone-1',
       'The Molten Hart has been defeated.',
+      'activity',
     );
   });
 
@@ -208,12 +216,37 @@ describe('chatActivityService', () => {
       'world',
       'world',
       'The Molten Hart in Iron Hollow has been defeated.',
+      'activity',
     );
     expect(mockPrisma.chatActivity.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         eventType: 'boss_defeat',
         scope: 'global',
         zoneId: null,
+      }),
+    });
+  });
+
+  it('truncates activity messages before emitting and persisting them', async () => {
+    await broadcastBossDefeatActivity({
+      zoneId: null,
+      zoneName: 'Z'.repeat(64),
+      bossName: 'B'.repeat(64),
+      killerName: 'K'.repeat(32),
+    });
+
+    const emittedMessage = mockEmitSystemMessage.mock.calls[0]?.[3];
+    expect(emittedMessage).toHaveLength(CHAT_CONSTANTS.MAX_MESSAGE_LENGTH);
+    expect(mockEmitSystemMessage).toHaveBeenCalledWith(
+      expect.anything(),
+      'world',
+      'world',
+      emittedMessage,
+      'activity',
+    );
+    expect(mockPrisma.chatActivity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        message: emittedMessage,
       }),
     });
   });
@@ -294,6 +327,50 @@ describe('chatActivityService', () => {
     expect(mockPrisma.playerNpcActivityReaction.create).toHaveBeenCalledWith({
       data: { playerId: 'player-1', npcKey: 'kessa-weaponsmithing', activityId: 'activity-matching' },
     });
+  });
+
+  it('continues paging recent activity until an NPC reaction is found', async () => {
+    const stalePage = Array.from({ length: 25 }, (_, index) => ({
+      id: `activity-irrelevant-${index}`,
+      eventType: 'craft_crit',
+      scope: 'zone',
+      zoneId: 'zone-1',
+      actorPlayerId: 'other-player',
+      actorUsername: 'Other',
+      subjectName: 'Other Sword',
+      subjectRarity: 'epic',
+      message: 'Other crafted an Epic Other Sword.',
+      metadata: { skillType: 'weaponsmithing' },
+      createdAt: new Date('2026-04-24T10:00:00.000Z'),
+    }));
+    const matchingActivity = {
+      id: 'activity-matching-page',
+      eventType: 'craft_crit',
+      scope: 'zone',
+      zoneId: 'zone-1',
+      actorPlayerId: 'player-1',
+      actorUsername: 'Kael',
+      subjectName: 'Fresh Sword',
+      subjectRarity: 'epic',
+      message: 'Kael crafted an Epic Fresh Sword.',
+      metadata: { skillType: 'weaponsmithing' },
+      createdAt: new Date('2026-04-24T09:59:00.000Z'),
+    };
+    mockPrisma.chatActivity.findMany
+      .mockResolvedValueOnce(stalePage)
+      .mockResolvedValueOnce([matchingActivity]);
+
+    const result = await getNpcActivityReaction('player-1', 'kessa-weaponsmithing');
+
+    expect(result?.activityId).toBe('activity-matching-page');
+    expect(mockPrisma.chatActivity.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      take: 25,
+      skip: 0,
+    }));
+    expect(mockPrisma.chatActivity.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      take: 25,
+      skip: 25,
+    }));
   });
 
   it('skips invalid activity rows while finding an NPC reaction', async () => {

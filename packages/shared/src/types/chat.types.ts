@@ -9,7 +9,7 @@ export interface ChatSendPayload {
 }
 
 export type ChatRole = 'player' | 'admin' | 'moderator';
-export type ChatMessageType = 'player' | 'system';
+export type ChatMessageType = 'player' | 'system' | 'activity';
 
 export interface ChatMessageEvent {
   id: string;

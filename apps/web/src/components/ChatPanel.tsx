@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, type FormEvent } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
-import { CHAT_CONSTANTS } from '@pocketrealm/shared';
+import { CHAT_ACTIVITY_CONSTANTS, CHAT_CONSTANTS } from '@pocketrealm/shared';
 import { PlayerTitle } from '@/components/common/PlayerTitle';
 import type { ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import type { ChatChannel } from '@/hooks/useChat';
@@ -58,7 +58,7 @@ export function ChatPanel({
   const messages = activeChannel === 'world' ? worldMessages
     : activeChannel === 'casino' ? casinoMessages
     : zoneMessages;
-  const visibleGlobalActivity = globalActivityMessages.slice(-3);
+  const visibleGlobalActivity = globalActivityMessages.slice(-CHAT_ACTIVITY_CONSTANTS.VISIBLE_GLOBAL_ACTIVITY_COUNT);
   const pinnedId = pinnedMessage?.id;
 
   // Reset dismiss when a new pin arrives
@@ -206,7 +206,7 @@ export function ChatPanel({
           {messages.map((msg) => {
             const isOwn = msg.playerId === playerId;
             const time = formatTime(msg.createdAt);
-            const isSystem = msg.messageType === 'system';
+            const isSystem = msg.messageType === 'system' || msg.messageType === 'activity';
             const isAdmin = msg.role === 'admin';
             const isMod = msg.role === 'moderator';
 

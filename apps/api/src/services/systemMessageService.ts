@@ -1,5 +1,5 @@
 import type { Server as SocketServer } from 'socket.io';
-import type { ChatChannelType, ChatMessageEvent } from '@pocketrealm/shared';
+import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
 import { saveMessage } from './chatService';
 
 const SYSTEM_PLAYER_ID = '00000000-0000-0000-0000-000000000000';
@@ -10,6 +10,7 @@ export async function emitSystemMessage(
   channelType: ChatChannelType,
   channelId: string,
   message: string,
+  messageType: Extract<ChatMessageType, 'system' | 'activity'> = 'system',
 ): Promise<{ id: string; createdAt: Date }> {
   const row = await saveMessage({
     channelType,
@@ -17,7 +18,7 @@ export async function emitSystemMessage(
     playerId: SYSTEM_PLAYER_ID,
     username: SYSTEM_USERNAME,
     message,
-    messageType: 'system',
+    messageType,
   });
 
   if (!io) return row;
@@ -29,7 +30,7 @@ export async function emitSystemMessage(
     playerId: SYSTEM_PLAYER_ID,
     username: SYSTEM_USERNAME,
     message,
-    messageType: 'system',
+    messageType,
     createdAt: row.createdAt.toISOString(),
   };
 

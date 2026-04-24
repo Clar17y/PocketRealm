@@ -59,8 +59,9 @@ describe('chatActivity constants', () => {
       ...craftActivity,
       eventType: 'boss_defeat',
       actorUsername: 'Hero',
-      subjectName: 'The Molten Hart in Iron Hollow',
+      subjectName: 'The Molten Hart',
       subjectRarity: null,
+      metadata: { zoneName: 'Iron Hollow' },
     })).toBe('The Molten Hart in Iron Hollow has been defeated. Hero dealt the final blow.');
   });
 
@@ -69,8 +70,9 @@ describe('chatActivity constants', () => {
       ...craftActivity,
       eventType: 'boss_defeat',
       actorUsername: null,
-      subjectName: 'The Molten Hart in Iron Hollow',
+      subjectName: 'The Molten Hart',
       subjectRarity: null,
+      metadata: { zoneName: 'Iron Hollow' },
     })).toBe('The Molten Hart in Iron Hollow has been defeated.');
   });
 

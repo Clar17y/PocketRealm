@@ -37,6 +37,12 @@ function withIndefiniteArticle(nounPhrase: string): string {
   return `${article} ${nounPhrase}`;
 }
 
+function bossDefeatSubject(activity: Pick<ChatActivityRecord, 'subjectName' | 'metadata'>): string {
+  const subject = activity.subjectName ?? 'something noteworthy';
+  const zoneName = typeof activity.metadata.zoneName === 'string' ? activity.metadata.zoneName : null;
+  return zoneName ? `${subject} in ${zoneName}` : subject;
+}
+
 export function isRarityAtLeast(rarity: string | null | undefined, minRarity: string): boolean {
   if (!rarity || !isKnownRarity(rarity) || !isKnownRarity(minRarity)) {
     return false;
@@ -62,10 +68,12 @@ export function formatChatActivityMessage(
       return `${actor} discovered a passage to the ${subject}.`;
     case 'achievement':
       return `${actor} earned the achievement ${subject}.`;
-    case 'boss_defeat':
+    case 'boss_defeat': {
+      const bossSubject = bossDefeatSubject(activity);
       return activity.actorUsername
-        ? `${subject} has been defeated. ${actor} dealt the final blow.`
-        : `${subject} has been defeated.`;
+        ? `${bossSubject} has been defeated. ${actor} dealt the final blow.`
+        : `${bossSubject} has been defeated.`;
+    }
     case 'server_milestone':
       return subject;
   }

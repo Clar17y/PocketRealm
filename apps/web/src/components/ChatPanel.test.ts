@@ -54,7 +54,7 @@ describe('ChatPanel', () => {
     expect(title.className).toContain('rainbow-title');
   });
 
-  it('renders world system messages in the activity shelf, not the main world stream', () => {
+  it('renders world activity messages in the activity shelf, not the main world stream', () => {
     render(
       React.createElement(ChatPanel, {
         isOpen: true,
@@ -80,7 +80,7 @@ describe('ChatPanel', () => {
             playerId: 'system',
             username: 'System',
             message: 'The Ashen Herald has been defeated.',
-            messageType: 'system',
+            messageType: 'activity',
             createdAt: new Date('2026-04-18T12:01:00.000Z').toISOString(),
           },
         ],

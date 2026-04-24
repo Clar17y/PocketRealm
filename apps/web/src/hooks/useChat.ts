@@ -66,7 +66,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
 
   const appendMessage = useCallback((msg: ChatMessageEvent) => {
     if (msg.channelType === 'world') {
-      if (msg.messageType === 'system') {
+      if (msg.messageType === 'activity') {
         setGlobalActivityMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
         return;
       }
@@ -121,8 +121,8 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       getChatHistory('world', 'world').then((res) => {
         if (res.data) {
           const messages = res.data.messages as ChatMessageEvent[];
-          setWorldMessages(messages.filter((msg) => msg.messageType !== 'system'));
-          setGlobalActivityMessages(messages.filter((msg) => msg.messageType === 'system'));
+          setWorldMessages(messages.filter((msg) => msg.messageType !== 'activity'));
+          setGlobalActivityMessages(messages.filter((msg) => msg.messageType === 'activity'));
         }
       });
 

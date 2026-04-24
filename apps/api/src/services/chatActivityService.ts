@@ -3,6 +3,7 @@ import {
   CHAT_ACTIVITY_CONSTANTS,
   CHAT_ACTIVITY_EVENT_TYPES,
   CHAT_ACTIVITY_SCOPES,
+  CHAT_CONSTANTS,
   ITEM_RARITY_CONSTANTS,
   formatChatActivityMessage,
   getNpcActivityReactionLine,
@@ -61,6 +62,7 @@ type ActivityCreateInput = BaseActivityCreateInput & (
 );
 
 const RARITY_ORDER = ITEM_RARITY_CONSTANTS.ORDER;
+const NPC_ACTIVITY_REACTION_PAGE_SIZE = 25;
 
 function isChatActivityEventType(value: string): value is ChatActivityEventType {
   return (CHAT_ACTIVITY_EVENT_TYPES as readonly string[]).includes(value);
@@ -175,10 +177,11 @@ async function broadcastAndPersistActivity(activity: ActivityCreateInput): Promi
     return;
   }
 
-  const message = formatChatActivityMessage(activity.eventType, messagePreview(activity));
+  const message = formatChatActivityMessage(activity.eventType, messagePreview(activity))
+    .slice(0, CHAT_CONSTANTS.MAX_MESSAGE_LENGTH);
   const channelType: ChatChannelType = activity.scope === 'global' ? 'world' : 'zone';
   const channelId = activity.scope === 'global' ? 'world' : `zone:${activity.zoneId}`;
-  const chatMessage = await emitSystemMessage(getIo(), channelType, channelId, message);
+  const chatMessage = await emitSystemMessage(getIo(), channelType, channelId, message, 'activity');
 
   await prisma.chatActivity.create({
     data: {
@@ -274,8 +277,9 @@ export async function broadcastBossDefeatActivity(params: {
     zoneId: params.zoneId,
     actorPlayerId: null,
     actorUsername: params.killerName,
-    subjectName: `${params.bossName} in ${params.zoneName}`,
+    subjectName: params.bossName,
     subjectRarity: null,
+    metadata: { zoneName: params.zoneName },
   });
 
   if (!params.zoneId) {
@@ -299,55 +303,66 @@ export async function getNpcActivityReaction(
 ): Promise<ChatNpcActivityReactionResponse['reaction']> {
   const now = new Date();
   const since = new Date(now.getTime() - CHAT_ACTIVITY_CONSTANTS.NPC_REACTION_LOOKBACK_HOURS * 60 * 60 * 1000);
-  const [reactedRows, activityRows]: [{ activityId: string }[], ChatActivityRow[]] = await Promise.all([
-    prisma.playerNpcActivityReaction.findMany({
-      where: { playerId, npcKey },
-      select: { activityId: true },
-    }),
-    prisma.chatActivity.findMany({
+  const reactedRows: { activityId: string }[] = await prisma.playerNpcActivityReaction.findMany({
+    where: { playerId, npcKey },
+    select: { activityId: true },
+  });
+  const reactedActivityIds = new Set(reactedRows.map((row) => row.activityId));
+  let skip = 0;
+
+  while (true) {
+    const activityRows: ChatActivityRow[] = await prisma.chatActivity.findMany({
       where: {
         createdAt: { gte: since },
         expiresAt: { gte: now },
       },
       orderBy: { createdAt: 'desc' },
-      take: 25,
-    }),
-  ]);
-  const reactedActivityIds = new Set(reactedRows.map((row) => row.activityId));
+      take: NPC_ACTIVITY_REACTION_PAGE_SIZE,
+      skip,
+    });
 
-  for (const row of activityRows) {
-    if (reactedActivityIds.has(row.id)) {
-      continue;
+    if (activityRows.length === 0) {
+      return null;
     }
 
-    const activity = toChatActivityRecord(row);
-    if (!activity) {
-      continue;
-    }
-
-    const relevance = getNpcActivityRelevance(npcKey, activity);
-    if (!relevance.relevant || (relevance.preferOwn && activity.actorPlayerId !== playerId)) {
-      continue;
-    }
-
-    const line = getNpcActivityReactionLine(npcKey, activity);
-    if (!line) {
-      continue;
-    }
-
-    try {
-      await prisma.playerNpcActivityReaction.create({
-        data: { playerId, npcKey, activityId: activity.id },
-      });
-    } catch (error: unknown) {
-      if (hasPrismaRequestErrorCode(error, 'P2002')) {
+    for (const row of activityRows) {
+      if (reactedActivityIds.has(row.id)) {
         continue;
       }
-      throw error;
+
+      const activity = toChatActivityRecord(row);
+      if (!activity) {
+        continue;
+      }
+
+      const relevance = getNpcActivityRelevance(npcKey, activity);
+      if (!relevance.relevant || (relevance.preferOwn && activity.actorPlayerId !== playerId)) {
+        continue;
+      }
+
+      const line = getNpcActivityReactionLine(npcKey, activity);
+      if (!line) {
+        continue;
+      }
+
+      try {
+        await prisma.playerNpcActivityReaction.create({
+          data: { playerId, npcKey, activityId: activity.id },
+        });
+      } catch (error: unknown) {
+        if (hasPrismaRequestErrorCode(error, 'P2002')) {
+          continue;
+        }
+        throw error;
+      }
+
+      return { activityId: activity.id, eventType: activity.eventType, line };
     }
 
-    return { activityId: activity.id, eventType: activity.eventType, line };
-  }
+    if (activityRows.length < NPC_ACTIVITY_REACTION_PAGE_SIZE) {
+      return null;
+    }
 
-  return null;
+    skip += NPC_ACTIVITY_REACTION_PAGE_SIZE;
+  }
 }

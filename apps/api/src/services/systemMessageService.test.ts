@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Server as SocketServer } from 'socket.io';
 
 vi.mock('./chatService', () => ({
   saveMessage: vi.fn(),
@@ -44,7 +45,7 @@ describe('systemMessageService', () => {
 
     const mockEmit = vi.fn();
     const mockTo = vi.fn(() => ({ emit: mockEmit }));
-    const mockIo = { to: mockTo } as any;
+    const mockIo = { to: mockTo } as unknown as SocketServer;
 
     await emitSystemMessage(mockIo, 'zone', 'zone:z1', 'Zone message');
 
@@ -70,5 +71,19 @@ describe('systemMessageService', () => {
     await emitSystemMessage(null, 'world', 'world', 'No socket');
 
     expect(mockSaveMessage).toHaveBeenCalled();
+  });
+
+  it('can mark structured activity separately from regular system messages', async () => {
+    mockSaveMessage.mockResolvedValue({
+      id: 'msg-4',
+      createdAt: new Date('2026-02-04T12:00:00Z'),
+    });
+
+    await emitSystemMessage(null, 'world', 'world', 'Activity happened', 'activity');
+
+    expect(mockSaveMessage).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Activity happened',
+      messageType: 'activity',
+    }));
   });
 });
