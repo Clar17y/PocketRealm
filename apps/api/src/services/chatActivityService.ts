@@ -1,6 +1,8 @@
-import { prisma, type Prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import {
   CHAT_ACTIVITY_CONSTANTS,
+  CHAT_ACTIVITY_EVENT_TYPES,
+  CHAT_ACTIVITY_SCOPES,
   ITEM_RARITY_CONSTANTS,
   formatChatActivityMessage,
   getNpcActivityReactionLine,
@@ -44,10 +46,8 @@ type ChatActivityRow = {
   createdAt: Date;
 };
 
-type ActivityCreateInput = {
+type BaseActivityCreateInput = {
   eventType: ChatActivityEventType;
-  scope: ChatActivityScope;
-  zoneId: string | null;
   actorPlayerId: string | null;
   actorUsername: string | null;
   subjectName: string | null;
@@ -55,7 +55,20 @@ type ActivityCreateInput = {
   metadata?: Prisma.InputJsonObject;
 };
 
+type ActivityCreateInput = BaseActivityCreateInput & (
+  | { scope: 'zone'; zoneId: string }
+  | { scope: 'global'; zoneId: string | null }
+);
+
 const RARITY_ORDER = ITEM_RARITY_CONSTANTS.ORDER;
+
+function isChatActivityEventType(value: string): value is ChatActivityEventType {
+  return (CHAT_ACTIVITY_EVENT_TYPES as readonly string[]).includes(value);
+}
+
+function isChatActivityScope(value: string): value is ChatActivityScope {
+  return (CHAT_ACTIVITY_SCOPES as readonly string[]).includes(value);
+}
 
 function rarityRank(rarity: string | null | undefined): number {
   return RARITY_ORDER.findIndex((knownRarity) => knownRarity === rarity);
@@ -77,11 +90,18 @@ function metadataRecord(metadata: unknown): Record<string, unknown> {
   return metadata as Record<string, unknown>;
 }
 
-function toChatActivityRecord(row: ChatActivityRow): ChatActivityRecord {
+function toChatActivityRecord(row: ChatActivityRow): ChatActivityRecord | null {
+  if (!isChatActivityEventType(row.eventType) || !isChatActivityScope(row.scope)) {
+    return null;
+  }
+  if (row.scope === 'zone' && !row.zoneId) {
+    return null;
+  }
+
   return {
     id: row.id,
-    eventType: row.eventType as ChatActivityEventType,
-    scope: row.scope === 'global' ? 'global' : 'zone',
+    eventType: row.eventType,
+    scope: row.scope,
     zoneId: row.zoneId,
     actorPlayerId: row.actorPlayerId,
     actorUsername: row.actorUsername,
@@ -91,6 +111,23 @@ function toChatActivityRecord(row: ChatActivityRow): ChatActivityRecord {
     metadata: metadataRecord(row.metadata),
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function hasPrismaRequestErrorCode(error: unknown, code: string): boolean {
+  const knownRequestError = (Prisma as typeof Prisma & {
+    PrismaClientKnownRequestError?: new (...args: never[]) => { code?: string };
+  }).PrismaClientKnownRequestError;
+
+  if (typeof knownRequestError === 'function' && error instanceof knownRequestError) {
+    return error.code === code;
+  }
+
+  return Boolean(
+    error
+      && typeof error === 'object'
+      && 'code' in error
+      && (error as Record<'code', unknown>).code === code,
+  );
 }
 
 function expiresAtFromNow(): Date {
@@ -130,6 +167,10 @@ async function canBroadcastActivity(actorPlayerId: string | null, eventType: Cha
 }
 
 async function broadcastAndPersistActivity(activity: ActivityCreateInput): Promise<void> {
+  if (activity.scope === 'zone' && !activity.zoneId) {
+    throw new Error('zoneId is required for zone chat activity');
+  }
+
   if (!(await canBroadcastActivity(activity.actorPlayerId, activity.eventType))) {
     return;
   }
@@ -280,6 +321,10 @@ export async function getNpcActivityReaction(
     }
 
     const activity = toChatActivityRecord(row);
+    if (!activity) {
+      continue;
+    }
+
     const relevance = getNpcActivityRelevance(npcKey, activity);
     if (!relevance.relevant || (relevance.preferOwn && activity.actorPlayerId !== playerId)) {
       continue;
@@ -290,9 +335,16 @@ export async function getNpcActivityReaction(
       continue;
     }
 
-    await prisma.playerNpcActivityReaction.create({
-      data: { playerId, npcKey, activityId: activity.id },
-    });
+    try {
+      await prisma.playerNpcActivityReaction.create({
+        data: { playerId, npcKey, activityId: activity.id },
+      });
+    } catch (error: unknown) {
+      if (hasPrismaRequestErrorCode(error, 'P2002')) {
+        continue;
+      }
+      throw error;
+    }
 
     return { activityId: activity.id, eventType: activity.eventType, line };
   }
