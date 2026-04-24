@@ -376,18 +376,24 @@ inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
   await depositItem(playerId, body.itemId, body.quantity);
-  const [remainingDTOs, inventoryMeta, materialTotals] = await Promise.all([
-    fetchItemDTOs([body.itemId]),
+  const [sourceItem, inventoryMeta, materialTotals] = await Promise.all([
+    prisma.item.findUnique({
+      where: { id: body.itemId },
+      select: { inStash: true },
+    }),
     fetchInventoryMeta(playerId),
     fetchMaterialTotals(playerId),
   ]);
-  const wasFullyMoved = remainingDTOs.length === 0;
+  const remainingDTOs = sourceItem?.inStash === false
+    ? await fetchItemDTOs([body.itemId])
+    : [];
+  const inventoryDelta = remainingDTOs.length === 0
+    ? { inventoryRemoved: [body.itemId] }
+    : { inventoryUpdated: remainingDTOs };
   res.json({
     success: true,
     stateUpdates: {
-      ...(wasFullyMoved
-        ? { inventoryRemoved: [body.itemId] }
-        : { inventoryUpdated: remainingDTOs }),
+      ...inventoryDelta,
       inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
       materialTotals,
     },
