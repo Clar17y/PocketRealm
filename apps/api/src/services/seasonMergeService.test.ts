@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getCategories: vi.fn(() => ({ groups: [] })),
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
   levelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
+  invalidateCrownCollectorSnapshot: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../redis', () => ({
@@ -29,6 +30,10 @@ vi.mock('./leaderboardService', () => ({
   getCategories: mocks.getCategories,
 }));
 
+vi.mock('./crownLeaderboardService', () => ({
+  invalidateCrownCollectorSnapshot: mocks.invalidateCrownCollectorSnapshot,
+}));
+
 vi.mock('@pocketrealm/game-engine', () => ({
   characterLevelFromXp: mocks.characterLevelFromXp,
   levelFromXp: mocks.levelFromXp,
@@ -43,6 +48,8 @@ describe('seasonMergeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (fn: (tx: any) => Promise<unknown>) => fn(mockPrisma));
+    mockPrisma.playerCrown.findMany.mockResolvedValue([]);
+    mockPrisma.playerCrown.createMany.mockResolvedValue({ count: 0 });
   });
 
   it('merges transferable data and folds seasonal skill xp into the permanent player inside the transaction', async () => {
@@ -71,10 +78,12 @@ describe('seasonMergeService', () => {
       skillXp: { woodcutting: 120 },
       characterXp: { amount: 200 },
       achievements: { merged: 0 },
+      crowns: { merged: 0 },
       bestiary: { merged: 0 },
       recipes: { merged: 0 },
       zoneDiscoveries: { merged: 0 },
     });
+    expect(mocks.invalidateCrownCollectorSnapshot).not.toHaveBeenCalled();
     expect(mockPrisma.item.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['item-1'] } },
       data: { ownerId: 'perm-1', inStash: true },
@@ -108,6 +117,42 @@ describe('seasonMergeService', () => {
         xp: 120n,
         level: 1,
       },
+    });
+  });
+
+  it('transfers seasonal crowns to the permanent player before deletion', async () => {
+    const awardedAt = new Date('2026-04-20T00:00:00.000Z');
+    const weekStart = new Date('2026-04-13T00:00:00.000Z');
+    mockPrisma.player.findUniqueOrThrow
+      .mockResolvedValueOnce({ gold: 0, characterXp: 0n })
+      .mockResolvedValueOnce({ characterXp: 0n, characterLevel: 1, attributePoints: 0 });
+    mockPrisma.item.findMany.mockResolvedValue([]);
+    mockPrisma.item.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+    mockPrisma.playerAchievement.findMany.mockResolvedValue([]);
+    mockPrisma.playerCrown.findMany.mockResolvedValue([
+      { category: 'pvp_wins', realmId: 'season-1', rank: 1, weekStart, awardedAt },
+    ]);
+    mockPrisma.playerCrown.createMany.mockResolvedValue({ count: 1 });
+    mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+    mockPrisma.playerBestiaryPrefix.findMany.mockResolvedValue([]);
+    mockPrisma.playerRecipe.findMany.mockResolvedValue([]);
+    mockPrisma.playerZoneDiscovery.findMany.mockResolvedValue([]);
+
+    const result = await mergeSeasonalPlayer('seasonal-1', 'perm-1', 'season-1');
+
+    expect(result.crowns).toEqual({ merged: 1 });
+    expect(mocks.invalidateCrownCollectorSnapshot).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.playerCrown.createMany).toHaveBeenCalledWith({
+      data: [{
+        playerId: 'perm-1',
+        category: 'pvp_wins',
+        realmId: 'season-1',
+        rank: 1,
+        weekStart,
+        awardedAt,
+      }],
+      skipDuplicates: true,
     });
   });
 
@@ -165,6 +210,7 @@ describe('seasonMergeService', () => {
       data: { status: 'archived' },
     });
     expect(mocks.refreshSeasonCache).toHaveBeenCalledTimes(1);
+    expect(mocks.invalidateCrownCollectorSnapshot).not.toHaveBeenCalled();
   });
 
   it('keeps the season ended when any player merge fails', async () => {
