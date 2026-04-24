@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
-import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('../services/stripeService', () => ({
   parseStripeWebhookEvent: vi.fn(),
@@ -12,7 +12,12 @@ vi.mock('../services/premiumService', () => ({
   grantPremiumDays: vi.fn(),
 }));
 
+vi.mock('../middleware/rateLimiter', () => ({
+  createEndpointLimiter: vi.fn(() => (_req: unknown, _res: unknown, next: () => void) => next()),
+}));
+
 import { errorHandler } from '../middleware/errorHandler';
+import { createEndpointLimiter } from '../middleware/rateLimiter';
 import { grantPremiumDays } from '../services/premiumService';
 import { parseStripeWebhookEvent } from '../services/stripeService';
 import { premiumWebhookRouter } from './premiumWebhook';
@@ -33,7 +38,17 @@ function buildApp() {
 
 describe('premium webhook router', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(parseStripeWebhookEvent).mockReset();
+    vi.mocked(grantPremiumDays).mockReset();
+  });
+
+  it('applies a dedicated rate limiter before processing Stripe payloads', () => {
+    expect(createEndpointLimiter).toHaveBeenCalledWith(
+      'stripe-webhook',
+      RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS,
+      RATE_LIMIT_CONSTANTS.STRIPE_WEBHOOK_MAX,
+      { message: 'Too many webhook requests, please try again later', passOnStoreError: false },
+    );
   });
 
   it('grants premium days for checkout.session.completed events', async () => {

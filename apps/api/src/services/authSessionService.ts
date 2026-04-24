@@ -5,6 +5,7 @@ import {
   refreshTokenExpiresAt,
   type AuthPayload,
 } from '../middleware/auth';
+import { hashToken } from './authTokenService';
 
 interface AuthSessionPlayer {
   id: string;
@@ -59,7 +60,7 @@ export async function persistRefreshToken(
   await client.refreshToken.create({
     data: {
       accountId,
-      token: refreshToken,
+      tokenHash: hashToken(refreshToken),
       expiresAt: refreshTokenExpiresAt(now.getTime()),
     },
   });

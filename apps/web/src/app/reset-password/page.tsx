@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { resetPassword } from '@/lib/api';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
 import { PixelButton } from '@/components/PixelButton';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 
@@ -16,6 +17,7 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const isHydrated = useIsHydrated();
 
   if (!token) {
     return (
@@ -108,7 +110,7 @@ function ResetPasswordContent() {
             <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
           )}
 
-          <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
+          <PixelButton type={isHydrated ? 'submit' : 'button'} variant="primary" disabled={loading} className="mt-2">
             {loading ? 'Resetting...' : 'Reset Password'}
           </PixelButton>
 

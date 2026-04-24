@@ -17,10 +17,26 @@ export const estimateRouter = Router();
  */
 estimateRouter.get('/estimate', asyncHandler(async (req, res) => {
     const query = estimateQuerySchema.parse(req.query);
+    const playerId = req.player!.playerId;
 
     const validation = validateExplorationTurns(query.turns);
     if (!validation.valid) {
       throw new AppError(400, validation.error ?? 'Invalid turns', 'INVALID_TURNS');
+    }
+
+    if (query.zoneId) {
+      const discovery = await prisma.playerZoneDiscovery.findUnique({
+        where: {
+          playerId_zoneId: {
+            playerId,
+            zoneId: query.zoneId,
+          },
+        },
+        select: { zoneId: true },
+      });
+      if (!discovery) {
+        throw new AppError(403, 'Zone has not been discovered', 'ZONE_NOT_DISCOVERED');
+      }
     }
 
     let zoneExitChance: number | null = null;
@@ -40,9 +56,9 @@ estimateRouter.get('/estimate', asyncHandler(async (req, res) => {
       spawnRateMultiplier = zoneMods.mobSpawnRateMultiplier;
     }
 
-    const { taxRate } = await getPlayerTaxRate(req.player!.playerId);
+    const { taxRate } = await getPlayerTaxRate(playerId);
     const effectiveTurns = calculateEffectiveTurns(query.turns, taxRate);
-    const hasChampion = await getHasActivePremiumEntitlement(prisma, req.player!.playerId);
+    const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
     const hiddenCacheChance = hasChampion
       ? EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * PREMIUM_CONSTANTS.BONUS_MULTIPLIER
       : null;

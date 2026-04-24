@@ -384,7 +384,6 @@ export async function placeBet(
   if (io) {
     const betEvent: CasinoBetEvent = {
       playerName: result.username,
-      playerId,
       betType,
       betValue,
       amount,

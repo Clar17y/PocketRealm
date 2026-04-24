@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { STARTER_LOADOUT } from '@pocketrealm/shared';
+import { RATE_LIMIT_CONSTANTS, STARTER_LOADOUT } from '@pocketrealm/shared';
 
 vi.mock('../utils/passwordValidation', () => ({
   validatePassword: vi.fn().mockReturnValue({ valid: true }),
 }));
 
 vi.mock('../services/authTokenService', () => ({
+  hashToken: vi.fn((token: string) => `hashed:${token}`),
   createEmailVerificationToken: vi.fn().mockResolvedValue({ rawToken: 'test-token' }),
   verifyEmailToken: vi.fn().mockResolvedValue(null),
   createPasswordResetToken: vi.fn().mockResolvedValue({ rawToken: 'reset-token' }),
@@ -49,21 +50,38 @@ vi.mock('../middleware/auth', () => ({
 
 vi.mock('../socket', () => ({
   getIo: vi.fn(() => null),
+  disconnectAccountSockets: vi.fn(),
+  disconnectPlayerSockets: vi.fn(),
 }));
 
 import { mockPrisma } from '../__test__/setup';
 import bcrypt from 'bcrypt';
+import { createEndpointLimiter } from '../middleware/rateLimiter';
 import { verifyRefreshToken } from '../middleware/auth';
 import { checkAndSpawnEvents } from '../services/eventSchedulerService';
+import { disconnectPlayerSockets } from '../socket';
 import { authRouter } from './auth';
 
+it('configures registration rate limiting to fail closed when Redis is unavailable', () => {
+  expect(createEndpointLimiter).toHaveBeenCalledWith(
+    'register',
+    RATE_LIMIT_CONSTANTS.REGISTER_WINDOW_MS,
+    RATE_LIMIT_CONSTANTS.REGISTER_MAX,
+    { message: 'Too many registration attempts, please try again later', passOnStoreError: false },
+  );
+});
+
 function findHandler(method: string, path: string) {
+  const handlers = findHandlers(method, path);
+  return handlers[handlers.length - 1];
+}
+
+function findHandlers(method: string, path: string) {
   const layer = (authRouter as any).stack.find(
     (l: any) => l.route?.path === path && l.route?.methods[method],
   );
   if (!layer) throw new Error(`No ${method.toUpperCase()} ${path} handler found`);
-  const handlers = layer.route.stack.map((s: any) => s.handle);
-  return handlers[handlers.length - 1];
+  return layer.route.stack.map((s: any) => s.handle);
 }
 
 function mockRes() {
@@ -174,6 +192,12 @@ describe('POST /register', () => {
     };
   });
 
+  it('applies a registration-specific limiter before the handler', () => {
+    const handlers = findHandlers('post', '/register');
+
+    expect(handlers.length).toBeGreaterThan(1);
+  });
+
   it('wraps all registration steps in a transaction', async () => {
     const txCalls = setupSuccessfulRegisterState();
 
@@ -231,7 +255,7 @@ describe('POST /register', () => {
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
         accountId: 'account-1',
-        token: 'refresh-token',
+        tokenHash: 'hashed:refresh-token',
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
     });
@@ -327,7 +351,7 @@ describe('POST /login', () => {
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
         accountId: 'account-1',
-        token: 'refresh-token',
+        tokenHash: 'hashed:refresh-token',
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
     });
@@ -469,11 +493,6 @@ describe('POST /refresh', () => {
       seasonId: null,
       role: 'player',
     });
-    mockPrisma.refreshToken.findUnique.mockResolvedValue({
-      token: 'old-refresh-token',
-      accountId: 'account-1',
-      expiresAt: new Date(Date.now() + 60_000),
-    });
     mockPrisma.account.findUnique.mockResolvedValue({
       id: 'account-1',
       role: 'player',
@@ -497,7 +516,11 @@ describe('POST /refresh', () => {
     await handler(req, res, next);
 
     expect(mockPrisma.refreshToken.deleteMany).toHaveBeenNthCalledWith(1, {
-      where: { token: 'old-refresh-token' },
+      where: {
+        tokenHash: 'hashed:old-refresh-token',
+        accountId: 'account-1',
+        expiresAt: { gte: expect.any(Date) },
+      },
     });
     expect(mockPrisma.refreshToken.deleteMany).toHaveBeenNthCalledWith(2, {
       where: {
@@ -508,12 +531,55 @@ describe('POST /refresh', () => {
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
         accountId: 'account-1',
-        token: 'refresh-token',
+        tokenHash: 'hashed:refresh-token',
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
     });
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects refresh rotation when the stored refresh token was already consumed', async () => {
+    (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      username: 'Rook',
+      seasonId: null,
+      role: 'player',
+    });
+    mockPrisma.refreshToken.deleteMany.mockResolvedValueOnce({ count: 0 });
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
+      role: 'player',
+    });
+    mockPrisma.player.findFirst.mockResolvedValue({
+      id: 'player-1',
+      username: 'Rook',
+      seasonId: null,
+    });
+
+    const req = {
+      body: {
+        refreshToken: 'old-refresh-token',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/refresh');
+    await handler(req, res, next);
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tokenHash: 'hashed:old-refresh-token',
+        accountId: 'account-1',
+        expiresAt: { gte: expect.any(Date) },
+      },
+    });
+    expect(mockPrisma.refreshToken.create).not.toHaveBeenCalled();
+    expect(mockPrisma.account.update).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('triggers world event catch-up after a successful refresh', async () => {
@@ -523,11 +589,6 @@ describe('POST /refresh', () => {
       username: 'Rook',
       seasonId: null,
       role: 'player',
-    });
-    mockPrisma.refreshToken.findUnique.mockResolvedValue({
-      token: 'old-refresh-token',
-      accountId: 'account-1',
-      expiresAt: new Date(Date.now() + 60_000),
     });
     mockPrisma.account.findUnique.mockResolvedValue({
       id: 'account-1',
@@ -564,11 +625,6 @@ describe('POST /refresh', () => {
       seasonId: 'season-1',
       role: 'player',
     });
-    mockPrisma.refreshToken.findUnique.mockResolvedValue({
-      token: 'old-refresh-token',
-      accountId: 'account-1',
-      expiresAt: new Date(Date.now() + 60_000),
-    });
     mockPrisma.account.findUnique.mockResolvedValue({
       id: 'account-1',
       role: 'player',
@@ -603,6 +659,73 @@ describe('POST /refresh', () => {
         seasonId: true,
       },
     });
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /logout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.refreshToken = {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    };
+  });
+
+  it('deletes refresh tokens by hash only', async () => {
+    (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      username: 'Rook',
+      seasonId: null,
+      role: 'player',
+    });
+    const req = {
+      body: {
+        refreshToken: 'refresh-token-to-revoke',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/logout');
+    await handler(req, res, next);
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { tokenHash: 'hashed:refresh-token-to-revoke' },
+    });
+    expect(disconnectPlayerSockets).toHaveBeenCalledWith('player-1', 'logout');
+    expect(res.json).toHaveBeenCalledWith({ success: true });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('does not disconnect sockets when the refresh token row is already gone', async () => {
+    (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      username: 'Rook',
+      seasonId: null,
+      role: 'player',
+    });
+    mockPrisma.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+
+    const req = {
+      body: {
+        refreshToken: 'already-revoked-refresh-token',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/logout');
+    await handler(req, res, next);
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { tokenHash: 'hashed:already-revoked-refresh-token' },
+    });
+    expect(disconnectPlayerSockets).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ success: true });
     expect(next).not.toHaveBeenCalled();
   });
 });

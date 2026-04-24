@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { register } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
 import { PixelButton } from '@/components/PixelButton';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { trackEvent } from '@/lib/analytics';
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const isHydrated = useIsHydrated();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -115,7 +117,7 @@ export default function RegisterPage() {
             <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
           )}
 
-          <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
+          <PixelButton type={isHydrated ? 'submit' : 'button'} variant="primary" disabled={loading} className="mt-2">
             {loading ? 'Creating account...' : 'Begin Journey'}
           </PixelButton>
         </form>

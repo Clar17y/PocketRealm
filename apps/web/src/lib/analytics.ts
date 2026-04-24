@@ -26,7 +26,11 @@ export function trackEvent<E extends AnalyticsEvent>(
 ): void {
   if (typeof window === 'undefined') return;
   const props = args[0] as Record<string, string | number> | undefined;
-  window.plausible?.(event, props ? { props } : undefined);
+  try {
+    window.plausible?.(event, props ? { props } : undefined);
+  } catch {
+    // Analytics failures must not interrupt auth, navigation, or gameplay flows.
+  }
 }
 
 /**

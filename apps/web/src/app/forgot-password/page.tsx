@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { forgotPassword } from '@/lib/api';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
 import { PixelButton } from '@/components/PixelButton';
 
 export default function ForgotPasswordPage() {
@@ -10,6 +11,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const isHydrated = useIsHydrated();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +80,7 @@ export default function ForgotPasswordPage() {
               <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
             )}
 
-            <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
+            <PixelButton type={isHydrated ? 'submit' : 'button'} variant="primary" disabled={loading} className="mt-2">
               {loading ? 'Sending...' : 'Send Reset Link'}
             </PixelButton>
 

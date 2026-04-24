@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
-import { getChannelHistory } from '../services/chatService';
+import { getAuthorizedChannelHistory } from '../services/chatService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const chatRouter = Router();
@@ -21,6 +21,6 @@ chatRouter.get('/history', asyncHandler(async (req, res) => {
   }
 
   const { channelType, channelId } = parsed.data;
-  const messages = await getChannelHistory(channelType, channelId);
+  const messages = await getAuthorizedChannelHistory(req.player!.playerId, channelType, channelId);
   res.json({ messages });
 }));

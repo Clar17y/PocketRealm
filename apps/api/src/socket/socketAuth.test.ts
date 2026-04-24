@@ -30,6 +30,8 @@ describe('authenticateSocket', () => {
     expect(socket.data.username).toBe('Alice');
     expect(socket.data.seasonId).toBe('season-1');
     expect(socket.data.role).toBe('player');
+    expect(socket.data.accessTokenExpiresAt).toEqual(expect.any(Number));
+    expect(socket.data.accessTokenExpiresAt).toBeGreaterThan(Date.now());
   });
 
   it('calls next with error on missing token', () => {

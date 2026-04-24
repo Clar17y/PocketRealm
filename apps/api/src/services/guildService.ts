@@ -304,6 +304,15 @@ export async function requireRole(playerId: string, minRole: 'leader' | 'officer
   return membership;
 }
 
+export async function requireGuildMember(playerId: string, guildId: string): Promise<GuildMember> {
+  const membership = await prisma.guildMember.findUnique({ where: { playerId } });
+  if (!membership || membership.guildId !== guildId) {
+    throw new AppError(403, 'Not a member of this guild', 'NOT_IN_GUILD');
+  }
+
+  return membership;
+}
+
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------

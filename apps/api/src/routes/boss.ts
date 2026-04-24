@@ -20,6 +20,62 @@ export const bossRouter = Router();
 
 bossRouter.use(authenticate);
 
+interface BossParticipantTelemetry {
+  id: string;
+  playerId: string;
+  turnsCommitted: number;
+  autoSignUp: boolean;
+  currentHp: number;
+  currentStamina: number;
+  currentMana: number;
+  threat: number;
+  templateRound?: number;
+}
+
+function canViewBossPrivateState(
+  viewerPlayerId: string,
+  viewerRole: string | undefined,
+  participants: BossParticipantTelemetry[],
+): boolean {
+  return viewerRole === 'admin' || participants.some((p) => p.playerId === viewerPlayerId);
+}
+
+function buildPublicParticipantIds(participants: BossParticipantTelemetry[]): Map<string, string> {
+  const publicIds = new Map<string, string>();
+  for (const participant of participants) {
+    if (!publicIds.has(participant.playerId)) {
+      publicIds.set(participant.playerId, `participant-${publicIds.size + 1}`);
+    }
+  }
+  return publicIds;
+}
+
+function sanitizeBossParticipant<T extends BossParticipantTelemetry>(
+  participant: T,
+  viewerPlayerId: string,
+  canViewPrivateState: boolean,
+  publicParticipantIds: Map<string, string>,
+): T {
+  const canViewParticipant = canViewPrivateState || participant.playerId === viewerPlayerId;
+  if (canViewParticipant) {
+    return participant;
+  }
+
+  const publicParticipantId = publicParticipantIds.get(participant.playerId) ?? 'participant';
+  return {
+    ...participant,
+    id: publicParticipantId,
+    playerId: publicParticipantId,
+    turnsCommitted: 0,
+    autoSignUp: false,
+    currentHp: 0,
+    currentStamina: 0,
+    currentMana: 0,
+    threat: 0,
+    ...(participant.templateRound !== undefined ? { templateRound: 0 } : {}),
+  };
+}
+
 async function resolveKilledByUsername(killedBy: string | null): Promise<string | null> {
   if (!killedBy) return null;
   const player = await prisma.player.findUnique({
@@ -49,9 +105,10 @@ bossRouter.get('/active', asyncHandler(async (_req, res) => {
         }),
         resolveKilledByUsername(enc.killedBy),
       ]);
-      const { rewardsByPlayer: _rewards, ...encWithoutRewards } = enc;
+      const { rewardsByPlayer: _rewards, killedBy: _killedBy, ...encWithoutRewards } = enc;
       return {
         ...encWithoutRewards,
+        killedBy: null,
         mobName: mob?.name ?? 'Unknown',
         mobLevel: mob?.level ?? 1,
         zoneId: event?.zoneId ?? '',
@@ -117,20 +174,23 @@ bossRouter.get('/:id', asyncHandler(async (req, res) => {
   const usernameMap = new Map(players.map((p) => [p.id, p.username]));
 
   const playerId = req.player!.playerId;
+  const canViewPrivateState = canViewBossPrivateState(playerId, req.player?.role, data.participants);
+  const publicParticipantIds = buildPublicParticipantIds(data.participants);
   const myRewards = data.encounter.rewardsByPlayer?.[playerId] ?? null;
   const { rewardsByPlayer: _full, ...encounterWithoutRewardsMap } = data.encounter;
 
   res.json({
     encounter: {
       ...encounterWithoutRewardsMap,
+      killedBy: canViewPrivateState || data.encounter.killedBy === playerId ? data.encounter.killedBy : null,
       mobName: mob?.name ?? 'Unknown',
       mobLevel: mob?.level ?? 1,
       killedByUsername,
     },
-    participants: data.participants.map((p) => ({
+    participants: data.participants.map((p) => sanitizeBossParticipant({
       ...p,
       username: usernameMap.get(p.playerId) ?? null,
-    })),
+    }, playerId, canViewPrivateState, publicParticipantIds)),
     myRewards,
   });
 }));
@@ -208,9 +268,14 @@ bossRouter.get('/:id/round/:num', asyncHandler(async (req, res) => {
     throw new AppError(404, 'Round not found', 'NOT_FOUND');
   }
 
+  const playerId = req.player!.playerId;
+  const canViewPrivateState = canViewBossPrivateState(playerId, req.player?.role, participants);
+  const publicParticipantIds = buildPublicParticipantIds(participants);
+
   res.json({
     round: num,
-    participants: participants.map((p) => ({
+    participants: participants.map((p) => sanitizeBossParticipant({
+      id: p.id,
       playerId: p.playerId,
       turnsCommitted: p.turnsCommitted,
       totalDamage: p.totalDamage,
@@ -224,6 +289,8 @@ bossRouter.get('/:id/round/:num', asyncHandler(async (req, res) => {
       threat: p.threat,
       damageAbsorbed: p.damageAbsorbed,
       status: p.status,
-    })),
+      autoSignUp: p.autoSignUp,
+      templateRound: p.templateRound,
+    }, playerId, canViewPrivateState, publicParticipantIds)),
   });
 }));
