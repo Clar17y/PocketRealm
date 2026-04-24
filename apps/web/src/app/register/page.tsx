@@ -17,6 +17,11 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -115,7 +120,7 @@ export default function RegisterPage() {
             <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
           )}
 
-          <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
+          <PixelButton type="submit" variant="primary" disabled={loading || !isHydrated} className="mt-2">
             {loading ? 'Creating account...' : 'Begin Journey'}
           </PixelButton>
         </form>
