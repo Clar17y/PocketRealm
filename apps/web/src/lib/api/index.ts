@@ -118,6 +118,7 @@ export {
   getPvpNotificationCount,
   markPvpNotificationsRead,
   getChatHistory,
+  getNpcActivityReaction,
   getActiveEvents,
   getZoneEvents,
   getActiveBossEncounters,
