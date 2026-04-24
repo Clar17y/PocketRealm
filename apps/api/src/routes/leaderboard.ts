@@ -12,12 +12,12 @@ export const leaderboardRouter = Router();
 leaderboardRouter.use(optionalAuthenticate);
 
 function optionalPositiveInt(value: unknown): number | undefined {
-  if (typeof value !== 'string') {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
     return undefined;
   }
 
   const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  return parsed > 0 ? parsed : undefined;
 }
 
 function stripPlayerIds<TEntry extends object>(

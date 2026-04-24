@@ -145,6 +145,14 @@ describe('leaderboard route seasonal realm selection', () => {
     expect(mocks.getCrownCollectorLeaderboard).toHaveBeenCalledWith('player-1', true, undefined);
   });
 
+  it('passes invalid crown collector limit strings as undefined', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/crowns?limit=5abc');
+
+    expect(res.status).toBe(200);
+    expect(mocks.getCrownCollectorLeaderboard).toHaveBeenCalledWith(undefined, false, undefined);
+  });
+
   it('returns cache-only public summary', async () => {
     const summary = {
       crownCollectors: [{ rank: 1, username: 'Ada', totalCrowns: 7, crownsByGroup: { pvp: 7 } }],
