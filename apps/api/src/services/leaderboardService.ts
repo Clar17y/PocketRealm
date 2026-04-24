@@ -7,7 +7,8 @@ import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 import { leaderboardKey, leaderboardMetaKey } from './leaderboardKeys';
 
-const LAST_REFRESH_KEY = 'leaderboard:last_refresh';
+export const LEADERBOARD_LAST_REFRESH_KEY = 'leaderboard:last_refresh';
+const LAST_REFRESH_KEY = LEADERBOARD_LAST_REFRESH_KEY;
 const LOCK_KEY = 'leaderboard:refresh_lock';
 const RELEASE_LOCK_LUA = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
 
@@ -168,6 +169,10 @@ const ALL_CATEGORIES = [
 const VALID_SLUGS = new Set(ALL_CATEGORIES.map((c) => c.slug));
 
 // ── Public API ──────────────────────────────────────────────────────────────
+
+export function getCategoryLabel(category: string): string | null {
+  return ALL_CATEGORIES.find((entry) => entry.slug === category)?.label ?? null;
+}
 
 export function getCategories() {
   const groups = new Map<string, { slug: string; label: string }[]>();
