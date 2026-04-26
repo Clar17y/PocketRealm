@@ -18,6 +18,7 @@ import {
 } from '@pocketrealm/shared';
 import { applyCombatBuffs, buildCombatBuffBadges, consumeBuffChargesPerMob, type CombatBuffBadge } from '../buffService';
 import { broadcastRareLootActivity } from '../chatActivityService';
+import { logger } from '../../logger';
 import { buildCombatLogResult, buildPlayerTemplateCombatant, processCombatVictoryRewards } from '../combatOrchestrationService';
 import { mapTemplateCombatLog } from '../combatLogMapper';
 import { degradeEquippedDurability } from '../durabilityService';
@@ -271,7 +272,9 @@ export async function processAmbushOutcome(args: {
       actorPlayerId: playerId,
       actorUsername: username,
       loot: lootWithNames,
-    }).catch(() => {});
+    }).catch((error: unknown) => {
+      logger.error({ err: error, playerId, zoneId }, 'Rare loot activity broadcast failed');
+    });
     allNewItemIds.push(...rewards.newItemIds);
     allUpdatedItemIds.push(...rewards.updatedItemIds);
     if (rewards.pendingLootSessionId) {

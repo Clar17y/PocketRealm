@@ -62,7 +62,6 @@ type ActivityCreateInput = BaseActivityCreateInput & {
 };
 
 const RARITY_ORDER = ITEM_RARITY_CONSTANTS.ORDER;
-const NPC_ACTIVITY_REACTION_PAGE_SIZE = 25;
 
 function isChatActivityEventType(value: string): value is ChatActivityEventType {
   return (CHAT_ACTIVITY_EVENT_TYPES as readonly string[]).includes(value);
@@ -321,14 +320,14 @@ export async function getNpcActivityReaction(
   const reactedActivityIds = new Set(reactedRows.map((row) => row.activityId));
   let cursorId: string | undefined;
 
-  while (true) {
+  for (let page = 0; page < CHAT_ACTIVITY_CONSTANTS.NPC_REACTION_MAX_PAGES; page++) {
     const activityRows: ChatActivityRow[] = await prisma.chatActivity.findMany({
       where: {
         createdAt: { gte: since },
         expiresAt: { gte: now },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: NPC_ACTIVITY_REACTION_PAGE_SIZE,
+      take: CHAT_ACTIVITY_CONSTANTS.NPC_REACTION_PAGE_SIZE,
       ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     });
 
@@ -370,10 +369,12 @@ export async function getNpcActivityReaction(
       return { activityId: activity.id, eventType: activity.eventType, line };
     }
 
-    if (activityRows.length < NPC_ACTIVITY_REACTION_PAGE_SIZE) {
+    if (activityRows.length < CHAT_ACTIVITY_CONSTANTS.NPC_REACTION_PAGE_SIZE) {
       return null;
     }
 
     cursorId = activityRows[activityRows.length - 1]!.id;
   }
+
+  return null;
 }

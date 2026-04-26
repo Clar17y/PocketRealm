@@ -65,13 +65,6 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     await assertCanAct(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
-    const player = await prisma.player.findUnique({
-      where: { id: playerId },
-      select: { username: true, currentZoneId: true },
-    });
-    if (!player?.currentZoneId) {
-      throw new AppError(400, 'You must be in a zone to craft', 'NO_ZONE');
-    }
     assertZoneAllowsCrafting(zone);
 
     const recipe = await prisma.craftingRecipe.findUnique({
@@ -352,13 +345,15 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     if (bestCraft) {
       void broadcastCraftActivity({
-        zoneId: player.currentZoneId,
+        zoneId: zone.zoneId,
         actorPlayerId: playerId,
-        actorUsername: player.username,
+        actorUsername: req.player!.username,
         itemName: recipe.resultTemplate.name,
         rarity: bestCraft.rarity,
         skillType: recipe.skillType,
-      }).catch(() => {});
+      }).catch((error: unknown) => {
+        logger.error({ err: error, playerId, recipeId: recipe.id }, 'Craft activity broadcast failed');
+      });
     }
 
     const craftingBuffBadges: EventModifierBadge[] = [];

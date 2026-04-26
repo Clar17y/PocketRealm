@@ -537,7 +537,7 @@ async function resolveBossRoundInner(
 
     const killerName = (await resolveUsername(killedBy)) ?? 'unknown';
     const zoneName = encounter.event.zone?.name ?? 'unknown';
-    void broadcastBossDefeatActivity({
+    await broadcastBossDefeatActivity({
       zoneId: encounter.event.zoneId,
       zoneName,
       bossName: encounter.mobTemplate.name,

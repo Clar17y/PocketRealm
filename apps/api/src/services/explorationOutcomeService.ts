@@ -4,6 +4,7 @@ import {
 } from '@pocketrealm/shared';
 import { prisma } from '@pocketrealm/database';
 import { broadcastZoneDiscoveryActivity } from './chatActivityService';
+import { logger } from '../logger';
 import { discoverZone } from './zoneDiscoveryService';
 import { createBossEncounter } from './bossEncounterService';
 import { spawnWorldEvent, computeZoneModifiers, filterEventModifiers } from './worldEventService';
@@ -264,7 +265,9 @@ export async function processExplorationOutcomes(
         actorPlayerId: playerId,
         actorUsername: username,
         discoveredZoneName: neighbor.name,
-      }).catch(() => {});
+      }).catch((error: unknown) => {
+        logger.error({ err: error, playerId, zoneId, discoveredZoneId: neighbor.id }, 'Zone discovery activity broadcast failed');
+      });
       // Remove discovered neighbor so subsequent zone_exit rolls don't pick it again
       const origIndex = undiscoveredNeighbors.findIndex((n) => n.id === neighbor.id);
       if (origIndex !== -1) undiscoveredNeighbors.splice(origIndex, 1);

@@ -31,6 +31,7 @@ import { computeZoneModifiers, computeSpawnRateModifiers, getActiveEventsForZone
 import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { broadcastZoneDiscoveryActivity } from '../../services/chatActivityService';
 import { getIo } from '../../socket';
+import { logger } from '../../logger';
 import { deductConsumedPotions } from '../../services/potionService';
 import { getCombatBuffsWithUses } from '../../services/buffService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
@@ -308,7 +309,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           actorPlayerId: playerId,
           actorUsername: req.player!.username,
           discoveredZoneName: neighbor.name,
-        }).catch(() => {});
+        }).catch((error: unknown) => {
+          logger.error({ err: error, playerId, zoneId: body.zoneId, discoveredZoneId: neighbor.id }, 'Zone discovery activity broadcast failed');
+        });
         finalZoneExitDiscovered = true;
         events.push({
           turn: effectiveTurns,

@@ -296,7 +296,9 @@ export function registerStartRoutes(router: Router): void {
           actorPlayerId: playerId,
           actorUsername: req.player!.username,
           loot: lootWithNames,
-        }).catch(() => {});
+        }).catch((error: unknown) => {
+          logger.error({ err: error, playerId, zoneId }, 'Rare loot activity broadcast failed');
+        });
       }
 
       // Zone combat: upsert bestiary on ALL outcomes (kills:0 on defeat, increment on victory).
