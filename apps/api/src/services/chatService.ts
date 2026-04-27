@@ -1,8 +1,10 @@
-import { prisma } from '@pocketrealm/database';
+import { prisma, type Prisma } from '@pocketrealm/database';
 import { CHAT_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
+
+export type ChatHistoryMessageTypeFilter = ChatMessageType | 'non_activity';
 
 export async function checkRateLimit(playerId: string, channelType: ChatChannelType): Promise<boolean> {
   const key = `chat:rl:${playerId}:${channelType}`;
@@ -42,12 +44,23 @@ export async function saveMessage(params: {
 export async function getChannelHistory(
   channelType: ChatChannelType,
   channelId: string,
+  options: { messageType?: ChatHistoryMessageTypeFilter } = {},
 ): Promise<ChatMessageEvent[]> {
+  const where: Prisma.ChatMessageWhereInput = { channelType, channelId };
+  if (options.messageType === 'non_activity') {
+    where.NOT = { messageType: 'activity' };
+  } else if (options.messageType) {
+    where.messageType = options.messageType;
+  }
+
   const rows = await prisma.chatMessage.findMany({
-    where: { channelType, channelId },
+    where,
     orderBy: { createdAt: 'desc' },
     take: CHAT_CONSTANTS.HISTORY_LIMIT,
   });
+  if (rows.length === 0) {
+    return [];
+  }
 
   // Batch-lookup player titles for all unique player IDs
   const playerIds = [...new Set(rows.map((r) => r.playerId))];
@@ -141,7 +154,8 @@ export async function getAuthorizedChannelHistory(
   playerId: string,
   channelType: ChatChannelType,
   channelId: string,
+  options: { messageType?: ChatHistoryMessageTypeFilter } = {},
 ): Promise<ChatMessageEvent[]> {
   await assertCanReadChannelHistory(playerId, channelType, channelId);
-  return getChannelHistory(channelType, channelId);
+  return getChannelHistory(channelType, channelId, options);
 }

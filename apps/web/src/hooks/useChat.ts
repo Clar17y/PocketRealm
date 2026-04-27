@@ -15,6 +15,7 @@ interface UseChatParams {
 
 export interface UseChatReturn {
   worldMessages: ChatMessageEvent[];
+  globalActivityMessages: ChatMessageEvent[];
   zoneMessages: ChatMessageEvent[];
   casinoMessages: ChatMessageEvent[];
   activeChannel: ChatChannel;
@@ -39,6 +40,7 @@ export interface UseChatReturn {
 
 export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseChatReturn {
   const [worldMessages, setWorldMessages] = useState<ChatMessageEvent[]>([]);
+  const [globalActivityMessages, setGlobalActivityMessages] = useState<ChatMessageEvent[]>([]);
   const [zoneMessages, setZoneMessages] = useState<ChatMessageEvent[]>([]);
   const [activeChannel, setActiveChannelRaw] = useState<ChatChannel>('world');
   const [isOpen, setIsOpen] = useState(false);
@@ -64,6 +66,11 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
 
   const appendMessage = useCallback((msg: ChatMessageEvent) => {
     if (msg.channelType === 'world') {
+      if (msg.messageType === 'activity') {
+        setGlobalActivityMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
+        return;
+      }
+
       setWorldMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
       if (!isOpenRef.current || activeChannelRef.current !== 'world') {
         setUnreadWorld((n) => n + 1);
@@ -111,9 +118,15 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
 
     // Load world history on connect
     const onConnect = () => {
-      getChatHistory('world', 'world').then((res) => {
-        if (res.data) {
-          setWorldMessages(res.data.messages as ChatMessageEvent[]);
+      Promise.all([
+        getChatHistory('world', 'world', { messageType: 'non_activity' }),
+        getChatHistory('world', 'world', { messageType: 'activity' }),
+      ]).then(([worldRes, activityRes]) => {
+        if (worldRes.data) {
+          setWorldMessages(worldRes.data.messages);
+        }
+        if (activityRes.data) {
+          setGlobalActivityMessages(activityRes.data.messages);
         }
       });
 
@@ -121,7 +134,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       if (currentZoneIdRef.current) {
         getChatHistory('zone', `zone:${currentZoneIdRef.current}`).then((res) => {
           if (res.data) {
-            setZoneMessages(res.data.messages as ChatMessageEvent[]);
+            setZoneMessages(res.data.messages);
           }
         });
       }
@@ -131,7 +144,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
         socket.emit('chat:join-casino');
         getChatHistory('casino', 'casino').then((res) => {
           if (res.data) {
-            setCasinoMessages(res.data.messages as ChatMessageEvent[]);
+            setCasinoMessages(res.data.messages);
           }
         });
       }
@@ -169,7 +182,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     getChatHistory('zone', `zone:${currentZoneId}`).then((res) => {
       if (cancelled) return;
       if (res.data) {
-        setZoneMessages(res.data.messages as ChatMessageEvent[]);
+        setZoneMessages(res.data.messages);
       }
     });
     return () => { cancelled = true; };
@@ -230,7 +243,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     }
     getChatHistory('casino', 'casino').then((res) => {
       if (res.data) {
-        setCasinoMessages(res.data.messages as ChatMessageEvent[]);
+        setCasinoMessages(res.data.messages);
       }
     });
   }, []);
@@ -267,6 +280,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
 
   return {
     worldMessages,
+    globalActivityMessages,
     zoneMessages,
     casinoMessages,
     activeChannel,

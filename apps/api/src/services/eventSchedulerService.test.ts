@@ -9,7 +9,10 @@ vi.mock('./bossEncounterService', () => ({
   checkAndResolveDueBossRounds: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('./systemMessageService', () => ({
-  emitSystemMessage: vi.fn().mockResolvedValue(undefined),
+  emitSystemMessage: vi.fn().mockResolvedValue({
+    id: 'msg-1',
+    createdAt: new Date('2026-02-04T12:00:00Z'),
+  }),
 }));
 vi.mock('./pushNotificationService', () => ({
   sendPush: vi.fn().mockResolvedValue(undefined),
@@ -53,7 +56,10 @@ describe('eventSchedulerService', () => {
     vi.mocked(spawnWorldEvent).mockResolvedValue(null);
     vi.mocked(createBossEncounter).mockResolvedValue({} as any);
     vi.mocked(checkAndResolveDueBossRounds).mockResolvedValue(undefined);
-    vi.mocked(emitSystemMessage).mockResolvedValue(undefined);
+    vi.mocked(emitSystemMessage).mockResolvedValue({
+      id: 'msg-1',
+      createdAt: new Date('2026-02-04T12:00:00Z'),
+    });
 
     // Block boss spawn timer by default (boss-specific tests override)
     mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);

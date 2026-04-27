@@ -4,18 +4,28 @@ import { useState, useEffect } from 'react';
 import { getNpcName, NPC_DIALOGUE_CONSTANTS, type DialogueEvent, type NpcKey } from '@pocketrealm/shared';
 import { getNextNpcLine } from '../../lib/npcLineRotation';
 import { useSessionStorageToggle } from '../../hooks/useSessionStorageToggle';
+import { useNpcActivityReaction } from '../../hooks/useNpcActivityReaction';
 import { ChevronRight } from 'lucide-react';
 
 interface NpcDialogueBannerProps {
   npcKey: NpcKey;
   event: DialogueEvent;
   showDialogue?: boolean;
+  activityLine?: string | null;
 }
 
-export function NpcDialogueBanner({ npcKey, event, showDialogue = true }: NpcDialogueBannerProps) {
+export function NpcDialogueBanner({
+  npcKey,
+  event,
+  showDialogue = true,
+  activityLine: activityLineOverride,
+}: NpcDialogueBannerProps) {
   const name = getNpcName(npcKey);
   const [line, setLine] = useState<string | null>(null);
   const [expanded, setExpanded] = useSessionStorageToggle(`lore-collapsed:npc-banner:${npcKey}`, false);
+  const fetchedActivityLine = useNpcActivityReaction(npcKey, showDialogue && activityLineOverride == null);
+  const activityLine = activityLineOverride ?? fetchedActivityLine;
+  const displayLine = activityLine ?? line;
 
   // Set initial line and update when event/npcKey changes
   useEffect(() => {
@@ -31,7 +41,7 @@ export function NpcDialogueBanner({ npcKey, event, showDialogue = true }: NpcDia
     return () => clearInterval(interval);
   }, [event, npcKey]);
 
-  if (!showDialogue || !name || !line) return null;
+  if (!showDialogue || !name || !displayLine) return null;
 
   return (
     <div className="mb-3 p-3 rounded-lg bg-[var(--rpg-surface)] border border-[var(--rpg-border)]">
@@ -56,7 +66,7 @@ export function NpcDialogueBanner({ npcKey, event, showDialogue = true }: NpcDia
       </button>
       {expanded && (
         <p className="text-sm italic text-[var(--rpg-text-secondary)] leading-snug mt-1">
-          &ldquo;{line}&rdquo;
+          &ldquo;{displayLine}&rdquo;
         </p>
       )}
     </div>

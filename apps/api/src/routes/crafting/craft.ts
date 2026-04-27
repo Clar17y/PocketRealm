@@ -2,11 +2,15 @@ import { Router } from 'express';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { logger } from '../../logger';
 import { createActivityLog } from '../../services/activityLogService';
+import { broadcastCraftActivity } from '../../services/chatActivityService';
 import type { EventModifierBadge } from '../../services/worldEventService';
 import {
   CRAFTING_CONSTANTS,
+  CHAT_ACTIVITY_CONSTANTS,
   GUILD_CONSTANTS,
+  ITEM_RARITY_CONSTANTS,
   PREMIUM_CONSTANTS,
+  isRarityAtLeast,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
@@ -332,6 +336,25 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         xp: serializeXpGrant(xpGrant),
       },
     });
+
+    const bestCraft = craftedItemDetails
+      .filter((item) => isRarityAtLeast(item.rarity, CHAT_ACTIVITY_CONSTANTS.MIN_CRAFT_RARITY))
+      .sort(
+        (a, b) => ITEM_RARITY_CONSTANTS.ORDER.indexOf(b.rarity) - ITEM_RARITY_CONSTANTS.ORDER.indexOf(a.rarity),
+      )[0];
+
+    if (bestCraft) {
+      void broadcastCraftActivity({
+        zoneId: zone.zoneId,
+        actorPlayerId: playerId,
+        actorUsername: req.player!.username,
+        itemName: recipe.resultTemplate.name,
+        rarity: bestCraft.rarity,
+        skillType: recipe.skillType,
+      }).catch((error: unknown) => {
+        logger.error({ err: error, playerId, recipeId: recipe.id }, 'Craft activity broadcast failed');
+      });
+    }
 
     const craftingBuffBadges: EventModifierBadge[] = [];
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });

@@ -136,6 +136,37 @@ describe('chatService', () => {
         orderBy: { createdAt: 'desc' },
         take: 50,
       });
+      expect(mockPrisma.player.findMany).not.toHaveBeenCalled();
+    });
+
+    it('can query history without activity messages', async () => {
+      mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await getChannelHistory('world', 'world', { messageType: 'non_activity' });
+
+      expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: {
+          channelType: 'world',
+          channelId: 'world',
+          NOT: { messageType: 'activity' },
+        },
+      }));
+    });
+
+    it('can query only activity history', async () => {
+      mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await getChannelHistory('world', 'world', { messageType: 'activity' });
+
+      expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: {
+          channelType: 'world',
+          channelId: 'world',
+          messageType: 'activity',
+        },
+      }));
     });
   });
 });
@@ -167,6 +198,18 @@ describe('getAuthorizedChannelHistory', () => {
 
     expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { channelType: 'zone', channelId: 'zone:zone-current' },
+    }));
+  });
+
+  it('applies history filters after authorizing the channel', async () => {
+    await getAuthorizedChannelHistory('player-1', 'world', 'world', { messageType: 'non_activity' });
+
+    expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        channelType: 'world',
+        channelId: 'world',
+        NOT: { messageType: 'activity' },
+      },
     }));
   });
 

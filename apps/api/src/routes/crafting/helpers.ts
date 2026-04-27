@@ -36,7 +36,7 @@ export function parseItemRarity(value: string): ItemRarity {
 
 export { getSkillLevel } from '../../services/combatStatsService.js';
 
-export async function getZoneCraftingLevel(playerId: string): Promise<{ maxCraftingLevel: number | null; zoneName: string }> {
+export async function getZoneCraftingLevel(playerId: string): Promise<{ maxCraftingLevel: number | null; zoneName: string; zoneId: string }> {
   const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: { currentZoneId: true },
@@ -51,7 +51,7 @@ export async function getZoneCraftingLevel(playerId: string): Promise<{ maxCraft
   if (!zone) {
     throw new AppError(400, 'Current zone not found', 'NO_ZONE');
   }
-  return { maxCraftingLevel: zone.maxCraftingLevel, zoneName: zone.name };
+  return { maxCraftingLevel: zone.maxCraftingLevel, zoneName: zone.name, zoneId: player.currentZoneId };
 }
 
 /**

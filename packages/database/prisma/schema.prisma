@@ -123,10 +123,11 @@ model Player {
   activityLogs       ActivityLog[]
   encounterSites     EncounterSite[]
   knownRecipes       PlayerRecipe[]
-  resourceNodes      PlayerResourceNode[]
-  zoneDiscoveries    PlayerZoneDiscovery[]
-  zoneExplorations   PlayerZoneExploration[]
-  pvpRating                PvpRating?
+  resourceNodes        PlayerResourceNode[]
+  zoneDiscoveries      PlayerZoneDiscovery[]
+  zoneExplorations     PlayerZoneExploration[]
+  npcActivityReactions PlayerNpcActivityReaction[]
+  pvpRating            PvpRating?
   pvpAttacks               PvpMatch[]    @relation("PvpAttacker")
   pvpDefenses              PvpMatch[]    @relation("PvpDefender")
   pvpCooldownsAsAttacker   PvpCooldown[] @relation("pvpCooldownAttacker")
@@ -796,8 +797,50 @@ model ChatMessage {
   messageType String   @default("player") @map("message_type") @db.VarChar(8)
   createdAt   DateTime @default(now()) @map("created_at")
 
+  activity ChatActivity?
+
   @@index([channelType, channelId, createdAt])
   @@map("chat_messages")
+}
+
+model ChatActivity {
+  id            String    @id @default(uuid())
+  chatMessageId String?   @unique @map("chat_message_id")
+  eventType     String    @map("event_type") @db.VarChar(32)
+  scope         String    @db.VarChar(16)
+  zoneId        String?   @map("zone_id")
+  actorPlayerId String?   @map("actor_player_id")
+  actorUsername String?   @map("actor_username") @db.VarChar(32)
+  subjectName   String?   @map("subject_name") @db.VarChar(96)
+  subjectRarity String?   @map("subject_rarity") @db.VarChar(16)
+  message       String    @db.VarChar(200)
+  metadata      Json      @default("{}")
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  chatMessage ChatMessage?                 @relation(fields: [chatMessageId], references: [id], onDelete: SetNull)
+  reactions   PlayerNpcActivityReaction[]
+
+  @@index([scope, createdAt])
+  @@index([zoneId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([expiresAt])
+  @@map("chat_activities")
+}
+
+model PlayerNpcActivityReaction {
+  playerId   String   @map("player_id")
+  npcKey     String   @map("npc_key") @db.VarChar(64)
+  activityId String   @map("activity_id")
+  reactedAt  DateTime @default(now()) @map("reacted_at")
+
+  player   Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  activity ChatActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@id([playerId, npcKey, activityId])
+  @@index([playerId, npcKey, reactedAt])
+  @@index([activityId])
+  @@map("player_npc_activity_reactions")
 }
 
 // =============================================================================

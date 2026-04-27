@@ -8,7 +8,9 @@ import {
 } from '@pocketrealm/shared';
 import type { AchievementDef, PlayerAchievementProgress } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { logger } from '../logger';
 import { getIo } from '../socket';
+import { broadcastAchievementActivity } from './chatActivityService';
 import { resolveAllStats, resolveFamilyKills, resolveAllFamilyKills, resolveStats } from './statsService';
 
 // Maps MobFamily DB name to the family key used in achievement definitions
@@ -281,13 +283,28 @@ export async function emitAchievementNotifications(
     })),
   });
 
-  // Socket emissions are in-memory, no DB cost — keep per-achievement
+  // Per-achievement socket emit + activity broadcast (broadcast performs Redis + DB writes per call)
   const io = getIo();
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { username: true, currentZoneId: true },
+  });
   for (const ach of achievements) {
     io?.to(playerId).emit('achievement_unlocked', {
       id: ach.id,
       title: ach.title,
       category: ach.category,
     });
+
+    if (player?.currentZoneId) {
+      void broadcastAchievementActivity({
+        zoneId: player.currentZoneId,
+        actorPlayerId: playerId,
+        actorUsername: player.username,
+        achievementTitle: ach.title,
+      }).catch((error: unknown) => {
+        logger.error({ err: error, playerId, achievementId: ach.id }, 'Achievement activity broadcast failed');
+      });
+    }
   }
 }

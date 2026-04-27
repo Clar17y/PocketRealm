@@ -30,6 +30,7 @@ export * from './constants/talentTreeDefinitions';
 export * from './constants/bossTemplateDefinitions';
 export * from './constants/expeditionDefinitions';
 export * from './constants/npcDialogue';
+export * from './constants/chatActivity';
 export * from './constants/tutorialConstants';
 
 // Utils

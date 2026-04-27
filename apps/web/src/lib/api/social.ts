@@ -1,5 +1,13 @@
 import { fetchApi } from './core';
-import type { StateUpdates, TitleStyleVariant } from '@pocketrealm/shared';
+import type {
+  ChatChannelType,
+  ChatMessageEvent,
+  ChatMessageType,
+  ChatNpcActivityReactionResponse,
+  NpcKey,
+  StateUpdates,
+  TitleStyleVariant,
+} from '@pocketrealm/shared';
 import type { CombatLogEntryResponse, CombatOutcomeResponse } from './combat';
 
 // PvP Arena
@@ -173,22 +181,23 @@ export async function markPvpNotificationsRead(matchIds?: string[]) {
 
 // Chat
 
-export async function getChatHistory(channelType: string, channelId: string) {
-  return fetchApi<{
-    messages: Array<{
-      id: string;
-      channelType: string;
-      channelId: string;
-      playerId: string;
-      username: string;
-      title?: string;
-      titleTier?: number;
-      titleStyle?: TitleStyleVariant;
-      message: string;
-      messageType?: string;
-      createdAt: string;
-    }>;
-  }>(`/api/v1/chat/history?channelType=${encodeURIComponent(channelType)}&channelId=${encodeURIComponent(channelId)}`);
+export async function getChatHistory(
+  channelType: ChatChannelType,
+  channelId: string,
+  options: { messageType?: ChatMessageType | 'non_activity' } = {},
+) {
+  const params = new URLSearchParams({ channelType, channelId });
+  if (options.messageType) {
+    params.set('messageType', options.messageType);
+  }
+
+  return fetchApi<{ messages: ChatMessageEvent[] }>(`/api/v1/chat/history?${params.toString()}`);
+}
+
+export async function getNpcActivityReaction(npcKey: NpcKey) {
+  return fetchApi<ChatNpcActivityReactionResponse>(
+    `/api/v1/chat/activity/npc-reaction?npcKey=${encodeURIComponent(npcKey)}`,
+  );
 }
 
 // World Events

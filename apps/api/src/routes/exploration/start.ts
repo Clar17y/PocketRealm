@@ -29,7 +29,9 @@ import { discoverZone, getUndiscoveredNeighborZones } from '../../services/zoneD
 import { addExplorationTurns, calculateExplorationPercent, getExplorationPercent } from '../../services/zoneExplorationService';
 import { computeZoneModifiers, computeSpawnRateModifiers, getActiveEventsForZone, getActiveWorldWideEvents } from '../../services/worldEventService';
 import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
+import { broadcastZoneDiscoveryActivity } from '../../services/chatActivityService';
 import { getIo } from '../../socket';
+import { logger } from '../../logger';
 import { deductConsumedPotions } from '../../services/potionService';
 import { getCombatBuffsWithUses } from '../../services/buffService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
@@ -302,6 +304,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       });
       for (const neighbor of autoDiscoverNeighbors) {
         await discoverZone(playerId, neighbor.id);
+        void broadcastZoneDiscoveryActivity({
+          zoneId: body.zoneId,
+          actorPlayerId: playerId,
+          actorUsername: req.player!.username,
+          discoveredZoneName: neighbor.name,
+        }).catch((error: unknown) => {
+          logger.error({ err: error, playerId, zoneId: body.zoneId, discoveredZoneId: neighbor.id }, 'Zone discovery activity broadcast failed');
+        });
         finalZoneExitDiscovered = true;
         events.push({
           turn: effectiveTurns,

@@ -517,6 +517,7 @@ export default function GamePage() {
         activeChannel={chat.activeChannel}
         setActiveChannel={chat.setActiveChannel}
         worldMessages={chat.worldMessages}
+        globalActivityMessages={chat.globalActivityMessages}
         zoneMessages={chat.zoneMessages}
         casinoMessages={chat.casinoMessages}
         presence={chat.presence}
