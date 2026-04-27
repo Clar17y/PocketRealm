@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import { CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
 
 const mocks = vi.hoisted(() => ({
   optionalAuthenticate: vi.fn((req: any, _res: any, next: any) => {
@@ -14,6 +15,8 @@ const mocks = vi.hoisted(() => ({
     next();
   }),
   getLeaderboard: vi.fn(),
+  getCrownCollectorLeaderboard: vi.fn(),
+  getPublicLeaderboardSummary: vi.fn(),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -23,6 +26,14 @@ vi.mock('../middleware/auth', () => ({
 vi.mock('../services/leaderboardService', () => ({
   getCategories: vi.fn(() => ({ groups: [] })),
   getLeaderboard: mocks.getLeaderboard,
+}));
+
+vi.mock('../services/crownLeaderboardService', () => ({
+  getCrownCollectorLeaderboard: mocks.getCrownCollectorLeaderboard,
+}));
+
+vi.mock('../services/publicLeaderboardSummaryService', () => ({
+  getPublicLeaderboardSummary: mocks.getPublicLeaderboardSummary,
 }));
 
 import { leaderboardRouter } from './leaderboard';
@@ -38,9 +49,21 @@ describe('leaderboard route seasonal realm selection', () => {
     vi.clearAllMocks();
     mocks.getLeaderboard.mockResolvedValue({
       category: 'pvp_rating',
+      period: 'alltime',
       entries: [],
       myRank: null,
       totalPlayers: 0,
+      lastRefreshedAt: null,
+    });
+    mocks.getCrownCollectorLeaderboard.mockResolvedValue({
+      entries: [],
+      myRank: null,
+      totalPlayers: 0,
+      lastRefreshedAt: null,
+    });
+    mocks.getPublicLeaderboardSummary.mockResolvedValue({
+      crownCollectors: [],
+      weeklyLeaders: [],
       lastRefreshedAt: null,
     });
   });
@@ -50,7 +73,7 @@ describe('leaderboard route seasonal realm selection', () => {
       .get('/api/v1/leaderboard/pvp_rating?seasonId=season-1');
 
     expect(res.status).toBe(200);
-    expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', undefined, false, 'season-1');
+    expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', undefined, false, 'season-1', 'alltime');
   });
 
   it('falls back to the authenticated player realm when no query parameter is provided', async () => {
@@ -59,6 +82,102 @@ describe('leaderboard route seasonal realm selection', () => {
       .set('x-player-season-id', 'season-2');
 
     expect(res.status).toBe(200);
-    expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', 'player-1', false, 'season-2');
+    expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', 'player-1', false, 'season-2', 'alltime');
+  });
+
+  it('treats the permanent seasonId sentinel as the permanent realm for authenticated players', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/pvp_rating?seasonId=permanent')
+      .set('x-player-season-id', 'season-2');
+
+    expect(res.status).toBe(200);
+    expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', 'player-1', false, null, 'alltime');
+  });
+
+  it('passes the weekly period query parameter through to the service', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/pvp_rating?period=weekly&seasonId=season-1');
+
+    expect(res.status).toBe(200);
+    expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', undefined, false, 'season-1', 'weekly');
+  });
+
+  it('returns lifetime crown collectors before player crown collection routing', async () => {
+    mocks.getCrownCollectorLeaderboard.mockResolvedValue({
+      entries: [{
+        rank: 1,
+        playerId: 'player-1',
+        username: 'Ada',
+        totalCrowns: 7,
+        crownsByGroup: { pvp: 7 },
+      }],
+      myRank: null,
+      totalPlayers: 1,
+      lastRefreshedAt: null,
+    });
+
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/crowns?limit=5');
+
+    expect(res.status).toBe(200);
+    expect(mocks.getCrownCollectorLeaderboard).toHaveBeenCalledWith(undefined, false, 5);
+    expect(res.body.entries[0].username).toBe('Ada');
+    expect(res.body.entries[0]).not.toHaveProperty('playerId');
+  });
+
+  it('does not expose player crown collections by UUID', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/crowns/player-1');
+
+    expect(res.status).toBe(404);
+    expect(mocks.getCrownCollectorLeaderboard).not.toHaveBeenCalled();
+    expect(mocks.getLeaderboard).not.toHaveBeenCalled();
+  });
+
+  it('passes authenticated playerId and around_me to crown collectors', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/crowns?around_me=true')
+      .set('x-player-season-id', 'season-2');
+
+    expect(res.status).toBe(200);
+    expect(mocks.getCrownCollectorLeaderboard).toHaveBeenCalledWith('player-1', true, undefined);
+  });
+
+  it('passes invalid crown collector limit strings as undefined', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/crowns?limit=5abc');
+
+    expect(res.status).toBe(200);
+    expect(mocks.getCrownCollectorLeaderboard).toHaveBeenCalledWith(undefined, false, undefined);
+  });
+
+  it('returns public categories without optional authentication', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/categories')
+      .set('Authorization', 'Bearer token');
+
+    expect(res.status).toBe(200);
+    expect(res.header['cache-control']).toBe(CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
+    expect(mocks.optionalAuthenticate).not.toHaveBeenCalled();
+  });
+
+  it('returns cache-only public summary', async () => {
+    const summary = {
+      crownCollectors: [{ rank: 1, username: 'Ada', totalCrowns: 7, crownsByGroup: { pvp: 7 } }],
+      weeklyLeaders: [{ category: 'pvp_wins', username: 'Grace', score: 12 }],
+      lastRefreshedAt: '2026-04-24T10:00:00.000Z',
+    };
+    mocks.getPublicLeaderboardSummary.mockResolvedValue(summary);
+
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/public-summary')
+      .set('Authorization', 'Bearer token');
+
+    expect(res.status).toBe(200);
+    expect(res.header['cache-control']).toBe(CACHE_HEADER_CONSTANTS.PUBLIC_MEDIUM);
+    expect(mocks.optionalAuthenticate).not.toHaveBeenCalled();
+    expect(mocks.getPublicLeaderboardSummary).toHaveBeenCalledTimes(1);
+    expect(mocks.getLeaderboard).not.toHaveBeenCalled();
+    expect(res.body).toEqual(summary);
   });
 });

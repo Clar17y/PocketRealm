@@ -11,11 +11,14 @@ vi.mock('../redis', () => ({
     zrevrank: vi.fn(),
     zrevrange: vi.fn(),
     zscore: vi.fn(),
+    exists: vi.fn(),
     hget: vi.fn(),
     hmget: vi.fn(),
+    pipeline: vi.fn(),
     zadd: vi.fn(),
     hset: vi.fn(),
     del: vi.fn(),
+    rename: vi.fn(),
     set: vi.fn(),
     eval: vi.fn(),
   },
@@ -45,6 +48,8 @@ function stubEmptyRefresh() {
 describe('leaderboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRedis.exists.mockResolvedValue(0);
+    mockPrisma.playerCrown.groupBy.mockResolvedValue([]);
     mockPrisma.season = {
       findMany: vi.fn().mockResolvedValue([]),
     };
@@ -94,6 +99,22 @@ describe('leaderboardService', () => {
 
       expect(mockPrisma.pvpRating.findMany).not.toHaveBeenCalled();
       expect(mockRedis.eval).not.toHaveBeenCalled();
+    });
+
+    it('skips refresh while the weekly crown job lock is active', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.exists.mockResolvedValue(1);
+
+      await ensureLeaderboardsFresh();
+
+      expect(mockRedis.set).not.toHaveBeenCalledWith(
+        'leaderboard:refresh_lock',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockPrisma.pvpRating.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -290,6 +311,24 @@ describe('leaderboardService', () => {
         'leaderboard:permanent:pvp_rating',
         0,
         LEADERBOARD_CONSTANTS.PAGE_SIZE - 1,
+        'WITHSCORES',
+      );
+    });
+
+    it('clamps aroundMe start near the bottom to keep a full page when possible', async () => {
+      mockRedis.zcard.mockResolvedValue(100);
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.zrevrank.mockResolvedValue(98);
+      mockRedis.zrevrange.mockResolvedValue([]);
+      mockRedis.zscore.mockResolvedValue('10');
+      mockRedis.hget.mockResolvedValue(JSON.stringify({ username: 'Bottom', characterLevel: 1, isBot: false }));
+
+      await getLeaderboard('pvp_rating', 'bottom-id', true);
+
+      expect(mockRedis.zrevrange).toHaveBeenCalledWith(
+        'leaderboard:permanent:pvp_rating',
+        100 - LEADERBOARD_CONSTANTS.PAGE_SIZE,
+        99,
         'WITHSCORES',
       );
     });
@@ -549,6 +588,26 @@ describe('leaderboardService', () => {
       );
     });
 
+    it('sets last_refresh when permanent refresh succeeds even if an active season fails', async () => {
+      mockPrisma.season.findMany.mockResolvedValue([{ id: 'season-1' }]);
+      mockPrisma.pvpRating.findMany
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error('season fail'));
+      mockPrisma.player.findMany.mockResolvedValue([]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+      mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.guild.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+
+      await refreshAllLeaderboards();
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'leaderboard:last_refresh',
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      );
+    });
+
     // ── refreshPvp ─────────────────────────────────────────────────────────
 
     describe('refreshPvp', () => {
@@ -571,8 +630,38 @@ describe('leaderboardService', () => {
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
         expect(zaddKeys).toContain('leaderboard:permanent:pvp_rating');
         expect(zaddKeys).toContain('leaderboard:permanent:pvp_wins');
-        expect(zaddKeys).toContain('leaderboard:permanent:pvp_best_rating');
-        expect(zaddKeys).toContain('leaderboard:permanent:pvp_win_streak');
+      expect(zaddKeys).toContain('leaderboard:permanent:pvp_best_rating');
+      expect(zaddKeys).toContain('leaderboard:permanent:pvp_win_streak');
+    });
+
+      it('stores crown counts in Redis metadata during refresh', async () => {
+        mockPrisma.pvpRating.findMany.mockResolvedValue([
+          {
+            id: 'pvp-1', playerId: 'p1', rating: 1500, wins: 20, bestRating: 1600, winStreak: 5,
+            player: { username: 'Warrior', characterLevel: 30, isBot: false, role: 'player', activeTitle: null },
+          },
+        ]);
+        mockPrisma.player.findMany.mockResolvedValue([]);
+        mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+        mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+        mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+        mockPrisma.guild.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
+        mockPrisma.playerCrown.groupBy.mockImplementation((args: { where?: { category?: string } }) =>
+          Promise.resolve(args.where?.category === 'pvp_wins'
+            ? [
+                { playerId: 'p1', rank: 1, _count: { id: 2 } },
+                { playerId: 'p1', rank: 3, _count: { id: 1 } },
+              ]
+            : []),
+        );
+
+        await refreshAllLeaderboards();
+
+        const hsetCalls = mockRedis.hset.mock.calls;
+        const winsMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:pvp_wins');
+        const meta = JSON.parse(winsMeta![2] as string);
+        expect(meta.crowns).toEqual({ gold: 2, silver: 0, bronze: 1 });
       });
 
       it('maps correct scores for each PvP category', async () => {
@@ -737,6 +826,168 @@ describe('leaderboardService', () => {
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
         expect(zaddKeys).not.toContain('leaderboard:permanent:pvp_rating');
       });
+    });
+
+    describe('weekly deltas', () => {
+      function makePipeline() {
+        return {
+          zscore: vi.fn().mockReturnThis(),
+          exec: vi.fn().mockResolvedValue([]),
+        };
+      }
+
+      it('writes weekly deltas using realm-scoped snapshot keys', async () => {
+        const readPipeline = makePipeline();
+        readPipeline.exec.mockResolvedValue([[null, '1100'], [null, null]]);
+        mockRedis.pipeline.mockReturnValueOnce(readPipeline);
+        mockRedis.exists.mockImplementation((key: string) =>
+          Promise.resolve(key === 'leaderboard:weekly_start:season-1:pvp_rating' ? 1 : 0),
+        );
+        mockPrisma.season.findMany.mockResolvedValue([{ id: 'season-1' }]);
+        mockPrisma.pvpRating.findMany.mockResolvedValue([
+          {
+            id: 'pvp-1',
+            playerId: 'p1',
+            rating: 1200,
+            wins: 10,
+            bestRating: 1300,
+            winStreak: 3,
+            player: { username: 'Alice', characterLevel: 5, isBot: false, activeTitle: null, account: { role: 'player' } },
+          },
+          {
+            id: 'pvp-2',
+            playerId: 'p2',
+            rating: 900,
+            wins: 5,
+            bestRating: 950,
+            winStreak: 1,
+            player: { username: 'Bob', characterLevel: 4, isBot: false, activeTitle: null, account: { role: 'player' } },
+          },
+        ]);
+        mockPrisma.player.findMany.mockResolvedValue([]);
+        mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+        mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+        mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+        mockPrisma.guild.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
+
+        await refreshAllLeaderboards();
+
+        expect(readPipeline.zscore).toHaveBeenCalledWith('leaderboard:weekly_start:season-1:pvp_rating', 'p1');
+        expect(readPipeline.zscore).toHaveBeenCalledWith('leaderboard:weekly_start:season-1:pvp_rating', 'p2');
+        expect(mockRedis.zadd).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:season-1:pvp_rating:tmp:lock-token',
+          100,
+          'p1',
+        );
+        expect(mockRedis.zadd).not.toHaveBeenCalledWith(
+          expect.stringContaining('leaderboard:weekly_delta:season-1:pvp_rating'),
+          900,
+          'p2',
+        );
+        expect(mockRedis.rename).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:season-1:pvp_rating:tmp:lock-token',
+          'leaderboard:weekly_delta:season-1:pvp_rating',
+        );
+      });
+
+      it('uses skill XP rather than level when computing weekly skill deltas', async () => {
+        const readPipeline = makePipeline();
+        readPipeline.exec.mockResolvedValue([[null, '1000']]);
+        mockRedis.pipeline.mockReturnValueOnce(readPipeline);
+        mockRedis.exists.mockImplementation((key: string) =>
+          Promise.resolve(key === 'leaderboard:weekly_start_xp:permanent:skill_melee' ? 1 : 0),
+        );
+        mockPrisma.pvpRating.findMany.mockResolvedValue([]);
+        mockPrisma.player.findMany.mockResolvedValue([]);
+        mockPrisma.playerSkill.findMany.mockResolvedValue([
+          {
+            id: 'skill-1',
+            playerId: 'p1',
+            skillType: 'melee',
+            level: 12,
+            xp: BigInt(1500),
+            player: { username: 'Alice', characterLevel: 5, isBot: false, activeTitle: null, account: { role: 'player' } },
+          },
+        ]);
+        mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+        mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+        mockPrisma.guild.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
+
+        await refreshAllLeaderboards();
+
+        expect(readPipeline.zscore).toHaveBeenCalledWith('leaderboard:weekly_start_xp:permanent:skill_melee', 'p1');
+        expect(mockRedis.zadd).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:permanent:skill_melee:tmp:lock-token',
+          500,
+          'p1',
+        );
+        expect(mockRedis.rename).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:permanent:skill_melee:tmp:lock-token',
+          'leaderboard:weekly_delta:permanent:skill_melee',
+        );
+      });
+    });
+
+    it('reads weekly delta scores when period is weekly', async () => {
+      const meta = JSON.stringify({ username: 'Hero', characterLevel: 10, isBot: false });
+      mockRedis.zcard.mockResolvedValue(1);
+      mockRedis.get.mockResolvedValue('2026-04-20T00:00:00Z');
+      mockRedis.zrevrange.mockResolvedValue(['player-1', '125']);
+      mockRedis.hmget.mockResolvedValue([meta]);
+
+      const result = await getLeaderboard('pvp_wins', undefined, false, null, 'weekly');
+
+      expect(result.period).toBe('weekly');
+      expect(mockRedis.zcard).toHaveBeenCalledWith('leaderboard:weekly_delta:permanent:pvp_wins');
+      expect(mockRedis.zrevrange).toHaveBeenCalledWith(
+        'leaderboard:weekly_delta:permanent:pvp_wins',
+        0,
+        LEADERBOARD_CONSTANTS.PAGE_SIZE - 1,
+        'WITHSCORES',
+      );
+      expect(result.entries[0].score).toBe(125);
+    });
+
+    it('reads cached crown counts from leaderboard metadata without hitting Postgres', async () => {
+      const meta = JSON.stringify({
+        username: 'Hero',
+        characterLevel: 10,
+        isBot: false,
+        crowns: { gold: 2, silver: 0, bronze: 1 },
+      });
+      mockRedis.zcard.mockResolvedValue(1);
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.zrevrange.mockResolvedValue(['player-1', '500']);
+      mockRedis.hmget.mockResolvedValue([meta]);
+
+      const result = await getLeaderboard('pvp_wins');
+
+      expect(mockPrisma.playerCrown.groupBy).not.toHaveBeenCalled();
+      expect(result.entries[0].crowns).toEqual({ gold: 2, silver: 0, bronze: 1 });
+    });
+
+    it('reads cached crown counts to myRank when the player is outside the current page', async () => {
+      const pageMeta = JSON.stringify({ username: 'Hero', characterLevel: 10, isBot: false });
+      const myMeta = JSON.stringify({
+        username: 'Me',
+        characterLevel: 12,
+        isBot: false,
+        crowns: { gold: 0, silver: 3, bronze: 0 },
+      });
+      mockRedis.zcard.mockResolvedValue(10);
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.zrevrank.mockResolvedValue(4);
+      mockRedis.zrevrange.mockResolvedValue(['player-1', '500']);
+      mockRedis.hmget.mockResolvedValue([pageMeta]);
+      mockRedis.zscore.mockResolvedValue('250');
+      mockRedis.hget.mockResolvedValue(myMeta);
+
+      const result = await getLeaderboard('pvp_wins', 'my-id');
+
+      expect(mockPrisma.playerCrown.groupBy).not.toHaveBeenCalled();
+      expect(result.myRank?.crowns).toEqual({ gold: 0, silver: 3, bronze: 0 });
     });
 
     // ── refreshProgression ─────────────────────────────────────────────────

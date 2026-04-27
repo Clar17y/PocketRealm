@@ -3,6 +3,7 @@
 import type { LeaderboardEntry } from '@/lib/api';
 import { Bot, Medal, Shield } from 'lucide-react';
 import { PlayerTitle } from '@/components/common/PlayerTitle';
+import { CrownChips } from '@/components/rankings/CrownChips';
 
 interface LeaderboardTableProps {
   entries: LeaderboardEntry[];
@@ -35,6 +36,15 @@ function RankBadge({ rank }: { rank: number }) {
   if (rank === 2) return <span className="text-gray-300 font-bold"><Medal className="w-4 h-4 inline" /> 2</span>;
   if (rank === 3) return <span className="text-amber-600 font-bold"><Medal className="w-4 h-4 inline" /> 3</span>;
   return <span className="text-[var(--rpg-text-secondary)]">#{rank}</span>;
+}
+
+function ScoreWithCrowns({ entry }: { entry: LeaderboardEntry }) {
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <span>{formatScore(entry.score)}</span>
+      {entry.crowns && <CrownChips crowns={entry.crowns} compact />}
+    </div>
+  );
 }
 
 export function LeaderboardTable({
@@ -110,7 +120,7 @@ export function LeaderboardTable({
                 </div>
               </div>
               <div className="text-right font-pixel text-[12px] text-[var(--rpg-text-primary)] shrink-0">
-                {formatScore(entry.score)}
+                <ScoreWithCrowns entry={entry} />
               </div>
             </div>
           );
@@ -120,6 +130,7 @@ export function LeaderboardTable({
       {/* View my rank / Back to top toggle */}
       {onToggleAroundMe && myRank && (
         <button
+          type="button"
           onClick={onToggleAroundMe}
           className="w-full py-2 text-sm text-[var(--rpg-gold)] hover:text-[var(--rpg-gold)]/80 transition-colors"
         >
@@ -150,7 +161,7 @@ export function LeaderboardTable({
               </div>
             </div>
             <div className="text-right font-pixel text-[12px] text-[var(--rpg-text-primary)] shrink-0">
-              {formatScore(myRank.score)}
+              <ScoreWithCrowns entry={myRank} />
             </div>
           </div>
         </div>

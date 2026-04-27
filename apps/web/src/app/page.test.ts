@@ -8,6 +8,15 @@ vi.mock('next/image', () => ({
     React.createElement('img', props),
 }));
 
+const publicRankingsMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/components/rankings/PublicRankings', () => ({
+  PublicRankings: (props: { embedded?: boolean }) => {
+    publicRankingsMock(props);
+    return React.createElement('div', { 'data-embedded': String(Boolean(props.embedded)) }, 'public rankings component');
+  },
+}));
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -22,5 +31,14 @@ describe('Home page', () => {
     expect(screen.getByText(/One-time purchase\. Grants 30 days of Champion\./i)).toBeTruthy();
     expect(screen.getByText(/Helps cover the server bill and gently pressures me into shipping more content\./i)).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'Support Pocketrealm' }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps rankings on the homepage without the redundant learn more button', () => {
+    render(React.createElement(Home));
+
+    expect(screen.queryByRole('link', { name: 'Learn More' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Rankings' }).getAttribute('href')).toBe('#rankings');
+    expect(screen.getByText('public rankings component')).toBeTruthy();
+    expect(publicRankingsMock).toHaveBeenCalledWith(expect.objectContaining({ embedded: true, initialTab: 'leaderboards' }));
   });
 });

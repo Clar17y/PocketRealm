@@ -404,6 +404,33 @@ export async function setActiveTitle(achievementId: string | null) {
 
 // Leaderboard
 
+export type LeaderboardPeriod = 'alltime' | 'weekly';
+
+export interface CrownCounts {
+  gold: number;
+  silver: number;
+  bronze: number;
+  total?: number;
+}
+
+export interface CrownCollectorEntry {
+  rank: number;
+  username: string;
+  characterLevel: number;
+  title?: string;
+  titleTier?: number;
+  titleStyle?: TitleStyleVariant;
+  crowns: Required<CrownCounts>;
+  topGroups: Array<{ group: string; count: number }>;
+}
+
+export interface CrownCollectorsResponse {
+  entries: CrownCollectorEntry[];
+  myRank: CrownCollectorEntry | null;
+  totalPlayers: number;
+  lastRefreshedAt: string | null;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   playerId?: string;
@@ -415,6 +442,7 @@ export interface LeaderboardEntry {
   title?: string;
   titleTier?: number;
   titleStyle?: TitleStyleVariant;
+  crowns?: CrownCounts;
 }
 
 export interface LeaderboardResponse {
@@ -423,6 +451,7 @@ export interface LeaderboardResponse {
   myRank: LeaderboardEntry | null;
   totalPlayers: number;
   lastRefreshedAt: string | null;
+  period?: LeaderboardPeriod;
 }
 
 export interface LeaderboardCategoryGroup {
@@ -435,18 +464,41 @@ export interface LeaderboardCategoriesResponse {
 }
 
 export async function getLeaderboardCategories() {
-  return fetchApi<LeaderboardCategoriesResponse>('/api/v1/leaderboard/categories');
+  return fetchApi<LeaderboardCategoriesResponse>('/api/v1/leaderboard/categories', { auth: 'omit' });
 }
 
-export async function getLeaderboard(category: string, aroundMe = false, seasonId?: string | null) {
+export async function getLeaderboard(
+  category: string,
+  aroundMe = false,
+  seasonId?: string | null,
+  period: LeaderboardPeriod = 'alltime',
+) {
   const params = new URLSearchParams();
   if (aroundMe) {
     params.set('around_me', 'true');
   }
-  if (seasonId) {
+  if (seasonId === null) {
+    params.set('seasonId', 'permanent');
+  } else if (seasonId) {
     params.set('seasonId', seasonId);
+  }
+  if (period !== 'alltime') {
+    params.set('period', period);
   }
 
   const query = params.size > 0 ? `?${params.toString()}` : '';
   return fetchApi<LeaderboardResponse>(`/api/v1/leaderboard/${category}${query}`);
+}
+
+export async function getCrownCollectors(aroundMe = false, limit?: number) {
+  const params = new URLSearchParams();
+  if (aroundMe) {
+    params.set('around_me', 'true');
+  }
+  if (typeof limit === 'number') {
+    params.set('limit', String(limit));
+  }
+
+  const query = params.size > 0 ? `?${params.toString()}` : '';
+  return fetchApi<CrownCollectorsResponse>(`/api/v1/leaderboard/crowns${query}`);
 }

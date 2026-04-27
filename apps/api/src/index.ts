@@ -58,6 +58,8 @@ import { startMetricsLogger } from './services/metricsLogger';
 import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 import { refreshSeasonCache } from './services/seasonCacheService';
+import { runWeeklyLeaderboardJob } from './jobs/weeklyLeaderboardJob';
+import { msUntilNextWeeklyLeaderboardWindow } from './jobs/weeklyLeaderboardSchedule';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -185,6 +187,7 @@ createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
 let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
+let weeklyLeaderboardTimer: ReturnType<typeof setTimeout> | null = null;
 
 const PREMIUM_RECONCILIATION_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -194,6 +197,19 @@ async function runPremiumReconciliation(): Promise<void> {
   } catch (err) {
     logger.error({ err }, 'Premium reconciliation failed');
   }
+}
+
+function scheduleWeeklyLeaderboardJob(skipCurrentWindow = false): void {
+  weeklyLeaderboardTimer = setTimeout(() => {
+    const now = new Date();
+    void runWeeklyLeaderboardJob(now)
+      .catch((err) => {
+        logger.error({ err }, 'Weekly leaderboard crown job failed');
+      })
+      .finally(() => {
+        scheduleWeeklyLeaderboardJob(true);
+      });
+  }, msUntilNextWeeklyLeaderboardWindow(new Date(), { includeCurrentWindow: !skipCurrentWindow }));
 }
 
 function startServer(): void {
@@ -209,6 +225,7 @@ function startServer(): void {
     premiumReconciliationTimer = setInterval(() => {
       void runPremiumReconciliation();
     }, PREMIUM_RECONCILIATION_INTERVAL_MS);
+    scheduleWeeklyLeaderboardJob();
     stopMetricsLogger = startMetricsLogger(getIo);
   });
 }
@@ -222,6 +239,7 @@ process.on('SIGTERM', () => {
   markShuttingDown();
   stopMetricsLogger?.();
   if (premiumReconciliationTimer) clearInterval(premiumReconciliationTimer);
+  if (weeklyLeaderboardTimer) clearTimeout(weeklyLeaderboardTimer);
   const io = getIo();
   if (io) io.close();
   server.close(() => {

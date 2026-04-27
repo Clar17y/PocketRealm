@@ -1,10 +1,13 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { characterLevelFromXp, levelFromXp } from '@pocketrealm/game-engine';
+import { SEASON_STATUSES } from '@pocketrealm/shared';
 import { redis } from '../redis';
+import { logger } from '../logger';
 import { getCategories } from './leaderboardService';
 import { refreshSeasonCache } from './seasonCacheService';
 import { leaderboardKey } from './leaderboardKeys';
-import { SEASON_STATUSES } from './season.constants';
+import { transferCrownsToPlayerTx } from './crownService';
+import { invalidateCrownCollectorSnapshot } from './crownLeaderboardService';
 
 export interface MergeLog {
   items: { transferred: number; deleted: number };
@@ -12,6 +15,7 @@ export interface MergeLog {
   skillXp: Record<string, number>;
   characterXp: { amount: number };
   achievements: { merged: number };
+  crowns: { merged: number };
   bestiary: { merged: number };
   recipes: { merged: number };
   zoneDiscoveries: { merged: number };
@@ -23,6 +27,7 @@ export const EMPTY_MERGE_LOG: MergeLog = {
   skillXp: {},
   characterXp: { amount: 0 },
   achievements: { merged: 0 },
+  crowns: { merged: 0 },
   bestiary: { merged: 0 },
   recipes: { merged: 0 },
   zoneDiscoveries: { merged: 0 },
@@ -35,6 +40,7 @@ function cloneEmptyMergeLog(): MergeLog {
     skillXp: {},
     characterXp: { amount: 0 },
     achievements: { merged: 0 },
+    crowns: { merged: 0 },
     bestiary: { merged: 0 },
     recipes: { merged: 0 },
     zoneDiscoveries: { merged: 0 },
@@ -65,6 +71,14 @@ function runSerializableTransaction<T>(
   }
 
   return prisma.$transaction(operation, { isolationLevel });
+}
+
+async function invalidateCrownCollectorSnapshotBestEffort(): Promise<void> {
+  try {
+    await invalidateCrownCollectorSnapshot();
+  } catch (err) {
+    logger.warn({ err }, 'Failed to invalidate crown collector snapshot after seasonal crown transfer');
+  }
 }
 
 async function mergeSeasonalPlayerTx(
@@ -228,6 +242,8 @@ async function mergeSeasonalPlayerTx(
     }
   }
 
+  log.crowns.merged = await transferCrownsToPlayerTx(tx, seasonalPlayerId, permanentPlayerId);
+
   const seasonalBestiary = await tx.playerBestiary.findMany({
     where: { playerId: seasonalPlayerId },
   });
@@ -379,7 +395,14 @@ export async function mergeSeasonalPlayer(
   permanentPlayerId: string,
   seasonId: string,
 ): Promise<MergeLog> {
-  return prisma.$transaction((tx) => mergeSeasonalPlayerTx(tx, seasonalPlayerId, permanentPlayerId, seasonId));
+  const log = await prisma.$transaction((tx) =>
+    mergeSeasonalPlayerTx(tx, seasonalPlayerId, permanentPlayerId, seasonId));
+
+  if (log.crowns.merged > 0) {
+    await invalidateCrownCollectorSnapshotBestEffort();
+  }
+
+  return log;
 }
 
 export async function createSeasonArchive(
@@ -503,10 +526,11 @@ export async function runSeasonMerge(seasonId: string): Promise<{ merged: number
 
   let merged = 0;
   const errors: string[] = [];
+  let crownCollectorsChanged = false;
 
   for (const seasonalPlayer of seasonalPlayers) {
     try {
-      await runSerializableTransaction(async (tx) => {
+      const mergeLog = await runSerializableTransaction(async (tx) => {
         const permanent = await tx.player.findFirst({
           where: {
             accountId: seasonalPlayer.accountId,
@@ -557,8 +581,13 @@ export async function runSeasonMerge(seasonId: string): Promise<{ merged: number
         await tx.player.delete({
           where: { id: seasonalPlayer.id },
         });
+
+        return mergeLog;
       });
 
+      if (mergeLog.crowns.merged > 0) {
+        crownCollectorsChanged = true;
+      }
       merged++;
     } catch (error) {
       errors.push(`Failed to merge player ${seasonalPlayer.id}: ${(error as Error).message}`);
@@ -588,6 +617,10 @@ export async function runSeasonMerge(seasonId: string): Promise<{ merged: number
     });
 
     await refreshSeasonCache();
+  }
+
+  if (crownCollectorsChanged) {
+    await invalidateCrownCollectorSnapshotBestEffort();
   }
 
   return { merged, errors };

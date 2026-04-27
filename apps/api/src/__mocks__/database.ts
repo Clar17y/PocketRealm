@@ -53,6 +53,7 @@ export const prisma = {
   playerNpcActivityReaction: mockModel(),
   playerStats: mockModel(),
   playerAchievement: mockModel(),
+  playerCrown: { ...mockModel(), groupBy: vi.fn() },
   premiumPurchase: mockModel(),
   mobFamily: mockModel(),
   activityLog: mockModel(),

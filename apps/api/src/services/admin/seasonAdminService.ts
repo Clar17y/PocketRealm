@@ -1,10 +1,10 @@
 import { Prisma, prisma } from '@pocketrealm/database';
+import { SEASON_STATUSES } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { bootstrapSeason } from '../seasonBootstrapService';
 import { runSeasonMerge } from '../seasonMergeService';
 import { evaluateSeasonRewards } from '../seasonRewardService';
 import { activateSeason, endSeason, isSeasonBootstrapped } from '../seasonLifecycleService';
-import { SEASON_STATUSES } from '../season.constants';
 import { adminAudit } from './adminAuditService';
 
 export interface CreateAdminSeasonInput {

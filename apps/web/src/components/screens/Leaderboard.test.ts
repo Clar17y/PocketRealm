@@ -140,7 +140,6 @@ describe('Leaderboard', () => {
           {
             category: 'pvp_rating',
             rank: 1,
-            accountId: 'account-1',
             username: 'Champion',
             value: 2450,
             createdAt: '2026-04-20T00:00:00.000Z',

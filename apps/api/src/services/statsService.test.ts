@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPrisma } from '../__test__/setup';
-import { incrementStats, resolveAllStats, resolveFamilyKills, resolveAllFamilyKills } from './statsService';
+import { incrementStats, resolveAllStats, resolveCrownStats, resolveFamilyKills, resolveAllFamilyKills, resolveStats } from './statsService';
 
 describe('statsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.playerCrown.findMany.mockResolvedValue([]);
   });
 
   describe('incrementStats', () => {
@@ -88,6 +89,82 @@ describe('statsService', () => {
       expect(result.totalKills).toBe(0);
       expect(result.totalCrafts).toBe(0);
       expect(result.totalDeaths).toBe(0);
+    });
+
+    it('includes crown stats for achievement progress', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{
+        total_kills: 0,
+        total_boss_kills: 0,
+        total_boss_damage: 0,
+        total_pvp_wins: 0,
+        best_pvp_win_streak: 0,
+        total_zones_discovered: 0,
+        total_zones_fully_explored: 0,
+        total_recipes_learned: 0,
+        total_bestiary_completed: 0,
+        total_unique_monster_kills: 0,
+        highest_character_level: 1,
+        highest_skill_level: 1,
+      }]);
+      mockPrisma.playerStats.findUnique.mockResolvedValue(null);
+      mockPrisma.playerCrown.findMany.mockResolvedValue([
+        { category: 'pvp_wins' },
+        { category: 'pvp_rating' },
+        { category: 'skill_alchemy' },
+      ]);
+
+      const result = await resolveAllStats('p1');
+
+      expect(result.crowns_pvp).toBe(2);
+      expect(result.crowns_crafting).toBe(1);
+      expect(result.crowns_combat).toBe(0);
+    });
+  });
+
+  describe('resolveCrownStats', () => {
+    it('counts player crowns by category group', async () => {
+      mockPrisma.playerCrown.findMany.mockResolvedValue([
+        { category: 'pvp_wins' },
+        { category: 'boss_damage' },
+        { category: 'skill_foraging' },
+        { category: 'guild_level' },
+      ]);
+
+      const result = await resolveCrownStats('p1');
+
+      expect(result).toMatchObject({
+        crowns_pvp: 1,
+        crowns_combat: 1,
+        crowns_gathering: 1,
+        crowns_crafting: 0,
+      });
+      expect(result).not.toHaveProperty('crowns_guild');
+    });
+
+    it('resolves requested crown stat keys', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{
+        total_kills: 0,
+        total_boss_kills: 0,
+        total_boss_damage: 0,
+        total_pvp_wins: 0,
+        best_pvp_win_streak: 0,
+        total_zones_discovered: 0,
+        total_zones_fully_explored: 0,
+        total_recipes_learned: 0,
+        total_bestiary_completed: 0,
+        total_unique_monster_kills: 0,
+        highest_character_level: 1,
+        highest_skill_level: 1,
+      }]);
+      mockPrisma.playerStats.findUnique.mockResolvedValue(null);
+      mockPrisma.playerCrown.findMany.mockResolvedValue([
+        { category: 'pvp_wins' },
+        { category: 'pvp_rating' },
+      ]);
+
+      const result = await resolveStats('p1', ['crowns_pvp']);
+
+      expect(result).toEqual({ crowns_pvp: 2 });
     });
   });
 

@@ -136,6 +136,7 @@ model Player {
   persistedMobs      PersistedMob[]
   stats              PlayerStats?
   achievements       PlayerAchievement[]
+  crowns             PlayerCrown[]
   premiumPurchases   PremiumPurchase[]
   guildMember        GuildMember?
   guildJoinRequests  GuildJoinRequest[]
@@ -1052,6 +1053,22 @@ model PlayerAchievement {
 
   @@id([playerId, achievementId])
   @@map("player_achievements")
+}
+
+model PlayerCrown {
+  id        String   @id @default(uuid())
+  playerId  String   @map("player_id")
+  category  String   @db.VarChar(32)
+  realmId   String   @default("permanent") @map("realm_id") @db.VarChar(128)
+  rank      Int
+  weekStart DateTime @map("week_start")
+  awardedAt DateTime @default(now()) @map("awarded_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, category, weekStart, realmId])
+  @@index([playerId])
+  @@map("player_crowns")
 }
 
 // =============================================================================

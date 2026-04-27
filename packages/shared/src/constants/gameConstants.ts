@@ -892,7 +892,90 @@ export const LEADERBOARD_CONSTANTS = {
   PAGE_SIZE: 25,
   TOP_N: 25,
   BATCH_SIZE: 500,
+  WEEK_SECONDS: 7 * 24 * 60 * 60,
+  WEEKLY_JOB_LOCK_SECONDS: 10 * 60,
+  WEEKLY_SNAPSHOT_MARKER_TTL_SECONDS: 14 * 24 * 60 * 60,
+  PUBLIC_SUMMARY_LIMIT: 3,
+  CROWN_COLLECTOR_SNAPSHOT_TTL_SECONDS: 15 * 60,
+  CROWN_COLLECTOR_LOCK_TTL_MS: 30_000,
+  CROWN_COLLECTOR_LOCK_WAIT_ATTEMPTS: 3,
+  CROWN_COLLECTOR_LOCK_WAIT_DELAY_MS: 10,
 } as const;
+
+export const CROWN_CONSTANTS = {
+  /** Minimum weekly delta score required to qualify for a crown. */
+  MIN_DELTA: 1,
+
+  /** Maximum crown records awarded per category per week, including ties. */
+  MAX_CROWNS_PER_CATEGORY: 5,
+
+  /** Number of weekly delta rows to scan per Redis page while filtering ineligible entries. */
+  AWARD_SCAN_PAGE_SIZE: 50,
+
+  /** Maximum weekly delta rows to scan per category while looking for crown winners. */
+  AWARD_SCAN_MAX_ENTRIES: 500,
+
+  /** Crown rank values. */
+  GOLD: 1,
+  SILVER: 2,
+  BRONZE: 3,
+
+  /** Player-owned category groups. Guild leaderboards use guild ids and are intentionally excluded. */
+  CATEGORY_GROUPS: {
+    pvp: ['pvp_rating', 'pvp_wins', 'pvp_best_rating', 'pvp_win_streak'],
+    combat: ['total_kills', 'boss_damage'],
+    skills: ['skill_melee', 'skill_ranged', 'skill_magic', 'skill_mining'],
+    crafting: [
+      'skill_refining',
+      'skill_tanning',
+      'skill_weaving',
+      'skill_weaponsmithing',
+      'skill_armorsmithing',
+      'skill_leatherworking',
+      'skill_tailoring',
+      'skill_alchemy',
+    ],
+    gathering: ['skill_foraging', 'skill_woodcutting'],
+    progression: ['character_level', 'character_xp', 'total_skill_level'],
+    casino: ['casino_profit', 'casino_wagered'],
+  } satisfies Record<string, readonly string[]>,
+
+  /** Categories where weekly delta uses XP from Postgres rather than level scores. */
+  XP_BASED_CATEGORIES: [
+    'skill_melee',
+    'skill_ranged',
+    'skill_magic',
+    'skill_mining',
+    'skill_foraging',
+    'skill_woodcutting',
+    'skill_refining',
+    'skill_tanning',
+    'skill_weaving',
+    'skill_weaponsmithing',
+    'skill_armorsmithing',
+    'skill_leatherworking',
+    'skill_tailoring',
+    'skill_alchemy',
+    'character_level',
+    'total_skill_level',
+  ],
+} as const;
+
+export const SEASON_STATUSES = {
+  UPCOMING: 'upcoming',
+  ACTIVE: 'active',
+  ENDED: 'ended',
+  ARCHIVED: 'archived',
+} as const;
+
+export type SeasonStatus = (typeof SEASON_STATUSES)[keyof typeof SEASON_STATUSES];
+
+export const CACHED_SEASON_STATUSES: readonly SeasonStatus[] = [
+  SEASON_STATUSES.ACTIVE,
+  SEASON_STATUSES.ENDED,
+] as const;
+
+export const SEASON_CACHE_TTL_MS = 60_000;
 
 // =============================================================================
 // QUERY LIMITS
@@ -1623,6 +1706,8 @@ export const AUTH_CONSTANTS = {
 export const CACHE_HEADER_CONSTANTS = {
   /** Cache-Control for public, rarely changing data (e.g. leaderboard categories) */
   PUBLIC_LONG: 'public, max-age=3600',
+  /** Cache-Control for public, periodically refreshed data (e.g. public leaderboard summaries) */
+  PUBLIC_MEDIUM: 'public, max-age=900',
   /** Cache-Control for private, semi-static data (e.g. bestiary, recipes) */
   PRIVATE_MEDIUM: 'private, max-age=300',
   /** Cache-Control for private, frequently changing data (e.g. leaderboard, zones) */
