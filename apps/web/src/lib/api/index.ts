@@ -132,7 +132,6 @@ export {
   getLeaderboardCategories,
   getLeaderboard,
   getCrownCollectors,
-  getPublicLeaderboardSummary,
 } from './social';
 export type {
   PvpRatingResponse,
@@ -156,8 +155,6 @@ export type {
   CrownCounts,
   CrownCollectorEntry,
   CrownCollectorsResponse,
-  PublicSummaryWeeklyLeader,
-  PublicLeaderboardSummaryResponse,
   LeaderboardEntry,
   LeaderboardResponse,
   LeaderboardCategoryGroup,

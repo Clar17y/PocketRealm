@@ -29,6 +29,8 @@ interface SeasonOption {
 }
 
 const DEFAULT_CATEGORY = 'character_xp';
+const DEFAULT_GROUP = 'Progression';
+const DEFAULT_TAB: PublicRankingsTab = 'leaderboards';
 
 function updateTabQuery(tab: PublicRankingsTab) {
   if (typeof window === 'undefined') return;
@@ -55,14 +57,34 @@ function periodForTab(tab: PublicRankingsTab): LeaderboardPeriod {
   return tab === 'weekly' ? 'weekly' : 'alltime';
 }
 
-interface PublicRankingsProps {
-  initialTab?: PublicRankingsTab;
+function preferredCategorySelection(groups: LeaderboardCategoryGroup[]) {
+  const preferredGroup = groups.find((group) => group.name === DEFAULT_GROUP);
+  const preferredCategory = preferredGroup?.categories.find((category) => category.slug === DEFAULT_CATEGORY);
+
+  if (preferredGroup && preferredCategory) {
+    return { groupName: preferredGroup.name, categorySlug: preferredCategory.slug };
+  }
+
+  if (preferredGroup?.categories[0]) {
+    return { groupName: preferredGroup.name, categorySlug: preferredGroup.categories[0].slug };
+  }
+
+  const fallbackGroup = groups[0];
+  const fallbackCategory = fallbackGroup?.categories[0];
+  return fallbackGroup && fallbackCategory
+    ? { groupName: fallbackGroup.name, categorySlug: fallbackCategory.slug }
+    : { groupName: DEFAULT_GROUP, categorySlug: DEFAULT_CATEGORY };
 }
 
-export function PublicRankings({ initialTab = 'crowns' }: PublicRankingsProps) {
+interface PublicRankingsProps {
+  initialTab?: PublicRankingsTab;
+  embedded?: boolean;
+}
+
+export function PublicRankings({ initialTab = DEFAULT_TAB, embedded = false }: PublicRankingsProps) {
   const [activeTab, setActiveTab] = useState<PublicRankingsTab>(initialTab);
   const [groups, setGroups] = useState<LeaderboardCategoryGroup[]>([]);
-  const [activeGroup, setActiveGroup] = useState('Characters');
+  const [activeGroup, setActiveGroup] = useState(DEFAULT_GROUP);
   const [activeCategory, setActiveCategory] = useState(DEFAULT_CATEGORY);
   const [rankingsSeasonId, setRankingsSeasonId] = useState<string | null>(null);
   const [hallOfFameSeasonId, setHallOfFameSeasonId] = useState('');
@@ -85,10 +107,10 @@ export function PublicRankings({ initialTab = 'crowns' }: PublicRankingsProps) {
       ]);
 
       if (categoriesRes.data?.groups.length) {
-        const firstGroup = categoriesRes.data.groups[0];
+        const selection = preferredCategorySelection(categoriesRes.data.groups);
         setGroups(categoriesRes.data.groups);
-        setActiveGroup(firstGroup.name);
-        setActiveCategory(firstGroup.categories[0]?.slug ?? DEFAULT_CATEGORY);
+        setActiveGroup(selection.groupName);
+        setActiveCategory(selection.categorySlug);
       }
 
       const season = activeSeasonRes.data?.season ?? null;
@@ -168,170 +190,180 @@ export function PublicRankings({ initialTab = 'crowns' }: PublicRankingsProps) {
     updateTabQuery(tab);
   }, []);
 
-  return (
-    <main className="min-h-screen bg-[var(--rpg-background)] px-4 py-6 text-[var(--rpg-text-primary)]">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-[var(--rpg-gold)]" />
-          <h1 className="font-almendra text-2xl font-bold text-[var(--rpg-text-primary)]">Realm Rankings</h1>
-        </div>
+  const Heading = embedded ? 'h2' : 'h1';
 
-        <RankingsTabs activeTab={activeTab} onChange={changeTab} />
+  const content = (
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-[var(--rpg-gold)]" />
+        <Heading className="font-almendra text-2xl font-bold text-[var(--rpg-text-primary)]">Realm Rankings</Heading>
+      </div>
 
-        {activeTab === 'crowns' && (
-          <PixelCard>
-            <CrownCollectorsTable
-              entries={crownData?.entries ?? []}
-              myRank={crownData?.myRank ?? null}
-              loading={crownsLoading}
-              totalPlayers={crownData?.totalPlayers ?? 0}
-              lastRefreshedAt={crownData?.lastRefreshedAt ?? null}
-              showAroundMe={aroundMe}
-              onToggleAroundMe={() => setAroundMe((value) => !value)}
-            />
-          </PixelCard>
-        )}
+      <RankingsTabs activeTab={activeTab} onChange={changeTab} />
 
-        {(activeTab === 'leaderboards' || activeTab === 'weekly') && (
-          <>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {rankingsRealms.map((realm) => (
-                <button
-                  key={realm.id}
-                  type="button"
-                  onClick={() => {
-                    setRankingsSeasonId(realm.seasonId);
-                    setAroundMe(false);
-                  }}
-                  className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                    rankingsSeasonId === realm.seasonId
-                      ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                      : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
-                  }`}
-                >
-                  {realm.label}
-                </button>
-              ))}
-            </div>
+      {activeTab === 'crowns' && (
+        <PixelCard>
+          <CrownCollectorsTable
+            entries={crownData?.entries ?? []}
+            myRank={crownData?.myRank ?? null}
+            loading={crownsLoading}
+            totalPlayers={crownData?.totalPlayers ?? 0}
+            lastRefreshedAt={crownData?.lastRefreshedAt ?? null}
+            showAroundMe={aroundMe}
+            onToggleAroundMe={() => setAroundMe((value) => !value)}
+          />
+        </PixelCard>
+      )}
 
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {groups.map((group) => (
-                <button
-                  key={group.name}
-                  type="button"
-                  onClick={() => {
-                    setActiveGroup(group.name);
-                    setActiveCategory(group.categories[0]?.slug ?? DEFAULT_CATEGORY);
-                    setAroundMe(false);
-                  }}
-                  className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                    activeGroup === group.name
-                      ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                      : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
-                  }`}
-                >
-                  {group.name}
-                </button>
-              ))}
-            </div>
-
-            {currentGroupCategories.length > 1 && (
-              <select
-                value={activeCategory}
-                onChange={(event) => {
-                  setActiveCategory(event.target.value);
+      {(activeTab === 'leaderboards' || activeTab === 'weekly') && (
+        <>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {rankingsRealms.map((realm) => (
+              <button
+                key={realm.id}
+                type="button"
+                onClick={() => {
+                  setRankingsSeasonId(realm.seasonId);
                   setAroundMe(false);
                 }}
-                className="w-full rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-surface)] px-3 py-2 text-sm text-[var(--rpg-text-primary)]"
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                  rankingsSeasonId === realm.seasonId
+                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
+                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                }`}
               >
-                {currentGroupCategories.map((category) => (
-                  <option key={category.slug} value={category.slug}>
-                    {category.label}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <PixelCard>
-              <LeaderboardTable
-                entries={leaderboardData?.entries ?? []}
-                myRank={leaderboardData?.myRank ?? null}
-                currentPlayerId={null}
-                loading={leaderboardLoading}
-                totalPlayers={leaderboardData?.totalPlayers ?? 0}
-                lastRefreshedAt={leaderboardData?.lastRefreshedAt ?? null}
-                showAroundMe={aroundMe}
-                onToggleAroundMe={() => setAroundMe((value) => !value)}
-                isGuildCategory={activeGroup === 'Guilds'}
-              />
-            </PixelCard>
-          </>
-        )}
-
-        {activeTab === 'hallOfFame' && (
-          <>
-            {hallOfFameSeasons.length > 0 && (
-              <select
-                value={hallOfFameSeasonId}
-                onChange={(event) => setHallOfFameSeasonId(event.target.value)}
-                className="w-full rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-surface)] px-3 py-2 text-sm text-[var(--rpg-text-primary)]"
-              >
-                {hallOfFameSeasons.map((season) => (
-                  <option key={season.id} value={season.id}>
-                    {season.name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {hallOfFameSeasons.length === 0 && (
-              <PixelCard>
-                <p className="text-sm text-[var(--rpg-text-secondary)]">No seasonal results are archived yet.</p>
-              </PixelCard>
-            )}
-
-            {hallOfFameSeasons.length > 0 && hallOfFameLoading && (
-              <PixelCard>
-                <p className="text-sm text-[var(--rpg-text-secondary)]">Loading hall of fame...</p>
-              </PixelCard>
-            )}
-
-            {hallOfFameSeasons.length > 0 && !hallOfFameLoading && hallOfFameByCategory.length === 0 && (
-              <PixelCard>
-                <p className="text-sm text-[var(--rpg-text-secondary)]">No hall of fame entries recorded for this season.</p>
-              </PixelCard>
-            )}
-
-            {hallOfFameByCategory.map(({ category, entries }) => (
-              <PixelCard key={category}>
-                <h2 className="mb-3 text-sm font-bold text-[var(--rpg-text-primary)]">
-                  {titleCaseFromSnake(category)}
-                </h2>
-                <div className="space-y-2">
-                  {entries.map((entry) => (
-                    <div
-                      key={`${entry.category}-${entry.rank}-${entry.username}`}
-                      className="flex items-center justify-between gap-3 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-[var(--rpg-text-primary)]">
-                          #{entry.rank} {entry.username}
-                        </p>
-                        <p className="text-xs text-[var(--rpg-text-secondary)]">
-                          {entry.value.toLocaleString()} points
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-pixel uppercase text-[var(--rpg-gold)]">
-                        Legend
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </PixelCard>
+                {realm.label}
+              </button>
             ))}
-          </>
-        )}
-      </div>
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {groups.map((group) => (
+              <button
+                key={group.name}
+                type="button"
+                onClick={() => {
+                  setActiveGroup(group.name);
+                  setActiveCategory(group.categories[0]?.slug ?? DEFAULT_CATEGORY);
+                  setAroundMe(false);
+                }}
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                  activeGroup === group.name
+                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
+                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                }`}
+              >
+                {group.name}
+              </button>
+            ))}
+          </div>
+
+          {currentGroupCategories.length > 1 && (
+            <select
+              value={activeCategory}
+              onChange={(event) => {
+                setActiveCategory(event.target.value);
+                setAroundMe(false);
+              }}
+              className="w-full rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-surface)] px-3 py-2 text-sm text-[var(--rpg-text-primary)]"
+            >
+              {currentGroupCategories.map((category) => (
+                <option key={category.slug} value={category.slug}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <PixelCard>
+            <LeaderboardTable
+              entries={leaderboardData?.entries ?? []}
+              myRank={leaderboardData?.myRank ?? null}
+              currentPlayerId={null}
+              loading={leaderboardLoading}
+              totalPlayers={leaderboardData?.totalPlayers ?? 0}
+              lastRefreshedAt={leaderboardData?.lastRefreshedAt ?? null}
+              showAroundMe={aroundMe}
+              onToggleAroundMe={() => setAroundMe((value) => !value)}
+              isGuildCategory={activeGroup === 'Guilds'}
+            />
+          </PixelCard>
+        </>
+      )}
+
+      {activeTab === 'hallOfFame' && (
+        <>
+          {hallOfFameSeasons.length > 0 && (
+            <select
+              value={hallOfFameSeasonId}
+              onChange={(event) => setHallOfFameSeasonId(event.target.value)}
+              className="w-full rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-surface)] px-3 py-2 text-sm text-[var(--rpg-text-primary)]"
+            >
+              {hallOfFameSeasons.map((season) => (
+                <option key={season.id} value={season.id}>
+                  {season.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {hallOfFameSeasons.length === 0 && (
+            <PixelCard>
+              <p className="text-sm text-[var(--rpg-text-secondary)]">No seasonal results are archived yet.</p>
+            </PixelCard>
+          )}
+
+          {hallOfFameSeasons.length > 0 && hallOfFameLoading && (
+            <PixelCard>
+              <p className="text-sm text-[var(--rpg-text-secondary)]">Loading hall of fame...</p>
+            </PixelCard>
+          )}
+
+          {hallOfFameSeasons.length > 0 && !hallOfFameLoading && hallOfFameByCategory.length === 0 && (
+            <PixelCard>
+              <p className="text-sm text-[var(--rpg-text-secondary)]">No hall of fame entries recorded for this season.</p>
+            </PixelCard>
+          )}
+
+          {hallOfFameByCategory.map(({ category, entries }) => (
+            <PixelCard key={category}>
+              <h2 className="mb-3 text-sm font-bold text-[var(--rpg-text-primary)]">
+                {titleCaseFromSnake(category)}
+              </h2>
+              <div className="space-y-2">
+                {entries.map((entry) => (
+                  <div
+                    key={`${entry.category}-${entry.rank}-${entry.username}`}
+                    className="flex items-center justify-between gap-3 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-[var(--rpg-text-primary)]">
+                        #{entry.rank} {entry.username}
+                      </p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">
+                        {entry.value.toLocaleString()} points
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-pixel uppercase text-[var(--rpg-gold)]">
+                      Legend
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </PixelCard>
+          ))}
+        </>
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return <div className="text-[var(--rpg-text-primary)]">{content}</div>;
+  }
+
+  return (
+    <main className="min-h-screen bg-[var(--rpg-background)] px-4 py-6 text-[var(--rpg-text-primary)]">
+      {content}
     </main>
   );
 }

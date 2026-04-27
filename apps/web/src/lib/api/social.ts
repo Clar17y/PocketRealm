@@ -422,21 +422,6 @@ export interface CrownCollectorsResponse {
   lastRefreshedAt: string | null;
 }
 
-export interface PublicSummaryWeeklyLeader {
-  category: string;
-  label: string;
-  rank: number;
-  username: string;
-  characterLevel: number;
-  score: number;
-}
-
-export interface PublicLeaderboardSummaryResponse {
-  crownCollectors: CrownCollectorEntry[];
-  weeklyLeaders: PublicSummaryWeeklyLeader[];
-  lastRefreshedAt: string | null;
-}
-
 export interface LeaderboardEntry {
   rank: number;
   playerId?: string;
@@ -505,8 +490,4 @@ export async function getCrownCollectors(aroundMe = false, limit?: number) {
 
   const query = params.size > 0 ? `?${params.toString()}` : '';
   return fetchApi<CrownCollectorsResponse>(`/api/v1/leaderboard/crowns${query}`);
-}
-
-export async function getPublicLeaderboardSummary() {
-  return fetchApi<PublicLeaderboardSummaryResponse>('/api/v1/leaderboard/public-summary', { auth: 'omit' });
 }

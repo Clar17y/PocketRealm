@@ -5,7 +5,7 @@ const VALID_TABS = new Set<PublicRankingsTab>(['leaderboards', 'weekly', 'crowns
 
 function tabFromSearchParam(tab: string | string[] | undefined): PublicRankingsTab {
   const value = Array.isArray(tab) ? tab[0] : tab;
-  return value && VALID_TABS.has(value as PublicRankingsTab) ? (value as PublicRankingsTab) : 'crowns';
+  return value && VALID_TABS.has(value as PublicRankingsTab) ? (value as PublicRankingsTab) : 'leaderboards';
 }
 
 interface RankingsPageProps {

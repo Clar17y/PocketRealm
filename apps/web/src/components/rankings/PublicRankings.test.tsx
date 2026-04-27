@@ -46,8 +46,15 @@ function primeApi() {
     data: {
       groups: [
         {
-          name: 'Characters',
-          categories: [{ slug: 'character_xp', label: 'Character XP' }],
+          name: 'PvP',
+          categories: [{ slug: 'pvp_rating', label: 'PvP Rating' }],
+        },
+        {
+          name: 'Progression',
+          categories: [
+            { slug: 'character_level', label: 'Character Level' },
+            { slug: 'character_xp', label: 'Total XP' },
+          ],
         },
       ],
     },
@@ -97,13 +104,34 @@ describe('PublicRankings', () => {
     primeApi();
   });
 
-  it('defaults to the crowns tab', async () => {
+  it('defaults to permanent realm Total XP leaderboards', async () => {
     render(<PublicRankings />);
 
-    await waitFor(() => expect(getCrownCollectors).toHaveBeenCalledWith(false));
+    await waitFor(() => expect(getLeaderboard).toHaveBeenCalledWith('character_xp', false, null, 'alltime'));
     expect(screen.getByRole('heading', { name: 'Realm Rankings' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Leaderboards' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Permanent Realm' }).className).toContain('bg-[var(--rpg-gold)]');
+    expect(screen.getByRole('button', { name: 'Progression' }).className).toContain('bg-[var(--rpg-gold)]');
+    expect(screen.getByText('XP Hero')).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Total XP' })).toBeTruthy();
+  });
+
+  it('loads crown collectors when the crowns tab is selected', async () => {
+    render(<PublicRankings />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Crowns' }));
+
+    await waitFor(() => expect(getCrownCollectors).toHaveBeenCalledWith(false));
     expect(screen.getByText('Arden')).toBeTruthy();
     expect(screen.getByText('4 crowns')).toBeTruthy();
+  });
+
+  it('can render inside another page without its own main landmark', async () => {
+    const { container } = render(<PublicRankings embedded />);
+
+    await waitFor(() => expect(getLeaderboard).toHaveBeenCalledWith('character_xp', false, null, 'alltime'));
+    expect(container.querySelector('main')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Realm Rankings' })).toBeTruthy();
   });
 
   it('loads weekly rankings when the weekly tab is selected', async () => {
@@ -165,7 +193,7 @@ describe('PublicRankings', () => {
       error: null,
     });
 
-    render(<PublicRankings />);
+    render(<PublicRankings initialTab="crowns" />);
 
     await screen.findByRole('button', { name: 'View My Rank' });
     fireEvent.click(screen.getByRole('button', { name: 'View My Rank' }));

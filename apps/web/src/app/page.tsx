@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { pixelButtonBase, pixelButtonVariants, pixelButtonSizes } from '@/components/PixelButton';
-import { LandingRankingsPreview } from '@/components/rankings/LandingRankingsPreview';
+import { PublicRankings } from '@/components/rankings/PublicRankings';
 
 const linkPrimary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.primary}`;
 const linkSecondary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.secondary}`;
@@ -32,11 +32,15 @@ export default function Home() {
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <a href="/register" className={linkPrimary}>Play Free</a>
-            <a href="#features" className={linkSecondary}>Learn More</a>
             <a href="/wiki" className={linkSecondary}>Game Wiki</a>
-            <a href="/rankings" className={linkSecondary}>Rankings</a>
+            <a href="#rankings" className={linkSecondary}>Rankings</a>
           </div>
         </div>
+      </section>
+
+      {/* Rankings */}
+      <section id="rankings" className="scroll-mt-6 border-b border-[var(--rpg-border)] px-4 py-16">
+        <PublicRankings initialTab="leaderboards" embedded />
       </section>
 
       {/* Features */}
@@ -164,8 +168,6 @@ export default function Home() {
             <p className="text-center font-crimson text-[var(--rpg-text-secondary)] mb-8">
               One-time purchase. Grants 30 days of Champion. Stacks if purchased again.
             </p>
-
-            <LandingRankingsPreview />
 
             {/* Perks grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 text-sm">
