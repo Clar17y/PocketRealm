@@ -314,7 +314,7 @@ export async function getNpcActivityReaction(
   const now = new Date();
   const since = new Date(now.getTime() - CHAT_ACTIVITY_CONSTANTS.NPC_REACTION_LOOKBACK_HOURS * 60 * 60 * 1000);
   const reactedRows: { activityId: string }[] = await prisma.playerNpcActivityReaction.findMany({
-    where: { playerId, npcKey },
+    where: { playerId, npcKey, reactedAt: { gte: since } },
     select: { activityId: true },
   });
   const reactedActivityIds = new Set(reactedRows.map((row) => row.activityId));

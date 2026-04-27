@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { NpcKey } from '@pocketrealm/shared';
+import { NPC_DIALOGUE_CONSTANTS, type NpcKey } from '@pocketrealm/shared';
 import { getNpcActivityReaction } from '@/lib/api';
 
 export function useNpcActivityReaction(npcKey: NpcKey, enabled: boolean): string | null {
@@ -14,11 +14,20 @@ export function useNpcActivityReaction(npcKey: NpcKey, enabled: boolean): string
     }
 
     let cancelled = false;
+    let clearLineTimer: ReturnType<typeof setTimeout> | undefined;
     setLine(null);
     getNpcActivityReaction(npcKey)
       .then((res) => {
         if (cancelled) return;
-        setLine(res.data?.reaction?.line ?? null);
+        const nextLine = res.data?.reaction?.line ?? null;
+        setLine(nextLine);
+        if (nextLine) {
+          clearLineTimer = setTimeout(() => {
+            if (!cancelled) {
+              setLine(null);
+            }
+          }, NPC_DIALOGUE_CONSTANTS.ACTION_DURATION_MS);
+        }
       })
       .catch(() => {
         if (cancelled) return;
@@ -27,6 +36,9 @@ export function useNpcActivityReaction(npcKey: NpcKey, enabled: boolean): string
 
     return () => {
       cancelled = true;
+      if (clearLineTimer) {
+        clearTimeout(clearLineTimer);
+      }
     };
   }, [enabled, npcKey]);
 

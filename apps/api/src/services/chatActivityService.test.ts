@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../redis', () => ({
   redis: { set: vi.fn() },
@@ -12,7 +12,7 @@ vi.mock('./systemMessageService', () => ({
   emitSystemMessage: vi.fn(),
 }));
 
-import { CHAT_CONSTANTS } from '@pocketrealm/shared';
+import { CHAT_ACTIVITY_CONSTANTS, CHAT_CONSTANTS } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { mockPrisma } from '../__test__/setup';
 import { emitSystemMessage } from './systemMessageService';
@@ -44,6 +44,10 @@ describe('chatActivityService', () => {
     mockPrisma.chatActivity.create.mockResolvedValue({});
     mockPrisma.playerNpcActivityReaction.findMany.mockResolvedValue([]);
     mockPrisma.playerNpcActivityReaction.create.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('broadcasts and persists rare loot activity', async () => {
@@ -326,6 +330,24 @@ describe('chatActivityService', () => {
     expect(result?.line).toContain('Epic Fresh Sword');
     expect(mockPrisma.playerNpcActivityReaction.create).toHaveBeenCalledWith({
       data: { playerId: 'player-1', npcKey: 'kessa-weaponsmithing', activityId: 'activity-matching' },
+    });
+  });
+
+  it('bounds existing NPC reaction lookups to the activity lookback window', async () => {
+    const now = new Date('2026-04-24T10:00:00.000Z');
+    const since = new Date(now.getTime() - CHAT_ACTIVITY_CONSTANTS.NPC_REACTION_LOOKBACK_HOURS * 60 * 60 * 1000);
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    await getNpcActivityReaction('player-1', 'kessa-weaponsmithing');
+
+    expect(mockPrisma.playerNpcActivityReaction.findMany).toHaveBeenCalledWith({
+      where: {
+        playerId: 'player-1',
+        npcKey: 'kessa-weaponsmithing',
+        reactedAt: { gte: since },
+      },
+      select: { activityId: true },
     });
   });
 

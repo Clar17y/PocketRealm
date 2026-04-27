@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { NpcKey } from '@pocketrealm/shared';
+import { NPC_DIALOGUE_CONSTANTS, type NpcKey } from '@pocketrealm/shared';
 import { getNpcActivityReaction } from '@/lib/api';
 import { useNpcActivityReaction } from '../../hooks/useNpcActivityReaction';
 import { NpcDialogueBanner } from './NpcDialogueBanner';
@@ -26,6 +26,7 @@ vi.mock('@/lib/api', () => ({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe('NpcDialogueBanner', () => {
@@ -65,6 +66,34 @@ describe('NpcDialogueBanner', () => {
     await waitFor(() => expect(hook.result.current).toBe('Blacksmith line'));
 
     hook.rerender({ npcKey: 'millbrook-alchemist' });
+
+    expect(hook.result.current).toBeNull();
+  });
+
+  it('clears a fetched activity line after the activity display window', async () => {
+    vi.useFakeTimers();
+    const getNpcActivityReactionMock = vi.mocked(getNpcActivityReaction);
+    const { useNpcActivityReaction } =
+      await vi.importActual<typeof import('../../hooks/useNpcActivityReaction')>(
+        '../../hooks/useNpcActivityReaction',
+      );
+
+    getNpcActivityReactionMock.mockResolvedValue({
+      data: { reaction: { activityId: 'activity-1', eventType: 'rare_loot', line: 'Temporary activity line' } },
+    });
+
+    const hook = renderHook(() => useNpcActivityReaction('millbrook-blacksmith', true));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(hook.result.current).toBe('Temporary activity line');
+
+    act(() => {
+      vi.advanceTimersByTime(NPC_DIALOGUE_CONSTANTS.ACTION_DURATION_MS);
+    });
 
     expect(hook.result.current).toBeNull();
   });
