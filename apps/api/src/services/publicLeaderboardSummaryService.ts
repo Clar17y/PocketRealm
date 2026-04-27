@@ -1,10 +1,11 @@
+import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { getCachedCrownCollectorRows, type CrownCollectorEntry } from './crownLeaderboardService';
 import { leaderboardMetaKey, leaderboardWeeklyDeltaKey } from './leaderboardKeys';
 import { getCategoryLabel, LEADERBOARD_LAST_REFRESH_KEY } from './leaderboardService';
+import { parseLeaderboardMeta } from './leaderboardMeta';
 
 const SUMMARY_CATEGORIES = ['character_xp', 'total_kills', 'pvp_rating', 'casino_profit'] as const;
-const SUMMARY_LIMIT = 3;
 
 export interface PublicSummaryWeeklyLeader {
   category: string;
@@ -19,40 +20,6 @@ export interface PublicLeaderboardSummary {
   crownCollectors: CrownCollectorEntry[];
   weeklyLeaders: PublicSummaryWeeklyLeader[];
   lastRefreshedAt: string | null;
-}
-
-interface LeaderboardMeta {
-  username: string;
-  characterLevel: number;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parseLeaderboardMeta(raw: string | null): LeaderboardMeta | null {
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      isRecord(parsed) &&
-      typeof parsed.username === 'string' &&
-      typeof parsed.characterLevel === 'number' &&
-      Number.isFinite(parsed.characterLevel)
-    ) {
-      return {
-        username: parsed.username,
-        characterLevel: parsed.characterLevel,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
 }
 
 async function getWeeklyLeader(category: string): Promise<PublicSummaryWeeklyLeader | null> {
@@ -75,7 +42,7 @@ async function getWeeklyLeader(category: string): Promise<PublicSummaryWeeklyLea
 
   const [metaRaw] = await redis.hmget(leaderboardMetaKey(category, null), playerId);
   const meta = parseLeaderboardMeta(metaRaw);
-  if (!meta) {
+  if (!meta?.username || meta.characterLevel === undefined) {
     return null;
   }
 
@@ -91,7 +58,7 @@ async function getWeeklyLeader(category: string): Promise<PublicSummaryWeeklyLea
 
 export async function getPublicLeaderboardSummary(): Promise<PublicLeaderboardSummary> {
   const [crownCollectors, weeklyLeaderResults, lastRefreshedAt] = await Promise.all([
-    getCachedCrownCollectorRows(SUMMARY_LIMIT),
+    getCachedCrownCollectorRows(LEADERBOARD_CONSTANTS.PUBLIC_SUMMARY_LIMIT),
     Promise.all(SUMMARY_CATEGORIES.map(getWeeklyLeader)),
     redis.get(LEADERBOARD_LAST_REFRESH_KEY),
   ]);

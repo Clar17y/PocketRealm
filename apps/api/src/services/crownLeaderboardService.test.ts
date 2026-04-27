@@ -29,6 +29,7 @@ import {
 const SNAPSHOT_KEY = 'leaderboard:crowns:lifetime:snapshot';
 
 interface CrownRow {
+  id: string;
   playerId: string;
   category: string;
   rank: number;
@@ -48,6 +49,7 @@ function crownRow(
   isBot = false,
 ): CrownRow {
   return {
+    id: `${playerId}-${category}-${rank}`,
     playerId,
     category,
     rank,
@@ -138,7 +140,31 @@ describe('crownLeaderboardService', () => {
     expect(mocks.redis.set).toHaveBeenCalledWith(
       SNAPSHOT_KEY,
       expect.stringContaining('"lastRefreshedAt"'),
+      'EX',
+      LEADERBOARD_CONSTANTS.CROWN_COLLECTOR_SNAPSHOT_TTL_SECONDS,
     );
+  });
+
+  it('reads crown rows in cursor batches while rebuilding the snapshot', async () => {
+    const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
+    const firstBatch = Array.from({ length: batchSize }, (_, index) =>
+      crownRow(`p${index}`, `Player ${index}`, CROWN_CONSTANTS.BRONZE));
+    const secondBatch = [
+      crownRow('p-final', 'Final', CROWN_CONSTANTS.GOLD),
+    ];
+
+    mocks.prisma.playerCrown.findMany
+      .mockResolvedValueOnce(firstBatch)
+      .mockResolvedValueOnce(secondBatch);
+
+    await rebuildCrownCollectorSnapshot();
+
+    expect(mocks.prisma.playerCrown.findMany).toHaveBeenCalledTimes(2);
+    expect(mocks.prisma.playerCrown.findMany.mock.calls[1][0]).toMatchObject({
+      take: batchSize,
+      skip: 1,
+      cursor: { id: firstBatch[firstBatch.length - 1].id },
+    });
   });
 
   it('getCrownCollectorLeaderboard strips player IDs from public entries while preserving authenticated myRank', async () => {

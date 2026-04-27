@@ -150,6 +150,15 @@ describe('PublicRankings', () => {
     expect(screen.getByText('XP Hero')).toBeTruthy();
   });
 
+  it('clears leaderboard loading state when the request rejects', async () => {
+    vi.mocked(getLeaderboard).mockRejectedValue(new Error('network failed'));
+
+    render(<PublicRankings />);
+
+    await waitFor(() => expect(screen.queryByText('Loading rankings...')).toBeNull());
+    expect(screen.getByText('No rankings available yet.')).toBeTruthy();
+  });
+
   it('loads hall of fame season options from the public archives endpoint', async () => {
     vi.mocked(getActiveSeason).mockResolvedValue({ data: { season: null }, error: null });
     vi.mocked(getPublicSeasonArchives).mockResolvedValue({

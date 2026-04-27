@@ -1,6 +1,6 @@
 import { type NextFunction, type Request, type Response } from 'express';
+import { SEASON_STATUSES } from '@pocketrealm/shared';
 import { AppError } from './errorHandler';
-import { SEASON_STATUSES } from '../services/season.constants';
 
 /**
  * Blocks gameplay mutations for frozen seasonal characters while allowing

@@ -1,7 +1,7 @@
 import { Prisma, prisma } from '@pocketrealm/database';
+import { SEASON_STATUSES } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { refreshSeasonCache } from './seasonCacheService';
-import { SEASON_STATUSES } from './season.constants';
 
 function isSerializableConflict(error: unknown): boolean {
   const knownRequestError = (Prisma as typeof Prisma & {

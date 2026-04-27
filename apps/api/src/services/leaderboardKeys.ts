@@ -27,3 +27,24 @@ export function leaderboardWeeklyDeltaKey(category: string, seasonId?: string | 
 export function leaderboardWeeklySnapshotMarkerKey(seasonId?: string | null): string {
   return `leaderboard:weekly_snapshot:${leaderboardRealmId(seasonId)}`;
 }
+
+export function leaderboardWeeklyJobLockKey(weekKey: string): string {
+  return `leaderboard:weekly_job_lock:${weekKey}`;
+}
+
+export function leaderboardWeeklyJobRanKey(weekKey: string): string {
+  return `leaderboard:weekly_job_ran:${weekKey}`;
+}
+
+export function leaderboardUtcMondayFor(now: Date): Date {
+  const daysSinceMonday = (now.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - daysSinceMonday,
+  ));
+}
+
+export function leaderboardWeekKeyFor(now: Date): string {
+  return leaderboardUtcMondayFor(now).toISOString().slice(0, 10);
+}

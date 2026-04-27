@@ -18,6 +18,7 @@ vi.mock('../redis', () => ({
     zadd: vi.fn(),
     hset: vi.fn(),
     del: vi.fn(),
+    rename: vi.fn(),
     set: vi.fn(),
     eval: vi.fn(),
   },
@@ -98,6 +99,22 @@ describe('leaderboardService', () => {
 
       expect(mockPrisma.pvpRating.findMany).not.toHaveBeenCalled();
       expect(mockRedis.eval).not.toHaveBeenCalled();
+    });
+
+    it('skips refresh while the weekly crown job lock is active', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.exists.mockResolvedValue(1);
+
+      await ensureLeaderboardsFresh();
+
+      expect(mockRedis.set).not.toHaveBeenCalledWith(
+        'leaderboard:refresh_lock',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockPrisma.pvpRating.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -571,6 +588,26 @@ describe('leaderboardService', () => {
       );
     });
 
+    it('sets last_refresh when permanent refresh succeeds even if an active season fails', async () => {
+      mockPrisma.season.findMany.mockResolvedValue([{ id: 'season-1' }]);
+      mockPrisma.pvpRating.findMany
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error('season fail'));
+      mockPrisma.player.findMany.mockResolvedValue([]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+      mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.guild.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+
+      await refreshAllLeaderboards();
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'leaderboard:last_refresh',
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      );
+    });
+
     // ── refreshPvp ─────────────────────────────────────────────────────────
 
     describe('refreshPvp', () => {
@@ -795,8 +832,6 @@ describe('leaderboardService', () => {
       function makePipeline() {
         return {
           zscore: vi.fn().mockReturnThis(),
-          del: vi.fn().mockReturnThis(),
-          zadd: vi.fn().mockReturnThis(),
           exec: vi.fn().mockResolvedValue([]),
         };
       }
@@ -804,10 +839,7 @@ describe('leaderboardService', () => {
       it('writes weekly deltas using realm-scoped snapshot keys', async () => {
         const readPipeline = makePipeline();
         readPipeline.exec.mockResolvedValue([[null, '1100'], [null, null]]);
-        const writePipeline = makePipeline();
-        mockRedis.pipeline
-          .mockReturnValueOnce(readPipeline)
-          .mockReturnValueOnce(writePipeline);
+        mockRedis.pipeline.mockReturnValueOnce(readPipeline);
         mockRedis.exists.mockImplementation((key: string) =>
           Promise.resolve(key === 'leaderboard:weekly_start:season-1:pvp_rating' ? 1 : 0),
         );
@@ -843,18 +875,26 @@ describe('leaderboardService', () => {
 
         expect(readPipeline.zscore).toHaveBeenCalledWith('leaderboard:weekly_start:season-1:pvp_rating', 'p1');
         expect(readPipeline.zscore).toHaveBeenCalledWith('leaderboard:weekly_start:season-1:pvp_rating', 'p2');
-        expect(writePipeline.del).toHaveBeenCalledWith('leaderboard:weekly_delta:season-1:pvp_rating');
-        expect(writePipeline.zadd).toHaveBeenCalledWith('leaderboard:weekly_delta:season-1:pvp_rating', 100, 'p1');
-        expect(writePipeline.zadd).toHaveBeenCalledWith('leaderboard:weekly_delta:season-1:pvp_rating', 900, 'p2');
+        expect(mockRedis.zadd).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:season-1:pvp_rating:tmp:lock-token',
+          100,
+          'p1',
+        );
+        expect(mockRedis.zadd).not.toHaveBeenCalledWith(
+          expect.stringContaining('leaderboard:weekly_delta:season-1:pvp_rating'),
+          900,
+          'p2',
+        );
+        expect(mockRedis.rename).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:season-1:pvp_rating:tmp:lock-token',
+          'leaderboard:weekly_delta:season-1:pvp_rating',
+        );
       });
 
       it('uses skill XP rather than level when computing weekly skill deltas', async () => {
         const readPipeline = makePipeline();
         readPipeline.exec.mockResolvedValue([[null, '1000']]);
-        const writePipeline = makePipeline();
-        mockRedis.pipeline
-          .mockReturnValueOnce(readPipeline)
-          .mockReturnValueOnce(writePipeline);
+        mockRedis.pipeline.mockReturnValueOnce(readPipeline);
         mockRedis.exists.mockImplementation((key: string) =>
           Promise.resolve(key === 'leaderboard:weekly_start_xp:permanent:skill_melee' ? 1 : 0),
         );
@@ -878,7 +918,15 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         expect(readPipeline.zscore).toHaveBeenCalledWith('leaderboard:weekly_start_xp:permanent:skill_melee', 'p1');
-        expect(writePipeline.zadd).toHaveBeenCalledWith('leaderboard:weekly_delta:permanent:skill_melee', 500, 'p1');
+        expect(mockRedis.zadd).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:permanent:skill_melee:tmp:lock-token',
+          500,
+          'p1',
+        );
+        expect(mockRedis.rename).toHaveBeenCalledWith(
+          'leaderboard:weekly_delta:permanent:skill_melee:tmp:lock-token',
+          'leaderboard:weekly_delta:permanent:skill_melee',
+        );
       });
     });
 

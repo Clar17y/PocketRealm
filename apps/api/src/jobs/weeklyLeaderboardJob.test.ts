@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 
 const mocks = vi.hoisted(() => ({
   redis: {
@@ -169,5 +170,30 @@ describe('weeklyLeaderboardJob', () => {
       'EX',
       604800,
     );
+  });
+
+  it('snapshots XP categories with cursor pagination', async () => {
+    const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
+    const skillBatch = Array.from({ length: batchSize }, (_, index) => ({
+      id: `skill-${index}`,
+      playerId: `p${index}`,
+      skillType: 'melee',
+      xp: BigInt(1000 + index),
+    }));
+
+    mocks.prisma.playerSkill.findMany
+      .mockResolvedValueOnce(skillBatch)
+      .mockResolvedValueOnce([]);
+    mocks.prisma.player.findMany.mockResolvedValue([]);
+    mocks.prisma.season.findMany.mockResolvedValue([]);
+
+    await runWeeklyLeaderboardJob(new Date('2026-04-27T00:00:30.000Z'));
+
+    expect(mocks.prisma.playerSkill.findMany).toHaveBeenCalledTimes(2);
+    expect(mocks.prisma.playerSkill.findMany.mock.calls[1][0]).toMatchObject({
+      take: batchSize,
+      skip: 1,
+      cursor: { id: skillBatch[skillBatch.length - 1].id },
+    });
   });
 });

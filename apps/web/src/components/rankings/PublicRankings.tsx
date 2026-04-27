@@ -127,11 +127,16 @@ export function PublicRankings({ initialTab = DEFAULT_TAB, embedded = false }: P
 
     void (async () => {
       setCrownsLoading(true);
-      const res = await getCrownCollectors(aroundMe);
-      if (res.data) {
-        setCrownData(res.data);
+      try {
+        const res = await getCrownCollectors(aroundMe);
+        if (res.data) {
+          setCrownData(res.data);
+        }
+      } catch {
+        setCrownData(null);
+      } finally {
+        setCrownsLoading(false);
       }
-      setCrownsLoading(false);
     })();
   }, [activeTab, aroundMe]);
 
@@ -140,11 +145,16 @@ export function PublicRankings({ initialTab = DEFAULT_TAB, embedded = false }: P
 
     void (async () => {
       setLeaderboardLoading(true);
-      const res = await getLeaderboard(activeCategory, aroundMe, rankingsSeasonId, periodForTab(activeTab));
-      if (res.data) {
-        setLeaderboardData(res.data);
+      try {
+        const res = await getLeaderboard(activeCategory, aroundMe, rankingsSeasonId, periodForTab(activeTab));
+        if (res.data) {
+          setLeaderboardData(res.data);
+        }
+      } catch {
+        setLeaderboardData(null);
+      } finally {
+        setLeaderboardLoading(false);
       }
-      setLeaderboardLoading(false);
     })();
   }, [activeCategory, activeTab, aroundMe, rankingsSeasonId]);
 
@@ -153,11 +163,16 @@ export function PublicRankings({ initialTab = DEFAULT_TAB, embedded = false }: P
 
     void (async () => {
       setHallOfFameLoading(true);
-      const res = await getHallOfFame(hallOfFameSeasonId);
-      if (res.data) {
-        setHallOfFameEntries(res.data.entries);
+      try {
+        const res = await getHallOfFame(hallOfFameSeasonId);
+        if (res.data) {
+          setHallOfFameEntries(res.data.entries);
+        }
+      } catch {
+        setHallOfFameEntries([]);
+      } finally {
+        setHallOfFameLoading(false);
       }
-      setHallOfFameLoading(false);
     })();
   }, [activeTab, hallOfFameSeasonId]);
 

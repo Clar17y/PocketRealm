@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { prisma } from '@pocketrealm/database';
-import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS } from '@pocketrealm/shared';
+import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS, SEASON_STATUSES } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
 import {
@@ -27,7 +27,6 @@ import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { logger } from '../logger';
 import { disconnectAccountSockets, disconnectPlayerSockets, getIo } from '../socket';
 import { issueAccountSession } from '../services/authSessionService';
-import { SEASON_STATUSES } from '../services/season.constants';
 
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP

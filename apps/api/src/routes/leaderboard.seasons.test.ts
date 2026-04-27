@@ -85,6 +85,15 @@ describe('leaderboard route seasonal realm selection', () => {
     expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', 'player-1', false, 'season-2', 'alltime');
   });
 
+  it('treats the permanent seasonId sentinel as the permanent realm for authenticated players', async () => {
+    const res = await request(buildApp())
+      .get('/api/v1/leaderboard/pvp_rating?seasonId=permanent')
+      .set('x-player-season-id', 'season-2');
+
+    expect(res.status).toBe(200);
+    expect(mocks.getLeaderboard).toHaveBeenCalledWith('pvp_rating', 'player-1', false, null, 'alltime');
+  });
+
   it('passes the weekly period query parameter through to the service', async () => {
     const res = await request(buildApp())
       .get('/api/v1/leaderboard/pvp_rating?period=weekly&seasonId=season-1');

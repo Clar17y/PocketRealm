@@ -2,7 +2,9 @@ import { prisma, type Prisma } from '@pocketrealm/database';
 import { CROWN_CONSTANTS } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { checkAchievements } from './achievementService';
+import { crownGroupForCategory } from './crownCategories';
 import { leaderboardMetaKey, leaderboardRealmId, leaderboardWeeklyDeltaKey } from './leaderboardKeys';
+import { parseLeaderboardMeta } from './leaderboardMeta';
 
 interface DeltaEntry {
   playerId: string;
@@ -33,32 +35,8 @@ export interface CrownCollection {
   totalByGroup: Record<string, number>;
 }
 
-type CrownGroup = keyof typeof CROWN_CONSTANTS.CATEGORY_GROUPS;
-
-function crownGroupForCategory(category: string): CrownGroup | null {
-  for (const group of Object.keys(CROWN_CONSTANTS.CATEGORY_GROUPS) as CrownGroup[]) {
-    if (CROWN_CONSTANTS.CATEGORY_GROUPS[group].includes(category)) {
-      return group;
-    }
-  }
-
-  return null;
-}
-
 function emptyRankCounts(): CrownRankCounts {
   return { gold: 0, silver: 0, bronze: 0 };
-}
-
-function parseLeaderboardMeta(raw: unknown): { isBot?: boolean } {
-  if (typeof raw !== 'string') {
-    return {};
-  }
-
-  try {
-    return JSON.parse(raw) as { isBot?: boolean };
-  } catch {
-    return {};
-  }
 }
 
 export function computeCrownWinners(deltas: DeltaEntry[]): CrownWinner[] {
@@ -124,7 +102,7 @@ async function readCrownDeltas(category: string, seasonId?: string | null): Prom
       entries.push({
         playerId: playerIds[index],
         score: scores[index] ?? 0,
-        isBot: meta.isBot ?? false,
+        isBot: meta?.isBot ?? false,
       });
     }
 
@@ -221,7 +199,7 @@ export async function getPlayerCrownCollection(playerId: string): Promise<CrownC
   });
 
   const totalByGroup: Record<string, number> = {};
-  for (const group of Object.keys(CROWN_CONSTANTS.CATEGORY_GROUPS) as CrownGroup[]) {
+  for (const group of Object.keys(CROWN_CONSTANTS.CATEGORY_GROUPS)) {
     totalByGroup[group] = 0;
   }
   for (const crown of crowns) {

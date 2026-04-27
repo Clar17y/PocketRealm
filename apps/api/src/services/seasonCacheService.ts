@@ -1,5 +1,5 @@
 import { prisma } from '@pocketrealm/database';
-import { CACHED_SEASON_STATUSES, SEASON_CACHE_TTL_MS } from './season.constants';
+import { CACHED_SEASON_STATUSES, SEASON_CACHE_TTL_MS, SEASON_STATUSES } from '@pocketrealm/shared';
 
 export interface CachedSeason {
   id: string;
@@ -55,7 +55,7 @@ export function isSeasonCacheStale(): boolean {
 
 export function getActiveSeason(): CachedSeason | undefined {
   for (const season of seasonCache.values()) {
-    if (season.status === 'active') {
+    if (season.status === SEASON_STATUSES.ACTIVE) {
       return season;
     }
   }

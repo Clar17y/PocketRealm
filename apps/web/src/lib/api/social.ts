@@ -468,7 +468,9 @@ export async function getLeaderboard(
   if (aroundMe) {
     params.set('around_me', 'true');
   }
-  if (seasonId) {
+  if (seasonId === null) {
+    params.set('seasonId', 'permanent');
+  } else if (seasonId) {
     params.set('seasonId', seasonId);
   }
   if (period !== 'alltime') {

@@ -892,6 +892,14 @@ export const LEADERBOARD_CONSTANTS = {
   PAGE_SIZE: 25,
   TOP_N: 25,
   BATCH_SIZE: 500,
+  WEEK_SECONDS: 7 * 24 * 60 * 60,
+  WEEKLY_JOB_LOCK_SECONDS: 10 * 60,
+  WEEKLY_SNAPSHOT_MARKER_TTL_SECONDS: 14 * 24 * 60 * 60,
+  PUBLIC_SUMMARY_LIMIT: 3,
+  CROWN_COLLECTOR_SNAPSHOT_TTL_SECONDS: 15 * 60,
+  CROWN_COLLECTOR_LOCK_TTL_MS: 30_000,
+  CROWN_COLLECTOR_LOCK_WAIT_ATTEMPTS: 3,
+  CROWN_COLLECTOR_LOCK_WAIT_DELAY_MS: 10,
 } as const;
 
 export const CROWN_CONSTANTS = {
@@ -952,6 +960,22 @@ export const CROWN_CONSTANTS = {
     'total_skill_level',
   ],
 } as const;
+
+export const SEASON_STATUSES = {
+  UPCOMING: 'upcoming',
+  ACTIVE: 'active',
+  ENDED: 'ended',
+  ARCHIVED: 'archived',
+} as const;
+
+export type SeasonStatus = (typeof SEASON_STATUSES)[keyof typeof SEASON_STATUSES];
+
+export const CACHED_SEASON_STATUSES: readonly SeasonStatus[] = [
+  SEASON_STATUSES.ACTIVE,
+  SEASON_STATUSES.ENDED,
+] as const;
+
+export const SEASON_CACHE_TTL_MS = 60_000;
 
 // =============================================================================
 // QUERY LIMITS

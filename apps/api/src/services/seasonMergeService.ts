@@ -1,11 +1,11 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { characterLevelFromXp, levelFromXp } from '@pocketrealm/game-engine';
+import { SEASON_STATUSES } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { logger } from '../logger';
 import { getCategories } from './leaderboardService';
 import { refreshSeasonCache } from './seasonCacheService';
 import { leaderboardKey } from './leaderboardKeys';
-import { SEASON_STATUSES } from './season.constants';
 import { transferCrownsToPlayerTx } from './crownService';
 import { invalidateCrownCollectorSnapshot } from './crownLeaderboardService';
 

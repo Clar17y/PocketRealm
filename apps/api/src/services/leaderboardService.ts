@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { prisma, Prisma } from '@pocketrealm/database';
-import { CROWN_CONSTANTS, LEADERBOARD_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
+import { CROWN_CONSTANTS, LEADERBOARD_CONSTANTS, SEASON_STATUSES, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
 import type { TitleStyleVariant } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
@@ -8,11 +8,15 @@ import { logger } from '../logger';
 import {
   leaderboardKey,
   leaderboardMetaKey,
+  leaderboardWeekKeyFor,
   leaderboardWeeklyDeltaKey,
+  leaderboardWeeklyJobLockKey,
   leaderboardWeeklyStartKey,
   leaderboardWeeklyStartXpKey,
 } from './leaderboardKeys';
 import { getCrownCountsForCategory, type CrownRankCounts } from './crownService';
+import { parseLeaderboardMeta as parseRawLeaderboardMeta } from './leaderboardMeta';
+import { paginatedFindMany } from './paginatedFindMany';
 
 export const LEADERBOARD_LAST_REFRESH_KEY = 'leaderboard:last_refresh';
 const LAST_REFRESH_KEY = LEADERBOARD_LAST_REFRESH_KEY;
@@ -22,8 +26,6 @@ const RELEASE_LOCK_LUA = 'if redis.call("get", KEYS[1]) == ARGV[1] then return r
 function playerSeasonWhere(seasonId?: string | null): { seasonId: string | null } {
   return { seasonId: seasonId ?? null };
 }
-
-// ── Paginated fetch helper ───────────────────────────────────────────────────
 
 // Shared player sub-shape selected in leaderboard queries
 interface LeaderboardPlayerSummary {
@@ -130,37 +132,6 @@ function buildPlayerLeaderboardRow(
     isAdmin: getRole(player) === 'admin',
     ...resolveAchievementTitleDisplay(player.activeTitle),
   };
-}
-
-/**
- * Fetches all rows from a Prisma model in cursor-based batches to avoid
- * unbounded single-query memory pressure at scale.
- */
-async function paginatedFindMany<T extends { id: string }>(
-  findMany: (args: { take: number; skip?: number; cursor?: { id: string }; select?: unknown; where?: unknown; orderBy?: unknown }) => Promise<T[]>,
-  baseArgs: { select?: unknown; where?: unknown },
-): Promise<T[]> {
-  const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
-  const allRows: T[] = [];
-  let cursor: string | undefined;
-  let batch: T[];
-
-  do {
-    batch = await findMany({
-      ...baseArgs,
-      orderBy: { id: 'asc' },
-      take: batchSize,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-    });
-
-    allRows.push(...batch);
-
-    if (batch.length === batchSize) {
-      cursor = batch[batch.length - 1].id;
-    }
-  } while (batch.length === batchSize);
-
-  return allRows;
 }
 
 // ── Category definitions ────────────────────────────────────────────────────
@@ -277,41 +248,22 @@ const DEFAULT_META: LeaderboardMeta = {
   isAdmin: false,
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function parseLeaderboardMeta(raw: unknown): LeaderboardMeta {
+  const parsed = parseRawLeaderboardMeta(raw);
+  return {
+    username: parsed?.username ?? DEFAULT_META.username,
+    characterLevel: parsed?.characterLevel ?? DEFAULT_META.characterLevel,
+    isBot: parsed?.isBot ?? DEFAULT_META.isBot,
+    isAdmin: parsed?.isAdmin ?? DEFAULT_META.isAdmin,
+    ...(parsed?.title ? { title: parsed.title } : {}),
+    ...(parsed?.titleTier !== undefined ? { titleTier: parsed.titleTier } : {}),
+    ...(parsed?.titleStyle ? { titleStyle: parsed.titleStyle } : {}),
+    ...(parsed?.crowns ? { crowns: parsed.crowns } : {}),
+  };
 }
 
-function isCrownCounts(value: unknown): value is CrownRankCounts {
-  return isRecord(value) &&
-    typeof value.gold === 'number' &&
-    typeof value.silver === 'number' &&
-    typeof value.bronze === 'number';
-}
-
-function parseLeaderboardMeta(raw: string | null | undefined): LeaderboardMeta {
-  if (!raw) {
-    return DEFAULT_META;
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) {
-      return DEFAULT_META;
-    }
-
-    return {
-      username: typeof parsed.username === 'string' ? parsed.username : DEFAULT_META.username,
-      characterLevel: typeof parsed.characterLevel === 'number' ? parsed.characterLevel : DEFAULT_META.characterLevel,
-      isBot: typeof parsed.isBot === 'boolean' ? parsed.isBot : DEFAULT_META.isBot,
-      isAdmin: typeof parsed.isAdmin === 'boolean' ? parsed.isAdmin : DEFAULT_META.isAdmin,
-      ...(typeof parsed.title === 'string' ? { title: parsed.title } : {}),
-      ...(typeof parsed.titleTier === 'number' ? { titleTier: parsed.titleTier } : {}),
-      ...(typeof parsed.titleStyle === 'string' ? { titleStyle: parsed.titleStyle as TitleStyleVariant } : {}),
-      ...(isCrownCounts(parsed.crowns) ? { crowns: parsed.crowns } : {}),
-    };
-  } catch {
-    return DEFAULT_META;
-  }
+async function isWeeklyCrownJobLocked(now = new Date()): Promise<boolean> {
+  return (await redis.exists(leaderboardWeeklyJobLockKey(leaderboardWeekKeyFor(now)))) > 0;
 }
 
 export async function getLeaderboard(
@@ -415,6 +367,10 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
       }
     }
 
+    if (await isWeeklyCrownJobLocked()) {
+      return;
+    }
+
     const lockToken = randomUUID();
     const acquired = await redis.set(
       LOCK_KEY,
@@ -516,8 +472,7 @@ async function computeWeeklyDelta(
   const snapshotResults = await readPipeline.exec();
 
   const deltaKey = leaderboardWeeklyDeltaKey(category, seasonId);
-  const writePipeline = redis.pipeline();
-  writePipeline.del(deltaKey);
+  const zaddArgs: Array<string | number> = [];
 
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
@@ -527,15 +482,27 @@ async function computeWeeklyDelta(
       ? snapshotRaw
       : typeof snapshotRaw === 'string'
         ? Number(snapshotRaw)
-        : 0;
+        : Number.NaN;
+    if (!Number.isFinite(snapshotScore)) {
+      continue;
+    }
+
     const delta = currentScore - snapshotScore;
 
     if (delta >= CROWN_CONSTANTS.MIN_DELTA) {
-      writePipeline.zadd(deltaKey, delta, row.playerId);
+      zaddArgs.push(delta, row.playerId);
     }
   }
 
-  await writePipeline.exec();
+  if (zaddArgs.length === 0) {
+    await redis.del(deltaKey);
+    return;
+  }
+
+  const tempDeltaKey = `${deltaKey}:tmp:${randomUUID()}`;
+  await redis.del(tempDeltaKey);
+  await redis.zadd(tempDeltaKey, ...zaddArgs);
+  await redis.rename(tempDeltaKey, deltaKey);
 }
 
 async function refreshPvp(seasonId?: string | null) {
@@ -866,26 +833,34 @@ async function refreshCasino(seasonId?: string | null): Promise<void> {
 export async function refreshAllLeaderboards(): Promise<void> {
   const start = Date.now();
   let failures = 0;
+  let permanentFailures = 0;
 
   const activeSeasons = await prisma.season.findMany({
-    where: { status: 'active' },
+    where: { status: SEASON_STATUSES.ACTIVE },
     select: { id: true },
   });
 
   const realms: Array<string | null> = [null, ...activeSeasons.map((season) => season.id)];
+  const recordFailure = (err: unknown, board: string, seasonId: string | null) => {
+    failures++;
+    if (seasonId === null) {
+      permanentFailures++;
+    }
+    logger.error({ err, board, seasonId }, 'Leaderboard refresh error');
+  };
 
   for (const seasonId of realms) {
-    try { await refreshPvp(seasonId); } catch (err) { failures++; logger.error({ err, board: 'pvp', seasonId }, 'Leaderboard refresh error'); }
-    try { await refreshProgression(seasonId); } catch (err) { failures++; logger.error({ err, board: 'progression', seasonId }, 'Leaderboard refresh error'); }
-    try { await refreshSkills(seasonId); } catch (err) { failures++; logger.error({ err, board: 'skills', seasonId }, 'Leaderboard refresh error'); }
-    try { await refreshCombat(seasonId); } catch (err) { failures++; logger.error({ err, board: 'combat', seasonId }, 'Leaderboard refresh error'); }
-    try { await refreshGuilds(seasonId); } catch (err) { failures++; logger.error({ err, board: 'guilds', seasonId }, 'Leaderboard refresh error'); }
-    try { await refreshCasino(seasonId); } catch (err) { failures++; logger.error({ err, board: 'casino', seasonId }, 'Leaderboard refresh error'); }
+    try { await refreshPvp(seasonId); } catch (err) { recordFailure(err, 'pvp', seasonId); }
+    try { await refreshProgression(seasonId); } catch (err) { recordFailure(err, 'progression', seasonId); }
+    try { await refreshSkills(seasonId); } catch (err) { recordFailure(err, 'skills', seasonId); }
+    try { await refreshCombat(seasonId); } catch (err) { recordFailure(err, 'combat', seasonId); }
+    try { await refreshGuilds(seasonId); } catch (err) { recordFailure(err, 'guilds', seasonId); }
+    try { await refreshCasino(seasonId); } catch (err) { recordFailure(err, 'casino', seasonId); }
   }
 
-  if (failures === 0) {
+  if (permanentFailures === 0) {
     await redis.set(LAST_REFRESH_KEY, new Date().toISOString());
   }
 
-  logger.info({ durationMs: Date.now() - start, failures }, 'Leaderboard refresh completed');
+  logger.info({ durationMs: Date.now() - start, failures, permanentFailures }, 'Leaderboard refresh completed');
 }

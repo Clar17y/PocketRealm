@@ -1,5 +1,5 @@
 import { prisma } from '@pocketrealm/database';
-import { CROWN_CONSTANTS } from '@pocketrealm/shared';
+import { CROWN_CONSTANTS, LEADERBOARD_CONSTANTS, SEASON_STATUSES } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { logger } from '../logger';
 import { getIo } from '../socket';
@@ -9,29 +9,33 @@ import { rebuildCrownCollectorSnapshot } from '../services/crownLeaderboardServi
 import { getCategories, refreshAllLeaderboards } from '../services/leaderboardService';
 import {
   leaderboardKey,
+  leaderboardUtcMondayFor,
+  leaderboardWeekKeyFor,
   leaderboardWeeklyDeltaKey,
+  leaderboardWeeklyJobLockKey,
+  leaderboardWeeklyJobRanKey,
   leaderboardWeeklySnapshotMarkerKey,
   leaderboardWeeklyStartKey,
   leaderboardWeeklyStartXpKey,
 } from '../services/leaderboardKeys';
-
-const WEEK_SECONDS = 7 * 24 * 60 * 60;
-const JOB_LOCK_SECONDS = 10 * 60;
-const SNAPSHOT_MARKER_TTL_SECONDS = 14 * 24 * 60 * 60;
+import { paginatedFindMany } from '../services/paginatedFindMany';
 
 const CROWN_CATEGORIES = [...new Set(Object.values(CROWN_CONSTANTS.CATEGORY_GROUPS).flat())];
 
-export function isWeeklyLeaderboardWindow(now = new Date()): boolean {
-  return now.getUTCDay() === 1 && now.getUTCHours() === 0 && now.getUTCMinutes() < 2;
+interface SkillSnapshotRow {
+  id: string;
+  playerId: string;
+  skillType: string;
+  xp: bigint;
 }
 
-function utcMondayFor(now: Date): Date {
-  const daysSinceMonday = (now.getUTCDay() + 6) % 7;
-  return new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - daysSinceMonday,
-  ));
+interface PlayerXpSnapshotRow {
+  id: string;
+  characterXp: bigint;
+}
+
+export function isWeeklyLeaderboardWindow(now = new Date()): boolean {
+  return now.getUTCDay() === 1 && now.getUTCHours() === 0 && now.getUTCMinutes() < 2;
 }
 
 function dateKey(date: Date): string {
@@ -44,7 +48,7 @@ function allLeaderboardCategories(): string[] {
 
 async function activeLeaderboardRealms(): Promise<Array<string | null>> {
   const activeSeasons = await prisma.season.findMany({
-    where: { status: 'active' },
+    where: { status: SEASON_STATUSES.ACTIVE },
     select: { id: true },
   });
 
@@ -99,16 +103,20 @@ async function writeSnapshotZset(
 async function snapshotXpCategories(seasonId: string | null): Promise<void> {
   const playerWhere = { isBot: false, seasonId: seasonId ?? null };
   const xpSnapshots = new Map<string, Array<{ playerId: string; score: number }>>();
-  const skills = await prisma.playerSkill.findMany({
-    where: {
-      player: playerWhere,
+  const skills = await paginatedFindMany<SkillSnapshotRow>(
+    (args) => prisma.playerSkill.findMany(args as Parameters<typeof prisma.playerSkill.findMany>[0]) as unknown as Promise<SkillSnapshotRow[]>,
+    {
+      where: {
+        player: playerWhere,
+      },
+      select: {
+        id: true,
+        playerId: true,
+        skillType: true,
+        xp: true,
+      },
     },
-    select: {
-      playerId: true,
-      skillType: true,
-      xp: true,
-    },
-  });
+  );
 
   const totalSkillXp = new Map<string, number>();
   for (const skill of skills) {
@@ -119,13 +127,16 @@ async function snapshotXpCategories(seasonId: string | null): Promise<void> {
     totalSkillXp.set(skill.playerId, (totalSkillXp.get(skill.playerId) ?? 0) + Number(skill.xp));
   }
 
-  const players = await prisma.player.findMany({
-    where: playerWhere,
-    select: {
-      id: true,
-      characterXp: true,
+  const players = await paginatedFindMany<PlayerXpSnapshotRow>(
+    (args) => prisma.player.findMany(args as Parameters<typeof prisma.player.findMany>[0]) as unknown as Promise<PlayerXpSnapshotRow[]>,
+    {
+      where: playerWhere,
+      select: {
+        id: true,
+        characterXp: true,
+      },
     },
-  });
+  );
 
   xpSnapshots.set(
     'character_level',
@@ -151,20 +162,20 @@ async function snapshotRealm(seasonId: string | null, weekStart: Date): Promise<
     leaderboardWeeklySnapshotMarkerKey(seasonId),
     dateKey(weekStart),
     'EX',
-    SNAPSHOT_MARKER_TTL_SECONDS,
+    LEADERBOARD_CONSTANTS.WEEKLY_SNAPSHOT_MARKER_TTL_SECONDS,
   );
 }
 
 export async function runWeeklyLeaderboardJob(now = new Date()): Promise<void> {
-  const currentWeekStart = utcMondayFor(now);
-  const currentWeekKey = dateKey(currentWeekStart);
-  const jobKey = `leaderboard:weekly_job_ran:${currentWeekKey}`;
+  const currentWeekStart = leaderboardUtcMondayFor(now);
+  const currentWeekKey = leaderboardWeekKeyFor(now);
+  const jobKey = leaderboardWeeklyJobRanKey(currentWeekKey);
   if (await redis.get(jobKey)) {
     return;
   }
 
-  const lockKey = `leaderboard:weekly_job_lock:${currentWeekKey}`;
-  const acquiredLock = await redis.set(lockKey, '1', 'EX', JOB_LOCK_SECONDS, 'NX');
+  const lockKey = leaderboardWeeklyJobLockKey(currentWeekKey);
+  const acquiredLock = await redis.set(lockKey, '1', 'EX', LEADERBOARD_CONSTANTS.WEEKLY_JOB_LOCK_SECONDS, 'NX');
   if (acquiredLock !== 'OK') {
     return;
   }
@@ -202,7 +213,7 @@ export async function runWeeklyLeaderboardJob(now = new Date()): Promise<void> {
       );
     }
 
-    await redis.set(jobKey, '1', 'EX', WEEK_SECONDS);
+    await redis.set(jobKey, '1', 'EX', LEADERBOARD_CONSTANTS.WEEK_SECONDS);
     logger.info({ crownCount, realms: realms.length }, 'Weekly leaderboard crown job completed');
   } finally {
     await redis.del(lockKey);

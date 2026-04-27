@@ -7,12 +7,11 @@ import {
   type TitleStyleVariant,
 } from '@pocketrealm/shared';
 import { redis } from '../redis';
+import { crownGroupForCategory } from './crownCategories';
+import { paginatedFindMany } from './paginatedFindMany';
 
 const SNAPSHOT_KEY = 'leaderboard:crowns:lifetime:snapshot';
 const LOCK_KEY = 'leaderboard:crowns:lifetime:refresh_lock';
-const LOCK_TTL_MS = 30_000;
-const LOCK_WAIT_ATTEMPTS = 3;
-const LOCK_WAIT_DELAY_MS = 10;
 const RELEASE_LOCK_LUA = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
 
 export interface CrownRankBreakdown {
@@ -59,17 +58,17 @@ interface CollectorAggregate {
   groups: Map<string, number>;
 }
 
-type CrownGroup = keyof typeof CROWN_CONSTANTS.CATEGORY_GROUPS;
-type CrownSourceRow = Awaited<ReturnType<typeof readCrownRows>>[number];
-
-function groupForCategory(category: string): string | null {
-  for (const group of Object.keys(CROWN_CONSTANTS.CATEGORY_GROUPS) as CrownGroup[]) {
-    if (CROWN_CONSTANTS.CATEGORY_GROUPS[group].includes(category)) {
-      return group;
-    }
-  }
-
-  return null;
+interface CrownSourceRow {
+  id: string;
+  playerId: string;
+  category: string;
+  rank: number;
+  player: {
+    username: string;
+    characterLevel: number;
+    isBot: boolean;
+    activeTitle: string | null;
+  };
 }
 
 function emptyBreakdown(): CrownRankBreakdown {
@@ -175,7 +174,7 @@ function addCrownToAggregate(aggregate: CollectorAggregate, row: CrownSourceRow)
 
   aggregate.crowns.total++;
 
-  const group = groupForCategory(row.category);
+  const group = crownGroupForCategory(row.category);
   if (group) {
     aggregate.groups.set(group, (aggregate.groups.get(group) ?? 0) + 1);
   }
@@ -209,8 +208,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function waitForSnapshot(): Promise<CrownCollectorSnapshot | null> {
-  for (let attempt = 0; attempt < LOCK_WAIT_ATTEMPTS; attempt++) {
-    await sleep(LOCK_WAIT_DELAY_MS);
+  for (let attempt = 0; attempt < LEADERBOARD_CONSTANTS.CROWN_COLLECTOR_LOCK_WAIT_ATTEMPTS; attempt++) {
+    await sleep(LEADERBOARD_CONSTANTS.CROWN_COLLECTOR_LOCK_WAIT_DELAY_MS);
     const snapshot = await readSnapshot();
     if (snapshot) {
       return snapshot;
@@ -220,25 +219,29 @@ async function waitForSnapshot(): Promise<CrownCollectorSnapshot | null> {
   return null;
 }
 
-async function readCrownRows() {
-  return prisma.playerCrown.findMany({
-    select: {
-      playerId: true,
-      category: true,
-      rank: true,
-      player: {
-        select: {
-          username: true,
-          characterLevel: true,
-          isBot: true,
-          activeTitle: true,
+async function readCrownRows(): Promise<CrownSourceRow[]> {
+  return paginatedFindMany<CrownSourceRow>(
+    (args) => prisma.playerCrown.findMany(args as Parameters<typeof prisma.playerCrown.findMany>[0]) as unknown as Promise<CrownSourceRow[]>,
+    {
+      select: {
+        id: true,
+        playerId: true,
+        category: true,
+        rank: true,
+        player: {
+          select: {
+            username: true,
+            characterLevel: true,
+            isBot: true,
+            activeTitle: true,
+          },
         },
       },
+      where: {
+        player: { isBot: false },
+      },
     },
-    where: {
-      player: { isBot: false },
-    },
-  });
+  );
 }
 
 export async function rebuildCrownCollectorSnapshot(): Promise<CrownCollectorSnapshot> {
@@ -281,7 +284,12 @@ export async function rebuildCrownCollectorSnapshot(): Promise<CrownCollectorSna
     lastRefreshedAt: new Date().toISOString(),
   };
 
-  await redis.set(SNAPSHOT_KEY, JSON.stringify(snapshot));
+  await redis.set(
+    SNAPSHOT_KEY,
+    JSON.stringify(snapshot),
+    'EX',
+    LEADERBOARD_CONSTANTS.CROWN_COLLECTOR_SNAPSHOT_TTL_SECONDS,
+  );
   return snapshot;
 }
 
@@ -295,7 +303,13 @@ export async function getCrownCollectorLeaderboard(
 
   if (!snapshot) {
     const lockToken = randomUUID();
-    const acquired = await redis.set(LOCK_KEY, lockToken, 'PX', LOCK_TTL_MS, 'NX');
+    const acquired = await redis.set(
+      LOCK_KEY,
+      lockToken,
+      'PX',
+      LEADERBOARD_CONSTANTS.CROWN_COLLECTOR_LOCK_TTL_MS,
+      'NX',
+    );
     if (acquired) {
       try {
         snapshot = await rebuildCrownCollectorSnapshot();

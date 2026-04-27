@@ -30,6 +30,18 @@ function optionalPositiveInt(value: unknown): number | undefined {
   return parsed > 0 ? parsed : undefined;
 }
 
+function resolveLeaderboardSeasonId(querySeasonId: unknown, fallbackSeasonId?: string | null): string | null {
+  if (querySeasonId === 'permanent') {
+    return null;
+  }
+
+  if (typeof querySeasonId === 'string') {
+    return querySeasonId;
+  }
+
+  return fallbackSeasonId ?? null;
+}
+
 function toPublicCrownEntry(entry: CrownCollectorEntry): CrownCollectorEntry {
   return {
     rank: entry.rank,
@@ -62,10 +74,7 @@ leaderboardRouter.get('/:category', asyncHandler(async (req, res) => {
   const aroundMe = req.query.around_me === 'true';
   const period = req.query.period === 'weekly' ? 'weekly' : 'alltime';
   const playerId = req.player?.playerId;
-  const seasonId =
-    typeof req.query.seasonId === 'string'
-      ? req.query.seasonId
-      : (req.player?.seasonId ?? null);
+  const seasonId = resolveLeaderboardSeasonId(req.query.seasonId, req.player?.seasonId);
 
   const result = await getLeaderboard(category, playerId, aroundMe, seasonId, period);
 
