@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.56',
+    date: '2026-04-27',
+    title: 'Realm Rankings & World Activity',
+    summary:
+      'Realm Rankings are now public on the homepage and at /rankings, with all-time and weekly leaderboards, seasonal Hall of Fame archives, and Crown Collectors for weekly crown totals. Weekly crowns track top performers across player leaderboard categories. World chat now separates notable game activity from normal conversation: rare loot, craft crits, zone discoveries, achievements, and boss defeats can appear in a compact activity shelf, and nearby NPCs can react to relevant accomplishments.',
+  },
+  {
+    version: '0.55',
+    date: '2026-04-24',
+    title: 'Security, Stash & Exploration Polish',
+    summary:
+      'Stashing an item from its card now removes or updates that card immediately instead of waiting for a refresh. The combat template picker is cleaner, hides undiscovered talent actions, and groups core combat choices separately from utility actions. Discovering a new zone exit now pauses exploration playback with a dedicated discovery modal. Security has been tightened across sessions, chat, guilds, bosses, casino, and exploration: chat access now follows your current zone/guild, password changes and logouts disconnect active sockets, registration has stronger abuse protection, and unrelated players see less private boss/casino/exploration detail. The wiki now includes Turns & Regeneration and updated Champion and exploration rules.',
+  },
+  {
     version: '0.54',
     date: '2026-04-24',
     title: 'Seasonal Realms Foundation',
