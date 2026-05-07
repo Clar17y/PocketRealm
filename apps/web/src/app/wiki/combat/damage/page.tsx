@@ -3,6 +3,8 @@ import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
+  ALWAYS_AVAILABLE_ACTION_IDS,
+  BASE_ACTION_DEFINITIONS,
   COMBAT_CONSTANTS,
   CHARACTER_CONSTANTS,
 } from '@pocketrealm/shared';
@@ -10,6 +12,18 @@ import {
 const SCALING = COMBAT_CONSTANTS.DEFENCE_SCALING_FACTOR;
 
 const { Var, Out, Enemy, Const, Op, Comment } = FormulaBlock;
+const talentDamageMultipliers = Object.values(BASE_ACTION_DEFINITIONS)
+  .filter((action) => !ALWAYS_AVAILABLE_ACTION_IDS.has(action.id))
+  .map((action) => action.damageMultiplier)
+  .filter((value): value is number => typeof value === 'number');
+const talentMinDamageMultiplier = Math.min(...talentDamageMultipliers);
+const talentMaxDamageMultiplier = Math.max(...talentDamageMultipliers);
+
+const baseDamageMultipliers = {
+  lightAttack: BASE_ACTION_DEFINITIONS.light_attack.damageMultiplier ?? 0,
+  normalAttack: BASE_ACTION_DEFINITIONS.normal_attack.damageMultiplier ?? 0,
+  heavyAttack: BASE_ACTION_DEFINITIONS.heavy_attack.damageMultiplier ?? 0,
+};
 
 export const metadata: Metadata = {
   title: 'Damage Calculation - Pocketrealm Wiki',
@@ -90,8 +104,12 @@ export default function DamagePage() {
       <h2>Action Multiplier</h2>
       <p>
         Each combat action has a <code>damageMultiplier</code> that scales the
-        rolled damage. A Light Attack uses 0.6x, Normal Attack 1.0x, Heavy
-        Attack 1.5x, and talent abilities range from 0.5x to 2.5x. See the{' '}
+        rolled damage. A Light Attack uses{' '}
+        {baseDamageMultipliers.lightAttack}x, Normal Attack{' '}
+        {baseDamageMultipliers.normalAttack}x, Heavy Attack{' '}
+        {baseDamageMultipliers.heavyAttack}x, and talent abilities range
+        from {talentMinDamageMultiplier}x to {talentMaxDamageMultiplier}x. See
+        the{' '}
         <a href="/wiki/combat/actions">Combat Actions</a> page for the full
         table.
       </p>

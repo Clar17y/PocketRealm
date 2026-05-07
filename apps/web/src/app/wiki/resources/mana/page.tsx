@@ -16,7 +16,7 @@ export default function ManaPage() {
   return (
     <WikiSection
       title="Mana"
-      summary="Mana powers magical combat actions and spells. It scales with the Magic skill level and equipment bonuses."
+      summary="Mana powers magical combat actions and spells. It scales with the Magic skill level. The engine supports equipment mana bonuses, but current equipment stat pools do not add mana."
       related={[
         { label: 'Health', href: '/wiki/resources/health' },
         { label: 'Stamina', href: '/wiki/resources/stamina' },
@@ -52,22 +52,35 @@ export default function ManaPage() {
 
       <h2>Passive Regen (Out of Combat)</h2>
       <p>
-        Outside combat, mana regenerates at a flat rate of{' '}
-        <strong>{MANA_CONSTANTS.PASSIVE_REGEN_PER_SECOND}</strong> per second.
+        Outside combat, mana regenerates continuously and scales with Magic
+        level.
       </p>
+      <FormulaBlock>
+        <Out>regenPerSecond</Out> <Op>=</Op>{' '}
+        <Const>{MANA_CONSTANTS.PASSIVE_REGEN_PER_SECOND}</Const> <Op>+</Op>{' '}
+        <Var>magicLevel</Var> <Op>*</Op>{' '}
+        <Const>{MANA_CONSTANTS.PASSIVE_REGEN_PER_MAGIC_LEVEL}</Const>
+      </FormulaBlock>
 
       <h2>Rest Healing</h2>
       <p>
-        Resting restores <strong>{MANA_CONSTANTS.REST_HEAL_PER_TURN}</strong>{' '}
-        mana per turn spent.
+        Resting restores mana per turn spent, also scaling with Magic level.
       </p>
+      <FormulaBlock>
+        <Out>restHealPerTurn</Out> <Op>=</Op>{' '}
+        <Const>{MANA_CONSTANTS.REST_HEAL_PER_TURN}</Const> <Op>+</Op>{' '}
+        <Var>magicLevel</Var> <Op>*</Op>{' '}
+        <Const>{MANA_CONSTANTS.REST_HEAL_PER_MAGIC_LEVEL}</Const>
+      </FormulaBlock>
 
       <ConstantsTable
         rows={[
           { name: 'BASE_REGEN_PER_ROUND', value: MANA_CONSTANTS.BASE_REGEN_PER_ROUND, description: 'Base mana regen per combat round' },
           { name: 'REGEN_PER_MAGIC_LEVEL', value: MANA_CONSTANTS.REGEN_PER_MAGIC_LEVEL, description: 'Additional regen per Magic skill level' },
           { name: 'PASSIVE_REGEN_PER_SECOND', value: MANA_CONSTANTS.PASSIVE_REGEN_PER_SECOND, description: 'Out-of-combat regen rate per second' },
+          { name: 'PASSIVE_REGEN_PER_MAGIC_LEVEL', value: MANA_CONSTANTS.PASSIVE_REGEN_PER_MAGIC_LEVEL, description: 'Additional passive regen per Magic skill level' },
           { name: 'REST_HEAL_PER_TURN', value: MANA_CONSTANTS.REST_HEAL_PER_TURN, description: 'Mana healed per turn when resting' },
+          { name: 'REST_HEAL_PER_MAGIC_LEVEL', value: MANA_CONSTANTS.REST_HEAL_PER_MAGIC_LEVEL, description: 'Additional rest healing per Magic skill level' },
         ]}
       />
     </WikiSection>

@@ -3,7 +3,10 @@ import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
+  ALL_SKILLS,
+  CHARACTER_CONSTANTS,
   PREMIUM_CONSTANTS,
+  SKILL_CONSTANTS,
   SKILL_POINT_CONSTANTS,
   TALENT_TREE_DEFINITIONS,
 } from '@pocketrealm/shared';
@@ -23,6 +26,10 @@ const progressionRelated = [
 ];
 
 const treeNames = Object.keys(TALENT_TREE_DEFINITIONS) as (keyof typeof TALENT_TREE_DEFINITIONS)[];
+const skillCount = ALL_SKILLS.length;
+const maxLevelUps = skillCount * (SKILL_CONSTANTS.MAX_LEVEL - 1);
+const maxPointsFromLevels = maxLevelUps * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL;
+const theoreticalMaxPoints = CHARACTER_CONSTANTS.STARTING_SKILL_POINTS + maxPointsFromLevels;
 
 export default function SkillPointsPage() {
   return (
@@ -33,15 +40,20 @@ export default function SkillPointsPage() {
     >
       <h2>Earning Skill Points</h2>
       <p>
-        You earn <Const>{SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL}</Const> skill
-        point every time any of your 14 skills levels up. Since there are 14
-        skills with a max level of 100, the theoretical maximum is 14 &times;
-        99 = 1,386 skill points (no points at level 1).
+        You start with{' '}
+        <Const>{CHARACTER_CONSTANTS.STARTING_SKILL_POINTS}</Const> skill
+        points, then earn <Const>{SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL}</Const>{' '}
+        skill point every time any of your {skillCount} skills levels up. Since
+        each skill has a max level of <Const>{SKILL_CONSTANTS.MAX_LEVEL}</Const>,
+        the theoretical maximum is{' '}
+        <Const>{CHARACTER_CONSTANTS.STARTING_SKILL_POINTS}</Const> + {skillCount}{' '}
+        &times; {SKILL_CONSTANTS.MAX_LEVEL - 1} ={' '}
+        <Const>{theoreticalMaxPoints.toLocaleString()}</Const> skill points.
       </p>
       <FormulaBlock>
-        <Out>totalPoints</Out> <Op>=</Op> <Const>
-          {SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL}
-        </Const>{' '}
+        <Out>totalPoints</Out> <Op>=</Op>{' '}
+        <Var>startingSkillPoints</Var> <Op>+</Op>{' '}
+        <Const>{SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL}</Const>{' '}
         <Op>&times;</Op> <Var>totalLevelUps</Var>
         <Comment> {'//'} across all skills</Comment>
       </FormulaBlock>
@@ -145,6 +157,11 @@ export default function SkillPointsPage() {
             description: 'Skill points earned per skill level-up',
           },
           {
+            name: 'STARTING_SKILL_POINTS',
+            value: CHARACTER_CONSTANTS.STARTING_SKILL_POINTS,
+            description: 'Skill points granted at character creation',
+          },
+          {
             name: 'RESPEC_TURN_COST',
             value: SKILL_POINT_CONSTANTS.RESPEC_TURN_COST.toLocaleString(),
             description: 'Turns spent to respec all skill points',
@@ -158,6 +175,11 @@ export default function SkillPointsPage() {
             name: 'TEMPLATE_LIMIT_CHAMPION',
             value: PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION,
             description: 'Maximum saved combat templates for Champion supporters',
+          },
+          {
+            name: 'SKILL_COUNT',
+            value: skillCount,
+            description: 'Number of skills that can contribute skill points',
           },
         ]}
       />

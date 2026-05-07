@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
-import { EXPLORATION_CONSTANTS, EXPLORATION_TRACKING_CONSTANTS, PREMIUM_CONSTANTS } from '@pocketrealm/shared';
+import {
+  EXPLORATION_CONSTANTS,
+  EXPLORATION_TRACKING_CONSTANTS,
+  PREMIUM_CONSTANTS,
+  WORLD_EVENT_CONSTANTS,
+} from '@pocketrealm/shared';
 import { cumulativeProbability } from '@pocketrealm/game-engine';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
@@ -10,16 +15,23 @@ const { Var, Out, Const, Op, Comment } = FormulaBlock;
 export const metadata: Metadata = {
   title: 'Probability Model',
   description:
-    'Cumulative exploration probability formula, per-turn rates, tracking modifiers, and Champion hidden cache bonuses.',
+    'Cumulative exploration probability formula, per-turn rates, tracking modifiers, world event discovery, travel ambushes, and Champion hidden cache bonuses.',
 };
 
-const turnCounts = [50, 100, 250, 500, 1000, 5000, 10000];
+const turnCounts = [
+  EXPLORATION_CONSTANTS.MIN_EXPLORATION_TURNS,
+  250,
+  500,
+  1000,
+  EXPLORATION_CONSTANTS.MAX_EXPLORATION_TURNS,
+];
 
 const rates = [
   { label: 'Ambush', rate: EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN },
   { label: 'Encounter Site', rate: EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN },
   { label: 'Resource Node', rate: EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE },
   { label: 'Hidden Cache', rate: EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE },
+  { label: 'World Event', rate: WORLD_EVENT_CONSTANTS.EVENT_DISCOVERY_CHANCE_PER_TURN },
 ];
 
 function pct(value: number): string {
@@ -30,7 +42,7 @@ export default function ProbabilityPage() {
   return (
     <WikiSection
       title="Probability Model"
-      summary="Exploration uses a cumulative probability model. Each turn has an independent chance of triggering a discovery, and spending more turns increases the overall probability. Tracking and Champion status add a few targeted modifiers on top."
+      summary="Exploration uses a cumulative probability model. Each turn has an independent chance of triggering a discovery, and spending more turns increases the overall probability. Tracking, Champion status, world events, and travel ambushes add targeted modifiers on top."
       related={[
         { label: 'Room Generation', href: '/wiki/exploration/rooms' },
         { label: 'Mob Tier Filtering', href: '/wiki/exploration/mob-tiers' },
@@ -52,6 +64,8 @@ export default function ProbabilityPage() {
           { name: 'ENCOUNTER_SITE_CHANCE_PER_TURN', value: EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN, description: 'Chance of discovering an encounter site each turn' },
           { name: 'RESOURCE_NODE_CHANCE', value: EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE, description: 'Chance of discovering a resource node each turn' },
           { name: 'HIDDEN_CACHE_CHANCE', value: EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE, description: 'Chance of finding a hidden cache each turn' },
+          { name: 'EVENT_DISCOVERY_CHANCE_PER_TURN', value: WORLD_EVENT_CONSTANTS.EVENT_DISCOVERY_CHANCE_PER_TURN, description: 'Chance of discovering an eligible world event each turn' },
+          { name: 'TRAVEL_AMBUSH_CHANCE_PER_TURN', value: EXPLORATION_CONSTANTS.TRAVEL_AMBUSH_CHANCE_PER_TURN, description: 'Chance of a travel ambush each travel turn' },
           { name: 'RESULT_RATE_MULTIPLIER', value: `${EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER}x`, description: 'Tracking multiplier applied to ambush and encounter-site rates' },
           { name: 'BONUS_MULTIPLIER', value: `${PREMIUM_CONSTANTS.BONUS_MULTIPLIER}x`, description: 'Champion multiplier applied to hidden cache chance' },
           { name: 'MIN_EXPLORATION_TURNS', value: EXPLORATION_CONSTANTS.MIN_EXPLORATION_TURNS, description: 'Minimum turns per exploration' },
@@ -91,10 +105,33 @@ export default function ProbabilityPage() {
         <Const>{PREMIUM_CONSTANTS.BONUS_MULTIPLIER}</Const>
       </FormulaBlock>
 
+      <h2>World Events</h2>
+      <p>
+        When a world event is eligible for discovery, exploration performs a
+        separate event roll at{' '}
+        <strong>{WORLD_EVENT_CONSTANTS.EVENT_DISCOVERY_CHANCE_PER_TURN}</strong>{' '}
+        per turn. This roll is independent of ambushes, encounter sites,
+        resource nodes, hidden caches, and zone exits.
+      </p>
+
+      <h2>Travel Ambushes</h2>
+      <p>
+        Zone travel uses its own ambush model. Each travel turn has a{' '}
+        <strong>{(EXPLORATION_CONSTANTS.TRAVEL_AMBUSH_CHANCE_PER_TURN * 100).toFixed(0)}%</strong>{' '}
+        chance to trigger a travel ambush; this is separate from the standard
+        exploration ambush rate.
+      </p>
+      <FormulaBlock>
+        <Out>travelAmbushChance</Out> <Op>=</Op> <Const>1</Const> <Op>-</Op>{' '}
+        <Op>(</Op><Const>1</Const> <Op>-</Op>{' '}
+        <Var>TRAVEL_AMBUSH_CHANCE_PER_TURN</Var><Op>)</Op>
+        <sup><Var>travelTurns</Var></sup>
+      </FormulaBlock>
+
       <h2>Probability Table</h2>
       <p>
         Cumulative chance of at least one discovery for each event type across
-        common turn investments. Values computed from{' '}
+        legal exploration turn investments. Values computed from{' '}
         <code>cumulativeProbability()</code>.
       </p>
       <table className="wiki-table">

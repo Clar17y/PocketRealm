@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 import { GameScreenRenderer } from './GameScreenRenderer';
 
@@ -25,7 +25,13 @@ vi.mock('@/components/screens/Inventory', () => ({
   },
 }));
 
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-04-01T00:00:00.000Z'));
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   dashboardSpy.mockReset();
   inventorySpy.mockReset();
 });

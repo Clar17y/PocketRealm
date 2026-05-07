@@ -16,7 +16,7 @@ export default function StaminaPage() {
   return (
     <WikiSection
       title="Stamina"
-      summary="Stamina fuels physical combat actions. It scales with the average of melee, ranged, and evasion skill levels plus equipment bonuses."
+      summary="Stamina fuels physical combat actions. It scales with the average of melee, ranged, and evasion levels. The engine supports equipment stamina bonuses, but current equipment stat pools do not add stamina."
       related={[
         { label: 'Health', href: '/wiki/resources/health' },
         { label: 'Mana', href: '/wiki/resources/mana' },
@@ -59,22 +59,36 @@ export default function StaminaPage() {
 
       <h2>Passive Regen (Out of Combat)</h2>
       <p>
-        Outside combat, stamina regenerates at a flat rate of{' '}
-        <strong>{STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SECOND}</strong> per second.
+        Outside combat, stamina regenerates continuously and scales with the
+        same average level used for the stamina pool.
       </p>
+      <FormulaBlock>
+        <Out>regenPerSecond</Out> <Op>=</Op>{' '}
+        <Const>{STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SECOND}</Const> <Op>+</Op>{' '}
+        <Var>avgLevel</Var> <Op>*</Op>{' '}
+        <Const>{STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SKILL_LEVEL}</Const>
+      </FormulaBlock>
 
       <h2>Rest Healing</h2>
       <p>
-        Resting restores <strong>{STAMINA_CONSTANTS.REST_HEAL_PER_TURN}</strong>{' '}
-        stamina per turn spent.
+        Resting restores stamina per turn spent, also scaling with the average
+        level.
       </p>
+      <FormulaBlock>
+        <Out>restHealPerTurn</Out> <Op>=</Op>{' '}
+        <Const>{STAMINA_CONSTANTS.REST_HEAL_PER_TURN}</Const> <Op>+</Op>{' '}
+        <Var>avgLevel</Var> <Op>*</Op>{' '}
+        <Const>{STAMINA_CONSTANTS.REST_HEAL_PER_SKILL_LEVEL}</Const>
+      </FormulaBlock>
 
       <ConstantsTable
         rows={[
           { name: 'BASE_REGEN_PER_ROUND', value: STAMINA_CONSTANTS.BASE_REGEN_PER_ROUND, description: 'Base stamina regen per combat round' },
           { name: 'REGEN_PER_SKILL_LEVEL', value: STAMINA_CONSTANTS.REGEN_PER_SKILL_LEVEL, description: 'Additional regen per average combat skill level' },
           { name: 'PASSIVE_REGEN_PER_SECOND', value: STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SECOND, description: 'Out-of-combat regen rate per second' },
+          { name: 'PASSIVE_REGEN_PER_SKILL_LEVEL', value: STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SKILL_LEVEL, description: 'Additional passive regen per average level' },
           { name: 'REST_HEAL_PER_TURN', value: STAMINA_CONSTANTS.REST_HEAL_PER_TURN, description: 'Stamina healed per turn when resting' },
+          { name: 'REST_HEAL_PER_SKILL_LEVEL', value: STAMINA_CONSTANTS.REST_HEAL_PER_SKILL_LEVEL, description: 'Additional rest healing per average level' },
         ]}
       />
     </WikiSection>

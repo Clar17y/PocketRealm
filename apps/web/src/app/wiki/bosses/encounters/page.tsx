@@ -128,9 +128,11 @@ export default function BossEncountersPage() {
       <p>
         Boss encounters spawn on a dedicated{' '}
         <Const>{WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS}</Const>-hour
-        timer, independent of zone events. They also have a{' '}
+        timer, independent of zone events. Exploration can also discover a
+        world event; when that event roll succeeds, there is a{' '}
         <Const>{(WORLD_EVENT_CONSTANTS.BOSS_DISCOVERY_CHANCE * 100).toFixed(0)}%</Const>{' '}
-        discovery chance while exploring. At most{' '}
+        sub-roll to spawn a boss encounter instead of a regular world event. At
+        most{' '}
         <Const>{WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS}</Const> boss
         encounter can be active at a time.
       </p>
@@ -157,6 +159,16 @@ export default function BossEncountersPage() {
             name: 'MAX_BOSS_ENCOUNTERS',
             value: WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS,
             description: 'Maximum simultaneous active boss encounters',
+          },
+          {
+            name: 'BOSS_SPAWN_INTERVAL_HOURS',
+            value: WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS,
+            description: 'Scheduled boss spawn interval',
+          },
+          {
+            name: 'BOSS_DISCOVERY_CHANCE',
+            value: `${(WORLD_EVENT_CONSTANTS.BOSS_DISCOVERY_CHANCE * 100).toFixed(0)}%`,
+            description: 'Boss sub-roll after an eligible world event discovery',
           },
         ]}
       />

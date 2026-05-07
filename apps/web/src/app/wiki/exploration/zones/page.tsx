@@ -96,12 +96,14 @@ export default function ZonesPage() {
       <h2>Encounter Decay</h2>
       <p>
         Discovered encounter sites and resource nodes decay over time if not
-        engaged.
+        engaged. Encounter site decay removes whole mobs after enough elapsed
+        hours have accumulated; resource node decay removes whole units of
+        remaining capacity.
       </p>
       <ConstantsTable
         rows={[
-          { name: 'ENCOUNTER_SITE_DECAY_RATE_PER_HOUR', value: `${(EXPLORATION_CONSTANTS.ENCOUNTER_SITE_DECAY_RATE_PER_HOUR * 100).toFixed(0)}%/hr`, description: 'Encounter site decay rate' },
-          { name: 'RESOURCE_NODE_DECAY_RATE_PER_HOUR', value: `${(EXPLORATION_CONSTANTS.RESOURCE_NODE_DECAY_RATE_PER_HOUR * 100).toFixed(0)}%/hr`, description: 'Resource node decay rate' },
+          { name: 'ENCOUNTER_SITE_DECAY_RATE_PER_HOUR', value: `${EXPLORATION_CONSTANTS.ENCOUNTER_SITE_DECAY_RATE_PER_HOUR} mobs/hr`, description: 'Whole mobs decayed after flooring elapsed hours × rate' },
+          { name: 'RESOURCE_NODE_DECAY_RATE_PER_HOUR', value: `${EXPLORATION_CONSTANTS.RESOURCE_NODE_DECAY_RATE_PER_HOUR} capacity/hr`, description: 'Whole node capacity decayed after flooring elapsed hours × rate' },
         ]}
       />
 

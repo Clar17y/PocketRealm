@@ -5,7 +5,7 @@ import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
   HIT_CURVE_CONSTANTS,
   PVP_CONSTANTS,
-  COMBAT_CONSTANTS,
+  PREMIUM_CONSTANTS,
 } from '@pocketrealm/shared';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
@@ -110,17 +110,19 @@ export default function PvpCombatPage() {
 
       <h2>Template Combat Engine</h2>
       <p>
-        PvP fights are fully automated using combat templates. Each player has
-        up to {10} template slots that are evaluated in order
-        each round. The first slot whose conditions are met determines the
-        action for that round. If no conditions match, the player uses a basic
-        attack.
+        PvP fights are fully automated using combat templates. A saved template
+        contains one or more ordered slots that are evaluated each round. The
+        first slot whose conditions are met determines the action for that
+        round. If no conditions match, the player uses a basic attack.
       </p>
       <p>
         Template conditions can check: current HP percentage, current stamina
         or mana, active buffs or debuffs, round number, and opponent HP
         percentage. This allows for sophisticated strategies like opening with
-        a buff, switching to heavy attacks, and healing at low HP.
+        a buff, switching to heavy attacks, and healing at low HP. Free accounts
+        can save <Const>{PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE}</Const>{' '}
+        templates; Champion supporters can save{' '}
+        <Const>{PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION}</Const>.
       </p>
 
       <h2>Scouting</h2>
@@ -174,6 +176,16 @@ export default function PvpCombatPage() {
             name: 'MIN_CHARACTER_LEVEL',
             value: PVP_CONSTANTS.MIN_CHARACTER_LEVEL,
             description: 'Minimum character level to access the arena',
+          },
+          {
+            name: 'TEMPLATE_LIMIT_FREE',
+            value: PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE,
+            description: 'Maximum saved combat templates for free accounts',
+          },
+          {
+            name: 'TEMPLATE_LIMIT_CHAMPION',
+            value: PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION,
+            description: 'Maximum saved combat templates for Champion supporters',
           },
         ]}
       />

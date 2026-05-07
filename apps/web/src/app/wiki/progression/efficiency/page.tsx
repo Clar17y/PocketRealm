@@ -2,7 +2,13 @@ import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
-import { SKILL_CONSTANTS } from '@pocketrealm/shared';
+import {
+  COMBAT_SKILLS,
+  CRAFTING_SKILLS,
+  GATHERING_SKILLS,
+  PROCESSING_SKILLS,
+  SKILL_CONSTANTS,
+} from '@pocketrealm/shared';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
 
@@ -19,24 +25,28 @@ const progressionRelated = [
 
 const windowsPerDay = 24 / SKILL_CONSTANTS.XP_WINDOW_HOURS;
 
+function formatSkillList(skills: readonly string[]): string {
+  return skills.join(', ');
+}
+
 const skillCaps = [
   {
-    category: 'Combat (melee, ranged, magic)',
+    category: `Combat (${formatSkillList(COMBAT_SKILLS)})`,
     dailyCap: SKILL_CONSTANTS.DAILY_CAP_COMBAT,
     windowCap: Math.floor(SKILL_CONSTANTS.DAILY_CAP_COMBAT / windowsPerDay),
   },
   {
-    category: 'Gathering (mining, foraging, woodcutting)',
+    category: `Gathering (${formatSkillList(GATHERING_SKILLS)})`,
     dailyCap: SKILL_CONSTANTS.DAILY_CAP_GATHERING,
     windowCap: Math.floor(SKILL_CONSTANTS.DAILY_CAP_GATHERING / windowsPerDay),
   },
   {
-    category: 'Processing (refining, tanning, weaving)',
+    category: `Processing (${formatSkillList(PROCESSING_SKILLS)})`,
     dailyCap: SKILL_CONSTANTS.DAILY_CAP_PROCESSING,
     windowCap: Math.floor(SKILL_CONSTANTS.DAILY_CAP_PROCESSING / windowsPerDay),
   },
   {
-    category: 'Crafting (weaponsmithing, armorsmithing, etc.)',
+    category: `Crafting (${formatSkillList(CRAFTING_SKILLS)})`,
     dailyCap: SKILL_CONSTANTS.DAILY_CAP_CRAFTING,
     windowCap: Math.floor(SKILL_CONSTANTS.DAILY_CAP_CRAFTING / windowsPerDay),
   },

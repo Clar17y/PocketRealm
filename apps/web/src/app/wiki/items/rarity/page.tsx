@@ -56,12 +56,12 @@ export default function RarityPage() {
         rows={[
           {
             name: 'critChance',
-            value: `${CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critChance.min} - ${CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critChance.max}`,
+            value: `${(CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critChance.min * 100).toFixed(0)}% - ${(CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critChance.max * 100).toFixed(0)}%`,
             description: 'Flat crit chance bonus range per slot',
           },
           {
             name: 'critDamage',
-            value: `${CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critDamage.min} - ${CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critDamage.max}`,
+            value: `+${(CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critDamage.min * 100).toFixed(0)}% - +${(CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critDamage.max * 100).toFixed(0)}%`,
             description: 'Flat crit damage multiplier bonus range per slot',
           },
         ]}

@@ -9,7 +9,7 @@ const { Var, Out, Const, Op, Comment } = FormulaBlock;
 export const metadata: Metadata = {
   title: 'ELO & Matchmaking - Pocketrealm Wiki',
   description:
-    'ELO rating formula, K-factor, matchmaking bracket, and example calculations.',
+    'ELO rating formula, K-factor, draws, matchmaking bracket, and example calculations.',
 };
 
 const pvpRelated = [
@@ -17,29 +17,44 @@ const pvpRelated = [
   { label: 'Hit Chance', href: '/wiki/combat/hit-chance' },
 ];
 
-function eloExample(ratingA: number, ratingB: number, aWins: boolean) {
+type MatchResult = 'win' | 'loss' | 'draw';
+
+function eloExample(ratingA: number, ratingB: number, result: MatchResult) {
   const expectedA = 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
-  const scoreA = aWins ? 1 : 0;
+  const scoreA = result === 'win' ? 1 : result === 'draw' ? 0.5 : 0;
   const delta = Math.round(PVP_CONSTANTS.K_FACTOR * (scoreA - expectedA));
-  return { ratingA, ratingB, expectedA, delta, newRating: Math.max(0, ratingA + delta) };
+  return { ratingA, ratingB, result, expectedA, delta, newRating: Math.max(0, ratingA + delta) };
+}
+
+function formatResult(result: MatchResult): string {
+  if (result === 'win') return 'A wins';
+  if (result === 'draw') return 'Draw';
+  return 'A loses';
+}
+
+function deltaClassName(delta: number): string | undefined {
+  if (delta > 0) return 'text-green-400';
+  if (delta < 0) return 'text-red-400';
+  return undefined;
 }
 
 const examples = [
-  eloExample(1000, 1000, true),
-  eloExample(1000, 1000, false),
-  eloExample(1200, 800, true),
-  eloExample(1200, 800, false),
-  eloExample(800, 1200, true),
-  eloExample(800, 1200, false),
-  eloExample(1500, 1000, true),
-  eloExample(1500, 1000, false),
+  eloExample(1000, 1000, 'win'),
+  eloExample(1000, 1000, 'draw'),
+  eloExample(1000, 1000, 'loss'),
+  eloExample(1200, 800, 'win'),
+  eloExample(1200, 800, 'loss'),
+  eloExample(800, 1200, 'win'),
+  eloExample(800, 1200, 'loss'),
+  eloExample(1500, 1000, 'win'),
+  eloExample(1500, 1000, 'loss'),
 ];
 
 export default function EloPage() {
   return (
     <WikiSection
       title="ELO & Matchmaking"
-      summary="PvP arena uses an ELO rating system to track skill and match players of similar strength. Wins against stronger opponents yield large gains; losses to weaker ones result in big drops."
+      summary="PvP arena uses an ELO rating system to track skill and match players of similar strength. Wins against stronger opponents yield large gains, losses to weaker ones result in big drops, and draws use a half score."
       related={pvpRelated}
     >
       <h2>Starting Rating</h2>
@@ -68,14 +83,15 @@ export default function EloPage() {
 
       <h2>Rating Change</h2>
       <p>
-        After each match, the winner&rsquo;s and loser&rsquo;s ratings are
-        adjusted symmetrically:
+        After each match, player A receives a score of 1 for a win, 0.5 for a
+        draw, or 0 for a loss. Rating changes are then calculated from the
+        difference between that score and the expected score:
       </p>
       <FormulaBlock>
         <Out>deltaA</Out> <Op>=</Op> <Op>round(</Op>
         <Const>{PVP_CONSTANTS.K_FACTOR}</Const> <Op>&times;</Op> <Op>(</Op>
         <Var>scoreA</Var> <Op>-</Op> <Var>expectedA</Var><Op>))</Op>
-        <Comment> {'//'} scoreA = 1 if win, 0 if loss</Comment>
+        <Comment> {'//'} scoreA = 1 win, 0.5 draw, 0 loss</Comment>
       </FormulaBlock>
       <FormulaBlock>
         <Out>newRatingA</Out> <Op>=</Op> <Op>max(</Op><Const>0</Const>
@@ -104,9 +120,9 @@ export default function EloPage() {
             <tr key={i}>
               <td>{ex.ratingA}</td>
               <td>{ex.ratingB}</td>
-              <td>{ex.delta > 0 ? 'A wins' : 'A loses'}</td>
+              <td>{formatResult(ex.result)}</td>
               <td>{(ex.expectedA * 100).toFixed(1)}%</td>
-              <td className={ex.delta > 0 ? 'text-green-400' : 'text-red-400'}>
+              <td className={deltaClassName(ex.delta)}>
                 {ex.delta > 0 ? '+' : ''}{ex.delta}
               </td>
               <td>{ex.newRating}</td>
