@@ -5,6 +5,7 @@ import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
   EXPEDITION_CONSTANTS,
   EXPEDITION_ROOM_COMPOSITIONS,
+  EXPEDITION_THEMES,
 } from '@pocketrealm/shared';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
@@ -22,7 +23,19 @@ const bossRelated = [
   { label: 'Hit Chance', href: '/wiki/combat/hit-chance' },
 ];
 
-const tierLabels = ['Tier 0', 'Tier 1', 'Tier 2'];
+const tierConfigs = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER.map((levelReq, i) => {
+  const tier = i + 1;
+  return {
+    tier,
+    label: `Tier ${tier}`,
+    compositionIndex: i,
+    levelReq,
+    treasuryCost: EXPEDITION_CONSTANTS.TREASURY_COST_BY_TIER[i],
+    minParticipants: EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[i],
+    rooms: EXPEDITION_CONSTANTS.ROOMS_BY_TIER[i],
+    themes: EXPEDITION_THEMES.filter((theme) => theme.tier === tier),
+  };
+});
 
 export default function ExpeditionsPage() {
   return (
@@ -74,13 +87,13 @@ export default function ExpeditionsPage() {
           </tr>
         </thead>
         <tbody>
-          {tierLabels.map((label, i) => (
-            <tr key={label}>
-              <td>{label}</td>
-              <td>{EXPEDITION_CONSTANTS.TREASURY_COST_BY_TIER[i].toLocaleString()}</td>
-              <td>{EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER[i]}</td>
-              <td>{EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[i]}</td>
-              <td>{EXPEDITION_CONSTANTS.ROOMS_BY_TIER[i]}</td>
+          {tierConfigs.map((config) => (
+            <tr key={config.tier}>
+              <td>{config.label}</td>
+              <td>{config.treasuryCost.toLocaleString()}</td>
+              <td>{config.levelReq}</td>
+              <td>{config.minParticipants}</td>
+              <td>{config.rooms}</td>
             </tr>
           ))}
         </tbody>
@@ -96,11 +109,11 @@ export default function ExpeditionsPage() {
         Each tier has a fixed room layout. Higher tiers add more elites,
         mini-bosses, and event rooms.
       </p>
-      {tierLabels.map((label, i) => (
-        <div key={label}>
-          <h3>{label}</h3>
+      {tierConfigs.map((config) => (
+        <div key={config.tier}>
+          <h3>{config.label}</h3>
           <ul>
-            {EXPEDITION_ROOM_COMPOSITIONS[i]?.map((room) => (
+            {EXPEDITION_ROOM_COMPOSITIONS[config.compositionIndex]?.map((room) => (
               <li key={room.type}>
                 {room.count}x <strong>{room.type.replace('_', ' ')}</strong>
               </li>
@@ -108,6 +121,32 @@ export default function ExpeditionsPage() {
           </ul>
         </div>
       ))}
+
+      <h2>Current Theme Pool</h2>
+      <p>
+        Launching an expedition selects from the active theme pool for that
+        tier. Tiers without active themes are not currently launchable.
+      </p>
+      <table className="wiki-table">
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Themes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tierConfigs.map((config) => (
+            <tr key={config.tier}>
+              <td>{config.label}</td>
+              <td>
+                {config.themes.length > 0
+                  ? config.themes.map((theme) => theme.name).join(', ')
+                  : 'No active themes'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <h2>Multi-Mob Round Resolution</h2>
       <p>
@@ -255,7 +294,9 @@ export default function ExpeditionsPage() {
       <p>
         Clearing the entire expedition grants a completion bonus of{' '}
         {EXPEDITION_CONSTANTS.COMPLETION_BONUS_MULTIPLIER}x the total tokens
-        earned. Each room also awards{' '}
+        earned. Rooms cleared by expedition auto-resolve receive an additional{' '}
+        {(EXPEDITION_CONSTANTS.AUTO_RESOLVE_TOKEN_BONUS_PERCENT * 100).toFixed(0)}%
+        token bonus. Each room also awards{' '}
         {EXPEDITION_CONSTANTS.GUILD_XP_PER_ROOM} guild XP, with a{' '}
         {EXPEDITION_CONSTANTS.GUILD_XP_COMPLETION_BONUS} guild XP completion
         bonus.

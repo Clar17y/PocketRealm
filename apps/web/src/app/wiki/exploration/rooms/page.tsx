@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
-import { ROOM_CONSTANTS, CHEST_CONSTANTS, FULL_CLEAR_CONSTANTS } from '@pocketrealm/shared';
+import { ROOM_CONSTANTS, CHEST_CONSTANTS, ENCOUNTER_SITE_CONSTANTS } from '@pocketrealm/shared';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 
 export const metadata: Metadata = {
   title: 'Room Generation',
   description:
-    'Encounter site room counts by size, mobs per room, chest drops, recipe chances, material rolls, and full-clear bonuses.',
+    'Encounter site room counts by size, mobs per room, chest drops, recipe chances, material rolls, and auto-resolve bonuses.',
 };
 
 export default function RoomsPage() {
@@ -50,13 +50,14 @@ export default function RoomsPage() {
 
       <h2>Chest Drops</h2>
       <p>
-        Clearing an encounter site awards a chest. Larger sites yield better
-        chests with more materials and higher recipe chances.
+        Clearing an encounter site awards a chest. Chest rarity is based on
+        total room count, so larger sites yield better chests with more
+        materials and higher recipe chances.
       </p>
       <table className="wiki-table">
         <thead>
           <tr>
-            <th>Site Size</th>
+            <th>Total Rooms</th>
             <th>Chest Rarity</th>
             <th>Recipe Chance</th>
             <th>Material Rolls</th>
@@ -64,36 +65,44 @@ export default function RoomsPage() {
         </thead>
         <tbody>
           <tr>
-            <td>Small</td>
+            <td>1</td>
             <td>Common</td>
             <td>{(CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_SMALL * 100).toFixed(0)}%</td>
             <td>{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_SMALL.min}&#8211;{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_SMALL.max}</td>
           </tr>
           <tr>
-            <td>Medium</td>
+            <td>2</td>
             <td>Uncommon</td>
             <td>{(CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_MEDIUM * 100).toFixed(0)}%</td>
             <td>{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_MEDIUM.min}&#8211;{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_MEDIUM.max}</td>
           </tr>
           <tr>
-            <td>Large</td>
+            <td>3</td>
             <td>Rare</td>
             <td>{(CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_LARGE * 100).toFixed(0)}%</td>
             <td>{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_LARGE.min}&#8211;{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_LARGE.max}</td>
           </tr>
+          <tr>
+            <td>4+</td>
+            <td>Epic</td>
+            <td>{(CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_EPIC * 100).toFixed(0)}%</td>
+            <td>{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_EPIC.min}&#8211;{CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_EPIC.max}</td>
+          </tr>
         </tbody>
       </table>
 
-      <h2>Full Clear Bonus</h2>
+      <h2>Auto-Resolve Bonus</h2>
       <p>
-        Defeating every mob in every room of an encounter site grants a full
-        clear bonus:
+        If unresolved rooms are auto-resolved after decay, material rolls and
+        recipe chance receive a proportional bonus based on the fraction of
+        rooms resolved automatically. A fully auto-resolved site receives the
+        full multiplier.
       </p>
       <ConstantsTable
         rows={[
-          { name: 'DROP_MULTIPLIER', value: `${FULL_CLEAR_CONSTANTS.DROP_MULTIPLIER}x`, description: 'Item drop chance multiplier on full clear' },
-          { name: 'RECIPE_MULTIPLIER', value: `${FULL_CLEAR_CONSTANTS.RECIPE_MULTIPLIER}x`, description: 'Recipe drop chance multiplier on full clear' },
-          { name: 'CHEST_TIER_UPGRADE', value: FULL_CLEAR_CONSTANTS.CHEST_TIER_UPGRADE ? 'Yes' : 'No', description: 'Chest rarity is upgraded by one tier on full clear' },
+          { name: 'AUTO_RESOLVE_DROP_MULTIPLIER', value: `${ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_DROP_MULTIPLIER}x`, description: 'Maximum material-roll multiplier from auto-resolved rooms' },
+          { name: 'AUTO_RESOLVE_RECIPE_MULTIPLIER', value: `${ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_RECIPE_MULTIPLIER}x`, description: 'Maximum recipe chance multiplier from auto-resolved rooms' },
+          { name: 'AUTO_RESOLVE_MAX_ROUNDS', value: ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_MAX_ROUNDS, description: 'Maximum rounds used by auto-resolve simulation' },
         ]}
       />
     </WikiSection>

@@ -24,6 +24,9 @@ const sampleLevels = [1, 2, 3, 5, 7, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 const xpTable = sampleLevels.map((level) => ({
   level,
   xpRequired: xpForLevel(level),
+  xpToNext: level >= SKILL_CONSTANTS.MAX_LEVEL
+    ? null
+    : xpForLevel(level + 1) - xpForLevel(level),
 }));
 
 export default function XpLevelingPage() {
@@ -90,7 +93,8 @@ export default function XpLevelingPage() {
 
       <h2>XP Table</h2>
       <p>
-        Total XP required to reach each level (computed from the formula):
+        Total XP required to reach each sample level, plus the XP needed for
+        the next actual level:
       </p>
       <table className="wiki-table">
         <thead>
@@ -101,13 +105,10 @@ export default function XpLevelingPage() {
           </tr>
         </thead>
         <tbody>
-          {xpTable.map((row, i) => {
-            const nextRow = xpTable[i + 1];
-            const xpToNext = nextRow
-              ? (nextRow.xpRequired - row.xpRequired).toLocaleString()
-              : row.level >= SKILL_CONSTANTS.MAX_LEVEL
-                ? 'Max'
-                : '...';
+          {xpTable.map((row) => {
+            const xpToNext = row.xpToNext === null
+              ? 'Max'
+              : row.xpToNext.toLocaleString();
             return (
               <tr key={row.level}>
                 <td>{row.level}</td>

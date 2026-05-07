@@ -16,7 +16,7 @@ export default function HealthPage() {
   return (
     <WikiSection
       title="Health System"
-      summary="Health determines how much damage a player can take before being knocked out. It scales with the Vitality skill and equipment bonuses."
+      summary="Health determines how much damage a player can take before being knocked out. It scales with the Vitality attribute and equipment health bonuses."
       related={[
         { label: 'Stamina', href: '/wiki/resources/stamina' },
         { label: 'Mana', href: '/wiki/resources/mana' },

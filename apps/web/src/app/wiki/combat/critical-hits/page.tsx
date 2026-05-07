@@ -54,7 +54,7 @@ export default function CriticalHitsPage() {
       </FormulaBlock>
       <p>
         The base crit multiplier is {COMBAT_CONSTANTS.CRIT_MULTIPLIER}x. Equipment crit
-        damage bonuses add to this multiplicatively.
+        damage bonuses add directly to this multiplier.
       </p>
 
       <h2>Crit in the Damage Pipeline</h2>
