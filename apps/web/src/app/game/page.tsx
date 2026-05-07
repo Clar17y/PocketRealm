@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { screenBackgroundSrc, zoneImageSrc, type ExpeditionContext } from '@/lib/assets';
+import { PRESEASON_REALM_LABEL } from '@/lib/realmLabels';
 import {
   getActiveSeason,
   getCharacters,
@@ -485,7 +486,7 @@ export default function GamePage() {
           gc={gc}
           player={player}
           seasonArchives={seasonArchives}
-          realmLabel={activeCharacter?.seasonName ?? 'Permanent Realm'}
+          realmLabel={activeCharacter?.seasonName ?? PRESEASON_REALM_LABEL}
           realmEndsAt={activeCharacter?.seasonEndsAt ?? null}
           activePlayerId={player?.id ?? null}
           characters={characters}

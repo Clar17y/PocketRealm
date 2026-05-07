@@ -15,6 +15,7 @@ import {
   type SeasonArchiveSummary,
 } from '@/lib/api';
 import { titleCaseFromSnake } from '@/lib/format';
+import { PRESEASON_REALM_LABEL } from '@/lib/realmLabels';
 import { Trophy } from 'lucide-react';
 import { ScreenContainer } from '../common/ScreenContainer';
 
@@ -135,7 +136,7 @@ export function Leaderboard({ playerId, currentSeasonId }: LeaderboardProps) {
   const currentGroupCategories = groups.find((group) => group.name === activeGroup)?.categories ?? [];
   const rankingsRealms = useMemo(
     () => [
-      { id: 'permanent', label: 'Permanent Realm', seasonId: null as string | null },
+      { id: 'permanent', label: PRESEASON_REALM_LABEL, seasonId: null as string | null },
       ...(activeSeason ? [{ id: activeSeason.id, label: activeSeason.name, seasonId: activeSeason.id }] : []),
     ],
     [activeSeason],

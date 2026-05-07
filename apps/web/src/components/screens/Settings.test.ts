@@ -66,7 +66,7 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
     isPremium: false,
     premiumExpiresAt: null,
     seasonArchives: [],
-    realmLabel: 'Permanent Realm',
+    realmLabel: 'Preseason',
     realmEndsAt: null,
     activePlayerId: 'permanent-player',
     characters: [
@@ -180,6 +180,7 @@ describe('Settings', () => {
 
     expect(await screen.findByRole('heading', { name: 'Support Pocketrealm' })).toBeTruthy();
     expect(screen.getByText(/One-time purchase\. Grants 30 days of Champion\./i)).toBeTruthy();
+    expect(screen.getByText(/Preseason support carries forward\./i)).toBeTruthy();
     expect(screen.getByText('Free account')).toBeTruthy();
     expect(screen.getByText(/Champion perks/i)).toBeTruthy();
     expect(screen.getByText(/\+10% turn regen and turn bank cap/i)).toBeTruthy();
@@ -245,6 +246,7 @@ describe('Settings', () => {
     const successDialog = await screen.findByRole('dialog', { name: /support pocketrealm success/i });
     expect(within(successDialog).getByText(/Thanks for supporting Pocketrealm/i)).toBeTruthy();
     expect(within(successDialog).getByText(/Champion title is now available in Achievements/i)).toBeTruthy();
+    expect(within(successDialog).getByText(/Any Champion time purchased during Preseason will be honoured when PocketRealm officially launches\./i)).toBeTruthy();
     expect(within(successDialog).getByRole('button', { name: /continue/i })).toBeTruthy();
     await waitFor(() => expect(screen.getByText(/Champion until/i)).toBeTruthy());
     await waitFor(() => expect(window.location.search).not.toContain('session_id='));
@@ -385,9 +387,9 @@ describe('Settings', () => {
     expect(screen.getByText('1 tracked ranks')).toBeTruthy();
   });
 
-  it('single-character account shows Current Realm and Permanent Realm but no interactive button', () => {
+  it('single-character account shows Current Realm and Preseason but no interactive button', () => {
     renderSettings({
-      realmLabel: 'Permanent Realm',
+      realmLabel: 'Preseason',
       realmEndsAt: null,
       activePlayerId: 'permanent-player',
       characters: [
@@ -406,7 +408,7 @@ describe('Settings', () => {
     expect(screen.getByText('Username')).toBeTruthy();
     expect(screen.getByText('Rook')).toBeTruthy();
     expect(screen.getByText('Current Realm')).toBeTruthy();
-    expect(screen.getByText('Permanent Realm')).toBeTruthy();
+    expect(screen.getByText('Preseason')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /current realm/i })).toBeNull();
   });
 
@@ -462,10 +464,10 @@ describe('Settings', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /current realm: season 7/i }));
-    fireEvent.click(screen.getByRole('button', { name: /rook · permanent realm · level 18/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rook · preseason · level 18/i }));
 
     expect(onSwitchPlayer).toHaveBeenCalledWith('permanent-player');
-    expect(screen.queryByRole('button', { name: /rook · permanent realm · level 18/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /rook · preseason · level 18/i })).toBeNull();
     expect(screen.getByRole('button', { name: /current realm: season 7/i }).getAttribute('aria-expanded')).toBe('false');
   });
 
@@ -501,7 +503,7 @@ describe('Settings', () => {
     fireEvent.click(screen.getByRole('button', { name: /current realm: season 7/i }));
 
     const activeRow = screen.getByRole('button', { name: /rook_s7 · season 7 · level 26/i });
-    const targetRow = screen.getByRole('button', { name: /rook · permanent realm · level 18/i });
+    const targetRow = screen.getByRole('button', { name: /rook · preseason · level 18/i });
 
     expect((activeRow as HTMLButtonElement).disabled).toBe(true);
     expect((targetRow as HTMLButtonElement).disabled).toBe(true);

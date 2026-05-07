@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { pixelButtonBase, pixelButtonVariants, pixelButtonSizes } from '@/components/PixelButton';
 import { PublicRankings } from '@/components/rankings/PublicRankings';
+import { SUPPORT_CARRY_FORWARD_COPY } from '@/lib/supportCopy';
 
 const linkPrimary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.primary}`;
 const linkSecondary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.secondary}`;
@@ -165,8 +166,11 @@ export default function Home() {
             <p className="text-center text-2xl font-bold font-crimson text-[var(--rpg-text-primary)] mb-2">
               £4.99 one-time
             </p>
-            <p className="text-center font-crimson text-[var(--rpg-text-secondary)] mb-8">
+            <p className="mb-3 text-center font-crimson text-[var(--rpg-text-secondary)]">
               One-time purchase. Grants 30 days of Champion. Stacks if purchased again.
+            </p>
+            <p className="mx-auto mb-8 max-w-xl text-center font-crimson text-sm text-[var(--rpg-text-secondary)]">
+              {SUPPORT_CARRY_FORWARD_COPY}
             </p>
 
             {/* Perks grid */}

@@ -130,7 +130,7 @@ describe('AppShell', () => {
       onSettings: vi.fn(),
       onLogout: vi.fn(),
       onWhatsNew: vi.fn(),
-      realmLabel: 'Permanent Realm',
+      realmLabel: 'Preseason',
       realmEndsAt: null,
       activePlayerId: 'permanent-player',
       characters: [
@@ -166,6 +166,6 @@ describe('AppShell', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Switch character' })).toBeNull();
-    expect(screen.queryByText('Permanent Realm')).toBeNull();
+    expect(screen.queryByText('Preseason')).toBeNull();
   });
 });

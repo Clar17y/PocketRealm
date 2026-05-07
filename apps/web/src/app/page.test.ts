@@ -29,6 +29,7 @@ describe('Home page', () => {
     expect(screen.getByRole('heading', { name: 'Support Pocketrealm' })).toBeTruthy();
     expect(screen.getByText('£4.99 one-time')).toBeTruthy();
     expect(screen.getByText(/One-time purchase\. Grants 30 days of Champion\./i)).toBeTruthy();
+    expect(screen.getByText(/Preseason support carries forward\./i)).toBeTruthy();
     expect(screen.getByText(/Helps cover the server bill and gently pressures me into shipping more content\./i)).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'Support Pocketrealm' }).length).toBeGreaterThan(0);
   });

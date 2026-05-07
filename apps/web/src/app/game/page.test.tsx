@@ -78,8 +78,17 @@ vi.mock('@/components/common/JoinSeasonBanner', () => ({
 }));
 
 vi.mock('./GameScreenRenderer', () => ({
-  GameScreenRenderer: ({ onSwitchPlayer }: { onSwitchPlayer: (playerId: string) => void }) => (
-    <button onClick={() => onSwitchPlayer('season-player')}>Switch Character</button>
+  GameScreenRenderer: ({
+    onSwitchPlayer,
+    realmLabel,
+  }: {
+    onSwitchPlayer: (playerId: string) => void;
+    realmLabel: string;
+  }) => (
+    <div>
+      <div>Realm: {realmLabel}</div>
+      <button onClick={() => onSwitchPlayer('season-player')}>Switch Character</button>
+    </div>
   ),
 }));
 
@@ -269,6 +278,8 @@ describe('GamePage realm switching', () => {
 
   it('reloads the game controller after joining a season', async () => {
     render(<GamePage />);
+
+    expect(await screen.findByText('Realm: Preseason')).toBeTruthy();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Join Season' }));
 
