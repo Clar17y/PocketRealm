@@ -19,9 +19,11 @@ const talentDamageMultipliers = Object.values(BASE_ACTION_DEFINITIONS)
 const talentMinDamageMultiplier = Math.min(...talentDamageMultipliers);
 const talentMaxDamageMultiplier = Math.max(...talentDamageMultipliers);
 
-function actionDamageMultiplier(actionId: string): number {
-  return BASE_ACTION_DEFINITIONS[actionId]?.damageMultiplier ?? 0;
-}
+const baseDamageMultipliers = {
+  lightAttack: BASE_ACTION_DEFINITIONS.light_attack.damageMultiplier ?? 0,
+  normalAttack: BASE_ACTION_DEFINITIONS.normal_attack.damageMultiplier ?? 0,
+  heavyAttack: BASE_ACTION_DEFINITIONS.heavy_attack.damageMultiplier ?? 0,
+};
 
 export const metadata: Metadata = {
   title: 'Damage Calculation - Pocketrealm Wiki',
@@ -103,9 +105,9 @@ export default function DamagePage() {
       <p>
         Each combat action has a <code>damageMultiplier</code> that scales the
         rolled damage. A Light Attack uses{' '}
-        {actionDamageMultiplier('light_attack')}x, Normal Attack{' '}
-        {actionDamageMultiplier('normal_attack')}x, Heavy Attack{' '}
-        {actionDamageMultiplier('heavy_attack')}x, and talent abilities range
+        {baseDamageMultipliers.lightAttack}x, Normal Attack{' '}
+        {baseDamageMultipliers.normalAttack}x, Heavy Attack{' '}
+        {baseDamageMultipliers.heavyAttack}x, and talent abilities range
         from {talentMinDamageMultiplier}x to {talentMaxDamageMultiplier}x. See
         the{' '}
         <a href="/wiki/combat/actions">Combat Actions</a> page for the full

@@ -26,6 +26,18 @@ function eloExample(ratingA: number, ratingB: number, result: MatchResult) {
   return { ratingA, ratingB, result, expectedA, delta, newRating: Math.max(0, ratingA + delta) };
 }
 
+function formatResult(result: MatchResult): string {
+  if (result === 'win') return 'A wins';
+  if (result === 'draw') return 'Draw';
+  return 'A loses';
+}
+
+function deltaClassName(delta: number): string | undefined {
+  if (delta > 0) return 'text-green-400';
+  if (delta < 0) return 'text-red-400';
+  return undefined;
+}
+
 const examples = [
   eloExample(1000, 1000, 'win'),
   eloExample(1000, 1000, 'draw'),
@@ -108,9 +120,9 @@ export default function EloPage() {
             <tr key={i}>
               <td>{ex.ratingA}</td>
               <td>{ex.ratingB}</td>
-              <td>{ex.result === 'win' ? 'A wins' : ex.result === 'draw' ? 'Draw' : 'A loses'}</td>
+              <td>{formatResult(ex.result)}</td>
               <td>{(ex.expectedA * 100).toFixed(1)}%</td>
-              <td className={ex.delta > 0 ? 'text-green-400' : ex.delta < 0 ? 'text-red-400' : undefined}>
+              <td className={deltaClassName(ex.delta)}>
                 {ex.delta > 0 ? '+' : ''}{ex.delta}
               </td>
               <td>{ex.newRating}</td>

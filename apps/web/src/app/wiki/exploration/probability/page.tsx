@@ -103,7 +103,7 @@ export default function ProbabilityPage() {
         <Out>championHiddenCacheChance</Out> <Op>=</Op>{' '}
         <Var>HIDDEN_CACHE_CHANCE</Var> <Op>&times;</Op>{' '}
         <Const>{PREMIUM_CONSTANTS.BONUS_MULTIPLIER}</Const>
-        </FormulaBlock>
+      </FormulaBlock>
 
       <h2>World Events</h2>
       <p>
