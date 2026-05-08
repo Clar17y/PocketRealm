@@ -11,6 +11,20 @@ export type ApiRequestOptions = RequestInit & {
   auth?: 'include' | 'omit';
 };
 
+export async function checkApiReady(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/health/ready`, {
+      method: 'GET',
+      credentials: 'omit',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export interface TurnStateResponse {
   currentTurns: number;
   timeToCapMs: number | null;

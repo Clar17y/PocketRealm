@@ -1,4 +1,4 @@
-export { fetchApi, clearStoredTokens, getJwtExpMs } from './core';
+export { fetchApi, clearStoredTokens, getJwtExpMs, checkApiReady } from './core';
 export type { ApiRequestOptions, ApiResponse, TaxInfo } from './core';
 
 export {

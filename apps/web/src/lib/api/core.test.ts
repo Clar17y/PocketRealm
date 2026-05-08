@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchApi } from './core';
+import { checkApiReady, fetchApi } from './core';
 
 function base64Url(value: object): string {
   return btoa(JSON.stringify(value))
@@ -46,5 +46,41 @@ describe('fetchApi auth options', () => {
     const headers = init?.headers as Record<string, string> | undefined;
     expect(init?.credentials).toBe('omit');
     expect(headers?.Authorization).toBeUndefined();
+  });
+});
+
+describe('checkApiReady', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns true when the readiness endpoint succeeds without auth', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ status: 'ok' }), { status: 200 }));
+
+    await expect(checkApiReady()).resolves.toBe(true);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/\/health\/ready$/);
+    expect(init.credentials).toBe('omit');
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it('returns false when the readiness endpoint fails', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ status: 'error' }), { status: 503 }));
+
+    await expect(checkApiReady()).resolves.toBe(false);
+  });
+
+  it('returns false when the readiness request throws', async () => {
+    fetchMock.mockRejectedValue(new Error('network down'));
+
+    await expect(checkApiReady()).resolves.toBe(false);
   });
 });
