@@ -127,6 +127,28 @@ describe('useConnectionRecovery', () => {
     expect(checkApiReady).toHaveBeenCalledTimes(2);
   });
 
+  it('does not probe while the document is hidden', async () => {
+    visibilityState = 'hidden';
+    checkApiReady.mockResolvedValue(true);
+    renderHook(() => useConnectionRecovery('disconnected'));
+
+    dispatchWindowEvent('pointerdown');
+    await flushPromises();
+
+    expect(checkApiReady).not.toHaveBeenCalled();
+  });
+
+  it('does not probe while the window is blurred', async () => {
+    focused = false;
+    checkApiReady.mockResolvedValue(true);
+    renderHook(() => useConnectionRecovery('disconnected'));
+
+    dispatchWindowEvent('pointerdown');
+    await flushPromises();
+
+    expect(checkApiReady).not.toHaveBeenCalled();
+  });
+
   it('does not probe while already connected', async () => {
     checkApiReady.mockResolvedValue(true);
     renderHook(() => useConnectionRecovery('connected'));
