@@ -2,13 +2,14 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useConnectionRecovery } from './useConnectionRecovery';
 
-const { checkApiReady, connectSocket, socketMock } = vi.hoisted(() => ({
+const { checkApiReady, connectSocket, ensureFreshAccessToken, socketMock } = vi.hoisted(() => ({
   checkApiReady: vi.fn(),
   connectSocket: vi.fn(),
+  ensureFreshAccessToken: vi.fn(),
   socketMock: { connected: false },
 }));
 
-vi.mock('@/lib/api', () => ({ checkApiReady }));
+vi.mock('@/lib/api', () => ({ checkApiReady, ensureFreshAccessToken }));
 vi.mock('@/lib/socket', () => ({
   connectSocket,
   getSocket: () => socketMock,
@@ -62,6 +63,7 @@ describe('useConnectionRecovery', () => {
       get: () => visibilityState,
     });
     vi.clearAllMocks();
+    ensureFreshAccessToken.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -94,6 +96,34 @@ describe('useConnectionRecovery', () => {
 
     expect(reachableEvents).toEqual([true]);
     expect(connectSocket).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the access token before reconnecting the socket', async () => {
+    checkApiReady.mockResolvedValue(true);
+    ensureFreshAccessToken.mockResolvedValue(true);
+    renderHook(() => useConnectionRecovery('failed'));
+
+    dispatchWindowEvent('pointerdown');
+    await flushPromises();
+
+    expect(ensureFreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(connectSocket).toHaveBeenCalledTimes(1);
+    expect(ensureFreshAccessToken.mock.invocationCallOrder[0]).toBeLessThan(
+      connectSocket.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not reconnect the socket when the access token cannot be refreshed', async () => {
+    const reachableEvents = collectReachableEvents();
+    checkApiReady.mockResolvedValue(true);
+    ensureFreshAccessToken.mockResolvedValue(false);
+    renderHook(() => useConnectionRecovery('failed'));
+
+    dispatchWindowEvent('pointerdown');
+    await flushPromises();
+
+    expect(reachableEvents).toEqual([true]);
+    expect(connectSocket).not.toHaveBeenCalled();
   });
 
   it('keeps the API unreachable after a failed probe', async () => {

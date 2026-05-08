@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkApiReady, fetchApi } from './core';
+import { checkApiReady, ensureFreshAccessToken, fetchApi } from './core';
 
 function base64Url(value: object): string {
   return btoa(JSON.stringify(value))
@@ -82,5 +82,61 @@ describe('checkApiReady', () => {
     fetchMock.mockRejectedValue(new Error('network down'));
 
     await expect(checkApiReady()).resolves.toBe(false);
+  });
+});
+
+describe('ensureFreshAccessToken', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-08T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it('returns false when no access token is stored', async () => {
+    await expect(ensureFreshAccessToken()).resolves.toBe(false);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a valid access token without refreshing', async () => {
+    localStorage.setItem('accessToken', accessTokenExpiringAt(Math.floor(Date.now() / 1000) + 120));
+    localStorage.setItem('refreshToken', 'refresh-token');
+
+    await expect(ensureFreshAccessToken()).resolves.toBe(true);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refreshes an expired access token before socket reconnect', async () => {
+    localStorage.setItem('accessToken', accessTokenExpiringAt(Math.floor(Date.now() / 1000) - 60));
+    localStorage.setItem('refreshToken', 'refresh-token');
+    fetchMock.mockResolvedValue(jsonResponse({
+      accessToken: 'fresh-access-token',
+      refreshToken: 'fresh-refresh-token',
+    }));
+
+    await expect(ensureFreshAccessToken()).resolves.toBe(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('accessToken')).toBe('fresh-access-token');
+    expect(localStorage.getItem('refreshToken')).toBe('fresh-refresh-token');
+  });
+
+  it('returns false when an expired access token cannot be refreshed', async () => {
+    localStorage.setItem('accessToken', accessTokenExpiringAt(Math.floor(Date.now() / 1000) - 60));
+    localStorage.setItem('refreshToken', 'refresh-token');
+    fetchMock.mockRejectedValue(new Error('network down'));
+
+    await expect(ensureFreshAccessToken()).resolves.toBe(false);
   });
 });

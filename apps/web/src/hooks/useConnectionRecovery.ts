@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { checkApiReady } from '@/lib/api';
+import { checkApiReady, ensureFreshAccessToken } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { isPageVisibleAndFocused } from './usePageVisible';
 import type { ConnectionState } from './useConnectionStatus';
@@ -33,7 +33,8 @@ export function useConnectionRecovery(status: ConnectionState): void {
         try {
           const ok = await checkApiReady();
           dispatchApiReachable(ok);
-          if (ok && !getSocket().connected) {
+          const tokenReady = ok ? await ensureFreshAccessToken() : false;
+          if (tokenReady && !getSocket().connected) {
             connectSocket();
           }
         } finally {
