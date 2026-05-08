@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   getRouletteHistory,
   getRouletteRound,
   getRouletteStats,
   type RouletteNumberStat,
 } from '@/lib/api';
+import { useVisibleInterval } from '@/hooks/usePageVisible';
 import type { RouletteHistoryEntry, RouletteRoundState } from '@pocketrealm/shared';
 
 export interface UseRouletteRoundReturn {
@@ -21,7 +22,6 @@ export function useRouletteRound(): UseRouletteRoundReturn {
   const [history, setHistory] = useState<RouletteHistoryEntry[]>([]);
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [numberStats, setNumberStats] = useState<RouletteNumberStat[] | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshRound = useCallback(async () => {
     try {
@@ -50,24 +50,12 @@ export function useRouletteRound(): UseRouletteRoundReturn {
     void refreshHistory();
   }, [refreshHistory, refreshRound]);
 
-  useEffect(() => {
-    const phase = roundState?.phase;
-    const intervalMs = phase === 'result' ? 5000 : 3000;
-    const shouldPoll = phase === 'betting' || phase === 'spinning' || phase === 'result';
-
-    if (shouldPoll) {
-      pollRef.current = setInterval(() => {
-        void refreshRound();
-      }, intervalMs);
-    }
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [refreshRound, roundState?.phase]);
+  const phase = roundState?.phase;
+  const intervalMs = phase === 'result' ? 5000 : 3000;
+  const shouldPoll = phase === 'betting' || phase === 'spinning' || phase === 'result';
+  useVisibleInterval(() => {
+    void refreshRound();
+  }, intervalMs, shouldPoll);
 
   useEffect(() => {
     if (roundState?.phase === 'result') {

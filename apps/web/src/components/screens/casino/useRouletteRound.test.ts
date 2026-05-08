@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRouletteRound } from './useRouletteRound';
 
 const { getRouletteRound, getRouletteHistory, getRouletteStats } = vi.hoisted(() => ({
@@ -14,8 +14,20 @@ vi.mock('@/lib/api', () => ({
   getRouletteStats,
 }));
 
+const originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+let focused = true;
+
+function restoreVisibilityState(): void {
+  if (originalVisibilityStateDescriptor) {
+    Object.defineProperty(document, 'visibilityState', originalVisibilityStateDescriptor);
+  } else {
+    delete (document as Document & { visibilityState?: DocumentVisibilityState }).visibilityState;
+  }
+}
+
 describe('useRouletteRound', () => {
   beforeEach(() => {
+    focused = true;
     vi.clearAllMocks();
     getRouletteRound.mockResolvedValue({
       data: {
@@ -36,6 +48,13 @@ describe('useRouletteRound', () => {
         stats: [{ number: 7, count: 4 }],
       },
     });
+  });
+
+  afterEach(() => {
+    restoreVisibilityState();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('loads the round state and history on mount', async () => {
@@ -71,5 +90,33 @@ describe('useRouletteRound', () => {
     });
 
     expect(result.current.numberStats).toBeNull();
+  });
+
+  it('does not keep polling roulette rounds while the window is blurred', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-08T12:00:00.000Z'));
+    vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+
+    renderHook(() => useRouletteRound());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getRouletteRound).toHaveBeenCalledTimes(1);
+
+    focused = false;
+    act(() => {
+      window.dispatchEvent(new Event('blur'));
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(getRouletteRound).toHaveBeenCalledTimes(1);
   });
 });
