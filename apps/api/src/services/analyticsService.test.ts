@@ -166,6 +166,8 @@ describe('analyticsService', () => {
       expect(queryText(8)).toContain('active_in_period');
       expect(queryText(8)).not.toContain("NOW() - INTERVAL '7 days'");
       expect(queryText(10)).toContain("IN ('defeat', 'defeated')");
+      expect(queryText(10)).toContain('siteName');
+      expect(queryText(10)).toContain('mobFamilyName');
     });
   });
 });

@@ -433,7 +433,12 @@ export async function getBalanceReport(period: BalancePeriod): Promise<BalanceRe
       }>>`
         SELECT
           COALESCE(a.result->>'zoneName', a.result->'zone'->>'name', 'unknown') as zone_name,
-          COALESCE(a.result->>'mobDisplayName', a.result->>'mobName', 'unknown') as mob_name,
+          COALESCE(
+            a.result->>'mobDisplayName',
+            a.result->>'mobName',
+            NULLIF(CONCAT_WS(' / ', a.result->>'siteName', a.result->>'mobFamilyName'), ''),
+            'unknown'
+          ) as mob_name,
           COUNT(*) as death_count,
           COUNT(DISTINCT a.player_id) as unique_players
         FROM activity_logs a
