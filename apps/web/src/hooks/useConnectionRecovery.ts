@@ -1,16 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { checkApiReady } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { isPageVisibleAndFocused } from './usePageVisible';
 import type { ConnectionState } from './useConnectionStatus';
 
 const RECOVERY_PROBE_THROTTLE_MS = 5_000;
 const RECOVERY_EVENTS = ['focus', 'pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'] as const;
-
-function isForeground(): boolean {
-  if (typeof document === 'undefined') return false;
-  const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
-  return document.visibilityState === 'visible' && hasFocus;
-}
 
 function dispatchApiReachable(ok: boolean): void {
   window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok } }));
@@ -27,7 +22,7 @@ export function useConnectionRecovery(status: ConnectionState): void {
     if (status === 'connected' || typeof window === 'undefined') return;
 
     const runProbe = () => {
-      if (statusRef.current === 'connected' || !isForeground() || probeInFlightRef.current) return;
+      if (statusRef.current === 'connected' || !isPageVisibleAndFocused() || probeInFlightRef.current) return;
 
       const now = Date.now();
       if (now - lastProbeAtRef.current < RECOVERY_PROBE_THROTTLE_MS) return;

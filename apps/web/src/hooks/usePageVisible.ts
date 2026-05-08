@@ -31,7 +31,7 @@ function isPageActive(now = Date.now()): boolean {
   return isPageVisibleAndFocused() && now - lastInteractionAt < PAGE_ACTIVE_IDLE_MS;
 }
 
-function isPageVisibleAndFocused(): boolean {
+export function isPageVisibleAndFocused(): boolean {
   if (typeof document === 'undefined') return false;
   const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
   return document.visibilityState === 'visible' && hasFocus;
