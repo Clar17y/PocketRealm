@@ -13,6 +13,7 @@ Codex project guide for Pocketrealm. Keep this file concise and operational; use
 - Primary shell is Windows PowerShell 7. Prefer `pwsh`/PowerShell-compatible commands and examples.
 - This repository runs on Windows in local Codex sessions unless the current environment explicitly says otherwise.
 - Ports: web `3002`, API `4000`, PostgreSQL `5433`, Redis `6379`.
+- Do not start dev servers (`npm run dev`, `npm run dev:web`, `npm run dev:api`) unless the user explicitly asks for a running server or browser verification.
 
 ## Worktrees
 
