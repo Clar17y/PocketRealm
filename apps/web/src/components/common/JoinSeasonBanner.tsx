@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { formatTimeRemaining } from '@/lib/format';
+import { PRESEASON_REALM_LABEL } from '@/lib/realmLabels';
 
 interface JoinSeasonBannerProps {
   seasonName: string;
@@ -50,7 +51,7 @@ export function JoinSeasonBanner({
             {seasonName} is live
           </h2>
           <p className="mt-1 text-sm text-[var(--rpg-text-secondary)]">
-            Create a fresh character to compete. Your permanent realm progress stays untouched.
+            Create a fresh seasonal character to compete. Your {PRESEASON_REALM_LABEL} character stays separate.
           </p>
           <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
             Ends in {formatTimeRemaining(seasonEndsAt)}.

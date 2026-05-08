@@ -5,6 +5,7 @@ import { INVENTORY_CONSTANTS, PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 import { PixelCard } from '@/components/PixelCard';
 import { ChampionBadge } from '@/components/common/ChampionBadge';
 import { confirmPremiumCheckout, createPremiumCheckout, getPremiumPurchases, getPremiumStatus } from '@/lib/api';
+import { SUPPORT_CARRY_FORWARD_COPY } from '@/lib/supportCopy';
 
 interface SupportPocketrealmCardProps {
   initialIsPremium: boolean;
@@ -166,6 +167,9 @@ export function SupportPocketrealmCard({
               <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
                 Your {PREMIUM_CONSTANTS.SUPPORT_DURATION_DAYS} days of Champion time have been applied and will stack with future support purchases.
               </p>
+              <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
+                {SUPPORT_CARRY_FORWARD_COPY}
+              </p>
             </div>
 
             <button
@@ -186,6 +190,9 @@ export function SupportPocketrealmCard({
 
       <p className="text-xs text-[var(--rpg-text-secondary)] mb-2">
         One-time purchase. Grants {PREMIUM_CONSTANTS.SUPPORT_DURATION_DAYS} days of Champion. Stacks if purchased again.
+      </p>
+      <p className="text-xs text-[var(--rpg-text-secondary)] mb-3">
+        {SUPPORT_CARRY_FORWARD_COPY}
       </p>
       <div className="mb-4 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]/60 px-3 py-3">
         <p className="text-xs font-bold uppercase tracking-wide text-[var(--rpg-text-secondary)]">

@@ -98,7 +98,7 @@ function primeApi() {
 }
 
 describe('Leaderboard', () => {
-  it('loads rankings for the current season and can switch back to the permanent realm', async () => {
+  it('loads rankings for the current season and can switch back to Preseason', async () => {
     primeApi();
     vi.mocked(getLeaderboard).mockResolvedValue({
       data: {
@@ -117,7 +117,7 @@ describe('Leaderboard', () => {
     await waitFor(() => expect(getLeaderboard).toHaveBeenCalledWith('pvp_rating', false, 'season-1'));
     expect(screen.getByText('SeasonHero')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Permanent Realm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preseason' }));
 
     await waitFor(() => expect(getLeaderboard).toHaveBeenLastCalledWith('pvp_rating', false, null));
   });

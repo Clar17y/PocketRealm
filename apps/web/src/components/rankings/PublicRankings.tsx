@@ -22,6 +22,7 @@ import {
 import type { ActiveSeasonResponse } from '@/lib/api/seasons';
 import type { CrownCollectorsResponse } from '@/lib/api/social';
 import { titleCaseFromSnake } from '@/lib/format';
+import { PRESEASON_REALM_LABEL } from '@/lib/realmLabels';
 
 interface SeasonOption {
   id: string;
@@ -179,7 +180,7 @@ export function PublicRankings({ initialTab = DEFAULT_TAB, embedded = false }: P
   const currentGroupCategories = groups.find((group) => group.name === activeGroup)?.categories ?? [];
   const rankingsRealms = useMemo(
     () => [
-      { id: 'permanent', label: 'Permanent Realm', seasonId: null as string | null },
+      { id: 'permanent', label: PRESEASON_REALM_LABEL, seasonId: null as string | null },
       ...(activeSeason ? [{ id: activeSeason.id, label: activeSeason.name, seasonId: activeSeason.id }] : []),
     ],
     [activeSeason],

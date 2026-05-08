@@ -104,13 +104,13 @@ describe('PublicRankings', () => {
     primeApi();
   });
 
-  it('defaults to permanent realm Total XP leaderboards', async () => {
+  it('defaults to Preseason Total XP leaderboards', async () => {
     render(<PublicRankings />);
 
     await waitFor(() => expect(getLeaderboard).toHaveBeenCalledWith('character_xp', false, null, 'alltime'));
     expect(screen.getByRole('heading', { name: 'Realm Rankings' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Leaderboards' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Permanent Realm' }).className).toContain('bg-[var(--rpg-gold)]');
+    expect(screen.getByRole('button', { name: 'Preseason' }).className).toContain('bg-[var(--rpg-gold)]');
     expect(screen.getByRole('button', { name: 'Progression' }).className).toContain('bg-[var(--rpg-gold)]');
     expect(screen.getByText('XP Hero')).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Total XP' })).toBeTruthy();

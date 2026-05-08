@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { changeEmail, changePassword, resendVerification, type CharacterSummary, type SeasonArchiveSummary } from '@/lib/api';
 import type { ConfirmRarity } from '@/lib/rarity';
+import { PRESEASON_REALM_LABEL } from '@/lib/realmLabels';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import { RaritySelector } from '../common/RaritySelector';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -294,7 +295,7 @@ export function Settings({
   };
 
   const renderCharacterRealm = (character: CharacterSummary) => {
-    const nextRealmLabel = character.seasonName ?? 'Permanent Realm';
+    const nextRealmLabel = character.seasonName ?? PRESEASON_REALM_LABEL;
     const isActiveCharacter = character.id === activePlayerId;
     const rowLabel = `${character.username} · ${nextRealmLabel} · Level ${character.characterLevel}`;
 

@@ -263,7 +263,7 @@ describe('GameScreenRenderer', () => {
   it('passes Champion turn display values to Dashboard for active premium players', () => {
     renderGameScreen({
       isPremium: true,
-      premiumExpiresAt: '2026-05-02T00:00:00.000Z',
+      premiumExpiresAt: '2099-05-02T00:00:00.000Z',
     });
 
     expect(dashboardSpy).toHaveBeenCalledTimes(1);
