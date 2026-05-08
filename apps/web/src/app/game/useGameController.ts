@@ -512,7 +512,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     void loadFriendCounts();
   }, [isAuthenticated, loadAll, loadPvpNotificationCount, loadFriendCounts]);
 
-  // Recurring polls — paused when the tab is hidden to save compute
+  // Recurring polls pause unless the page is visible, focused, and recently active.
   useVisibleInterval(() => void pollScreenData(), 10000, isAuthenticated);
   useVisibleInterval(() => void loadPvpNotificationCount(), 60000, isAuthenticated);
   useVisibleInterval(() => void loadFriendCounts(), 60000, isAuthenticated);

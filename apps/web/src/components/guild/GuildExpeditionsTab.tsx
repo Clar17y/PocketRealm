@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ExpeditionContext } from '@/lib/assets';
 import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { useVisibleInterval } from '@/hooks/usePageVisible';
 import {
   getActiveExpedition,
   getExpeditionStatus,
@@ -137,12 +138,9 @@ export function GuildExpeditionsTab({
     } catch { /* ignore */ }
   }, [loadTemplates]);
 
-  // Auto-refresh every 30s when expedition is active
-  useEffect(() => {
-    if (!expedition || expedition.status === 'completed' || expedition.status === 'failed') return;
-    const interval = setInterval(() => void loadExpedition(), 30_000);
-    return () => clearInterval(interval);
-  }, [expedition?.status, loadExpedition]);
+  // Auto-refresh when expedition is active and the page is actively being used.
+  const expeditionPollEnabled = !!expedition && expedition.status !== 'completed' && expedition.status !== 'failed';
+  useVisibleInterval(() => void loadExpedition(), 30_000, expeditionPollEnabled);
 
   // --- Action Handlers ---
 
@@ -235,31 +233,25 @@ export function GuildExpeditionsTab({
     }
   };
 
-  // Auto-advance: fires force-round every 10s when toggled on
+  // Auto-advance while toggled on and the page is actively being used.
   const [autoAdvance, setAutoAdvance] = useState(false);
-  const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const roundInFlightRef = useRef(false);
+  const autoAdvanceEnabled = autoAdvance && expedition?.status === 'in_progress';
 
-  useEffect(() => {
-    if (autoAdvance && expedition?.status === 'in_progress') {
-      autoAdvanceRef.current = setInterval(async () => {
-        if (roundInFlightRef.current) return;
-        roundInFlightRef.current = true;
-        try {
-          await forceNextRound(expedition.id);
-          await loadExpedition();
-        } finally {
-          roundInFlightRef.current = false;
-        }
-      }, 10_000);
-    }
-    return () => {
-      if (autoAdvanceRef.current) {
-        clearInterval(autoAdvanceRef.current);
-        autoAdvanceRef.current = null;
+  useVisibleInterval(() => {
+    if (!autoAdvanceEnabled || !expedition) return;
+    if (roundInFlightRef.current) return;
+
+    roundInFlightRef.current = true;
+    void (async () => {
+      try {
+        await forceNextRound(expedition.id);
+        await loadExpedition();
+      } finally {
+        roundInFlightRef.current = false;
       }
-    };
-  }, [autoAdvance, expedition?.id, expedition?.status, loadExpedition]);
+    })();
+  }, 10_000, autoAdvanceEnabled, { catchUpOnResume: false });
 
   const handleRecover = async () => {
     if (!expedition) return;
