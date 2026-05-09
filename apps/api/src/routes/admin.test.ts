@@ -88,6 +88,11 @@ import { adminRouter } from './admin';
 const mockSpawnWorldEvent = spawnWorldEvent as ReturnType<typeof vi.fn>;
 const mockGetEventById = getEventById as ReturnType<typeof vi.fn>;
 
+const apiLatencyHistogram = {
+  upperBoundsMs: [25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, null],
+  counts: [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+};
+
 function findHandler(method: string, path: string) {
   const layer = (adminRouter as any).stack.find(
     (l: any) => l.route?.path === path && l.route?.methods[method],
@@ -108,6 +113,8 @@ describe('admin routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(createActivityLog).mockResolvedValue({ id: 'log-1' } as never);
+    mockPrisma.apiLatencySnapshot.findMany.mockResolvedValue([]);
+    mockPrisma.apiLatencySnapshot.deleteMany.mockResolvedValue({ count: 0 });
   });
 
   describe('POST /turns/grant', () => {
@@ -349,6 +356,67 @@ describe('admin routes', () => {
         pendingEnumeratedFromDb: 2,
         hasDrift: true,
       });
+    });
+  });
+
+  describe('GET /analytics/latency', () => {
+    it('returns latency report JSON with period, actions, and series', async () => {
+      mockPrisma.apiLatencySnapshot.findMany.mockResolvedValue([
+        {
+          bucketStart: new Date('2026-05-09T10:00:00.000Z'),
+          action: 'exploration.start',
+          requestCount: 1,
+          successCount: 1,
+          clientErrorCount: 0,
+          serverErrorCount: 0,
+          avgMs: 100,
+          p50Ms: 100,
+          p90Ms: 100,
+          p95Ms: 100,
+          p99Ms: 100,
+          durationHistogram: apiLatencyHistogram,
+          activeConnections: 2,
+          connectedPlayers: 1,
+          eventLoopLagMs: 4.2,
+          memoryUsageMb: 120.5,
+        },
+      ]);
+
+      const req = { query: { period: '1h' } } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/analytics/latency');
+      await handler(req, res, vi.fn());
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        period: '1h',
+        actions: [
+          expect.objectContaining({
+            action: 'exploration.start',
+            requestCount: 1,
+          }),
+        ],
+        series: [
+          expect.objectContaining({
+            bucketStart: '2026-05-09T10:00:00.000Z',
+            action: 'exploration.start',
+          }),
+        ],
+      }));
+    });
+  });
+
+  describe('GET /analytics/latency/actions', () => {
+    it('returns available latency actions for the requested period', async () => {
+      mockPrisma.apiLatencySnapshot.findMany.mockResolvedValue([
+        { action: 'exploration.start' },
+      ]);
+
+      const req = { query: { period: '24h' } } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/analytics/latency/actions');
+      await handler(req, res, vi.fn());
+
+      expect(res.json).toHaveBeenCalledWith({ actions: ['exploration.start'] });
     });
   });
 
