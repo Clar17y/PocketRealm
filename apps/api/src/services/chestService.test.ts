@@ -79,8 +79,12 @@ describe('grantEncounterSiteChestRewardsTx', () => {
           chestRarity: 'common',
         },
         include: {
+          mobFamily: {
+            select: { name: true },
+          },
           itemTemplate: {
             select: {
+              name: true,
               itemType: true,
               stackable: true,
               maxDurability: true,
@@ -101,6 +105,187 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(result.loot.length).toBe(1);
       expect(result.loot[0].itemTemplateId).toBe('ore-1');
       expect(result.loot[0].rarity).toBe('common');
+    });
+  });
+
+  // ── Family signature rewards ─────────────────────────────────────────────
+
+  describe('family signature rewards', () => {
+    it('guarantees a family signature material when current rarity only has ambient resources', async () => {
+      mockPrisma.chestDropTable.findMany
+        .mockResolvedValueOnce([
+          {
+            itemTemplateId: 'copper-ore',
+            dropChance: 80,
+            minQuantity: 1,
+            maxQuantity: 2,
+            itemTemplate: { name: 'Copper Ore', itemType: 'resource', stackable: true, maxDurability: 0 },
+          },
+          {
+            itemTemplateId: 'oak-log',
+            dropChance: 80,
+            minQuantity: 1,
+            maxQuantity: 2,
+            itemTemplate: { name: 'Oak Log', itemType: 'resource', stackable: true, maxDurability: 0 },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            chestRarity: 'uncommon',
+            itemTemplateId: 'spider-silk',
+            dropChance: 75,
+            minQuantity: 4,
+            maxQuantity: 8,
+            itemTemplate: { name: 'Spider Silk', itemType: 'resource', stackable: true, maxDurability: 0 },
+          },
+          {
+            chestRarity: 'rare',
+            itemTemplateId: 'spider-silk',
+            dropChance: 85,
+            minQuantity: 6,
+            maxQuantity: 12,
+            itemTemplate: { name: 'Spider Silk', itemType: 'resource', stackable: true, maxDurability: 0 },
+          },
+        ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, baseParams);
+
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'spider-silk')).toBe(true);
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'copper-ore' || drop.itemTemplateId === 'oak-log')).toBe(false);
+      expect(addStackableItemTx).toHaveBeenCalledWith(expect.anything(), 'p1', 'spider-silk', 8);
+      expect(addStackableItemTx).not.toHaveBeenCalledWith(expect.anything(), 'p1', 'copper-ore', expect.any(Number));
+      expect(addStackableItemTx).not.toHaveBeenCalledWith(expect.anything(), 'p1', 'oak-log', expect.any(Number));
+      expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            mobFamilyId: 'family-1',
+            chestRarity: { in: ['uncommon', 'rare', 'epic', 'legendary'] },
+          },
+        })
+      );
+    });
+
+    it('guarantees the preferred current-rarity signature material even when other family drops have higher weight', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.03);
+      mockPrisma.chestDropTable.findMany.mockResolvedValueOnce([
+        {
+          itemTemplateId: 'copper-ore',
+          dropChance: 80,
+          minQuantity: 1,
+          maxQuantity: 2,
+          mobFamily: { name: 'Boars' },
+          itemTemplate: { name: 'Copper Ore', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'oak-log',
+          dropChance: 80,
+          minQuantity: 1,
+          maxQuantity: 2,
+          mobFamily: { name: 'Boars' },
+          itemTemplate: { name: 'Oak Log', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'boar-tusk',
+          dropChance: 70,
+          minQuantity: 2,
+          maxQuantity: 4,
+          mobFamily: { name: 'Boars' },
+          itemTemplate: { name: 'Boar Tusk', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'boar-hide',
+          dropChance: 60,
+          minQuantity: 2,
+          maxQuantity: 4,
+          mobFamily: { name: 'Boars' },
+          itemTemplate: { name: 'Boar Hide', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+      ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 2,
+      });
+
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'boar-hide')).toBe(true);
+      expect(addStackableItemTx).toHaveBeenNthCalledWith(1, expect.anything(), 'p1', 'boar-hide', expect.any(Number));
+      expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps logs for treants but filters non-thematic ore', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.03);
+      mockPrisma.chestDropTable.findMany.mockResolvedValueOnce([
+        {
+          itemTemplateId: 'tin-ore',
+          dropChance: 80,
+          minQuantity: 1,
+          maxQuantity: 2,
+          mobFamily: { name: 'Treants' },
+          itemTemplate: { name: 'Tin Ore', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'maple-log',
+          dropChance: 80,
+          minQuantity: 1,
+          maxQuantity: 2,
+          mobFamily: { name: 'Treants' },
+          itemTemplate: { name: 'Maple Log', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'ancient-bark',
+          dropChance: 70,
+          minQuantity: 2,
+          maxQuantity: 4,
+          mobFamily: { name: 'Treants' },
+          itemTemplate: { name: 'Ancient Bark', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+      ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 2,
+      });
+
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'maple-log')).toBe(true);
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'tin-ore')).toBe(false);
+    });
+
+    it('keeps ore for mining-themed families', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.4);
+      mockPrisma.chestDropTable.findMany.mockResolvedValueOnce([
+        {
+          itemTemplateId: 'iron-ore',
+          dropChance: 80,
+          minQuantity: 1,
+          maxQuantity: 2,
+          mobFamily: { name: 'Golems' },
+          itemTemplate: { name: 'Iron Ore', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'glowcap',
+          dropChance: 80,
+          minQuantity: 1,
+          maxQuantity: 2,
+          mobFamily: { name: 'Golems' },
+          itemTemplate: { name: 'Glowcap Mushroom', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'crystal-shard',
+          dropChance: 70,
+          minQuantity: 2,
+          maxQuantity: 4,
+          mobFamily: { name: 'Golems' },
+          itemTemplate: { name: 'Crystal Shard', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+      ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 2,
+      });
+
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'iron-ore')).toBe(true);
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'glowcap')).toBe(false);
     });
   });
 
@@ -603,6 +788,44 @@ describe('grantEncounterSiteChestRewardsTx', () => {
   // ── Available slots / overflow ────────────────────────────────────────────
 
   describe('available slots and overflow', () => {
+    it('subtracts guaranteed signature slots before rolling thematic ambient rewards', async () => {
+      mockPrisma.chestDropTable.findMany
+        .mockResolvedValueOnce([
+          {
+            itemTemplateId: 'maple-log',
+            dropChance: 80,
+            minQuantity: 1,
+            maxQuantity: 1,
+            mobFamily: { name: 'Treants' },
+            itemTemplate: { name: 'Maple Log', itemType: 'resource', stackable: true, maxDurability: 0 },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            chestRarity: 'uncommon',
+            itemTemplateId: 'ancient-bark',
+            dropChance: 75,
+            minQuantity: 1,
+            maxQuantity: 1,
+            itemTemplate: { name: 'Ancient Bark', itemType: 'resource', stackable: true, maxDurability: 0 },
+          },
+        ]);
+      mockPrisma.item.findMany.mockResolvedValue([]);
+      mockPrisma.itemTemplate.findMany.mockResolvedValue([
+        { id: 'maple-log', name: 'Maple Log' },
+        { id: 'ancient-bark', name: 'Ancient Bark' },
+      ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        availableSlots: 1,
+      });
+
+      expect(result.slotsConsumed).toBe(1);
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'ancient-bark')).toBe(true);
+      expect(result.overflow.some((item) => item.templateId === 'maple-log')).toBe(true);
+    });
+
     it('passes availableSlots through to rollAndGrantDropsTx', async () => {
       // random=0.5: 2 rolls on 1-room chest, single stackable entry
       // Roll 1: new slot needed → slotsConsumed++ (total 1)
