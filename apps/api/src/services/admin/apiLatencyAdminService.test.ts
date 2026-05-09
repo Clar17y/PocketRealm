@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPrisma } from '../../__test__/setup';
 import { getAdminApiLatencyActions, getAdminApiLatencyReport } from './apiLatencyAdminService';
+import type { LatencyReport, LatencyReportQuery } from './diagnosticsAdminService';
 
 const histogram = {
   upperBoundsMs: [25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, null],
@@ -42,7 +43,8 @@ describe('apiLatencyAdminService', () => {
       },
     ]);
 
-    const report = await getAdminApiLatencyReport({ period: '1h' });
+    const query = { period: '1h' } satisfies LatencyReportQuery;
+    const report: LatencyReport = await getAdminApiLatencyReport(query);
 
     expect(report.period).toBe('1h');
     expect(report.actions[0]).toMatchObject({
@@ -66,9 +68,9 @@ describe('apiLatencyAdminService', () => {
 
   it('returns distinct action names', async () => {
     mockPrisma.apiLatencySnapshot.findMany.mockResolvedValue([
-      { action: 'exploration.start' },
       { action: 'pvp.action' },
       { action: 'exploration.start' },
+      { action: 'pvp.action' },
     ]);
 
     await expect(getAdminApiLatencyActions('24h')).resolves.toEqual(['exploration.start', 'pvp.action']);

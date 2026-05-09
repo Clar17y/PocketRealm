@@ -6,6 +6,8 @@ export {
   getAdminApiLatencyActions,
   getAdminApiLatencyReport,
   type ApiLatencyPeriod,
+  type LatencyReport,
+  type LatencyReportQuery,
 } from './apiLatencyAdminService';
 
 export async function getAdminSchedulerStatus() {
