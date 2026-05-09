@@ -34,12 +34,17 @@ function buildPath(
 }
 
 type LatencySeriesPoint = LatencyReport['series'][number];
+type PercentileLatencyMetric = Extract<LatencyMetric, 'p50Ms' | 'p95Ms' | 'p99Ms'>;
 
 function weightedAverage(total: number, requestCount: number): number {
   return requestCount === 0 ? 0 : total / requestCount;
 }
 
-function aggregateSeriesByBucket(series: LatencySeriesPoint[]): LatencySeriesPoint[] {
+function isPercentileMetric(metric: LatencyMetric): metric is PercentileLatencyMetric {
+  return metric === 'p50Ms' || metric === 'p95Ms' || metric === 'p99Ms';
+}
+
+function aggregateSeriesByBucket(series: LatencySeriesPoint[], metric: LatencyMetric): LatencySeriesPoint[] {
   const buckets = new Map<string, {
     point: LatencySeriesPoint;
     avgMsTotal: number;
@@ -70,6 +75,9 @@ function aggregateSeriesByBucket(series: LatencySeriesPoint[]): LatencySeriesPoi
     existing.point.activeConnections = Math.max(existing.point.activeConnections, point.activeConnections);
     existing.point.eventLoopLagMs = Math.max(existing.point.eventLoopLagMs, point.eventLoopLagMs);
     existing.point.memoryUsageMb = Math.max(existing.point.memoryUsageMb, point.memoryUsageMb);
+    if (isPercentileMetric(metric)) {
+      existing.point[metric] = Math.max(existing.point[metric], point[metric]);
+    }
     existing.avgMsTotal += point.avgMs * point.requestCount;
     existing.p50MsTotal += point.p50Ms * point.requestCount;
     existing.p90MsTotal += point.p90Ms * point.requestCount;
@@ -82,19 +90,20 @@ function aggregateSeriesByBucket(series: LatencySeriesPoint[]): LatencySeriesPoi
     .map((bucket) => ({
       ...bucket.point,
       avgMs: weightedAverage(bucket.avgMsTotal, bucket.point.requestCount),
-      p50Ms: weightedAverage(bucket.p50MsTotal, bucket.point.requestCount),
+      p50Ms: metric === 'p50Ms' ? bucket.point.p50Ms : weightedAverage(bucket.p50MsTotal, bucket.point.requestCount),
       p90Ms: weightedAverage(bucket.p90MsTotal, bucket.point.requestCount),
-      p95Ms: weightedAverage(bucket.p95MsTotal, bucket.point.requestCount),
-      p99Ms: weightedAverage(bucket.p99MsTotal, bucket.point.requestCount),
+      p95Ms: metric === 'p95Ms' ? bucket.point.p95Ms : weightedAverage(bucket.p95MsTotal, bucket.point.requestCount),
+      p99Ms: metric === 'p99Ms' ? bucket.point.p99Ms : weightedAverage(bucket.p99MsTotal, bucket.point.requestCount),
       errorRate: weightedAverage(bucket.errorRateTotal, bucket.point.requestCount),
     }))
     .sort((left, right) => left.bucketStart.localeCompare(right.bucketStart));
 }
 
 function MiniLatencyChart({ report, metric, action }: { report: LatencyReport; metric: LatencyMetric; action?: string }) {
+  const showsSlowestActionEnvelope = !action && isPercentileMetric(metric);
   const points = useMemo(
-    () => (action ? report.series : aggregateSeriesByBucket(report.series)).filter((point) => point.requestCount > 0),
-    [action, report.series],
+    () => (action ? report.series : aggregateSeriesByBucket(report.series, metric)).filter((point) => point.requestCount > 0),
+    [action, metric, report.series],
   );
 
   if (points.length === 0) {
@@ -118,7 +127,9 @@ function MiniLatencyChart({ report, metric, action }: { report: LatencyReport; m
     x: xFor(index),
     y: height - padding - (point.connectedPlayers / maxPlayers) * plotHeight,
   }));
-  const chartLabel = action ? `API latency trend, ${action}` : 'API latency trend, all actions aggregated by bucket';
+  const chartLabel = action
+    ? `API latency trend, ${action}`
+    : `API latency trend, ${showsSlowestActionEnvelope ? 'slowest action per bucket' : 'all actions aggregated by bucket'}`;
 
   return (
     <div className="space-y-1">
@@ -131,7 +142,7 @@ function MiniLatencyChart({ report, metric, action }: { report: LatencyReport; m
           <span className="h-2 w-2 rounded-full bg-[var(--rpg-blue-light)]" aria-hidden="true" />
           Connected players
         </span>
-        {!action && <span>All actions aggregated by bucket</span>}
+        {!action && <span>{showsSlowestActionEnvelope ? 'Slowest action per bucket' : 'All actions aggregated by bucket'}</span>}
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="h-44 w-full" role="img" aria-label={chartLabel}>
         <rect x="0" y="0" width={width} height={height} rx="6" className="fill-[var(--rpg-surface-dark)]" />

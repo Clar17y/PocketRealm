@@ -142,7 +142,7 @@ describe('LatencyAnalyticsSection', () => {
     expect(adminGetLatencyReport).not.toHaveBeenCalledWith('24h', 'exploration.start');
   });
 
-  it('labels the all-actions chart as aggregated by bucket', async () => {
+  it('labels all-actions percentile charts as the slowest action per bucket', async () => {
     vi.mocked(adminGetLatencyReport).mockResolvedValueOnce({
       data: {
         ...sampleReport,
@@ -183,8 +183,20 @@ describe('LatencyAnalyticsSection', () => {
       },
     });
 
+    const { container } = render(<LatencyAnalyticsSection />);
+
+    expect(await screen.findByRole('img', { name: 'API latency trend, slowest action per bucket' })).toBeTruthy();
+    expect(screen.getByText('Slowest action per bucket')).toBeTruthy();
+    expect(screen.queryByRole('img', { name: 'API latency trend, all actions aggregated by bucket' })).toBeNull();
+    expect(container.querySelector('path[stroke-width="3"]')?.getAttribute('d')).toBe('M 24.0 24.0 L 616.0 76.8');
+  });
+
+  it('keeps the aggregated-by-bucket label for all-actions average latency charts', async () => {
     render(<LatencyAnalyticsSection />);
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Avg' }));
+
     expect(await screen.findByRole('img', { name: 'API latency trend, all actions aggregated by bucket' })).toBeTruthy();
+    expect(screen.getByText('All actions aggregated by bucket')).toBeTruthy();
   });
 });
