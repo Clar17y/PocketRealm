@@ -1,7 +1,7 @@
 # API Latency Snapshots
 
 **Date:** 2026-05-09
-**Status:** Draft for user review
+**Status:** Approved for implementation planning
 
 ## Goal
 
@@ -133,6 +133,8 @@ Use fixed millisecond buckets such as:
 ```typescript
 [25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, Infinity]
 ```
+
+Store the overflow bucket as `null` in JSON because JSON cannot represent `Infinity`.
 
 The admin service can merge histogram counts for 5-minute, 1-hour, or 1-day views and estimate percentiles from the merged distribution.
 
