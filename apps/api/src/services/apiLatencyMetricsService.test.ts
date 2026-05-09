@@ -63,6 +63,16 @@ describe('apiLatencyMetricsService', () => {
       expect(classifyApiAction('POST', '/api/v1/pvp/challenge')).toBe('pvp.action');
       expect(classifyApiAction('POST', '/api/v1/combat/sites/:id/round')).toBe('combat.site');
     });
+
+    it('classifies current non-POST gameplay routes to stable action labels', () => {
+      expect(classifyApiAction('GET', '/api/v1/inventory')).toBe('inventory.action');
+      expect(classifyApiAction('DELETE', '/api/v1/inventory/:id')).toBe('inventory.action');
+      expect(classifyApiAction('GET', '/api/v1/gathering/nodes')).toBe('gathering.action');
+      expect(classifyApiAction('GET', '/api/v1/crafting/recipes')).toBe('crafting.action');
+      expect(classifyApiAction('GET', '/api/v1/pvp/ladder')).toBe('pvp.action');
+      expect(classifyApiAction('GET', '/api/v1/combat/sites')).toBe('combat.site');
+      expect(classifyApiAction('GET', '/api/v1/exploration/estimate')).toBe('exploration.estimate');
+    });
   });
 
   describe('sample buffer', () => {

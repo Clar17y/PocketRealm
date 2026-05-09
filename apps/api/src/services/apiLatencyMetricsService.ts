@@ -115,18 +115,16 @@ export function normalizeApiRoute(rawRoute: string): string {
 export function classifyApiAction(method: string, route: string): string {
   const upperMethod = method.toUpperCase();
 
-  if (upperMethod === 'POST') {
-    if (route === '/api/v1/exploration/start') return 'exploration.start';
-    if (route === '/api/v1/exploration/estimate') return 'exploration.estimate';
-    if (route === '/api/v1/zones/travel') return 'zones.travel';
-    if (route.startsWith('/api/v1/equipment/')) return 'equipment.change';
-    if (route === '/api/v1/combat/start') return 'combat.start';
-    if (route.startsWith('/api/v1/combat/sites/')) return 'combat.site';
-    if (route.startsWith('/api/v1/pvp/')) return 'pvp.action';
-    if (route.startsWith('/api/v1/gathering/')) return 'gathering.action';
-    if (route.startsWith('/api/v1/crafting/')) return 'crafting.action';
-    if (route.startsWith('/api/v1/inventory/')) return 'inventory.action';
-  }
+  if (upperMethod === 'POST' && route === '/api/v1/exploration/start') return 'exploration.start';
+  if (route === '/api/v1/exploration/estimate') return 'exploration.estimate';
+  if (upperMethod === 'POST' && route === '/api/v1/zones/travel') return 'zones.travel';
+  if (route.startsWith('/api/v1/equipment/')) return 'equipment.change';
+  if (route === '/api/v1/combat/start') return 'combat.start';
+  if (isApiRouteFamily(route, '/api/v1/combat/sites')) return 'combat.site';
+  if (route.startsWith('/api/v1/pvp/')) return 'pvp.action';
+  if (route.startsWith('/api/v1/gathering/')) return 'gathering.action';
+  if (route.startsWith('/api/v1/crafting/')) return 'crafting.action';
+  if (isApiRouteFamily(route, '/api/v1/inventory')) return 'inventory.action';
 
   return `${upperMethod} ${route}`;
 }
@@ -204,6 +202,10 @@ function getOrCreateSampleBucket(key: string, action: string, method: string, ro
   apiLatencySampleBuffer.set(key, bucket);
 
   return bucket;
+}
+
+function isApiRouteFamily(route: string, baseRoute: string): boolean {
+  return route === baseRoute || route.startsWith(`${baseRoute}/`);
 }
 
 function isApiIdSegment(segment: string): boolean {
