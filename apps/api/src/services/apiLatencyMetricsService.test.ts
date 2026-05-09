@@ -134,6 +134,8 @@ describe('apiLatencyMetricsService', () => {
     });
 
     it('writes aggregate snapshot rows when samples exist', async () => {
+      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
+
       recordApiLatencySample({
         method: 'POST',
         route: '/api/v1/exploration/start',
@@ -174,6 +176,21 @@ describe('apiLatencyMetricsService', () => {
       });
     });
 
+    it('returns the Prisma insert count when duplicate snapshot rows are skipped', async () => {
+      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 0 });
+
+      recordApiLatencySample({
+        method: 'POST',
+        route: '/api/v1/exploration/start',
+        statusCode: 200,
+        durationMs: 100,
+      });
+
+      const result = await flushApiLatencySnapshots(() => null, null);
+
+      expect(result).toEqual({ flushedRows: 0 });
+    });
+
     it('starts a timer that skips Prisma until samples exist', async () => {
       vi.useFakeTimers();
       const stop = startApiLatencySnapshotWriter(() => null, 1000);
@@ -198,7 +215,9 @@ describe('apiLatencyMetricsService', () => {
     });
 
     it('logs and requeues samples when snapshot creation fails', async () => {
-      mockPrisma.apiLatencySnapshot.createMany.mockRejectedValueOnce(new Error('temporary database failure'));
+      mockPrisma.apiLatencySnapshot.createMany
+        .mockRejectedValueOnce(new Error('temporary database failure'))
+        .mockResolvedValueOnce({ count: 1 });
 
       recordApiLatencySample({
         method: 'POST',
@@ -220,6 +239,60 @@ describe('apiLatencyMetricsService', () => {
 
       expect(successfulResult).toEqual({ flushedRows: 1 });
       expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not requeue inserted samples when retention cleanup fails', async () => {
+      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
+      mockPrisma.apiLatencySnapshot.deleteMany.mockRejectedValueOnce(new Error('retention cleanup failed'));
+
+      recordApiLatencySample({
+        method: 'POST',
+        route: '/api/v1/equipment/equip',
+        statusCode: 200,
+        durationMs: 80,
+      });
+
+      const result = await flushApiLatencySnapshots(() => null, null);
+
+      expect(result).toEqual({ flushedRows: 1 });
+      expect(hasApiLatencySamples()).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error) }),
+        'Failed to clean up old API latency snapshots',
+      );
+
+      const noSamplesResult = await flushApiLatencySnapshots(() => null, null);
+
+      expect(noSamplesResult).toEqual({ flushedRows: 0 });
+      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries retention cleanup on the next flush after cleanup fails', async () => {
+      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValue({ count: 1 });
+      mockPrisma.apiLatencySnapshot.deleteMany
+        .mockRejectedValueOnce(new Error('retention cleanup failed'))
+        .mockResolvedValueOnce({ count: 0 });
+
+      recordApiLatencySample({
+        method: 'POST',
+        route: '/api/v1/equipment/equip',
+        statusCode: 200,
+        durationMs: 80,
+      });
+
+      await flushApiLatencySnapshots(() => null, null);
+
+      recordApiLatencySample({
+        method: 'POST',
+        route: '/api/v1/exploration/start',
+        statusCode: 200,
+        durationMs: 120,
+      });
+
+      const result = await flushApiLatencySnapshots(() => null, null);
+
+      expect(result).toEqual({ flushedRows: 1 });
+      expect(mockPrisma.apiLatencySnapshot.deleteMany).toHaveBeenCalledTimes(2);
     });
   });
 });

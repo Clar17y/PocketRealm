@@ -210,20 +210,28 @@ export async function flushApiLatencySnapshots(
     return { flushedRows: 0 };
   }
 
+  let flushedRows: number;
+
   try {
-    await prisma.apiLatencySnapshot.createMany({
+    const result = await prisma.apiLatencySnapshot.createMany({
       data: rows,
       skipDuplicates: true,
     });
-    await cleanupOldSnapshots();
-
-    return { flushedRows: rows.length };
+    flushedRows = result.count;
   } catch (err) {
     requeueBufferedSamples(samples);
     logger.error({ err }, 'Failed to flush API latency snapshots');
 
     return { flushedRows: 0 };
   }
+
+  try {
+    await cleanupOldSnapshots();
+  } catch (err) {
+    logger.error({ err }, 'Failed to clean up old API latency snapshots');
+  }
+
+  return { flushedRows };
 }
 
 export function startApiLatencySnapshotWriter(
@@ -341,8 +349,6 @@ async function cleanupOldSnapshots(now = Date.now()): Promise<void> {
     return;
   }
 
-  lastRetentionCleanupAt = now;
-
   const retentionMs = API_LATENCY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   await prisma.apiLatencySnapshot.deleteMany({
     where: {
@@ -351,6 +357,8 @@ async function cleanupOldSnapshots(now = Date.now()): Promise<void> {
       },
     },
   });
+
+  lastRetentionCleanupAt = now;
 }
 
 function getBucketStart(now = Date.now()): Date {
