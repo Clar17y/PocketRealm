@@ -106,4 +106,85 @@ describe('LatencyAnalyticsSection', () => {
 
     expect(await screen.findByText('No latency samples for this period.')).toBeTruthy();
   });
+
+  it('clears previous report rows when a later report fetch fails', async () => {
+    vi.mocked(adminGetLatencyReport)
+      .mockResolvedValueOnce({ data: sampleReport })
+      .mockResolvedValueOnce({ error: { message: 'Latency report unavailable' } });
+
+    render(<LatencyAnalyticsSection />);
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByRole('cell', { name: 'exploration.start' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '6h' }));
+
+    expect(await screen.findByText('Latency report unavailable')).toBeTruthy();
+    expect(screen.queryByRole('cell', { name: 'exploration.start' })).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('drops a stale action filter when changing to a period that does not include it', async () => {
+    vi.mocked(adminGetLatencyActions)
+      .mockResolvedValueOnce({ data: { actions: ['exploration.start', 'equipment.change'] } })
+      .mockResolvedValueOnce({ data: { actions: ['equipment.change'] } });
+
+    render(<LatencyAnalyticsSection />);
+
+    await screen.findByRole('option', { name: 'exploration.start' });
+    fireEvent.change(screen.getByLabelText('Latency action'), { target: { value: 'exploration.start' } });
+
+    await waitFor(() => expect(adminGetLatencyReport).toHaveBeenCalledWith('1h', 'exploration.start'));
+
+    fireEvent.click(screen.getByRole('button', { name: '24h' }));
+
+    await waitFor(() => expect(adminGetLatencyReport).toHaveBeenCalledWith('24h', undefined));
+    expect(adminGetLatencyReport).not.toHaveBeenCalledWith('24h', 'exploration.start');
+  });
+
+  it('labels the all-actions chart as aggregated by bucket', async () => {
+    vi.mocked(adminGetLatencyReport).mockResolvedValueOnce({
+      data: {
+        ...sampleReport,
+        series: [
+          {
+            ...sampleReport.series[0],
+            bucketStart: '2026-05-09T09:58:00.000Z',
+            action: 'exploration.start',
+            requestCount: 10,
+            p95Ms: 500,
+            connectedPlayers: 2,
+          },
+          {
+            ...sampleReport.series[0],
+            bucketStart: '2026-05-09T09:58:00.000Z',
+            action: 'equipment.change',
+            requestCount: 5,
+            p95Ms: 100,
+            connectedPlayers: 4,
+          },
+          {
+            ...sampleReport.series[0],
+            bucketStart: '2026-05-09T09:59:00.000Z',
+            action: 'exploration.start',
+            requestCount: 8,
+            p95Ms: 300,
+            connectedPlayers: 3,
+          },
+          {
+            ...sampleReport.series[0],
+            bucketStart: '2026-05-09T09:59:00.000Z',
+            action: 'equipment.change',
+            requestCount: 12,
+            p95Ms: 200,
+            connectedPlayers: 5,
+          },
+        ],
+      },
+    });
+
+    render(<LatencyAnalyticsSection />);
+
+    expect(await screen.findByRole('img', { name: 'API latency trend, all actions aggregated by bucket' })).toBeTruthy();
+  });
 });
