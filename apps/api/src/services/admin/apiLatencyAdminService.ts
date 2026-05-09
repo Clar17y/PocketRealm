@@ -2,6 +2,7 @@ import { prisma } from '@pocketrealm/database';
 import { logger } from '../../logger';
 import {
   API_LATENCY_RETENTION_DAYS,
+  DURATION_HISTOGRAM_UPPER_BOUNDS_MS,
   type DurationHistogramJson,
   estimatePercentileFromHistogram,
 } from '../apiLatencyMetricsService';
@@ -66,6 +67,12 @@ interface ApiLatencySnapshotRow {
   memoryUsageMb: number;
 }
 
+interface SeriesBucketGroup {
+  bucketStartMs: number;
+  action: string;
+  rows: ApiLatencySnapshotRow[];
+}
+
 const PERIOD_MS: Record<ApiLatencyPeriod, number> = {
   '1h': 60 * 60 * 1000,
   '6h': 6 * 60 * 60 * 1000,
@@ -101,7 +108,7 @@ export async function getAdminApiLatencyReport(query: LatencyReportQuery): Promi
     bucketSizeSeconds: SERIES_BUCKET_SECONDS[query.period],
     generatedAt: new Date().toISOString(),
     actions: buildActionSummaries(rows),
-    series: rows.map(toSeriesRow),
+    series: buildSeriesRows(rows, SERIES_BUCKET_SECONDS[query.period]),
   };
 }
 
@@ -111,6 +118,7 @@ export async function getAdminApiLatencyActions(period: ApiLatencyPeriod): Promi
       bucketStart: { gte: sinceForPeriod(period) },
     },
     select: { action: true },
+    distinct: ['action'],
     orderBy: { action: 'asc' },
   });
 
@@ -156,22 +164,51 @@ function buildActionSummaries(rows: ApiLatencySnapshotRow[]): LatencyActionSumma
     .sort((left, right) => right.p95Ms - left.p95Ms);
 }
 
-function toSeriesRow(row: ApiLatencySnapshotRow): LatencySeriesRow {
-  return {
-    bucketStart: row.bucketStart.toISOString(),
-    action: row.action,
-    requestCount: row.requestCount,
-    avgMs: row.avgMs,
-    p50Ms: row.p50Ms,
-    p90Ms: row.p90Ms,
-    p95Ms: row.p95Ms,
-    p99Ms: row.p99Ms,
-    errorRate: calculateErrorRate(row),
-    connectedPlayers: row.connectedPlayers,
-    activeConnections: row.activeConnections,
-    eventLoopLagMs: row.eventLoopLagMs,
-    memoryUsageMb: row.memoryUsageMb,
-  };
+function buildSeriesRows(rows: ApiLatencySnapshotRow[], bucketSizeSeconds: number): LatencySeriesRow[] {
+  const rowsByBucketAndAction = new Map<string, SeriesBucketGroup>();
+
+  for (const row of rows) {
+    const bucketStartMs = floorToBucketMs(row.bucketStart, bucketSizeSeconds);
+    const key = `${bucketStartMs}|${row.action}`;
+    const group = rowsByBucketAndAction.get(key) ?? {
+      bucketStartMs,
+      action: row.action,
+      rows: [],
+    };
+
+    group.rows.push(row);
+    rowsByBucketAndAction.set(key, group);
+  }
+
+  return [...rowsByBucketAndAction.values()]
+    .map(({ bucketStartMs, action, rows: bucketRows }) => {
+      const requestCount = sumBy(bucketRows, (row) => row.requestCount);
+      const clientErrorCount = sumBy(bucketRows, (row) => row.clientErrorCount);
+      const serverErrorCount = sumBy(bucketRows, (row) => row.serverErrorCount);
+      const weightedAvgMs = requestCount === 0
+        ? 0
+        : sumBy(bucketRows, (row) => row.avgMs * row.requestCount) / requestCount;
+      const histogram = mergeHistograms(bucketRows);
+
+      return {
+        bucketStart: new Date(bucketStartMs).toISOString(),
+        action,
+        requestCount,
+        avgMs: roundTo(weightedAvgMs, 2),
+        p50Ms: estimatePercentileFromHistogram(histogram, 50),
+        p90Ms: estimatePercentileFromHistogram(histogram, 90),
+        p95Ms: estimatePercentileFromHistogram(histogram, 95),
+        p99Ms: estimatePercentileFromHistogram(histogram, 99),
+        errorRate: calculateErrorRate({ requestCount, clientErrorCount, serverErrorCount }),
+        connectedPlayers: averageMetric(bucketRows, (row) => row.connectedPlayers),
+        activeConnections: averageMetric(bucketRows, (row) => row.activeConnections),
+        eventLoopLagMs: averageMetric(bucketRows, (row) => row.eventLoopLagMs),
+        memoryUsageMb: averageMetric(bucketRows, (row) => row.memoryUsageMb),
+      };
+    })
+    .sort((left, right) => (
+      left.bucketStart.localeCompare(right.bucketStart) || left.action.localeCompare(right.action)
+    ));
 }
 
 function mergeHistograms(rows: ApiLatencySnapshotRow[]): DurationHistogramJson {
@@ -208,11 +245,17 @@ function parseDurationHistogram(value: unknown): DurationHistogramJson | null {
     return null;
   }
 
+  if (!hasCanonicalUpperBounds(histogram.upperBoundsMs) || histogram.counts.length !== DURATION_HISTOGRAM_UPPER_BOUNDS_MS.length) {
+    return null;
+  }
+
+  if (!histogram.counts.every((count) => typeof count === 'number' && Number.isFinite(count) && count >= 0)) {
+    return null;
+  }
+
   return {
-    upperBoundsMs: histogram.upperBoundsMs.map((upperBound) => (
-      typeof upperBound === 'number' ? upperBound : null
-    )),
-    counts: histogram.counts.map((count) => (typeof count === 'number' ? count : 0)),
+    upperBoundsMs: [...DURATION_HISTOGRAM_UPPER_BOUNDS_MS],
+    counts: [...histogram.counts],
   };
 }
 
@@ -232,15 +275,37 @@ function sumBy(rows: ApiLatencySnapshotRow[], selector: (row: ApiLatencySnapshot
   return rows.reduce((total, row) => total + selector(row), 0);
 }
 
+function averageMetric(rows: ApiLatencySnapshotRow[], selector: (row: ApiLatencySnapshotRow) => number): number {
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  return roundTo(sumBy(rows, selector) / rows.length, 2);
+}
+
 function roundTo(value: number, decimals: number): number {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
+}
+
+function floorToBucketMs(date: Date, bucketSizeSeconds: number): number {
+  const bucketSizeMs = bucketSizeSeconds * 1000;
+  return Math.floor(date.getTime() / bucketSizeMs) * bucketSizeMs;
+}
+
+function hasCanonicalUpperBounds(upperBoundsMs: unknown[]): boolean {
+  return (
+    upperBoundsMs.length === DURATION_HISTOGRAM_UPPER_BOUNDS_MS.length &&
+    upperBoundsMs.every((upperBound, index) => upperBound === DURATION_HISTOGRAM_UPPER_BOUNDS_MS[index])
+  );
 }
 
 async function opportunisticCleanup(now = Date.now()): Promise<void> {
   if (now - lastAdminRetentionCleanupAt < RETENTION_CLEANUP_INTERVAL_MS) {
     return;
   }
+
+  lastAdminRetentionCleanupAt = now;
 
   try {
     await prisma.apiLatencySnapshot.deleteMany({
@@ -250,7 +315,6 @@ async function opportunisticCleanup(now = Date.now()): Promise<void> {
         },
       },
     });
-    lastAdminRetentionCleanupAt = now;
   } catch (err) {
     logger.warn({ err }, 'Failed to clean up old API latency snapshots from admin API');
   }
