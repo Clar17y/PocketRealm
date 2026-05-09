@@ -202,6 +202,8 @@ export {
   adminResetExpeditionCooldowns,
   adminFillExpedition,
   adminGetBalanceReport,
+  adminGetLatencyActions,
+  adminGetLatencyReport,
 } from './admin';
 export type {
   AdminItemTemplate,
@@ -214,6 +216,11 @@ export type {
   AdminSeason,
   BalanceReport,
   BalancePeriod,
+  LatencyActionSummary,
+  LatencyMetric,
+  LatencyPeriod,
+  LatencyReport,
+  LatencySeriesPoint,
 } from './admin';
 
 export {
