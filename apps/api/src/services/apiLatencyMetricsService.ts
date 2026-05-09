@@ -79,7 +79,7 @@ export function estimatePercentileFromHistogram(histogram: DurationHistogramJson
     return 0;
   }
 
-  const rank = Math.min(Math.max(Math.round((percentile / 100) * totalCount), 1), totalCount);
+  const rank = Math.min(Math.max(Math.ceil((percentile / 100) * totalCount), 1), totalCount);
   let cumulativeCount = 0;
   let previousFiniteUpperBound = 0;
 

@@ -19,6 +19,7 @@ import {
   normalizeApiRoute,
   recordApiLatencySample,
   resetApiLatencyBufferForTests,
+  shouldRecordApiLatency,
 } from './apiLatencyMetricsService';
 
 describe('apiLatencyMetricsService', () => {
@@ -40,11 +41,11 @@ describe('apiLatencyMetricsService', () => {
       expect(histogram.counts.reduce((total, count) => total + count, 0)).toBe(5);
     });
 
-    it('estimates percentiles from histogram bucket upper bounds', () => {
+    it('estimates nearest-rank percentiles from histogram bucket upper bounds', () => {
       const histogram = buildDurationHistogram([40, 60, 70, 900, 2000, 20000]);
 
       expect(estimatePercentileFromHistogram(histogram, 50)).toBe(100);
-      expect(estimatePercentileFromHistogram(histogram, 90)).toBe(3200);
+      expect(estimatePercentileFromHistogram(histogram, 90)).toBe(12800);
       expect(estimatePercentileFromHistogram(histogram, 99)).toBe(12800);
     });
   });
@@ -91,6 +92,14 @@ describe('apiLatencyMetricsService', () => {
 
       expect(hasApiLatencySamples()).toBe(true);
       expect(mockPrisma.apiLatencySnapshot.createMany).not.toHaveBeenCalled();
+    });
+
+    it('skips health, latency analytics, non-API, and OPTIONS requests', () => {
+      expect(shouldRecordApiLatency('GET', '/api/v1/inventory')).toBe(true);
+      expect(shouldRecordApiLatency('GET', '/health')).toBe(false);
+      expect(shouldRecordApiLatency('GET', '/api/v1/admin/analytics/latency')).toBe(false);
+      expect(shouldRecordApiLatency('GET', '/assets/logo.png')).toBe(false);
+      expect(shouldRecordApiLatency('OPTIONS', '/api/v1/inventory')).toBe(false);
     });
   });
 });
