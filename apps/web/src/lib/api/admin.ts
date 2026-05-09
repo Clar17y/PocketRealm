@@ -343,6 +343,6 @@ export async function adminGetLatencyReport(period: LatencyPeriod = '1h', action
   return fetchApi<LatencyReport>(`/api/v1/admin/analytics/latency?${params.toString()}`);
 }
 
-export async function adminGetLatencyActions(period: LatencyPeriod = '24h') {
+export async function adminGetLatencyActions(period: LatencyPeriod = '1h') {
   return fetchApi<{ actions: string[] }>(`/api/v1/admin/analytics/latency/actions?period=${period}`);
 }

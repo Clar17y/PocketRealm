@@ -34,14 +34,14 @@ function buildPath(
 }
 
 type LatencySeriesPoint = LatencyReport['series'][number];
-type PercentileLatencyMetric = Extract<LatencyMetric, 'p50Ms' | 'p95Ms' | 'p99Ms'>;
+type PercentileLatencyMetric = Extract<LatencyMetric, 'p50Ms' | 'p90Ms' | 'p95Ms' | 'p99Ms'>;
 
 function weightedAverage(total: number, requestCount: number): number {
   return requestCount === 0 ? 0 : total / requestCount;
 }
 
 function isPercentileMetric(metric: LatencyMetric): metric is PercentileLatencyMetric {
-  return metric === 'p50Ms' || metric === 'p95Ms' || metric === 'p99Ms';
+  return metric === 'p50Ms' || metric === 'p90Ms' || metric === 'p95Ms' || metric === 'p99Ms';
 }
 
 function aggregateSeriesByBucket(series: LatencySeriesPoint[], metric: LatencyMetric): LatencySeriesPoint[] {
@@ -91,7 +91,7 @@ function aggregateSeriesByBucket(series: LatencySeriesPoint[], metric: LatencyMe
       ...bucket.point,
       avgMs: weightedAverage(bucket.avgMsTotal, bucket.point.requestCount),
       p50Ms: metric === 'p50Ms' ? bucket.point.p50Ms : weightedAverage(bucket.p50MsTotal, bucket.point.requestCount),
-      p90Ms: weightedAverage(bucket.p90MsTotal, bucket.point.requestCount),
+      p90Ms: metric === 'p90Ms' ? bucket.point.p90Ms : weightedAverage(bucket.p90MsTotal, bucket.point.requestCount),
       p95Ms: metric === 'p95Ms' ? bucket.point.p95Ms : weightedAverage(bucket.p95MsTotal, bucket.point.requestCount),
       p99Ms: metric === 'p99Ms' ? bucket.point.p99Ms : weightedAverage(bucket.p99MsTotal, bucket.point.requestCount),
       errorRate: weightedAverage(bucket.errorRateTotal, bucket.point.requestCount),
