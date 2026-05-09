@@ -50,11 +50,13 @@ import { markShuttingDown } from './services/healthChecks';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { sentryContext } from './middleware/sentryContext';
+import { apiLatencyRecorder } from './middleware/apiLatencyRecorder';
 import { logger } from './logger';
 import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { startMetricsLogger } from './services/metricsLogger';
+import { startApiLatencySnapshotWriter } from './services/apiLatencyMetricsService';
 import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 import { refreshSeasonCache } from './services/seasonCacheService';
@@ -122,6 +124,7 @@ app.use((req, res, next) => {
 
 app.use(requestLogger);
 app.use(sentryContext);
+app.use(apiLatencyRecorder);
 
 // Trust the first proxy hop (e.g. nginx/Caddy) so Express resolves req.ip
 // to the real client IP rather than the reverse proxy's address.  Without
@@ -186,6 +189,7 @@ const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
+let stopLatencySnapshotWriter: (() => void) | null = null;
 let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
 let weeklyLeaderboardTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -227,6 +231,7 @@ function startServer(): void {
     }, PREMIUM_RECONCILIATION_INTERVAL_MS);
     scheduleWeeklyLeaderboardJob();
     stopMetricsLogger = startMetricsLogger(getIo);
+    stopLatencySnapshotWriter = startApiLatencySnapshotWriter(getIo);
   });
 }
 
@@ -238,6 +243,7 @@ process.on('SIGTERM', () => {
   // drains traffic during the graceful-shutdown window.
   markShuttingDown();
   stopMetricsLogger?.();
+  stopLatencySnapshotWriter?.();
   if (premiumReconciliationTimer) clearInterval(premiumReconciliationTimer);
   if (weeklyLeaderboardTimer) clearTimeout(weeklyLeaderboardTimer);
   const io = getIo();
