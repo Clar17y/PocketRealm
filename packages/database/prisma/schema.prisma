@@ -1370,6 +1370,46 @@ model PushSubscription {
 }
 
 // =============================================================================
+// OPERATIONAL ANALYTICS
+// =============================================================================
+
+model ApiLatencySnapshot {
+  id                String   @id @default(uuid())
+  bucketStart       DateTime @map("bucket_start")
+  bucketSizeSeconds Int      @map("bucket_size_seconds")
+  action            String   @db.VarChar(64)
+  method            String   @db.VarChar(8)
+  route             String   @db.VarChar(160)
+
+  requestCount     Int @map("request_count")
+  successCount     Int @map("success_count")
+  clientErrorCount Int @map("client_error_count")
+  serverErrorCount Int @map("server_error_count")
+
+  avgMs             Float @map("avg_ms")
+  minMs             Int   @map("min_ms")
+  maxMs             Int   @map("max_ms")
+  p50Ms             Int   @map("p50_ms")
+  p75Ms             Int   @map("p75_ms")
+  p90Ms             Int   @map("p90_ms")
+  p95Ms             Int   @map("p95_ms")
+  p99Ms             Int   @map("p99_ms")
+  durationHistogram Json  @map("duration_histogram")
+
+  activeConnections Int   @map("active_connections")
+  connectedPlayers  Int   @map("connected_players")
+  eventLoopLagMs    Float @map("event_loop_lag_ms")
+  memoryUsageMb     Float @map("memory_usage_mb")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([bucketStart, bucketSizeSeconds, action, method, route])
+  @@index([bucketStart])
+  @@index([action, bucketStart])
+  @@map("api_latency_snapshots")
+}
+
+// =============================================================================
 // COMBAT TEMPLATES
 // =============================================================================
 

@@ -102,6 +102,7 @@ export const prisma = {
   pushSubscription: mockModel(),
   emailVerificationToken: mockModel(),
   passwordResetToken: mockModel(),
+  apiLatencySnapshot: mockModel(),
   $transaction: vi.fn((fnOrArray: ((tx: any) => Promise<any>) | any[]) => {
     if (typeof fnOrArray === 'function') return fnOrArray(prisma);
     return Promise.all(fnOrArray);
