@@ -166,6 +166,13 @@ function isAllowedRandomChestDrop(entry: ChestDropEntry): boolean {
   return !isAmbientChestResource(entry) || isThematicAmbientResource(entry);
 }
 
+function getRandomChestDropEntries(entries: ChestDropEntry[]): ChestDropEntry[] {
+  const allowedEntries = entries.filter(isAllowedRandomChestDrop);
+  return allowedEntries.every((entry) => entry.itemTemplate.itemType === 'consumable')
+    ? []
+    : allowedEntries;
+}
+
 async function getChestDropEntriesTx(
   tx: Prisma.TransactionClient,
   mobFamilyId: string,
@@ -253,7 +260,7 @@ export async function grantEncounterSiteChestRewardsTx(
 
   const dropEntries = await getChestDropEntriesTx(tx, params.mobFamilyId, chestRarity);
   const signatureEntries = await getSignatureChestDropEntriesTx(tx, params.mobFamilyId, chestRarity, dropEntries);
-  const randomDropEntries = dropEntries.filter(isAllowedRandomChestDrop);
+  const randomDropEntries = getRandomChestDropEntries(dropEntries);
   const signatureResult = signatureEntries.length > 0
     ? await rollAndGrantDropsTx(tx, params.playerId, signatureEntries, 1, 'common', params.availableSlots)
     : null;

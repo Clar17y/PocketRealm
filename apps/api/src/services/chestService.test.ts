@@ -128,6 +128,13 @@ describe('grantEncounterSiteChestRewardsTx', () => {
             maxQuantity: 2,
             itemTemplate: { name: 'Oak Log', itemType: 'resource', stackable: true, maxDurability: 0 },
           },
+          {
+            itemTemplateId: 'minor-health-potion',
+            dropChance: 30,
+            minQuantity: 1,
+            maxQuantity: 1,
+            itemTemplate: { name: 'Minor Health Potion', itemType: 'consumable', stackable: true, maxDurability: 0 },
+          },
         ])
         .mockResolvedValueOnce([
           {
@@ -152,9 +159,11 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       expect(result.loot.some((drop) => drop.itemTemplateId === 'spider-silk')).toBe(true);
       expect(result.loot.some((drop) => drop.itemTemplateId === 'copper-ore' || drop.itemTemplateId === 'oak-log')).toBe(false);
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'minor-health-potion')).toBe(false);
       expect(addStackableItemTx).toHaveBeenCalledWith(expect.anything(), 'p1', 'spider-silk', 8);
       expect(addStackableItemTx).not.toHaveBeenCalledWith(expect.anything(), 'p1', 'copper-ore', expect.any(Number));
       expect(addStackableItemTx).not.toHaveBeenCalledWith(expect.anything(), 'p1', 'oak-log', expect.any(Number));
+      expect(addStackableItemTx).not.toHaveBeenCalledWith(expect.anything(), 'p1', 'minor-health-potion', expect.any(Number));
       expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
