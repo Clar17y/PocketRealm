@@ -28,8 +28,8 @@ type MockResponse = Response & {
 function createMockReq(overrides: Partial<Pick<Request, 'method' | 'originalUrl' | 'path'>> = {}): Request {
   return {
     method: 'GET',
-    originalUrl: '/api/v1/player?include=stats',
-    path: '/api/v1/player',
+    originalUrl: '/api/v1/inventory?include=stats',
+    path: '/api/v1/inventory',
     ...overrides,
   } as unknown as Request;
 }
@@ -59,7 +59,11 @@ describe('apiLatencyRecorder', () => {
   });
 
   it('records API request duration on finish with method, route, and status code', () => {
-    const req = createMockReq({ method: 'POST' });
+    const req = createMockReq({
+      method: 'POST',
+      originalUrl: '/api/v1/equipment/equip?slot=weapon',
+      path: '/api/v1/equipment/equip',
+    });
     const res = createMockRes(201);
     const next = vi.fn() as NextFunction;
 
@@ -70,7 +74,7 @@ describe('apiLatencyRecorder', () => {
     expect(recordApiLatencySampleMock).toHaveBeenCalledOnce();
     expect(recordApiLatencySampleMock).toHaveBeenCalledWith({
       method: 'POST',
-      route: '/api/v1/player',
+      route: '/api/v1/equipment/equip',
       statusCode: 201,
       durationMs: expect.any(Number),
     });
@@ -101,7 +105,7 @@ describe('apiLatencyRecorder', () => {
     expect(recordApiLatencySampleMock).toHaveBeenCalledOnce();
     expect(recordApiLatencySampleMock).toHaveBeenCalledWith(expect.objectContaining({
       method: 'GET',
-      route: '/api/v1/player',
+      route: '/api/v1/inventory',
       statusCode: 500,
     }));
   });

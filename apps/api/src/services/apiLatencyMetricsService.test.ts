@@ -110,10 +110,25 @@ describe('apiLatencyMetricsService', () => {
 
     it('skips health, latency analytics, non-API, and OPTIONS requests', () => {
       expect(shouldRecordApiLatency('GET', '/api/v1/inventory')).toBe(true);
+      expect(shouldRecordApiLatency('GET', '/api/v1/inventory/abc123')).toBe(false);
+      expect(shouldRecordApiLatency('DELETE', '/api/v1/inventory/abc123')).toBe(true);
+      expect(shouldRecordApiLatency('GET', '/api/v1/not-real/sensitive-token')).toBe(false);
       expect(shouldRecordApiLatency('GET', '/health')).toBe(false);
       expect(shouldRecordApiLatency('GET', '/api/v1/admin/analytics/latency')).toBe(false);
       expect(shouldRecordApiLatency('GET', '/assets/logo.png')).toBe(false);
       expect(shouldRecordApiLatency('OPTIONS', '/api/v1/inventory')).toBe(false);
+    });
+
+    it('does not buffer unclassified API paths', () => {
+      recordApiLatencySample({
+        method: 'GET',
+        route: '/api/v1/not-real/sensitive-token?debug=true',
+        statusCode: 404,
+        durationMs: 25,
+      });
+
+      expect(hasApiLatencySamples()).toBe(false);
+      expect(mockPrisma.apiLatencySnapshot.createMany).not.toHaveBeenCalled();
     });
   });
 
@@ -176,6 +191,30 @@ describe('apiLatencyMetricsService', () => {
       });
     });
 
+    it('writes normalized route templates for dynamic paths', async () => {
+      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
+
+      recordApiLatencySample({
+        method: 'DELETE',
+        route: '/api/v1/inventory/abc123?debug=true',
+        statusCode: 200,
+        durationMs: 50,
+      });
+
+      await flushApiLatencySnapshots(() => null, null);
+
+      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            action: 'inventory.action',
+            method: 'DELETE',
+            route: '/api/v1/inventory/:id',
+          }),
+        ],
+        skipDuplicates: true,
+      });
+    });
+
     it('returns the Prisma insert count when duplicate snapshot rows are skipped', async () => {
       mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 0 });
 
@@ -209,9 +248,26 @@ describe('apiLatencyMetricsService', () => {
 
         expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(1);
       } finally {
-        stop();
+        await stop();
         vi.useRealTimers();
       }
+    });
+
+    it('flushes buffered samples when the writer is stopped', async () => {
+      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
+      const stop = startApiLatencySnapshotWriter(() => null, 60_000);
+
+      recordApiLatencySample({
+        method: 'POST',
+        route: '/api/v1/equipment/equip',
+        statusCode: 200,
+        durationMs: 80,
+      });
+
+      await stop();
+
+      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(1);
+      expect(hasApiLatencySamples()).toBe(false);
     });
 
     it('logs and requeues samples when snapshot creation fails', async () => {
@@ -267,7 +323,7 @@ describe('apiLatencyMetricsService', () => {
       expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(1);
     });
 
-    it('retries retention cleanup on the next flush after cleanup fails', async () => {
+    it('throttles retention cleanup after cleanup fails', async () => {
       mockPrisma.apiLatencySnapshot.createMany.mockResolvedValue({ count: 1 });
       mockPrisma.apiLatencySnapshot.deleteMany
         .mockRejectedValueOnce(new Error('retention cleanup failed'))
@@ -292,7 +348,7 @@ describe('apiLatencyMetricsService', () => {
       const result = await flushApiLatencySnapshots(() => null, null);
 
       expect(result).toEqual({ flushedRows: 1 });
-      expect(mockPrisma.apiLatencySnapshot.deleteMany).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.apiLatencySnapshot.deleteMany).toHaveBeenCalledTimes(1);
     });
   });
 });

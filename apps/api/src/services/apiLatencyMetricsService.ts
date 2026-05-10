@@ -28,12 +28,25 @@ interface ApiLatencySampleBucket {
 
 type ApiLatencySnapshotRow = Prisma.ApiLatencySnapshotCreateManyInput;
 
+interface ApiLatencyClassification {
+  action: string;
+  route: string;
+}
+
+interface ApiLatencyRouteDefinition {
+  action: string;
+  methods: ReadonlySet<string>;
+  routes: ReadonlySet<string>;
+}
+
 export interface FlushResult {
   flushedRows: number;
 }
 
 export const API_LATENCY_BUCKET_SIZE_SECONDS = 60;
 export const API_LATENCY_RETENTION_DAYS = 30;
+const API_LATENCY_MAX_ACTION_LENGTH = 64;
+const API_LATENCY_MAX_ROUTE_LENGTH = 160;
 export const DURATION_HISTOGRAM_UPPER_BOUNDS_MS = [
   25,
   50,
@@ -53,6 +66,139 @@ let lastRetentionCleanupAt = 0;
 const UUID_SEGMENT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NUMERIC_SEGMENT_PATTERN = /^\d+$/;
 const ID_LIKE_SEGMENT_PATTERN = /^(?=.*\d)[a-z0-9_-]{6,}$/i;
+
+const GET_METHODS = new Set(['GET']);
+const POST_METHODS = new Set(['POST']);
+const DELETE_METHODS = new Set(['DELETE']);
+
+// Snapshot labels must stay finite so request paths cannot leak or create unbounded DB keys.
+const API_LATENCY_ROUTE_DEFINITIONS: ApiLatencyRouteDefinition[] = [
+  {
+    action: 'exploration.start',
+    methods: POST_METHODS,
+    routes: new Set(['/api/v1/exploration/start']),
+  },
+  {
+    action: 'exploration.estimate',
+    methods: GET_METHODS,
+    routes: new Set(['/api/v1/exploration/estimate']),
+  },
+  {
+    action: 'zones.travel',
+    methods: POST_METHODS,
+    routes: new Set(['/api/v1/zones/travel']),
+  },
+  {
+    action: 'equipment.change',
+    methods: POST_METHODS,
+    routes: new Set([
+      '/api/v1/equipment/equip',
+      '/api/v1/equipment/init',
+      '/api/v1/equipment/unequip',
+    ]),
+  },
+  {
+    action: 'combat.start',
+    methods: POST_METHODS,
+    routes: new Set(['/api/v1/combat/start']),
+  },
+  {
+    action: 'combat.site',
+    methods: GET_METHODS,
+    routes: new Set(['/api/v1/combat/sites']),
+  },
+  {
+    action: 'combat.site',
+    methods: POST_METHODS,
+    routes: new Set([
+      '/api/v1/combat/sites/abandon',
+      '/api/v1/combat/sites/:id/abandon',
+      '/api/v1/combat/sites/:id/auto-resolve',
+      '/api/v1/combat/sites/:id/round',
+      '/api/v1/combat/sites/:id/start-room',
+    ]),
+  },
+  {
+    action: 'pvp.action',
+    methods: GET_METHODS,
+    routes: new Set([
+      '/api/v1/pvp/history',
+      '/api/v1/pvp/history/:id',
+      '/api/v1/pvp/ladder',
+      '/api/v1/pvp/notifications',
+      '/api/v1/pvp/notifications/count',
+      '/api/v1/pvp/notifications/scouts',
+      '/api/v1/pvp/notifications/scouts/count',
+      '/api/v1/pvp/rating',
+    ]),
+  },
+  {
+    action: 'pvp.action',
+    methods: POST_METHODS,
+    routes: new Set([
+      '/api/v1/pvp/challenge',
+      '/api/v1/pvp/notifications/read',
+      '/api/v1/pvp/notifications/scouts/read',
+      '/api/v1/pvp/scout',
+    ]),
+  },
+  {
+    action: 'gathering.action',
+    methods: GET_METHODS,
+    routes: new Set(['/api/v1/gathering/nodes']),
+  },
+  {
+    action: 'gathering.action',
+    methods: POST_METHODS,
+    routes: new Set(['/api/v1/gathering/mine']),
+  },
+  {
+    action: 'crafting.action',
+    methods: GET_METHODS,
+    routes: new Set(['/api/v1/crafting/recipes']),
+  },
+  {
+    action: 'crafting.action',
+    methods: POST_METHODS,
+    routes: new Set([
+      '/api/v1/crafting/craft',
+      '/api/v1/crafting/forge/reroll',
+      '/api/v1/crafting/forge/upgrade',
+      '/api/v1/crafting/salvage',
+      '/api/v1/crafting/salvage/batch',
+    ]),
+  },
+  {
+    action: 'inventory.action',
+    methods: GET_METHODS,
+    routes: new Set([
+      '/api/v1/inventory',
+      '/api/v1/inventory/loot/:id',
+      '/api/v1/inventory/stash',
+    ]),
+  },
+  {
+    action: 'inventory.action',
+    methods: DELETE_METHODS,
+    routes: new Set(['/api/v1/inventory/:id']),
+  },
+  {
+    action: 'inventory.action',
+    methods: POST_METHODS,
+    routes: new Set([
+      '/api/v1/inventory/loot/claim',
+      '/api/v1/inventory/repair',
+      '/api/v1/inventory/repair-equipped',
+      '/api/v1/inventory/sell',
+      '/api/v1/inventory/sell/bulk',
+      '/api/v1/inventory/stash/deposit',
+      '/api/v1/inventory/stash/deposit/batch',
+      '/api/v1/inventory/stash/withdraw',
+      '/api/v1/inventory/stash/withdraw/batch',
+      '/api/v1/inventory/use',
+    ]),
+  },
+];
 
 export function calculatePercentile(sortedDurations: number[], percentile: number): number {
   if (sortedDurations.length === 0) {
@@ -123,51 +269,72 @@ export function normalizeApiRoute(rawRoute: string): string {
   return segments.join('/');
 }
 
-export function classifyApiAction(method: string, route: string): string {
+function getApiLatencyClassification(method: string, route: string): ApiLatencyClassification | null {
+  const upperMethod = method.toUpperCase();
+  const definition = API_LATENCY_ROUTE_DEFINITIONS.find(
+    (routeDefinition) => (
+      routeDefinition.methods.has(upperMethod) &&
+      routeDefinition.routes.has(route)
+    ),
+  );
+
+  return definition ? { action: definition.action, route } : null;
+}
+
+function getRecordableApiLatencyClassification(method: string, route: string): ApiLatencyClassification | null {
   const upperMethod = method.toUpperCase();
 
-  if (upperMethod === 'POST' && route === '/api/v1/exploration/start') return 'exploration.start';
-  if (route === '/api/v1/exploration/estimate') return 'exploration.estimate';
-  if (upperMethod === 'POST' && route === '/api/v1/zones/travel') return 'zones.travel';
-  if (route.startsWith('/api/v1/equipment/')) return 'equipment.change';
-  if (route === '/api/v1/combat/start') return 'combat.start';
-  if (isApiRouteFamily(route, '/api/v1/combat/sites')) return 'combat.site';
-  if (route.startsWith('/api/v1/pvp/')) return 'pvp.action';
-  if (route.startsWith('/api/v1/gathering/')) return 'gathering.action';
-  if (route.startsWith('/api/v1/crafting/')) return 'crafting.action';
-  if (isApiRouteFamily(route, '/api/v1/inventory')) return 'inventory.action';
+  if (upperMethod === 'OPTIONS') {
+    return null;
+  }
+
+  if (route === '/health' || route === '/health/live' || route === '/health/ready') {
+    return null;
+  }
+
+  if (route.startsWith('/api/v1/admin/analytics/latency')) {
+    return null;
+  }
+
+  const classification = getApiLatencyClassification(upperMethod, route);
+
+  if (
+    !classification ||
+    classification.action.length > API_LATENCY_MAX_ACTION_LENGTH ||
+    classification.route.length > API_LATENCY_MAX_ROUTE_LENGTH
+  ) {
+    return null;
+  }
+
+  return classification;
+}
+
+export function classifyApiAction(method: string, route: string): string {
+  const upperMethod = method.toUpperCase();
+  const classification = getApiLatencyClassification(upperMethod, route);
+
+  if (classification) {
+    return classification.action;
+  }
 
   return `${upperMethod} ${route}`;
 }
 
 export function shouldRecordApiLatency(method: string, route: string): boolean {
-  const upperMethod = method.toUpperCase();
-
-  if (upperMethod === 'OPTIONS') {
-    return false;
-  }
-
-  if (route === '/health' || route === '/health/live' || route === '/health/ready') {
-    return false;
-  }
-
-  if (route.startsWith('/api/v1/admin/analytics/latency')) {
-    return false;
-  }
-
-  return route.startsWith('/api/');
+  return getRecordableApiLatencyClassification(method, normalizeApiRoute(route)) !== null;
 }
 
 export function recordApiLatencySample(input: ApiLatencySampleInput): void {
   try {
     const method = input.method.toUpperCase();
-    const route = normalizeApiRoute(input.route);
+    const normalizedRoute = normalizeApiRoute(input.route);
+    const classification = getRecordableApiLatencyClassification(method, normalizedRoute);
 
-    if (!shouldRecordApiLatency(method, route)) {
+    if (!classification) {
       return;
     }
 
-    const action = classifyApiAction(method, route);
+    const { action, route } = classification;
     const key = getSampleBucketKey(action, method, route);
     const bucket = getOrCreateSampleBucket(key, action, method, route);
 
@@ -237,9 +404,10 @@ export async function flushApiLatencySnapshots(
 export function startApiLatencySnapshotWriter(
   getIo: () => SocketServer | null,
   intervalMs = API_LATENCY_BUCKET_SIZE_SECONDS * 1000,
-): () => void {
+): () => Promise<void> {
   const histogram = monitorEventLoopDelay({ resolution: 20 });
   histogram.enable();
+  let stopped = false;
 
   const timer = setInterval(() => {
     if (!hasApiLatencySamples()) {
@@ -249,9 +417,21 @@ export function startApiLatencySnapshotWriter(
     void flushApiLatencySnapshots(getIo, histogram);
   }, intervalMs);
 
-  return () => {
+  return async () => {
+    if (stopped) {
+      return;
+    }
+
+    stopped = true;
     clearInterval(timer);
-    histogram.disable();
+
+    try {
+      if (hasApiLatencySamples()) {
+        await flushApiLatencySnapshots(getIo, histogram);
+      }
+    } finally {
+      histogram.disable();
+    }
   };
 }
 
@@ -350,6 +530,7 @@ async function cleanupOldSnapshots(now = Date.now()): Promise<void> {
   }
 
   const retentionMs = API_LATENCY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  lastRetentionCleanupAt = now;
   await prisma.apiLatencySnapshot.deleteMany({
     where: {
       bucketStart: {
@@ -357,8 +538,6 @@ async function cleanupOldSnapshots(now = Date.now()): Promise<void> {
       },
     },
   });
-
-  lastRetentionCleanupAt = now;
 }
 
 function getBucketStart(now = Date.now()): Date {
@@ -369,10 +548,6 @@ function getBucketStart(now = Date.now()): Date {
 
 function getSampleBucketKey(action: string, method: string, route: string): string {
   return `${action}|${method}|${route}`;
-}
-
-function isApiRouteFamily(route: string, baseRoute: string): boolean {
-  return route === baseRoute || route.startsWith(`${baseRoute}/`);
 }
 
 function isApiIdSegment(segment: string): boolean {

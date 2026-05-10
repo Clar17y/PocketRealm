@@ -189,7 +189,7 @@ const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
-let stopLatencySnapshotWriter: (() => void) | null = null;
+let stopLatencySnapshotWriter: (() => Promise<void>) | null = null;
 let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
 let weeklyLeaderboardTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -243,13 +243,14 @@ process.on('SIGTERM', () => {
   // drains traffic during the graceful-shutdown window.
   markShuttingDown();
   stopMetricsLogger?.();
-  stopLatencySnapshotWriter?.();
   if (premiumReconciliationTimer) clearInterval(premiumReconciliationTimer);
   if (weeklyLeaderboardTimer) clearTimeout(weeklyLeaderboardTimer);
   const io = getIo();
   if (io) io.close();
   server.close(() => {
-    redis.quit()
+    (stopLatencySnapshotWriter?.() ?? Promise.resolve())
+      .catch((err) => logger.error({ err }, 'API latency snapshot writer shutdown failed'))
+      .then(() => redis.quit())
       .then(() => logger.info('Redis connection closed'))
       .catch((err) => logger.error({ err }, 'Redis quit error'))
       // Flush any Sentry events captured during the drain window before

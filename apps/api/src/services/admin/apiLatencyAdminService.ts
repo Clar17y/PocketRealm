@@ -98,6 +98,23 @@ export async function getAdminApiLatencyReport(query: LatencyReportQuery): Promi
       bucketStart: { gte: sinceForPeriod(query.period) },
       ...(query.action ? { action: query.action } : {}),
     },
+    select: {
+      bucketStart: true,
+      action: true,
+      requestCount: true,
+      clientErrorCount: true,
+      serverErrorCount: true,
+      avgMs: true,
+      p50Ms: true,
+      p90Ms: true,
+      p95Ms: true,
+      p99Ms: true,
+      durationHistogram: true,
+      activeConnections: true,
+      connectedPlayers: true,
+      eventLoopLagMs: true,
+      memoryUsageMb: true,
+    },
     orderBy: [{ bucketStart: 'asc' }, { action: 'asc' }],
   });
 
