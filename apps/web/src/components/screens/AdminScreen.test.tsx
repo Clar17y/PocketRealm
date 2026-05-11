@@ -11,6 +11,7 @@ const {
   adminEndSeasonMock,
   adminEvaluateSeasonRewardsMock,
   adminMergeSeasonMock,
+  adminGetBalanceReportMock,
 } = vi.hoisted(() => ({
   adminGetSeasonsMock: vi.fn(),
   adminCreateSeasonMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   adminEndSeasonMock: vi.fn(),
   adminEvaluateSeasonRewardsMock: vi.fn(),
   adminMergeSeasonMock: vi.fn(),
+  adminGetBalanceReportMock: vi.fn(),
 }));
 
 vi.mock('@/lib/api', async () => {
@@ -32,6 +34,7 @@ vi.mock('@/lib/api', async () => {
     adminEndSeason: adminEndSeasonMock,
     adminEvaluateSeasonRewards: adminEvaluateSeasonRewardsMock,
     adminMergeSeason: adminMergeSeasonMock,
+    adminGetBalanceReport: adminGetBalanceReportMock,
     adminGetLatencyActions: vi.fn().mockResolvedValue({ data: { actions: [] } }),
     adminGetLatencyReport: vi.fn().mockResolvedValue({
       data: {
@@ -101,6 +104,54 @@ beforeEach(() => {
   adminEndSeasonMock.mockResolvedValue({ data: { message: 'Ended' }, error: null });
   adminEvaluateSeasonRewardsMock.mockResolvedValue({ data: { message: 'Evaluated', hallOfFameEntries: 12 }, error: null });
   adminMergeSeasonMock.mockResolvedValue({ data: { message: 'Merged', merged: 20, errors: [] }, error: null });
+  adminGetBalanceReportMock.mockResolvedValue({
+    data: {
+      period: '7d',
+      generatedAt: '2026-05-08T12:00:00.000Z',
+      activePlayers: 85,
+      onboarding: {
+        newAccounts: 50,
+        newPlayers: 45,
+        activatedPlayers: 36,
+        activationRate: 80,
+        firstCombatPlayers: 30,
+        firstGatheringPlayers: 24,
+        firstCraftingPlayers: 12,
+        firstExplorationPlayers: 32,
+      },
+      tutorial: {
+        completed: 20,
+        skipped: 4,
+        inProgress: 10,
+        notStarted: 8,
+        completionRate: 48,
+        byStep: { '0': 8, '7': 10, '13': 20, '-1': 4 },
+      },
+      retention: {
+        activeInPeriod: 85,
+        returningActivePlayers: 55,
+        eligibleNewPlayers: 30,
+        returnedNextDay: 12,
+        nextDayRetentionRate: 40,
+      },
+      friction: {
+        newPlayersWithoutActions: 9,
+        activePlayersBelowLevel5: 22,
+        staleTutorialPlayers: 6,
+        deaths: {
+          'Forest Edge / Wolf': { count: 7, uniquePlayers: 5 },
+        },
+      },
+      skillDistribution: {},
+      turnDistribution: {
+        combat: { totalTurns: 500000, actionCount: 10000, avgTurnsPerAction: 50, uniquePlayers: 75 },
+      },
+      xpEfficiency: {},
+      progressionVelocity: {},
+      zoneActivity: {},
+    },
+    error: null,
+  });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
@@ -250,5 +301,26 @@ describe('AdminScreen seasons tab', () => {
     await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByText('Season Two Merged')).toBeTruthy());
     expect(window.confirm).toHaveBeenCalledWith('Merge season "Season Two" into the permanent realm?');
+  });
+});
+
+describe('AdminScreen analytics tab', () => {
+  it('shows onboarding, retention, and friction metrics', async () => {
+    renderAdminScreen();
+    fireEvent.click(screen.getByRole('button', { name: 'Analytics' }));
+
+    await waitFor(() => expect(adminGetBalanceReportMock).toHaveBeenCalledWith('7d'));
+
+    expect(screen.getByRole('heading', { name: 'Onboarding Funnel' })).toBeTruthy();
+    expect(screen.getByText('New accounts')).toBeTruthy();
+    expect(screen.getAllByText('Activated').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('80.0%').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'Retention' })).toBeTruthy();
+    expect(screen.getByText('Active in period')).toBeTruthy();
+    expect(screen.getByText('Returning active')).toBeTruthy();
+    expect(screen.getAllByText('Next-day retention').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'Friction' })).toBeTruthy();
+    expect(screen.getByText('No actions after signup')).toBeTruthy();
+    expect(screen.getByText('Forest Edge / Wolf')).toBeTruthy();
   });
 });

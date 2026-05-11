@@ -11,6 +11,20 @@ export type ApiRequestOptions = RequestInit & {
   auth?: 'include' | 'omit';
 };
 
+export async function checkApiReady(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/health/ready`, {
+      method: 'GET',
+      credentials: 'omit',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export interface TurnStateResponse {
   currentTurns: number;
   timeToCapMs: number | null;
@@ -27,6 +41,7 @@ type RefreshOutcome =
   | { ok: true; accessToken: string; refreshToken: string }
   | { ok: false; reason: 'missing' | 'invalid' | 'network' | 'bad_response' };
 
+const ACCESS_TOKEN_REFRESH_WINDOW_MS = 60_000;
 let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
 export function clearStoredTokens() {
@@ -93,6 +108,22 @@ async function refreshTokens(): Promise<RefreshOutcome> {
   return refreshInFlight;
 }
 
+export async function ensureFreshAccessToken(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  const token = localStorage.getItem('accessToken');
+  if (!token) return false;
+
+  const expMs = getJwtExpMs(token);
+  const shouldRefresh = typeof expMs === 'number' && expMs - Date.now() < ACCESS_TOKEN_REFRESH_WINDOW_MS;
+  if (!shouldRefresh) return true;
+
+  const refreshed = await refreshTokens();
+  if (refreshed.ok) return true;
+  if (refreshed.reason === 'invalid') clearStoredTokens();
+  return false;
+}
+
 export async function fetchApi<T>(
   endpoint: string,
   options: ApiRequestOptions = {},
@@ -109,7 +140,7 @@ export async function fetchApi<T>(
 
   if (includeAuth && !isAuthEndpoint && token) {
     const expMs = getJwtExpMs(token);
-    const shouldRefreshSoon = typeof expMs === 'number' && expMs - Date.now() < 60_000;
+    const shouldRefreshSoon = typeof expMs === 'number' && expMs - Date.now() < ACCESS_TOKEN_REFRESH_WINDOW_MS;
     if (shouldRefreshSoon) {
       await refreshTokens();
     }

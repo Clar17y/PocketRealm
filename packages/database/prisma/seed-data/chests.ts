@@ -14,7 +14,7 @@ function cd(familyId: string, rarity: string, itemId: string, chancePct: number,
 const f = IDS.families;
 
 export function getAllChestDropTables() {
-  return [
+  const rows = [
     // ══════════════════════════════════════════════════════════════════════
     // TIER 1 — Forest Edge
     // ══════════════════════════════════════════════════════════════════════
@@ -306,4 +306,66 @@ export function getAllChestDropTables() {
     // Abominations — Legendary
     cd(f.abominations, 'legendary', r.ancientOre, 85, 5, 9), cd(f.abominations, 'legendary', r.petrifiedWood, 70, 4, 8), cd(f.abominations, 'legendary', r.abyssalKelp, 80, 5, 8), cd(f.abominations, 'legendary', d.eldritchFragment, 90, 6, 11), cd(f.abominations, 'legendary', d.oozeResidue, 80, 6, 10), cd(f.abominations, 'legendary', d.ancientRelic, 45, 3, 6), cd(f.abominations, 'legendary', p.elixirOfPower, 60, 3, 6),
   ];
+
+  return rows.filter(isAllowedChestDropTableRow);
+}
+
+type ChestDropTableSeedRow = ReturnType<typeof cd>;
+
+const AMBIENT_CHEST_RESOURCE_IDS = new Set([
+  r.copperOre,
+  r.tinOre,
+  r.ironOre,
+  r.sandstone,
+  r.darkIronOre,
+  r.mithrilOre,
+  r.ancientOre,
+  r.oakLog,
+  r.mapleLog,
+  r.fungalWood,
+  r.elderwoodLog,
+  r.willowLog,
+  r.bogwoodLog,
+  r.crystalWood,
+  r.petrifiedWood,
+  r.forestSage,
+  r.moonpetal,
+  r.caveMoss,
+  r.starbloom,
+  r.glowcapMushroom,
+  r.windbloom,
+  r.gravemoss,
+  r.shimmerFern,
+  r.abyssalKelp,
+]);
+
+const ORE_RESOURCE_IDS = new Set([
+  r.copperOre,
+  r.tinOre,
+  r.ironOre,
+  r.darkIronOre,
+  r.mithrilOre,
+  r.ancientOre,
+]);
+
+const LOG_RESOURCE_IDS = new Set([
+  r.oakLog,
+  r.mapleLog,
+  r.fungalWood,
+  r.elderwoodLog,
+  r.willowLog,
+  r.bogwoodLog,
+  r.crystalWood,
+  r.petrifiedWood,
+]);
+
+const THEMATIC_AMBIENT_RESOURCE_IDS_BY_FAMILY = new Map<string, Set<string>>([
+  [f.treants, LOG_RESOURCE_IDS],
+  [f.golems, ORE_RESOURCE_IDS],
+  [f.goblins, ORE_RESOURCE_IDS],
+]);
+
+function isAllowedChestDropTableRow(row: ChestDropTableSeedRow): boolean {
+  if (!AMBIENT_CHEST_RESOURCE_IDS.has(row.itemTemplateId)) return true;
+  return THEMATIC_AMBIENT_RESOURCE_IDS_BY_FAMILY.get(row.mobFamilyId)?.has(row.itemTemplateId) ?? false;
 }

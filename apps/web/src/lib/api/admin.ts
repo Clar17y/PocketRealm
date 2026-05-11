@@ -286,8 +286,39 @@ export interface BalanceReport {
   period: string;
   generatedAt: string;
   activePlayers: number;
+  onboarding: {
+    newAccounts: number;
+    newPlayers: number;
+    activatedPlayers: number;
+    activationRate: number;
+    firstCombatPlayers: number;
+    firstGatheringPlayers: number;
+    firstCraftingPlayers: number;
+    firstExplorationPlayers: number;
+  };
+  tutorial: {
+    completed: number;
+    skipped: number;
+    inProgress: number;
+    notStarted: number;
+    completionRate: number;
+    byStep: Record<string, number>;
+  };
+  retention: {
+    activeInPeriod: number;
+    returningActivePlayers: number;
+    eligibleNewPlayers: number;
+    returnedNextDay: number;
+    nextDayRetentionRate: number;
+  };
+  friction: {
+    newPlayersWithoutActions: number;
+    activePlayersBelowLevel5: number;
+    staleTutorialPlayers: number;
+    deaths: Record<string, { count: number; uniquePlayers: number }>;
+  };
   skillDistribution: Record<string, { avg: number; median: number; p90: number; playerCount: number }>;
-  turnDistribution: Record<string, { totalTurns: number; actionCount: number; avgTurnsPerAction: number }>;
+  turnDistribution: Record<string, { totalTurns: number; actionCount: number; avgTurnsPerAction: number; uniquePlayers: number }>;
   xpEfficiency: Record<string, { totalXpGained: number; totalTurnsSpent: number; xpPerTurn: number }>;
   progressionVelocity: Record<string, { atLevel5: number; atLevel10: number; atLevel15: number; atLevel20: number; atLevel30: number }>;
   zoneActivity: Record<string, { totalTurns: number; actionCount: number; uniquePlayers: number }>;

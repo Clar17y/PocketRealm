@@ -110,7 +110,7 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
     }
   }, [isAuthenticated, pendingEncounterPage, pendingEncounterZoneFilter, pendingEncounterMobFilter, pendingEncounterSort]);
 
-  // Poll encounter sites when on the combat screen (paused when tab hidden)
+  // Poll encounter sites during active page use when on the combat screen.
   const encounterPollEnabled = isAuthenticated && activeScreen === 'combat';
   useEffect(() => {
     if (!encounterPollEnabled) return;
