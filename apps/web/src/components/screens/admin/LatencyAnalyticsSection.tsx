@@ -175,8 +175,9 @@ export function LatencyAnalyticsSection() {
         return;
       }
       if (res.data) {
-        setActions(res.data.actions);
-        setAction((current) => (current && !res.data.actions.includes(current) ? undefined : current));
+        const { actions } = res.data;
+        setActions(actions);
+        setAction((current) => (current && !actions.includes(current) ? undefined : current));
       }
     });
 
