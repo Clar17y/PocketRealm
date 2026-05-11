@@ -2,6 +2,9 @@ import { vi } from 'vitest';
 
 // Minimal Prisma namespace mock for tagged template SQL queries
 export const Prisma = {
+  TransactionIsolationLevel: {
+    Serializable: 'Serializable',
+  },
   sql(strings: TemplateStringsArray, ...values: unknown[]) {
     return { strings, values };
   },

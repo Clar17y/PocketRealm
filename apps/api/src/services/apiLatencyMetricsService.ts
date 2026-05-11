@@ -1,6 +1,6 @@
 import { monitorEventLoopDelay, type IntervalHistogram } from 'perf_hooks';
 import type { Server as SocketServer } from 'socket.io';
-import { prisma, type Prisma } from '@pocketrealm/database';
+import { prisma, Prisma } from '@pocketrealm/database';
 import { logger } from '../logger';
 import { collectMetrics, type Metrics } from './metricsLogger';
 
@@ -26,7 +26,47 @@ interface ApiLatencySampleBucket {
   serverErrorCount: number;
 }
 
-type ApiLatencySnapshotRow = Prisma.ApiLatencySnapshotCreateManyInput;
+interface ApiLatencySnapshotRow {
+  bucketStart: Date;
+  bucketSizeSeconds: number;
+  action: string;
+  method: string;
+  route: string;
+  requestCount: number;
+  successCount: number;
+  clientErrorCount: number;
+  serverErrorCount: number;
+  avgMs: number;
+  minMs: number;
+  maxMs: number;
+  p50Ms: number;
+  p75Ms: number;
+  p90Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  durationHistogram: Prisma.InputJsonValue;
+  activeConnections: number;
+  connectedPlayers: number;
+  eventLoopLagMs: number;
+  memoryUsageMb: number;
+}
+
+type MergeableApiLatencySnapshotRow = Pick<
+  ApiLatencySnapshotRow,
+  | 'requestCount'
+  | 'successCount'
+  | 'clientErrorCount'
+  | 'serverErrorCount'
+  | 'avgMs'
+  | 'minMs'
+  | 'maxMs'
+  | 'activeConnections'
+  | 'connectedPlayers'
+  | 'eventLoopLagMs'
+  | 'memoryUsageMb'
+> & {
+  durationHistogram: unknown;
+};
 
 interface ApiLatencyClassification {
   action: string;
@@ -47,6 +87,7 @@ export const API_LATENCY_BUCKET_SIZE_SECONDS = 60;
 export const API_LATENCY_RETENTION_DAYS = 30;
 const API_LATENCY_MAX_ACTION_LENGTH = 64;
 const API_LATENCY_MAX_ROUTE_LENGTH = 160;
+const API_LATENCY_WRITE_MAX_ATTEMPTS = 3;
 export const DURATION_HISTOGRAM_UPPER_BOUNDS_MS = [
   25,
   50,
@@ -380,11 +421,7 @@ export async function flushApiLatencySnapshots(
   let flushedRows: number;
 
   try {
-    const result = await prisma.apiLatencySnapshot.createMany({
-      data: rows,
-      skipDuplicates: true,
-    });
-    flushedRows = result.count;
+    flushedRows = await writeApiLatencySnapshotRows(rows);
   } catch (err) {
     requeueBufferedSamples(samples);
     logger.error({ err }, 'Failed to flush API latency snapshots');
@@ -408,13 +445,27 @@ export function startApiLatencySnapshotWriter(
   const histogram = monitorEventLoopDelay({ resolution: 20 });
   histogram.enable();
   let stopped = false;
+  let activeFlush: Promise<FlushResult> | null = null;
+
+  const runFlush = (): Promise<FlushResult> => {
+    activeFlush = flushApiLatencySnapshots(getIo, histogram)
+      .catch((err) => {
+        logger.error({ err }, 'API latency snapshot flush failed');
+        return { flushedRows: 0 };
+      })
+      .finally(() => {
+        activeFlush = null;
+      });
+
+    return activeFlush;
+  };
 
   const timer = setInterval(() => {
-    if (!hasApiLatencySamples()) {
+    if (activeFlush || !hasApiLatencySamples()) {
       return;
     }
 
-    void flushApiLatencySnapshots(getIo, histogram);
+    void runFlush();
   }, intervalMs);
 
   return async () => {
@@ -426,8 +477,12 @@ export function startApiLatencySnapshotWriter(
     clearInterval(timer);
 
     try {
+      if (activeFlush) {
+        await activeFlush;
+      }
+
       if (hasApiLatencySamples()) {
-        await flushApiLatencySnapshots(getIo, histogram);
+        await runFlush();
       }
     } finally {
       histogram.disable();
@@ -505,7 +560,7 @@ function aggregateSamples(
         successCount: sample.successCount,
         clientErrorCount: sample.clientErrorCount,
         serverErrorCount: sample.serverErrorCount,
-        avgMs: Math.round((totalDurationMs / requestCount) * 100) / 100,
+        avgMs: roundTo(totalDurationMs / requestCount, 2),
         minMs: Math.round(sortedDurations[0] ?? 0),
         maxMs: Math.round(sortedDurations[sortedDurations.length - 1] ?? 0),
         p50Ms: calculatePercentile(sortedDurations, 50),
@@ -520,6 +575,154 @@ function aggregateSamples(
         memoryUsageMb: metrics.memoryUsageMb,
       };
     });
+}
+
+async function writeApiLatencySnapshotRows(rows: ApiLatencySnapshotRow[]): Promise<number> {
+  for (const row of rows) {
+    await writeApiLatencySnapshotRow(row);
+  }
+
+  return rows.length;
+}
+
+async function writeApiLatencySnapshotRow(row: ApiLatencySnapshotRow): Promise<void> {
+  for (let attempt = 1; attempt <= API_LATENCY_WRITE_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const existing = await tx.apiLatencySnapshot.findUnique({
+          where: getApiLatencySnapshotWhereUnique(row),
+        });
+
+        if (!existing) {
+          await tx.apiLatencySnapshot.create({ data: row });
+          return;
+        }
+
+        await tx.apiLatencySnapshot.update({
+          where: { id: existing.id },
+          data: mergeApiLatencySnapshotRows(existing, row),
+        });
+      }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+      return;
+    } catch (err) {
+      if (attempt === API_LATENCY_WRITE_MAX_ATTEMPTS || !isRetryablePrismaWriteError(err)) {
+        throw err;
+      }
+    }
+  }
+}
+
+function getApiLatencySnapshotWhereUnique(row: ApiLatencySnapshotRow): Prisma.ApiLatencySnapshotWhereUniqueInput {
+  return {
+    bucketStart_bucketSizeSeconds_action_method_route: {
+      bucketStart: row.bucketStart,
+      bucketSizeSeconds: row.bucketSizeSeconds,
+      action: row.action,
+      method: row.method,
+      route: row.route,
+    },
+  };
+}
+
+function mergeApiLatencySnapshotRows(
+  existing: MergeableApiLatencySnapshotRow,
+  incoming: ApiLatencySnapshotRow,
+): Prisma.ApiLatencySnapshotUpdateInput {
+  const requestCount = existing.requestCount + incoming.requestCount;
+  const mergedHistogram = mergeDurationHistograms(
+    parseDurationHistogram(existing.durationHistogram) ?? buildDurationHistogram([]),
+    parseDurationHistogram(incoming.durationHistogram) ?? buildDurationHistogram([]),
+  );
+
+  return {
+    requestCount,
+    successCount: existing.successCount + incoming.successCount,
+    clientErrorCount: existing.clientErrorCount + incoming.clientErrorCount,
+    serverErrorCount: existing.serverErrorCount + incoming.serverErrorCount,
+    avgMs: weightedAverageLatency(existing, incoming, requestCount),
+    minMs: Math.min(existing.minMs, incoming.minMs),
+    maxMs: Math.max(existing.maxMs, incoming.maxMs),
+    p50Ms: estimatePercentileFromHistogram(mergedHistogram, 50),
+    p75Ms: estimatePercentileFromHistogram(mergedHistogram, 75),
+    p90Ms: estimatePercentileFromHistogram(mergedHistogram, 90),
+    p95Ms: estimatePercentileFromHistogram(mergedHistogram, 95),
+    p99Ms: estimatePercentileFromHistogram(mergedHistogram, 99),
+    durationHistogram: mergedHistogram as unknown as Prisma.InputJsonValue,
+    activeConnections: Math.max(existing.activeConnections, incoming.activeConnections),
+    connectedPlayers: Math.max(existing.connectedPlayers, incoming.connectedPlayers),
+    eventLoopLagMs: Math.max(existing.eventLoopLagMs, incoming.eventLoopLagMs),
+    memoryUsageMb: Math.max(existing.memoryUsageMb, incoming.memoryUsageMb),
+  };
+}
+
+function weightedAverageLatency(
+  existing: MergeableApiLatencySnapshotRow,
+  incoming: ApiLatencySnapshotRow,
+  requestCount: number,
+): number {
+  if (requestCount === 0) {
+    return 0;
+  }
+
+  const totalLatencyMs = existing.avgMs * existing.requestCount + incoming.avgMs * incoming.requestCount;
+  return roundTo(totalLatencyMs / requestCount, 2);
+}
+
+function mergeDurationHistograms(left: DurationHistogramJson, right: DurationHistogramJson): DurationHistogramJson {
+  return {
+    upperBoundsMs: [...DURATION_HISTOGRAM_UPPER_BOUNDS_MS],
+    counts: left.counts.map((count, index) => count + (right.counts[index] ?? 0)),
+  };
+}
+
+function parseDurationHistogram(value: unknown): DurationHistogramJson | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const histogram = value as { upperBoundsMs?: unknown; counts?: unknown };
+  if (!Array.isArray(histogram.upperBoundsMs) || !Array.isArray(histogram.counts)) {
+    return null;
+  }
+
+  if (!hasCanonicalDurationHistogramUpperBounds(histogram.upperBoundsMs)) {
+    return null;
+  }
+
+  if (
+    histogram.counts.length !== DURATION_HISTOGRAM_UPPER_BOUNDS_MS.length ||
+    !histogram.counts.every((count) => typeof count === 'number' && Number.isFinite(count) && count >= 0)
+  ) {
+    return null;
+  }
+
+  return {
+    upperBoundsMs: [...DURATION_HISTOGRAM_UPPER_BOUNDS_MS],
+    counts: [...histogram.counts],
+  };
+}
+
+function hasCanonicalDurationHistogramUpperBounds(upperBoundsMs: unknown[]): boolean {
+  return (
+    upperBoundsMs.length === DURATION_HISTOGRAM_UPPER_BOUNDS_MS.length &&
+    upperBoundsMs.every((upperBoundMs, index) => upperBoundMs === DURATION_HISTOGRAM_UPPER_BOUNDS_MS[index])
+  );
+}
+
+function isRetryablePrismaWriteError(err: unknown): boolean {
+  if (!err || typeof err !== 'object' || !('code' in err)) {
+    return false;
+  }
+
+  const code = (err as { code: unknown }).code;
+  return code === 'P2002' || code === 'P2034';
+}
+
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
 }
 
 async function cleanupOldSnapshots(now = Date.now()): Promise<void> {

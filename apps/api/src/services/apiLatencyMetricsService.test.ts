@@ -36,6 +36,44 @@ function mockSocketServer(playerIds: string[]): SocketServer {
   } as unknown as SocketServer;
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
+
+function existingLatencySnapshot() {
+  return {
+    id: 'snapshot-1',
+    bucketStart: new Date('2026-05-11T10:00:00.000Z'),
+    bucketSizeSeconds: 60,
+    action: 'exploration.start',
+    method: 'POST',
+    route: '/api/v1/exploration/start',
+    requestCount: 2,
+    successCount: 2,
+    clientErrorCount: 0,
+    serverErrorCount: 0,
+    avgMs: 150,
+    minMs: 100,
+    maxMs: 200,
+    p50Ms: 100,
+    p75Ms: 200,
+    p90Ms: 200,
+    p95Ms: 200,
+    p99Ms: 200,
+    durationHistogram: buildDurationHistogram([100, 200]),
+    activeConnections: 1,
+    connectedPlayers: 1,
+    eventLoopLagMs: 2,
+    memoryUsageMb: 100,
+    createdAt: new Date('2026-05-11T10:00:05.000Z'),
+  };
+}
+
 describe('apiLatencyMetricsService', () => {
   describe('duration metrics', () => {
     it('calculates nearest-rank percentiles from sorted durations', () => {
@@ -105,7 +143,7 @@ describe('apiLatencyMetricsService', () => {
       });
 
       expect(hasApiLatencySamples()).toBe(true);
-      expect(mockPrisma.apiLatencySnapshot.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.apiLatencySnapshot.create).not.toHaveBeenCalled();
     });
 
     it('skips health, latency analytics, non-API, and OPTIONS requests', () => {
@@ -128,7 +166,7 @@ describe('apiLatencyMetricsService', () => {
       });
 
       expect(hasApiLatencySamples()).toBe(false);
-      expect(mockPrisma.apiLatencySnapshot.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.apiLatencySnapshot.create).not.toHaveBeenCalled();
     });
   });
 
@@ -136,7 +174,9 @@ describe('apiLatencyMetricsService', () => {
     beforeEach(() => {
       resetApiLatencyBufferForTests();
       vi.clearAllMocks();
-      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValue({ count: 0 });
+      mockPrisma.apiLatencySnapshot.findUnique.mockResolvedValue(null);
+      mockPrisma.apiLatencySnapshot.create.mockResolvedValue({ id: 'snapshot-1' });
+      mockPrisma.apiLatencySnapshot.update.mockResolvedValue({ id: 'snapshot-1' });
       mockPrisma.apiLatencySnapshot.deleteMany.mockResolvedValue({ count: 0 });
     });
 
@@ -144,13 +184,11 @@ describe('apiLatencyMetricsService', () => {
       const result = await flushApiLatencySnapshots(() => null, null);
 
       expect(result).toEqual({ flushedRows: 0 });
-      expect(mockPrisma.apiLatencySnapshot.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.apiLatencySnapshot.create).not.toHaveBeenCalled();
       expect(mockPrisma.apiLatencySnapshot.deleteMany).not.toHaveBeenCalled();
     });
 
     it('writes aggregate snapshot rows when samples exist', async () => {
-      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
-
       recordApiLatencySample({
         method: 'POST',
         route: '/api/v1/exploration/start',
@@ -173,27 +211,22 @@ describe('apiLatencyMetricsService', () => {
       const result = await flushApiLatencySnapshots(() => mockSocketServer(['p1']), null);
 
       expect(result).toEqual({ flushedRows: 1 });
-      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledWith({
-        data: [
-          expect.objectContaining({
-            action: 'exploration.start',
-            method: 'POST',
-            route: '/api/v1/exploration/start',
-            requestCount: 3,
-            successCount: 2,
-            serverErrorCount: 1,
-            p50Ms: 300,
-            p95Ms: 900,
-            connectedPlayers: 1,
-          }),
-        ],
-        skipDuplicates: true,
+      expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'exploration.start',
+          method: 'POST',
+          route: '/api/v1/exploration/start',
+          requestCount: 3,
+          successCount: 2,
+          serverErrorCount: 1,
+          p50Ms: 300,
+          p95Ms: 900,
+          connectedPlayers: 1,
+        }),
       });
     });
 
     it('writes normalized route templates for dynamic paths', async () => {
-      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
-
       recordApiLatencySample({
         method: 'DELETE',
         route: '/api/v1/inventory/abc123?debug=true',
@@ -203,31 +236,70 @@ describe('apiLatencyMetricsService', () => {
 
       await flushApiLatencySnapshots(() => null, null);
 
-      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledWith({
-        data: [
-          expect.objectContaining({
-            action: 'inventory.action',
-            method: 'DELETE',
-            route: '/api/v1/inventory/:id',
-          }),
-        ],
-        skipDuplicates: true,
+      expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'inventory.action',
+          method: 'DELETE',
+          route: '/api/v1/inventory/:id',
+        }),
       });
     });
 
-    it('returns the Prisma insert count when duplicate snapshot rows are skipped', async () => {
-      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 0 });
+    it('merges duplicate snapshot rows instead of skipping later samples', async () => {
+      mockPrisma.apiLatencySnapshot.findUnique.mockResolvedValueOnce(existingLatencySnapshot());
 
       recordApiLatencySample({
         method: 'POST',
         route: '/api/v1/exploration/start',
-        statusCode: 200,
-        durationMs: 100,
+        statusCode: 500,
+        durationMs: 300,
       });
 
       const result = await flushApiLatencySnapshots(() => null, null);
 
-      expect(result).toEqual({ flushedRows: 0 });
+      expect(result).toEqual({ flushedRows: 1 });
+      expect(mockPrisma.apiLatencySnapshot.create).not.toHaveBeenCalled();
+      expect(mockPrisma.apiLatencySnapshot.update).toHaveBeenCalledWith({
+        where: { id: 'snapshot-1' },
+        data: expect.objectContaining({
+          requestCount: 3,
+          successCount: 2,
+          serverErrorCount: 1,
+          avgMs: 200,
+          minMs: 100,
+          maxMs: 300,
+          durationHistogram: expect.objectContaining({
+            upperBoundsMs: expect.arrayContaining([25, 50, 100, null]),
+            counts: expect.any(Array),
+          }),
+        }),
+      });
+    });
+
+    it('retries and merges when a concurrent writer creates the row first', async () => {
+      mockPrisma.apiLatencySnapshot.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingLatencySnapshot());
+      mockPrisma.apiLatencySnapshot.create.mockRejectedValueOnce({ code: 'P2002' });
+
+      recordApiLatencySample({
+        method: 'POST',
+        route: '/api/v1/exploration/start',
+        statusCode: 500,
+        durationMs: 300,
+      });
+
+      const result = await flushApiLatencySnapshots(() => null, null);
+
+      expect(result).toEqual({ flushedRows: 1 });
+      expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.apiLatencySnapshot.update).toHaveBeenCalledWith({
+        where: { id: 'snapshot-1' },
+        data: expect.objectContaining({
+          requestCount: 3,
+          serverErrorCount: 1,
+        }),
+      });
     });
 
     it('starts a timer that skips Prisma until samples exist', async () => {
@@ -236,7 +308,7 @@ describe('apiLatencyMetricsService', () => {
 
       try {
         await vi.advanceTimersByTimeAsync(1000);
-        expect(mockPrisma.apiLatencySnapshot.createMany).not.toHaveBeenCalled();
+        expect(mockPrisma.apiLatencySnapshot.create).not.toHaveBeenCalled();
 
         recordApiLatencySample({
           method: 'POST',
@@ -246,7 +318,7 @@ describe('apiLatencyMetricsService', () => {
         });
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(1);
+        expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledTimes(1);
       } finally {
         await stop();
         vi.useRealTimers();
@@ -254,7 +326,6 @@ describe('apiLatencyMetricsService', () => {
     });
 
     it('flushes buffered samples when the writer is stopped', async () => {
-      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
       const stop = startApiLatencySnapshotWriter(() => null, 60_000);
 
       recordApiLatencySample({
@@ -266,14 +337,51 @@ describe('apiLatencyMetricsService', () => {
 
       await stop();
 
-      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledTimes(1);
       expect(hasApiLatencySamples()).toBe(false);
     });
 
+    it('waits for an active timer flush when the writer is stopped', async () => {
+      vi.useFakeTimers();
+      const deferred = createDeferred<{ id: string }>();
+      mockPrisma.apiLatencySnapshot.create.mockReturnValueOnce(deferred.promise);
+      const stop = startApiLatencySnapshotWriter(() => null, 1000);
+
+      try {
+        recordApiLatencySample({
+          method: 'POST',
+          route: '/api/v1/equipment/equip',
+          statusCode: 200,
+          durationMs: 80,
+        });
+
+        vi.advanceTimersByTime(1000);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledTimes(1);
+
+        let stopped = false;
+        const stopPromise = stop().then(() => {
+          stopped = true;
+        });
+
+        await Promise.resolve();
+        expect(stopped).toBe(false);
+
+        deferred.resolve({ id: 'snapshot-1' });
+        await stopPromise;
+
+        expect(stopped).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('logs and requeues samples when snapshot creation fails', async () => {
-      mockPrisma.apiLatencySnapshot.createMany
+      mockPrisma.apiLatencySnapshot.create
         .mockRejectedValueOnce(new Error('temporary database failure'))
-        .mockResolvedValueOnce({ count: 1 });
+        .mockResolvedValueOnce({ id: 'snapshot-1' });
 
       recordApiLatencySample({
         method: 'POST',
@@ -294,11 +402,10 @@ describe('apiLatencyMetricsService', () => {
       const successfulResult = await flushApiLatencySnapshots(() => null, null);
 
       expect(successfulResult).toEqual({ flushedRows: 1 });
-      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledTimes(2);
     });
 
     it('does not requeue inserted samples when retention cleanup fails', async () => {
-      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValueOnce({ count: 1 });
       mockPrisma.apiLatencySnapshot.deleteMany.mockRejectedValueOnce(new Error('retention cleanup failed'));
 
       recordApiLatencySample({
@@ -320,11 +427,10 @@ describe('apiLatencyMetricsService', () => {
       const noSamplesResult = await flushApiLatencySnapshots(() => null, null);
 
       expect(noSamplesResult).toEqual({ flushedRows: 0 });
-      expect(mockPrisma.apiLatencySnapshot.createMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.apiLatencySnapshot.create).toHaveBeenCalledTimes(1);
     });
 
     it('throttles retention cleanup after cleanup fails', async () => {
-      mockPrisma.apiLatencySnapshot.createMany.mockResolvedValue({ count: 1 });
       mockPrisma.apiLatencySnapshot.deleteMany
         .mockRejectedValueOnce(new Error('retention cleanup failed'))
         .mockResolvedValueOnce({ count: 0 });
