@@ -51,6 +51,16 @@ vi.mock('@/lib/api', () => ({
       zoneActivity: {},
     },
   }),
+  adminGetLatencyActions: vi.fn().mockResolvedValue({ data: { actions: [] } }),
+  adminGetLatencyReport: vi.fn().mockResolvedValue({
+    data: {
+      period: '1h',
+      bucketSizeSeconds: 60,
+      generatedAt: '2026-05-09T10:00:00.000Z',
+      actions: [],
+      series: [],
+    },
+  }),
 }));
 
 describe('AdminScreen', () => {

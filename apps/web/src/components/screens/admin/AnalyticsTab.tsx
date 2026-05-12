@@ -6,6 +6,7 @@ import {
   type BalanceReport,
   type BalancePeriod,
 } from '@/lib/api';
+import { LatencyAnalyticsSection } from './LatencyAnalyticsSection';
 
 const TUTORIAL_STEP_LABELS: Record<string, string> = {
   '-1': 'Skipped',
@@ -87,6 +88,8 @@ export function AnalyticsTab() {
 
   return (
     <div className="space-y-4">
+      <LatencyAnalyticsSection />
+
       <PixelCard>
         <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Overview</h3>
         <div className="flex items-center gap-2 flex-wrap">

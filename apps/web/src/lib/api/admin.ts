@@ -329,3 +329,51 @@ export type BalancePeriod = '1h' | '24h' | '7d' | '30d';
 export async function adminGetBalanceReport(period: BalancePeriod = '7d') {
   return fetchApi<BalanceReport>(`/api/v1/admin/analytics/balance?period=${period}`);
 }
+
+export type LatencyPeriod = '1h' | '6h' | '24h' | '7d' | '30d';
+export type LatencyMetric = 'avgMs' | 'p50Ms' | 'p90Ms' | 'p95Ms' | 'p99Ms';
+
+export interface LatencyActionSummary {
+  action: string;
+  requestCount: number;
+  avgMs: number;
+  p50Ms: number;
+  p90Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  errorRate: number;
+}
+
+export interface LatencySeriesPoint {
+  bucketStart: string;
+  action: string;
+  requestCount: number;
+  avgMs: number;
+  p50Ms: number;
+  p90Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  errorRate: number;
+  connectedPlayers: number;
+  activeConnections: number;
+  eventLoopLagMs: number;
+  memoryUsageMb: number;
+}
+
+export interface LatencyReport {
+  period: LatencyPeriod;
+  bucketSizeSeconds: number;
+  generatedAt: string;
+  actions: LatencyActionSummary[];
+  series: LatencySeriesPoint[];
+}
+
+export async function adminGetLatencyReport(period: LatencyPeriod = '1h', action?: string) {
+  const params = new URLSearchParams({ period });
+  if (action) params.set('action', action);
+  return fetchApi<LatencyReport>(`/api/v1/admin/analytics/latency?${params.toString()}`);
+}
+
+export async function adminGetLatencyActions(period: LatencyPeriod = '1h') {
+  return fetchApi<{ actions: string[] }>(`/api/v1/admin/analytics/latency/actions?period=${period}`);
+}

@@ -2,6 +2,14 @@ import { getBalanceReport } from '../analyticsService';
 import { prisma } from '@pocketrealm/database';
 import { roundTimerRegistry } from '../roundTimerRegistry';
 
+export {
+  getAdminApiLatencyActions,
+  getAdminApiLatencyReport,
+  type ApiLatencyPeriod,
+  type LatencyReport,
+  type LatencyReportQuery,
+} from './apiLatencyAdminService';
+
 export async function getAdminSchedulerStatus() {
   const [pendingBossEncounters, pendingGuildExpeditions] = await Promise.all([
     prisma.bossEncounter.count({
