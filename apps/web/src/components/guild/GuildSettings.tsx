@@ -107,6 +107,7 @@ interface GuildSettingsProps {
   myRole: string;
   playerId: string | null;
   onRefresh: () => void;
+  onMembershipChanged?: () => void;
   setError: (err: string | null) => void;
 }
 
@@ -115,6 +116,7 @@ export function GuildSettings({
   myRole,
   playerId,
   onRefresh,
+  onMembershipChanged,
   setError,
 }: GuildSettingsProps) {
   const [recruitmentMode, setRecruitmentMode] = useState(guild.recruitmentMode);
@@ -150,7 +152,7 @@ export function GuildSettings({
     try {
       const res = await disbandGuild(guild.id);
       if (res.error) { setError(res.error.message); return; }
-      onRefresh();
+      (onMembershipChanged ?? onRefresh)();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to disband');
     } finally {

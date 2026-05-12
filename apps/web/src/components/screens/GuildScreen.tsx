@@ -33,10 +33,19 @@ interface GuildScreenProps {
   initialTab?: GuildTab;
   onStateUpdates?: (updates: StateUpdates) => void;
   onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
+  onGuildMembershipChange?: () => void;
   showNpcDialogue?: boolean;
 }
 
-export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdates, onExpeditionContextChange, showNpcDialogue = true }: GuildScreenProps) {
+export function GuildScreen({
+  playerId,
+  characterLevel,
+  initialTab,
+  onStateUpdates,
+  onExpeditionContextChange,
+  onGuildMembershipChange,
+  showNpcDialogue = true,
+}: GuildScreenProps) {
   const [guildData, setGuildData] = useState<PlayerGuildResponse | null>(null);
   const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +67,10 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
   }, [startLoad, endLoad]);
 
   const refreshGuild = useCallback(() => { void loadGuild(true); }, [loadGuild]);
+  const refreshGuildMembership = useCallback(() => {
+    refreshGuild();
+    onGuildMembershipChange?.();
+  }, [onGuildMembershipChange, refreshGuild]);
 
   useEffect(() => {
     void loadGuild();
@@ -97,7 +110,7 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
           playerId={playerId}
           characterLevel={characterLevel}
           error={error}
-          onGuildJoined={() => { refreshGuild(); }}
+          onGuildJoined={refreshGuildMembership}
           showNpcDialogue={showNpcDialogue}
         />
       </>
@@ -139,6 +152,7 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
           myRole={guildData.role}
           playerId={playerId}
           onRefresh={refreshGuild}
+          onMembershipChanged={refreshGuildMembership}
           setError={setError}
         />
       )}
@@ -176,6 +190,7 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
           myRole={guildData.role}
           playerId={playerId}
           onRefresh={refreshGuild}
+          onMembershipChanged={refreshGuildMembership}
           setError={setError}
         />
       )}
