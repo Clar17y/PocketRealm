@@ -403,6 +403,7 @@ export function resolveRaidOutcomePhases({
           effectName: effect.name,
           damage: dotDamage,
           damageType: effect.dotDamageType ?? 'magic',
+          ...(effect.sourceScalingStat ? { sourceScalingStat: effect.sourceScalingStat } : {}),
           hpAfter: mob.hp,
         });
       }
@@ -466,6 +467,7 @@ export function resolveRaidOutcomePhases({
           effectName: effect.name,
           damage: dotDamage,
           damageType: effect.dotDamageType ?? 'magic',
+          ...(effect.sourceScalingStat ? { sourceScalingStat: effect.sourceScalingStat } : {}),
           hpAfter: pState[index].hp,
         });
       }

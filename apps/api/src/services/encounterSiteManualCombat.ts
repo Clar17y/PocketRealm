@@ -45,6 +45,12 @@ import {
   computeDefeatedMobXp,
   buildParticipantForEncounterSite,
   countEncounterSiteHits,
+  accumulateEncounterSiteXpContribution,
+  accumulateEncounterSiteEffectTickXpContributions,
+  createEncounterSiteXpContributions,
+  rebuildEncounterSiteXpContributionsFromRoundLogs,
+  type CombatSkillContribution,
+  type EncounterSiteXpContributions,
   type FleeResult,
 } from './encounterSiteCombatCore';
 import { degradeEquippedDurabilityByHits } from './durabilityService';
@@ -76,8 +82,10 @@ interface ManualCombatState {
   initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
   mobXpByTemplateId: Record<string, number>;
   roomMobSlots: EncounterMobSlot[];
-  attackSkill: string;
+  attackSkill: AttackSkill;
   guildXpBoost: number;
+  damageByScalingStat?: CombatSkillContribution;
+  resourceCostByScalingStat?: CombatSkillContribution;
 }
 
 // Redis key prefix for manual combat sessions
@@ -105,6 +113,23 @@ async function setCombatSession(playerId: string, siteId: string, state: ManualC
   } catch {
     // Best-effort — fall through, combat will fail on next round if Redis is down
   }
+}
+
+function ensureManualXpContributions(state: ManualCombatState): EncounterSiteXpContributions {
+  if (!state.damageByScalingStat || !state.resourceCostByScalingStat) {
+    const rebuilt = rebuildEncounterSiteXpContributionsFromRoundLogs(
+      state.roundLogs,
+      state.participant.actionDefinitions,
+      state.attackSkill,
+    );
+    state.damageByScalingStat = rebuilt.damageByScalingStat;
+    state.resourceCostByScalingStat = rebuilt.resourceCostByScalingStat;
+  }
+
+  return {
+    damageByScalingStat: state.damageByScalingStat,
+    resourceCostByScalingStat: state.resourceCostByScalingStat,
+  };
 }
 
 export async function deleteCombatSession(playerId: string, siteId: string): Promise<void> {
@@ -278,6 +303,7 @@ export async function startManualEncounterRoom(
     roomMobSlots: roomMobs,
     attackSkill,
     guildXpBoost,
+    ...createEncounterSiteXpContributions(),
   });
 
   return {
@@ -363,6 +389,17 @@ export async function resolveManualEncounterRound(
   };
 
   const result = resolveRaidRound(input, undefined, 'pve_open_world');
+  const xpContributions = ensureManualXpContributions(state);
+  accumulateEncounterSiteXpContribution(
+    xpContributions,
+    result.participantResults[0],
+    state.participant.actionDefinitions,
+    state.attackSkill,
+  );
+  accumulateEncounterSiteEffectTickXpContributions(
+    xpContributions,
+    result.roundLog.phases.effectTicks,
+  );
 
   // Carry forward participant state
   const pr = result.participantResults[0];
@@ -566,8 +603,12 @@ export async function resolveManualEncounterRound(
     const totalXp = totalXpForLog;
     if (totalXp > 0) {
       xpGrants = await splitAndGrantXp(
-        playerId, totalXp, state.attackSkill as AttackSkill,
-        undefined, undefined, state.guildXpBoost,
+        playerId,
+        totalXp,
+        state.attackSkill,
+        xpContributions.damageByScalingStat,
+        xpContributions.resourceCostByScalingStat,
+        state.guildXpBoost,
       );
     }
   }
