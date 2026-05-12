@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.58',
+    date: '2026-05-12',
+    title: 'Guild Chat',
+    summary:
+      'Guild members now get a dedicated Guild tab in the chat panel, with its own history, unread count, and pinned message support. The tab appears automatically when you join or create a guild, disappears when you leave, and stays scoped to your current guild so old guild messages do not leak into the wrong chat.',
+  },
+  {
     version: '0.57',
     date: '2026-05-09',
     title: 'Encounter Site Loot Rebalance',
