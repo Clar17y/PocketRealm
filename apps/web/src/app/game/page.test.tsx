@@ -327,4 +327,20 @@ describe('GamePage realm switching', () => {
       onGuildMembershipChange: refreshGuildChatMock,
     }));
   });
+
+  it('keeps Stripe checkout return params after applying the settings deep link', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/game?screen=settings&support=success&session_id=cs_test_123',
+    );
+
+    render(<GamePage />);
+
+    await waitFor(() => expect(setActiveScreenMock).toHaveBeenCalledWith('settings'));
+    expect(window.location.pathname).toBe('/game');
+    expect(window.location.search).toContain('support=success');
+    expect(window.location.search).toContain('session_id=cs_test_123');
+    expect(window.location.search).not.toContain('screen=settings');
+  });
 });

@@ -40,7 +40,7 @@ export function useAchievements(
     });
   }, [isAuthenticated, loadAchievementUnclaimedCount]);
 
-  // Poll unclaimed count (paused when tab hidden)
+  // Poll unclaimed count during active page use.
   useVisibleInterval(() => void loadAchievementUnclaimedCount(), 60_000, isAuthenticated);
 
   // Socket listener for real-time achievement unlocks

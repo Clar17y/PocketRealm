@@ -1,12 +1,14 @@
 'use client';
 
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
+import { useConnectionRecovery } from '@/hooks/useConnectionRecovery';
 import { useEffect, useRef, useState } from 'react';
 
 const bannerBase = 'fixed top-0 left-0 right-0 z-50 text-[var(--rpg-text-primary)] text-center text-xs py-1';
 
 export function ConnectionBanner() {
   const status = useConnectionStatus();
+  useConnectionRecovery(status);
   const [showReconnected, setShowReconnected] = useState(false);
   const hasEverConnectedRef = useRef(false);
   const wasDisconnectedRef = useRef(false);

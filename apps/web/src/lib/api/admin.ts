@@ -286,8 +286,39 @@ export interface BalanceReport {
   period: string;
   generatedAt: string;
   activePlayers: number;
+  onboarding: {
+    newAccounts: number;
+    newPlayers: number;
+    activatedPlayers: number;
+    activationRate: number;
+    firstCombatPlayers: number;
+    firstGatheringPlayers: number;
+    firstCraftingPlayers: number;
+    firstExplorationPlayers: number;
+  };
+  tutorial: {
+    completed: number;
+    skipped: number;
+    inProgress: number;
+    notStarted: number;
+    completionRate: number;
+    byStep: Record<string, number>;
+  };
+  retention: {
+    activeInPeriod: number;
+    returningActivePlayers: number;
+    eligibleNewPlayers: number;
+    returnedNextDay: number;
+    nextDayRetentionRate: number;
+  };
+  friction: {
+    newPlayersWithoutActions: number;
+    activePlayersBelowLevel5: number;
+    staleTutorialPlayers: number;
+    deaths: Record<string, { count: number; uniquePlayers: number }>;
+  };
   skillDistribution: Record<string, { avg: number; median: number; p90: number; playerCount: number }>;
-  turnDistribution: Record<string, { totalTurns: number; actionCount: number; avgTurnsPerAction: number }>;
+  turnDistribution: Record<string, { totalTurns: number; actionCount: number; avgTurnsPerAction: number; uniquePlayers: number }>;
   xpEfficiency: Record<string, { totalXpGained: number; totalTurnsSpent: number; xpPerTurn: number }>;
   progressionVelocity: Record<string, { atLevel5: number; atLevel10: number; atLevel15: number; atLevel20: number; atLevel30: number }>;
   zoneActivity: Record<string, { totalTurns: number; actionCount: number; uniquePlayers: number }>;
@@ -297,4 +328,52 @@ export type BalancePeriod = '1h' | '24h' | '7d' | '30d';
 
 export async function adminGetBalanceReport(period: BalancePeriod = '7d') {
   return fetchApi<BalanceReport>(`/api/v1/admin/analytics/balance?period=${period}`);
+}
+
+export type LatencyPeriod = '1h' | '6h' | '24h' | '7d' | '30d';
+export type LatencyMetric = 'avgMs' | 'p50Ms' | 'p90Ms' | 'p95Ms' | 'p99Ms';
+
+export interface LatencyActionSummary {
+  action: string;
+  requestCount: number;
+  avgMs: number;
+  p50Ms: number;
+  p90Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  errorRate: number;
+}
+
+export interface LatencySeriesPoint {
+  bucketStart: string;
+  action: string;
+  requestCount: number;
+  avgMs: number;
+  p50Ms: number;
+  p90Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  errorRate: number;
+  connectedPlayers: number;
+  activeConnections: number;
+  eventLoopLagMs: number;
+  memoryUsageMb: number;
+}
+
+export interface LatencyReport {
+  period: LatencyPeriod;
+  bucketSizeSeconds: number;
+  generatedAt: string;
+  actions: LatencyActionSummary[];
+  series: LatencySeriesPoint[];
+}
+
+export async function adminGetLatencyReport(period: LatencyPeriod = '1h', action?: string) {
+  const params = new URLSearchParams({ period });
+  if (action) params.set('action', action);
+  return fetchApi<LatencyReport>(`/api/v1/admin/analytics/latency?${params.toString()}`);
+}
+
+export async function adminGetLatencyActions(period: LatencyPeriod = '1h') {
+  return fetchApi<{ actions: string[] }>(`/api/v1/admin/analytics/latency/actions?period=${period}`);
 }

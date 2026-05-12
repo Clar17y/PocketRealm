@@ -8,9 +8,11 @@ import {
   getMobPrefixDefinition,
   type RaidRoundInput,
   type RaidParticipant,
+  type RaidParticipantResult,
   type RaidThreatEntry,
   type ExpeditionMobState,
   type ExpeditionRoundLog,
+  type PlayerAttackEntry,
   type BossActiveEffect,
   type ActionDefinition,
   type CombatPotion,
@@ -88,15 +90,121 @@ export interface RoundSnapshot {
   };
 }
 
+export type CombatSkillContribution = Record<AttackSkill, number>;
+
 export interface EncounterRoomCombatResult {
   outcome: 'cleared' | 'defeated';
   roundsResolved: number;
   rounds: RoundSnapshot[];
+  damageByScalingStat: CombatSkillContribution;
+  resourceCostByScalingStat: CombatSkillContribution;
   playerHpAfter: number;
   playerStaminaAfter: number;
   playerManaAfter: number;
   mobResults: { mobId: string; alive: boolean; hpRemaining: number }[];
   potionsConsumed: PotionConsumed[];
+}
+
+export interface EncounterSiteXpContributions {
+  damageByScalingStat: CombatSkillContribution;
+  resourceCostByScalingStat: CombatSkillContribution;
+}
+
+export function createEncounterSiteXpContributions(): EncounterSiteXpContributions {
+  return {
+    damageByScalingStat: { melee: 0, ranged: 0, magic: 0 },
+    resourceCostByScalingStat: { melee: 0, ranged: 0, magic: 0 },
+  };
+}
+
+function resolveActionXpSkill(action: ActionDefinition, fallbackSkill: AttackSkill): AttackSkill {
+  const scalingStat = action.scalingStat ?? 'weapon';
+  return scalingStat === 'weapon' ? fallbackSkill : scalingStat;
+}
+
+function resolveEncounterSiteAction(
+  actionId: string,
+  actionDefinitions: Record<string, ActionDefinition>,
+): ActionDefinition | undefined {
+  return actionDefinitions[actionId] ?? BASE_ACTION_DEFINITIONS[actionId];
+}
+
+export function accumulateEncounterSiteXpContribution(
+  contributions: EncounterSiteXpContributions,
+  participantResult: RaidParticipantResult | undefined,
+  actionDefinitions: Record<string, ActionDefinition>,
+  fallbackSkill: AttackSkill,
+): void {
+  if (!participantResult) return;
+
+  const action = resolveEncounterSiteAction(participantResult.actionId, actionDefinitions);
+  if (!action) return;
+
+  const xpSkill = resolveActionXpSkill(action, fallbackSkill);
+  if (participantResult.damageDealt > 0) {
+    contributions.damageByScalingStat[xpSkill] += participantResult.damageDealt;
+  }
+
+  if (!participantResult.wasExhausted) {
+    const resourceCost = action.cost.stamina + action.cost.mana;
+    if (resourceCost > 0) {
+      contributions.resourceCostByScalingStat[xpSkill] += resourceCost;
+    }
+  }
+}
+
+export function accumulateEncounterSiteEffectTickXpContributions(
+  contributions: EncounterSiteXpContributions,
+  effectTicks: ExpeditionRoundLog['phases']['effectTicks'],
+): void {
+  for (const tick of effectTicks) {
+    if (tick.targetType !== 'mob' || tick.damage <= 0 || !tick.sourceScalingStat) {
+      continue;
+    }
+
+    contributions.damageByScalingStat[tick.sourceScalingStat] += tick.damage;
+  }
+}
+
+function isPlayerAttackEntry(
+  entry: ExpeditionRoundLog['phases']['playerAttacks'][number],
+): entry is PlayerAttackEntry {
+  return 'hit' in entry;
+}
+
+export function rebuildEncounterSiteXpContributionsFromRoundLogs(
+  roundLogs: ExpeditionRoundLog[],
+  actionDefinitions: Record<string, ActionDefinition>,
+  fallbackSkill: AttackSkill,
+): EncounterSiteXpContributions {
+  const contributions = createEncounterSiteXpContributions();
+  const countedResourceCosts = new Set<string>();
+
+  for (const log of roundLogs) {
+    for (const entry of log.phases.playerAttacks) {
+      if (!isPlayerAttackEntry(entry)) {
+        continue;
+      }
+
+      const action = resolveEncounterSiteAction(entry.actionId, actionDefinitions);
+      if (!action) {
+        continue;
+      }
+
+      const xpSkill = resolveActionXpSkill(action, fallbackSkill);
+      contributions.damageByScalingStat[xpSkill] += entry.totalDamage ?? 0;
+
+      const resourceCostKey = `${log.round}:${entry.playerId}:${entry.actionId}`;
+      if (!countedResourceCosts.has(resourceCostKey)) {
+        countedResourceCosts.add(resourceCostKey);
+        contributions.resourceCostByScalingStat[xpSkill] += entry.staminaCost + entry.manaCost;
+      }
+    }
+
+    accumulateEncounterSiteEffectTickXpContributions(contributions, log.phases.effectTicks);
+  }
+
+  return contributions;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +219,7 @@ export function resolveEncounterRoomCombat(
   participant: RaidParticipant,
   mobs: ExpeditionMobState[],
   maxRounds: number = ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_MAX_ROUNDS,
+  fallbackAttackSkill: AttackSkill = 'melee',
 ): EncounterRoomCombatResult {
   // Track HP separately so we can report all mobs (alive and dead) at the end.
   // resolveRaidRound filters out dead mobs in its mobsAfter result, so we
@@ -123,6 +232,7 @@ export function resolveEncounterRoomCombat(
   let threatTable: RaidThreatEntry[] = initThreatTable([participant.playerId]);
   const roundSnapshots: RoundSnapshot[] = [];
   const allPotionsConsumed: PotionConsumed[] = [];
+  const xpContributions = createEncounterSiteXpContributions();
   let roundsResolved = 0;
 
   for (let round = 1; round <= maxRounds; round++) {
@@ -144,6 +254,16 @@ export function resolveEncounterRoomCombat(
     // Carry forward participant state
     const pr = result.participantResults[0];
     if (pr) {
+      accumulateEncounterSiteXpContribution(
+        xpContributions,
+        pr,
+        currentParticipant.actionDefinitions,
+        fallbackAttackSkill,
+      );
+      accumulateEncounterSiteEffectTickXpContributions(
+        xpContributions,
+        result.roundLog.phases.effectTicks,
+      );
       currentParticipant = {
         ...currentParticipant,
         hp: pr.hpAfter,
@@ -210,6 +330,8 @@ export function resolveEncounterRoomCombat(
     outcome: allMobsCleared ? 'cleared' : 'defeated',
     roundsResolved,
     rounds: roundSnapshots,
+    damageByScalingStat: { ...xpContributions.damageByScalingStat },
+    resourceCostByScalingStat: { ...xpContributions.resourceCostByScalingStat },
     playerHpAfter: currentParticipant.hp,
     playerStaminaAfter: currentParticipant.stamina,
     playerManaAfter: currentParticipant.mana,

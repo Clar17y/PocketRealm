@@ -48,6 +48,11 @@ export function actionLabel(actionId: string, defs: Record<string, ActionDefinit
   return defs[actionId]?.name ?? actionId.replace(/_/g, ' ');
 }
 
+function getActionEffectSourceScalingStat(def: ActionDefinition): Pick<BossActiveEffect, 'sourceScalingStat'> {
+  const scalingStat = def.scalingStat ?? 'weapon';
+  return scalingStat === 'weapon' ? {} : { sourceScalingStat: scalingStat };
+}
+
 // --- Shared offensive attack resolution ---
 
 export interface OffensiveAttackContext {
@@ -169,7 +174,11 @@ export function resolvePlayerOffensive(
                 stat: def.effect.stat,
                 modifier: def.effect.modifier,
                 roundsRemaining: def.effect.duration,
-                ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+                ...(resolvedDot > 0 ? {
+                  damagePerRound: resolvedDot,
+                  dotDamageType: def.effect.dotDamageType,
+                  ...getActionEffectSourceScalingStat(def),
+                } : {}),
               });
             }
             cascadeAttempts.push({
@@ -237,7 +246,11 @@ export function resolvePlayerOffensive(
         stat: def.effect.stat,
         modifier: def.effect.modifier,
         roundsRemaining: def.effect.duration,
-        ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+        ...(resolvedDot > 0 ? {
+          damagePerRound: resolvedDot,
+          dotDamageType: def.effect.dotDamageType,
+          ...getActionEffectSourceScalingStat(def),
+        } : {}),
       });
     }
 

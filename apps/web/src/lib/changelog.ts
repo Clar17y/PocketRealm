@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.57',
+    date: '2026-05-09',
+    title: 'Encounter Site Loot Rebalance',
+    summary:
+      'Encounter site chests now better match the family you clear. Full clears guarantee a family-signature material such as Spider Silk, Boar Hide, Wolf Pelt, Stolen Coin, or Ancient Bark, while generic ore, logs, and herbs have been removed from non-thematic site rewards. Treants can still yield logs, and mining-themed families such as Golems and Goblins can still yield ore. This makes spider nests, boar territories, bandit camps, and similar sites feel more reliable for targeted material farming.',
+  },
+  {
     version: '0.56',
     date: '2026-04-27',
     title: 'Realm Rankings & World Activity',

@@ -1,4 +1,4 @@
-export { fetchApi, clearStoredTokens, getJwtExpMs } from './core';
+export { fetchApi, clearStoredTokens, getJwtExpMs, checkApiReady, ensureFreshAccessToken } from './core';
 export type { ApiRequestOptions, ApiResponse, TaxInfo } from './core';
 
 export {
@@ -202,6 +202,8 @@ export {
   adminResetExpeditionCooldowns,
   adminFillExpedition,
   adminGetBalanceReport,
+  adminGetLatencyActions,
+  adminGetLatencyReport,
 } from './admin';
 export type {
   AdminItemTemplate,
@@ -214,6 +216,11 @@ export type {
   AdminSeason,
   BalanceReport,
   BalancePeriod,
+  LatencyActionSummary,
+  LatencyMetric,
+  LatencyPeriod,
+  LatencyReport,
+  LatencySeriesPoint,
 } from './admin';
 
 export {

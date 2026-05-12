@@ -136,12 +136,16 @@ export default function GamePage() {
   // Navigate to screen from query param (e.g. push notification deep link)
   const [deepLinkTab, setDeepLinkTab] = useState<string | null>(null);
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const screen = params.get('screen');
+    const url = new URL(window.location.href);
+    const screen = url.searchParams.get('screen');
     if (screen) {
       setActiveScreen(screen as Screen);
-      setDeepLinkTab(params.get('tab'));
-      window.history.replaceState(null, '', '/game');
+      setDeepLinkTab(url.searchParams.get('tab'));
+      url.searchParams.delete('screen');
+      url.searchParams.delete('tab');
+      const nextSearch = url.searchParams.toString();
+      const nextPath = `${url.pathname}${nextSearch ? `?${nextSearch}` : ''}${url.hash}`;
+      window.history.replaceState(null, '', nextPath);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

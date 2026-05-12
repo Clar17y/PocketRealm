@@ -2,6 +2,9 @@ import { vi } from 'vitest';
 
 // Minimal Prisma namespace mock for tagged template SQL queries
 export const Prisma = {
+  TransactionIsolationLevel: {
+    Serializable: 'Serializable',
+  },
   sql(strings: TemplateStringsArray, ...values: unknown[]) {
     return { strings, values };
   },
@@ -102,6 +105,7 @@ export const prisma = {
   pushSubscription: mockModel(),
   emailVerificationToken: mockModel(),
   passwordResetToken: mockModel(),
+  apiLatencySnapshot: mockModel(),
   $transaction: vi.fn((fnOrArray: ((tx: any) => Promise<any>) | any[]) => {
     if (typeof fnOrArray === 'function') return fnOrArray(prisma);
     return Promise.all(fnOrArray);
