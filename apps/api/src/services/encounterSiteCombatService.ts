@@ -41,8 +41,19 @@ import { deleteCombatSession } from './encounterSiteManualCombat';
 export { parseEncounterMobSlot, makeEncounterMobId };
 
 // Re-exports from encounterSiteCombatCore so existing importers don't break
-export { resolveEncounterRoomCombat, computeDefeatedMobXp } from './encounterSiteCombatCore';
-export type { RoundSnapshot, EncounterRoomCombatResult, FleeResult } from './encounterSiteCombatCore';
+export {
+  resolveEncounterRoomCombat,
+  computeDefeatedMobXp,
+  accumulateEncounterSiteXpContribution,
+  rebuildEncounterSiteXpContributionsFromRoundLogs,
+  createEncounterSiteXpContributions,
+} from './encounterSiteCombatCore';
+export type {
+  RoundSnapshot,
+  EncounterRoomCombatResult,
+  EncounterSiteXpContributions,
+  FleeResult,
+} from './encounterSiteCombatCore';
 
 // Re-exports from encounterSiteManualCombat so existing importers don't break
 export { clearManualCombatSession, startManualEncounterRoom, resolveManualEncounterRound } from './encounterSiteManualCombat';
@@ -164,7 +175,7 @@ export async function autoResolveEncounterRoom(
   );
 
   // Run combat loop in memory
-  const combatResult = resolveEncounterRoomCombat(participant, expeditionMobs);
+  const combatResult = resolveEncounterRoomCombat(participant, expeditionMobs, undefined, attackSkill);
 
   // Determine which slots were cleared
   const clearedSlotsByMobId = new Map<string, number>(); // mobId -> slot
@@ -324,8 +335,12 @@ export async function autoResolveEncounterRoom(
     const totalXp = totalXpForLog;
     if (totalXp > 0) {
       xpGrants = await splitAndGrantXp(
-        playerId, totalXp, attackSkill,
-        undefined, undefined, guildXpBoost,
+        playerId,
+        totalXp,
+        attackSkill,
+        combatResult.damageByScalingStat,
+        combatResult.resourceCostByScalingStat,
+        guildXpBoost,
       );
     }
   }

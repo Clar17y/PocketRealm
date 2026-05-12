@@ -305,6 +305,7 @@ export interface EffectTickEntry {
   effectName: string;
   damage: number;
   damageType: 'physical' | 'magic';
+  sourceScalingStat?: 'melee' | 'ranged' | 'magic';
   hpAfter: number;
 }
 

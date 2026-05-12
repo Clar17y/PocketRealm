@@ -24,6 +24,7 @@ export interface BossActiveEffect {
   roundsRemaining: number;
   damagePerRound?: number;
   dotDamageType?: 'physical' | 'magic';
+  sourceScalingStat?: 'melee' | 'ranged' | 'magic';
 }
 
 export type WorldEventScope = 'zone' | 'world';
