@@ -1,6 +1,7 @@
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { describe, expect, it } from 'vitest';
 import type { MobTemplate, SpellAction } from '@pocketrealm/shared';
-import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
+
 import {
   mobToTemplate,
   buildMobActionDefinitions,

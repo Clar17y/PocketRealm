@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { NPC_DIALOGUE_CONSTANTS, type DialogueEvent } from '@pocketrealm/shared';
+import { NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+import type { DialogueEvent } from '@pocketrealm/shared/constants/npcDialogue';
 
 const {
   GREETING_DURATION_MS,

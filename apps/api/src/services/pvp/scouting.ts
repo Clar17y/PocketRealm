@@ -1,14 +1,10 @@
+import { TALENT_TREE_DEFINITIONS } from '@pocketrealm/shared/constants/talentTreeDefinitions';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { prisma } from '@pocketrealm/database';
 import {
-  calculateMaxMana,
-  calculateMaxStamina,
-} from '@pocketrealm/game-engine';
+  calculateMaxMana, calculateMaxStamina, } from '@pocketrealm/game-engine';
 import {
-  BASE_ACTION_DEFINITIONS,
-  PVP_CONSTANTS,
-  TALENT_TREE_DEFINITIONS,
-  type ActionDefinition,
-} from '@pocketrealm/shared';
+  PVP_CONSTANTS, type ActionDefinition } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { getEquipmentStats } from '../equipmentService';
 import { getHpState } from '../hpService';

@@ -65,53 +65,62 @@ export default function RegisterPage() {
           Create Your Character
         </h1>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="username" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
-              Username
-            </label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              minLength={3}
-              maxLength={32}
-              pattern="^[a-zA-Z0-9_]+$"
-              className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" autoComplete="on">
+          {isHydrated ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="username" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  minLength={3}
+                  maxLength={32}
+                  pattern="^[a-zA-Z0-9_]+$"
+                  autoComplete="username"
+                  className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
+                />
+              </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
-            />
-          </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="email" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
+                />
+              </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={10}
-              className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
-            />
-            <PasswordStrengthIndicator password={password} />
-          </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="password" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={10}
+                  autoComplete="new-password"
+                  className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
+                />
+                <PasswordStrengthIndicator password={password} />
+              </div>
+            </>
+          ) : (
+            <div aria-hidden="true" className="h-[226px]" />
+          )}
 
           {error && (
             <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>

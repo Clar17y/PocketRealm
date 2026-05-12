@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ITEM_RARITY_CONSTANTS, type NpcKey } from '@pocketrealm/shared';
+import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';

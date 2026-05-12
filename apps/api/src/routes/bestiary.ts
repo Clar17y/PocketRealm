@@ -1,6 +1,7 @@
+import { BOSS_TEMPLATES } from '@pocketrealm/shared/constants/bossTemplateDefinitions';
 import { Router } from 'express';
 import { prisma } from '@pocketrealm/database';
-import { getAllMobPrefixes, BOSS_TEMPLATES, CACHE_HEADER_CONSTANTS, QUERY_LIMITS } from '@pocketrealm/shared';
+import { getAllMobPrefixes, CACHE_HEADER_CONSTANTS, QUERY_LIMITS } from '@pocketrealm/shared';
 import type { BossRotationReveal } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';

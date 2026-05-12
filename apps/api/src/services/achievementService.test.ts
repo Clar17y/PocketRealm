@@ -25,7 +25,7 @@ import {
 } from './achievementService';
 import { resolveStats, resolveAllStats, resolveFamilyKills, resolveAllFamilyKills } from './statsService';
 import { getIo } from '../socket';
-import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared/constants/achievementDefinitions';
 import { AppError } from '../middleware/errorHandler';
 
 const mockResolveStats = resolveStats as ReturnType<typeof vi.fn>;

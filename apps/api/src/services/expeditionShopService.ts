@@ -1,6 +1,6 @@
 import { prisma } from '@pocketrealm/database';
+import { EXPEDITION_SHOP_ITEMS } from '@pocketrealm/shared/constants/expeditionDefinitions';
 import {
-  EXPEDITION_SHOP_ITEMS,
   EXPEDITION_CONSTANTS,
   type ExpeditionShopItem,
 } from '@pocketrealm/shared';

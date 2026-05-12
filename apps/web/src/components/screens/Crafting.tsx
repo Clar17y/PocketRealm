@@ -44,7 +44,7 @@ interface Recipe {
   rarity: Rarity;
 }
 
-import type { NpcKey } from '@pocketrealm/shared';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 
 const CRAFTING_NPC_MAP: Record<string, Record<string, NpcKey>> = {
   weaponsmithing: {

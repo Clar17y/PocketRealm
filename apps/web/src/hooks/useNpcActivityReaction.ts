@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NPC_DIALOGUE_CONSTANTS, type NpcKey } from '@pocketrealm/shared';
+import { NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { getNpcActivityReaction } from '@/lib/api';
 
 export function useNpcActivityReaction(npcKey: NpcKey, enabled: boolean): string | null {

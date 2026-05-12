@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WORLD_EVENT_TEMPLATES } from '@pocketrealm/shared';
+import { WORLD_EVENT_TEMPLATES } from '@pocketrealm/shared/constants/worldEventTemplates';
 
 vi.mock('../worldEventService', () => ({
   getEventById: vi.fn(),

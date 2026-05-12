@@ -2,7 +2,8 @@
 import React from 'react';
 import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { NPC_DIALOGUE_CONSTANTS, type NpcKey } from '@pocketrealm/shared';
+import { NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { getNpcActivityReaction } from '@/lib/api';
 import { useNpcActivityReaction } from '../../hooks/useNpcActivityReaction';
 import { NpcDialogueBanner } from './NpcDialogueBanner';

@@ -37,11 +37,14 @@ afterEach(() => {
 });
 
 describe('RegisterPage', () => {
-  it('renders the submit button inert before hydration to avoid native GET form submits', () => {
+  it('renders the submit button inert and omits auth fields before hydration', () => {
     const html = renderToString(React.createElement(RegisterPage));
 
     expect(html).toContain('type="button"');
     expect(html).not.toContain('disabled=""');
+    expect(html).not.toContain('id="username"');
+    expect(html).not.toContain('id="email"');
+    expect(html).not.toContain('id="password"');
   });
 
   it('redirects to the game after successful registration even if analytics tracking fails', async () => {
@@ -71,9 +74,9 @@ describe('RegisterPage', () => {
     const submitButton = screen.getByRole('button', { name: 'Begin Journey' }) as HTMLButtonElement;
     await waitFor(() => expect(submitButton.disabled).toBe(false));
 
-    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'Rook' } });
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'rook@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'correct-horse-12345' } });
+    fireEvent.change(await screen.findByLabelText('Username'), { target: { value: 'Rook' } });
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'rook@example.com' } });
+    fireEvent.change(await screen.findByLabelText('Password'), { target: { value: 'correct-horse-12345' } });
     fireEvent.click(submitButton);
 
     await waitFor(() => {

@@ -1,9 +1,6 @@
-import {
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  BASE_ACTION_DEFINITIONS,
-  getAllTalentNodes,
-  type ActionDefinition,
-} from '@pocketrealm/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { getAllTalentNodes } from '@pocketrealm/shared/constants/talentTreeDefinitions';
+import { type ActionDefinition } from '@pocketrealm/shared';
 
 export interface TemplatePickerSection {
   key: 'combat-core' | 'utility';

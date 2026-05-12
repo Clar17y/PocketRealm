@@ -2,10 +2,8 @@ import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
-import {
-  BASE_ACTION_DEFINITIONS,
-  COMBAT_ACTION_CONSTANTS,
-} from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import type { ActionDefinition } from '@pocketrealm/shared';
 
 const { Var, Out, Enemy, Const, Op, Comment } = FormulaBlock;

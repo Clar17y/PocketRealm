@@ -1,15 +1,11 @@
+import { BOSS_ACTION_DEFINITIONS, BOSS_TEMPLATES } from '@pocketrealm/shared/constants/bossTemplateDefinitions';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { randomUUID } from 'crypto';
 import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
 import { logger } from '../../logger';
 import {
-  BASE_ACTION_DEFINITIONS,
-  BOSS_ACTION_DEFINITIONS,
-  BOSS_TEMPLATES,
-  GUILD_CONSTANTS,
-  WORLD_EVENT_CONSTANTS,
-  type BossRoundSummary,
-} from '@pocketrealm/shared';
+  GUILD_CONSTANTS, WORLD_EVENT_CONSTANTS, type BossRoundSummary } from '@pocketrealm/shared';
 import {
   buildPlayerCombatStats,
   calculateManaRegenPerRound,

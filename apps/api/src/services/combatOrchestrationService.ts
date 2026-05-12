@@ -1,19 +1,7 @@
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { buildPlayerCombatStats, type TemplateCombatant, } from '@pocketrealm/game-engine';
 import {
-  buildPlayerCombatStats,
-  type TemplateCombatant,
-} from '@pocketrealm/game-engine';
-import {
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  BASE_ACTION_DEFINITIONS,
-  COMBAT_CONSTANTS,
-  GUILD_CONSTANTS,
-  type ActionDefinition,
-  type CombatPotion,
-  type CombatTemplateSlotData,
-  type LootDrop,
-  type QuestProgressUpdate,
-  type PerActionScaling,
-} from '@pocketrealm/shared';
+  COMBAT_CONSTANTS, GUILD_CONSTANTS, type ActionDefinition, type CombatPotion, type CombatTemplateSlotData, type LootDrop, type QuestProgressUpdate, type PerActionScaling } from '@pocketrealm/shared';
 import { Prisma } from '@pocketrealm/database';
 import { rollAndGrantLootWithCapacity } from './lootService';
 import type { GrantedItemIds } from './stateUpdateHelpers';

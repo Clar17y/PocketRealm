@@ -4,6 +4,52 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./constants/gameConstants": {
+      "types": "./dist/constants/gameConstants.d.ts",
+      "default": "./dist/constants/gameConstants.js"
+    },
+    "./constants/npcDialogue": {
+      "types": "./dist/constants/npcDialogue.d.ts",
+      "default": "./dist/constants/npcDialogue.js"
+    },
+    "./constants/achievementDefinitions": {
+      "types": "./dist/constants/achievementDefinitions.d.ts",
+      "default": "./dist/constants/achievementDefinitions.js"
+    },
+    "./constants/expeditionDefinitions": {
+      "types": "./dist/constants/expeditionDefinitions.d.ts",
+      "default": "./dist/constants/expeditionDefinitions.js"
+    },
+    "./constants/worldEventTemplates": {
+      "types": "./dist/constants/worldEventTemplates.d.ts",
+      "default": "./dist/constants/worldEventTemplates.js"
+    },
+    "./constants/combatActionDefinitions": {
+      "types": "./dist/constants/combatActionDefinitions.d.ts",
+      "default": "./dist/constants/combatActionDefinitions.js"
+    },
+    "./constants/combatEffectNames": {
+      "types": "./dist/constants/combatEffectNames.d.ts",
+      "default": "./dist/constants/combatEffectNames.js"
+    },
+    "./constants/talentTreeDefinitions": {
+      "types": "./dist/constants/talentTreeDefinitions.d.ts",
+      "default": "./dist/constants/talentTreeDefinitions.js"
+    },
+    "./constants/bossTemplateDefinitions": {
+      "types": "./dist/constants/bossTemplateDefinitions.d.ts",
+      "default": "./dist/constants/bossTemplateDefinitions.js"
+    },
+    "./utils/titleDisplay": {
+      "types": "./dist/utils/titleDisplay.d.ts",
+      "default": "./dist/utils/titleDisplay.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

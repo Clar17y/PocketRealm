@@ -1,12 +1,7 @@
+import { EXPEDITION_THEMES } from '@pocketrealm/shared/constants/expeditionDefinitions';
 import { prisma } from '@pocketrealm/database';
 import {
-  EXPEDITION_CONSTANTS,
-  EXPEDITION_THEMES,
-  type ExpeditionData,
-  type ExpeditionMemberData,
-  type ExpeditionCooldownInfo,
-  type ExpeditionRoomDefinition,
-} from '@pocketrealm/shared';
+  EXPEDITION_CONSTANTS, type ExpeditionData, type ExpeditionMemberData, type ExpeditionCooldownInfo, type ExpeditionRoomDefinition } from '@pocketrealm/shared';
 import {
   generateExpeditionRooms,
   calculateMaxHp,

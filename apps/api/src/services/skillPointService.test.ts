@@ -1,17 +1,12 @@
+import { ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./turnBankService', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue({
-    previousTurns: 100_000,
-    spent: 50_000,
-    currentTurns: 50_000,
-    lastRegenAt: new Date().toISOString(),
-    timeToCapMs: 1000,
-  }),
-}));
+    previousTurns: 100_000, spent: 50_000, currentTurns: 50_000, lastRegenAt: new Date().toISOString(), timeToCapMs: 1000, }), }));
 
 import { mockPrisma } from '../__test__/setup';
-import { SKILL_POINT_CONSTANTS, CHARACTER_CONSTANTS, ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared';
+import { SKILL_POINT_CONSTANTS, CHARACTER_CONSTANTS } from '@pocketrealm/shared';
 import { spendPlayerTurnsTx } from './turnBankService';
 import {
   getSkillPoints,

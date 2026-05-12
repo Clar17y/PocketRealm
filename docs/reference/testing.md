@@ -2,13 +2,24 @@
 npm run test           # All tests across all workspaces
 npm run test:engine    # Game engine unit tests
 npm run test:api       # API integration tests
+npm run typecheck      # TypeScript project references
+npm run verify:ci      # CI parity: typecheck, builds, engine/API/shared/web tests
 ```
 
-**Test distribution (~88 test files):**
-- `packages/game-engine/` — 26 test files (combat, XP, turns, exploration, HP, crafting, items, inventory, resources, events, casino)
-- `apps/api/src/services/` — 44 test files (one per service)
-- `apps/api/src/middleware/` — 3 test files (auth, admin, error handler)
-- `apps/api/src/routes/` — 4 test files (admin, exploration tutorial, player settings/tutorial)
-- `apps/api/src/socket/` — 1 test file (socketAuth)
-- `apps/web/src/lib/` — 6 test files (rarity, assets, format, combatShare, changelog, utils)
-- `packages/shared/src/` — 6 test files (gameConstants, mobPrefixes, achievementDefinitions, worldEventTemplates, achievementChains, tierUtils)
+**Test distribution (263 test/spec files as of 2026-05-12):**
+- `packages/game-engine/` — 32 test files
+- `apps/api/src/services/` — 95 test files
+- `apps/api/src/middleware/` — 8 test files
+- `apps/api/src/routes/` — 27 test files
+- `apps/api/src/socket/` — 2 test files
+- `apps/web/src/app/` — 27 test files
+- `apps/web/src/components/` — 30 test files
+- `apps/web/src/lib/` — 13 test files
+- `apps/web/src/hooks/` — 6 test files
+- `packages/shared/src/` — 10 test files
+
+Refresh the total with:
+
+```powershell
+(rg --files | Where-Object { $_ -match '\.(test|spec)\.(ts|tsx)$' } | Measure-Object).Count
+```

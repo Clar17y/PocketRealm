@@ -1,3 +1,4 @@
+import { BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/bossTemplateDefinitions';
 import type {
   ActionDefinition,
   BossActiveEffect,
@@ -16,7 +17,7 @@ import type {
   CombatPotion,
   PotionConsumed,
 } from '@pocketrealm/shared';
-import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, mobDisplayName } from '@pocketrealm/shared';
 import type { CombatParticipantState } from './combatHelpers';
 import {
   resolveParticipantActions,

@@ -1,8 +1,7 @@
+import { resolveAchievementTitleDisplay } from '@pocketrealm/shared/utils/titleDisplay';
 import { prisma } from '@pocketrealm/database';
 import {
-  PVP_CONSTANTS,
-  resolveAchievementTitleDisplay,
-} from '@pocketrealm/shared';
+  PVP_CONSTANTS } from '@pocketrealm/shared';
 import { safeUpsert } from '../../utils/safeUpsert';
 import { getPlayerRole } from './playerRole';
 

@@ -20,7 +20,8 @@ import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
-import { getNpcLine, NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared';
+import { NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+import { getNpcLine } from '@pocketrealm/shared/constants/npcDialogue';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 
 interface ExplorationProps {

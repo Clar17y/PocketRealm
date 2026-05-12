@@ -1,4 +1,4 @@
-All routes prefixed with `/api/v1/`. Health check at `GET /health`.
+API routes are mounted in `apps/api/src/app.ts`. Most routes are prefixed with `/api/v1/`. Health routes (`/health`, `/health/live`, `/health/ready`) are mounted at root, and the Stripe webhook is mounted before JSON parsing at `/api/v1/premium/webhook/stripe`.
 
 ### Auth (`/auth`)
 ```
@@ -112,6 +112,7 @@ GET    /bestiary
 ### Chat (`/chat`)
 ```
 GET    /chat/history
+GET    /chat/activity/npc-reaction
 ```
 
 ### PvP (`/pvp`)
@@ -159,6 +160,13 @@ PUT    /achievements/title
 ```
 GET    /leaderboard/categories
 GET    /leaderboard/:category
+```
+
+### Seasons (`/seasons`)
+```
+GET    /seasons/active
+GET    /seasons/archives
+GET    /seasons/:id/hall-of-fame
 ```
 
 ### Guild (`/guild`)
@@ -222,6 +230,78 @@ GET    /casino/roulette/stats
 ```
 POST   /training/fight
 GET    /training/cooldown
+```
+
+### Quests (`/quests`)
+```
+GET    /quests
+POST   /quests/bonus
+POST   /quests/:id/reroll
+POST   /quests/:id/claim
+```
+
+### Expedition (`/expedition`)
+```
+GET    /expedition/cooldowns
+GET    /expedition/active
+GET    /expedition/history
+GET    /expedition/shop
+POST   /expedition/shop/purchase
+GET    /expedition/:id
+POST   /expedition/launch
+POST   /expedition/:id/signup
+POST   /expedition/:id/force-start
+POST   /expedition/:id/force-round
+POST   /expedition/:id/auto-resolve
+POST   /expedition/:id/abandon
+PATCH  /expedition/:id/target
+PATCH  /expedition/:id/heal-target
+POST   /expedition/:id/recover
+```
+
+### Shop (`/shop`)
+```
+GET    /shop
+POST   /shop/purchase/:itemId
+```
+
+### Friends (`/friends`)
+```
+POST   /friends/request
+POST   /friends/request/search
+GET    /friends/requests/incoming
+GET    /friends/requests/outgoing
+POST   /friends/requests/:id/accept
+POST   /friends/requests/:id/decline
+GET    /friends
+DELETE /friends/:id
+GET    /friends/:id/profile
+POST   /friends/:id/spar
+POST   /friends/block
+DELETE /friends/block/:id
+GET    /friends/block
+POST   /friends/mail
+GET    /friends/mail/inbox
+GET    /friends/mail/sent
+GET    /friends/mail/unread-count
+GET    /friends/mail/:id
+DELETE /friends/mail/:id
+```
+
+### Notifications (`/notifications`)
+```
+POST   /notifications/subscribe
+DELETE /notifications/unsubscribe
+GET    /notifications/status
+```
+
+### Premium (`/premium`)
+```
+POST   /premium/checkout
+POST   /premium/confirm
+GET    /premium/status
+GET    /premium/purchases
+POST   /premium/webhook/stripe
 ```
 
 ### Admin (`/admin`) — requires admin role

@@ -1,10 +1,7 @@
+import { WORLD_EVENT_TEMPLATES, type WorldEventTemplate } from '@pocketrealm/shared/constants/worldEventTemplates';
 import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
-import {
-  WORLD_EVENT_CONSTANTS,
-  WORLD_EVENT_TEMPLATES,
-  type WorldEventTemplate,
-} from '@pocketrealm/shared';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 import { logger } from '../logger';
 import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { getCachedZones, getCachedBossMobTemplates, getCachedZoneMobFamilies } from './staticDataCacheService';

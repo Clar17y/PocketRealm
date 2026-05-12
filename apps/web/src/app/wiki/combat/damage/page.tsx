@@ -1,13 +1,9 @@
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
-import {
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  BASE_ACTION_DEFINITIONS,
-  COMBAT_CONSTANTS,
-  CHARACTER_CONSTANTS,
-} from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS, CHARACTER_CONSTANTS } from '@pocketrealm/shared';
 
 const SCALING = COMBAT_CONSTANTS.DEFENCE_SCALING_FACTOR;
 

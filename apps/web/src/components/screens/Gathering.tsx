@@ -21,7 +21,7 @@ import type { EventModifierBadge } from '@/lib/api';
 import { ItemIcon } from '@/components/common/ItemIcon';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
-import type { NpcKey } from '@pocketrealm/shared';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 const GATHERING_NPC_MAP: Record<string, NpcKey> = {

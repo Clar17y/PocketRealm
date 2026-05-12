@@ -1,8 +1,7 @@
+import { BASE_ACTION_DEFINITIONS, ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { prisma } from '@pocketrealm/database';
 import {
   ENCOUNTER_SITE_CONSTANTS,
-  BASE_ACTION_DEFINITIONS,
-  ALWAYS_AVAILABLE_ACTION_IDS,
   makeEncounterMobId,
   parseEncounterMobSlot,
   getMobPrefixDefinition,

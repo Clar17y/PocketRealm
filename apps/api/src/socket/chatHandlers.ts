@@ -1,6 +1,7 @@
+import { resolveAchievementTitleDisplay } from '@pocketrealm/shared/utils/titleDisplay';
 import type { Server, Socket } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
-import { CHAT_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
+import { CHAT_CONSTANTS } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import { checkRateLimit, saveMessage } from '../services/chatService';
 import { sanitizeUserText } from '../utils/sanitize';

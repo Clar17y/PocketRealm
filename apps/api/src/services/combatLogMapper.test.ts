@@ -1,15 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-vi.mock('@pocketrealm/shared', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+vi.mock('@pocketrealm/shared/constants/combatActionDefinitions', () => {
   return {
-    ...actual,
     getActionDefinition: vi.fn(),
   };
 });
 
 import { mapTemplateCombatLog } from './combatLogMapper';
-import { getActionDefinition } from '@pocketrealm/shared';
+import { getActionDefinition } from '@pocketrealm/shared/constants/combatActionDefinitions';
 
 const mockGetActionDef = vi.mocked(getActionDefinition);
 

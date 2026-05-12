@@ -1,12 +1,10 @@
+import { EXPEDITION_ROOM_COMPOSITIONS, EXPEDITION_THEMES } from '@pocketrealm/shared/constants/expeditionDefinitions';
 import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
-  EXPEDITION_CONSTANTS,
-  EXPEDITION_ROOM_COMPOSITIONS,
-  EXPEDITION_THEMES,
-} from '@pocketrealm/shared';
+  EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
 

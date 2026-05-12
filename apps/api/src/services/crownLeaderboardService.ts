@@ -1,11 +1,8 @@
+import { resolveAchievementTitleDisplay } from '@pocketrealm/shared/utils/titleDisplay';
 import { randomUUID } from 'crypto';
 import { prisma } from '@pocketrealm/database';
 import {
-  CROWN_CONSTANTS,
-  LEADERBOARD_CONSTANTS,
-  resolveAchievementTitleDisplay,
-  type TitleStyleVariant,
-} from '@pocketrealm/shared';
+  CROWN_CONSTANTS, LEADERBOARD_CONSTANTS, type TitleStyleVariant } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { crownGroupForCategory } from './crownCategories';
 import { paginatedFindMany } from './paginatedFindMany';

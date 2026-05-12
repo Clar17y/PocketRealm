@@ -1,3 +1,4 @@
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type {
   CombatantStats,
@@ -9,7 +10,7 @@ import type {
   PlayerAttackEntry,
   EncounterMobSlot,
 } from '@pocketrealm/shared';
-import { BASE_ACTION_DEFINITIONS, makeEncounterMobId } from '@pocketrealm/shared';
+import { makeEncounterMobId } from '@pocketrealm/shared';
 import { initThreatTable } from '@pocketrealm/game-engine';
 
 const databaseMocks = vi.hoisted(() => {

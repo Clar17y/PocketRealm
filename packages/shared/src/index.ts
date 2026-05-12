@@ -22,14 +22,6 @@ export * from './types/stateUpdates.types';
 // Constants
 export * from './constants/gameConstants';
 export * from './constants/mobPrefixes';
-export * from './constants/worldEventTemplates';
-export * from './constants/achievementDefinitions';
-export * from './constants/combatActionDefinitions';
-export * from './constants/combatEffectNames';
-export * from './constants/talentTreeDefinitions';
-export * from './constants/bossTemplateDefinitions';
-export * from './constants/expeditionDefinitions';
-export * from './constants/npcDialogue';
 export * from './constants/chatActivity';
 export * from './constants/tutorialConstants';
 
@@ -38,4 +30,3 @@ export * from './utils/achievementChains';
 export * from './utils/tierUtils';
 export * from './utils/mobUtils';
 export * from './utils/repairUtils';
-export * from './utils/titleDisplay';

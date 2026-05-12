@@ -1,3 +1,4 @@
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import type {
   ActionDefinition,
   CombatTemplateSlotData,
@@ -5,7 +6,7 @@ import type {
   CombatActor,
   ExhaustedActionReason,
 } from '@pocketrealm/shared';
-import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { evaluateCondition } from './conditionEvaluator';
 
 // --- Result Types ---

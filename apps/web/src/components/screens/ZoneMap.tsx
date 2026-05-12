@@ -14,7 +14,7 @@ import { CollapsibleLoreSection } from '../common/CollapsibleLoreSection';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
-import type { NpcKey } from '@pocketrealm/shared';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 const GUARD_NPC_MAP: Record<string, NpcKey> = {

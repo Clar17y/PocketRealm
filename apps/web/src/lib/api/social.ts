@@ -4,10 +4,10 @@ import type {
   ChatMessageEvent,
   ChatMessageType,
   ChatNpcActivityReactionResponse,
-  NpcKey,
   StateUpdates,
   TitleStyleVariant,
 } from '@pocketrealm/shared';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import type { CombatLogEntryResponse, CombatOutcomeResponse } from './combat';
 
 // PvP Arena
