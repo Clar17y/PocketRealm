@@ -153,11 +153,13 @@ export function GuildScreenRenderer({
   player,
   deepLinkTab,
   setExpeditionContext,
+  onGuildMembershipChange,
 }: {
   gc: GameControllerState;
   player: GameScreenPlayer | null;
   deepLinkTab: string | null;
   setExpeditionContext: (context: GameScreenRendererProps['expeditionContext']) => void;
+  onGuildMembershipChange: () => void;
 }) {
   return (
     <GuildScreen
@@ -166,6 +168,7 @@ export function GuildScreenRenderer({
       initialTab={gc.activeScreen === 'guild' && deepLinkTab ? deepLinkTab as 'expeditions' : undefined}
       onStateUpdates={(updates) => applyStateUpdates(updates, gc.stateSetters)}
       onExpeditionContextChange={setExpeditionContext}
+      onGuildMembershipChange={onGuildMembershipChange}
       showNpcDialogue={gc.showNpcDialogue}
     />
   );

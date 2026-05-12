@@ -16,6 +16,8 @@ const {
   getCharactersMock,
   getSeasonArchivesMock,
   getActiveSeasonMock,
+  refreshGuildChatMock,
+  gameScreenRendererPropsMock,
 } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   logoutMock: vi.fn(),
@@ -30,6 +32,8 @@ const {
   getCharactersMock: vi.fn(),
   getSeasonArchivesMock: vi.fn(),
   getActiveSeasonMock: vi.fn(),
+  refreshGuildChatMock: vi.fn(),
+  gameScreenRendererPropsMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -81,15 +85,20 @@ vi.mock('./GameScreenRenderer', () => ({
   GameScreenRenderer: ({
     onSwitchPlayer,
     realmLabel,
+    onGuildMembershipChange,
   }: {
     onSwitchPlayer: (playerId: string) => void;
     realmLabel: string;
-  }) => (
-    <div>
-      <div>Realm: {realmLabel}</div>
-      <button onClick={() => onSwitchPlayer('season-player')}>Switch Character</button>
-    </div>
-  ),
+    onGuildMembershipChange?: () => void;
+  }) => {
+    gameScreenRendererPropsMock({ onSwitchPlayer, realmLabel, onGuildMembershipChange });
+    return (
+      <div>
+        <div>Realm: {realmLabel}</div>
+        <button onClick={() => onSwitchPlayer('season-player')}>Switch Character</button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('@/components/common/ChangelogModal', () => ({ ChangelogModal: () => null }));
@@ -134,17 +143,23 @@ vi.mock('@/hooks/useChat', () => ({
     activeChannel: 'world',
     setActiveChannel: vi.fn(),
     worldMessages: [],
+    globalActivityMessages: [],
     zoneMessages: [],
+    guildMessages: [],
     casinoMessages: [],
     presence: { worldOnline: 0, zoneOnline: {}, casinoOnline: 0 },
     unreadWorld: 0,
     unreadZone: 0,
+    unreadGuild: 0,
     unreadCasino: 0,
+    guildChatLabel: null,
+    refreshGuildChat: refreshGuildChatMock,
     casinoActive: false,
     sendMessage: vi.fn(),
     rateLimitError: null,
     pinnedWorld: null,
     pinnedZone: null,
+    pinnedGuild: null,
     joinCasino: vi.fn(),
     leaveCasino: vi.fn(),
     injectCasinoSystemMessage: vi.fn(),
@@ -301,5 +316,15 @@ describe('GamePage realm switching', () => {
       expect(refreshPlayerMock).toHaveBeenCalled();
       expect(loadAllMock).toHaveBeenCalled();
     });
+  });
+
+  it('passes guild chat refresh to game screens for guild membership changes', async () => {
+    render(<GamePage />);
+
+    await screen.findByText('Realm: Preseason');
+
+    expect(gameScreenRendererPropsMock).toHaveBeenCalledWith(expect.objectContaining({
+      onGuildMembershipChange: refreshGuildChatMock,
+    }));
   });
 });

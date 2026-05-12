@@ -42,6 +42,7 @@ export interface GameScreenRendererProps {
   deepLinkTab: string | null;
   pushState: ReturnType<typeof usePushNotifications>['state'];
   pushToggle: ReturnType<typeof usePushNotifications>['toggle'];
+  onGuildMembershipChange: () => void;
   onLogout: () => void;
   onAccountRefresh: () => Promise<void>;
   onForceRelogin: () => void;

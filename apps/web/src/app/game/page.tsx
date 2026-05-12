@@ -510,6 +510,7 @@ export default function GamePage() {
           deepLinkTab={deepLinkTab}
           pushState={pushState}
           pushToggle={pushToggle}
+          onGuildMembershipChange={chat.refreshGuildChat}
           onLogout={() => { logout(); router.push('/'); }}
           onAccountRefresh={async () => { await refreshPlayer(); }}
           onForceRelogin={() => {

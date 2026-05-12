@@ -56,6 +56,7 @@ export function GameScreenRenderer({
   deepLinkTab,
   pushState,
   pushToggle,
+  onGuildMembershipChange,
   onLogout,
   onAccountRefresh,
   onForceRelogin,
@@ -127,6 +128,7 @@ export function GameScreenRenderer({
           player={player}
           deepLinkTab={deepLinkTab}
           setExpeditionContext={setExpeditionContext}
+          onGuildMembershipChange={onGuildMembershipChange}
         />
       );
     case 'friends':

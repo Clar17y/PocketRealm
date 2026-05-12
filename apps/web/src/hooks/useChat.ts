@@ -34,6 +34,7 @@ export interface UseChatReturn {
   unreadGuild: number;
   unreadCasino: number;
   guildChatLabel: string | null;
+  refreshGuildChat: () => void;
   casinoActive: boolean;
   joinCasino: () => void;
   leaveCasino: () => void;
@@ -172,6 +173,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       refreshScopedChatRooms();
 
       const history = await getChatHistory('guild', getGuildChannelId(nextGuildChat.id));
+      if (guildChatRef.current?.id !== nextGuildChat.id) return;
       if (history.data) {
         setGuildMessages(history.data.messages);
       }
@@ -294,6 +296,10 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     setIsOpen((prev) => !prev);
   }, [loadGuildChat]);
 
+  const refreshGuildChat = useCallback(() => {
+    void loadGuildChat();
+  }, [loadGuildChat]);
+
   const setActiveChannel = useCallback((ch: ChatChannel) => {
     activeChannelRef.current = ch;
     setActiveChannelRaw(ch);
@@ -407,6 +413,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     unreadGuild,
     unreadCasino,
     guildChatLabel: guildChat?.label ?? null,
+    refreshGuildChat,
     casinoActive,
     joinCasino,
     leaveCasino,

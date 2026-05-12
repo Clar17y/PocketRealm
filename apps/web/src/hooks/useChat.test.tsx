@@ -162,6 +162,14 @@ function emitSocketEvent<TEvent extends SocketEvent>(event: TEvent, payload: Soc
   }
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe('useChat', () => {
   beforeEach(() => {
     testState.handlers.clear();
@@ -264,6 +272,25 @@ describe('useChat', () => {
     });
   });
 
+  it('refreshes guild chat on demand after membership changes', async () => {
+    vi.mocked(getPlayerGuild)
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: guildResponse, error: null });
+
+    const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
+
+    await waitFor(() => expect(getPlayerGuild).toHaveBeenCalledTimes(1));
+    expect(result.current.guildChatLabel).toBeNull();
+
+    act(() => {
+      result.current.refreshGuildChat();
+    });
+
+    await waitFor(() => expect(result.current.guildChatLabel).toBe('[RUN] Realm Runners'));
+    expect(getChatHistory).toHaveBeenCalledWith('guild', 'guild:guild-1');
+    expect(testState.socket.emit).toHaveBeenCalledWith('chat:refresh-rooms');
+  });
+
   it('sends messages to the current guild channel', async () => {
     vi.mocked(getPlayerGuild).mockResolvedValue({ data: guildResponse, error: null });
     const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
@@ -335,6 +362,36 @@ describe('useChat', () => {
     });
 
     await waitFor(() => expect(result.current.guildChatLabel).toBe('[NIT] Night Watch'));
+    expect(result.current.guildMessages).toEqual([]);
+  });
+
+  it('ignores stale guild history responses after membership is cleared', async () => {
+    const staleHistory = createDeferred<Awaited<ReturnType<typeof getChatHistory>>>();
+    vi.mocked(getPlayerGuild)
+      .mockResolvedValueOnce({ data: guildResponse, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    vi.mocked(getChatHistory).mockImplementation(async (channelType) => {
+      if (channelType === 'guild') {
+        return staleHistory.promise;
+      }
+      return { data: { messages: [] }, error: null };
+    });
+
+    const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
+
+    await waitFor(() => expect(result.current.guildChatLabel).toBe('[RUN] Realm Runners'));
+
+    act(() => {
+      result.current.refreshGuildChat();
+    });
+
+    await waitFor(() => expect(result.current.guildChatLabel).toBeNull());
+
+    await act(async () => {
+      staleHistory.resolve({ data: { messages: [guildMessage] }, error: null });
+      await staleHistory.promise;
+    });
+
     expect(result.current.guildMessages).toEqual([]);
   });
 

@@ -16,6 +16,7 @@ interface GuildMembersProps {
   myRole: string;
   playerId: string | null;
   onRefresh: () => void;
+  onMembershipChanged?: () => void;
   setError: (err: string | null) => void;
 }
 
@@ -25,6 +26,7 @@ export function GuildMembers({
   myRole,
   playerId,
   onRefresh,
+  onMembershipChanged,
   setError,
 }: GuildMembersProps) {
   const [actionLoading, setActionLoading] = useState(false);
@@ -58,7 +60,7 @@ export function GuildMembers({
     try {
       const res = await leaveGuild(guild.id);
       if (res.error) { setError(res.error.message); return; }
-      onRefresh();
+      (onMembershipChanged ?? onRefresh)();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to leave');
     } finally {
