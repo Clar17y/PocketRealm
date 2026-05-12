@@ -101,6 +101,22 @@ async function reconcileSocketScopedRooms(socket: Socket, playerId: string): Pro
   return scopedMembership;
 }
 
+function emitScopedPins(socket: Socket, membership: ScopedChatMembership): void {
+  if (membership.currentZoneId) {
+    const zonePin = pinnedMessages.get(`zone:${membership.currentZoneId}`);
+    if (zonePin) {
+      socket.emit('chat:pinned', zonePin);
+    }
+  }
+
+  if (membership.guildId) {
+    const guildPin = pinnedMessages.get(`guild:${membership.guildId}`);
+    if (guildPin) {
+      socket.emit('chat:pinned', guildPin);
+    }
+  }
+}
+
 function canSendToChannel(
   channelType: ChatChannelType,
   channelId: string,
@@ -217,13 +233,8 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
   }
 
   reconcileSocketScopedRooms(socket, playerId)
-    .then(({ currentZoneId }) => {
-      if (currentZoneId) {
-        const zonePin = pinnedMessages.get(`zone:${currentZoneId}`);
-        if (zonePin) {
-          socket.emit('chat:pinned', zonePin);
-        }
-      }
+    .then((membership) => {
+      emitScopedPins(socket, membership);
       schedulePresenceBroadcast(io);
     })
     .catch(() => {
@@ -280,6 +291,12 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
 
     await pruneUnauthorizedRoomMembers(io, room, channelType as ChatChannelType, channelId);
     io.to(room).emit('chat:message', event);
+  });
+
+  socket.on('chat:refresh-rooms', async () => {
+    const scopedMembership = await reconcileSocketScopedRooms(socket, playerId);
+    emitScopedPins(socket, scopedMembership);
+    schedulePresenceBroadcast(io);
   });
 
   // Handle zone switching (when player travels)
