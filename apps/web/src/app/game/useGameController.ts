@@ -693,6 +693,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setLootRevealItems(null);
   }, []);
 
+  const handleStateUpdates = useCallback(async (updates: StateUpdates) => {
+    applyStateUpdates(updates, stateSetters);
+    if (updates.currentZoneId !== undefined) {
+      await refreshCraftingRecipes().catch(() => undefined);
+    }
+  }, [refreshCraftingRecipes, stateSetters]);
+
   return {
     // Navigation
     activeScreen,
@@ -879,6 +886,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Loot reveal
     lootRevealItems,
     handleDismissLootReveal,
+    handleStateUpdates,
 
     // Encounter site combat
     refreshPendingEncounters,

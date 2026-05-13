@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameController } from './useGameController';
-import { getZoneEvents, getZones } from '@/lib/api';
+import { getCraftingRecipes, getZoneEvents, getZones } from '@/lib/api';
 import type { InventoryItemDTO } from '@pocketrealm/shared';
 
 vi.mock('@/lib/analytics', () => ({
@@ -437,5 +437,26 @@ describe('useGameController', () => {
         imageSrc: '/items/Boar Hide Boots',
       },
     ]);
+  });
+
+  it('refreshes crafting context after a generic state update changes the active zone', async () => {
+    vi.mocked(getCraftingRecipes).mockResolvedValue({
+      data: {
+        recipes: [],
+        zoneCraftingLevel: null,
+        zoneName: 'Millbrook',
+      },
+      error: null,
+    } as never);
+
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    await act(async () => {
+      await hook.result.current.handleStateUpdates({ currentZoneId: 'zone-town' });
+    });
+
+    expect(getCraftingRecipes).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.zoneCraftingLevel).toBeNull();
+    expect(hook.result.current.zoneCraftingName).toBe('Millbrook');
   });
 });
