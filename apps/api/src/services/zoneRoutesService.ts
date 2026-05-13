@@ -39,18 +39,16 @@ import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone } from '../services/staticDataCacheService';
 import { buildTrackableMobFamiliesByZone } from '../services/explorationTrackingService';
 import { invalidateZoneIdCache } from '../services/zoneService';
-import { routeJson, withHeaders, type RouteServiceResponse } from '../utils/routeServiceResponse';
-import type { AuthPayload } from '../middleware/auth';
-
-interface RouteServiceRequest {
-  body?: unknown;
-  query?: unknown;
-  player: AuthPayload;
-}
+import {
+  routeJson,
+  withHeaders,
+  type AuthenticatedRouteServiceRequest,
+  type RouteServiceResponse,
+} from '../utils/routeServiceResponse';
 
 
-export async function listZones(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-  const playerId = input.player!.playerId;
+export async function listZones(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+  const playerId = input.player.playerId;
 
   // Lazy-init starter discoveries for this player
   await ensureStarterDiscoveries(playerId);
@@ -172,8 +170,8 @@ interface TravelEvent {
   details?: Record<string, unknown>;
 }
 
-export async function travelToZone(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-  const playerId = input.player!.playerId;
+export async function travelToZone(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+  const playerId = input.player.playerId;
   const body = travelSchema.parse(input.body);
   const destinationId = body.zoneId;
 
@@ -380,7 +378,7 @@ export async function travelToZone(input: RouteServiceRequest): Promise<RouteSer
 
         const combatantA = buildPlayerTemplateCombatant({
           playerId,
-          username: input.player!.username,
+          username: input.player.username,
           playerStats,
           template: playerTemplate,
           stamina: currentStamina,

@@ -11,7 +11,7 @@ import type { PlayerProgressionState } from '../attributesService';
 import type { EquipmentStats } from '../equipmentService';
 import type { PlayerGuildModifiers } from '../guildUpgradeService';
 import type { GrantXpResult } from '../xpService';
-import type { NarrativeEvent, PendingAmbushCombatLog, PendingEncounterSiteDiscovery, PendingResourceDiscovery, ZoneFamilyRow } from '../../routes/exploration/helpers';
+import type { NarrativeEvent, PendingAmbushCombatLog, PendingEncounterSiteDiscovery, PendingResourceDiscovery, ZoneFamilyRow } from '../exploration/helpers';
 import type { computeZoneModifiers } from '../worldEventService';
 
 export interface ExplorationOutcomeContext {

@@ -88,7 +88,7 @@ vi.mock('./zoneExplorationService', () => ({}));
 vi.mock('./statsService', () => ({}));
 vi.mock('./equipmentService', () => ({}));
 vi.mock('./attributesService', () => ({}));
-vi.mock('../routes/combat/helpers', () => routeHelperMocks);
+vi.mock('./combat/helpers', () => routeHelperMocks);
 
 import {
   resolveEncounterRoomCombat,

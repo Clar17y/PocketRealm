@@ -18,9 +18,12 @@ import { getBuffValue, consumeBuffStandalone } from '../services/buffService';
 import { getHasActivePremiumEntitlement } from '../services/premiumEntitlement';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
-import { buildGatheringResultDetails } from '../routes/gatheringResult';
-import { routeJson, type RouteServiceResponse } from '../utils/routeServiceResponse';
-import type { AuthPayload } from '../middleware/auth';
+import { buildGatheringResultDetails } from './gatheringResult';
+import {
+  routeJson,
+  type AuthenticatedRouteServiceRequest,
+  type RouteServiceResponse,
+} from '../utils/routeServiceResponse';
 
 
 const nodesQuerySchema = z.object({
@@ -63,15 +66,8 @@ function getResourceTypeCategory(resourceType: string): string {
   const parts = normalized.split('_').filter(Boolean);
   return parts.length > 0 ? parts[parts.length - 1]! : normalized;
 }
-interface RouteServiceRequest {
-  body?: unknown;
-  query?: unknown;
-  player: AuthPayload;
-}
-
-
-export async function listResourceNodes(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-  const playerId = input.player!.playerId;
+export async function listResourceNodes(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+  const playerId = input.player.playerId;
   const query = nodesQuerySchema.parse(input.query);
   const now = new Date();
 
@@ -235,8 +231,8 @@ async function getResourceTemplateId(resourceType: string): Promise<string> {
   return match.id;
 }
 
-export async function mineResourceNode(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-  const playerId = input.player!.playerId;
+export async function mineResourceNode(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+  const playerId = input.player.playerId;
   const body = mineSchema.parse(input.body);
 
   await checkActivityLockout(playerId);

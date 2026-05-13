@@ -40,19 +40,17 @@ import {
   assertZoneAllowsRecipeLevel,
   parseMaterials,
   craftSchema,
-} from '../../routes/crafting/helpers';
+} from './helpers';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
-import { routeJson, type RouteServiceResponse } from '../../utils/routeServiceResponse';
-import type { AuthPayload } from '../../middleware/auth';
-interface RouteServiceRequest {
-  body?: unknown;
-  query?: unknown;
-  player: AuthPayload;
-}
+import {
+  routeJson,
+  type AuthenticatedRouteServiceRequest,
+  type RouteServiceResponse,
+} from '../../utils/routeServiceResponse';
 
 
-export async function craftItem(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-    const playerId = input.player!.playerId;
+export async function craftItem(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+    const playerId = input.player.playerId;
     const body = craftSchema.parse(input.body);
 
     await checkActivityLockout(playerId);
@@ -343,7 +341,7 @@ export async function craftItem(input: RouteServiceRequest): Promise<RouteServic
       void broadcastCraftActivity({
         zoneId: zone.zoneId,
         actorPlayerId: playerId,
-        actorUsername: input.player!.username,
+        actorUsername: input.player.username,
         itemName: recipe.resultTemplate.name,
         rarity: bestCraft.rarity,
         skillType: recipe.skillType,

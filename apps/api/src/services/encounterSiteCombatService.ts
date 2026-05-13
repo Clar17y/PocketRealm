@@ -21,7 +21,7 @@ import {
   getNextUnfinishedRoom,
   applyEncounterSiteDecayAndPersist,
   applyEncounterSiteDecayInMemory,
-} from '../routes/combat/helpers';
+} from './combat/helpers';
 import {
   toInitialMobSnapshot,
   advanceToFirstAliveRoom,

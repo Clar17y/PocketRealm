@@ -16,7 +16,7 @@ import {
   getRecipeDiscountedCost,
   salvageSchema,
   salvageBatchSchema,
-} from './helpers';
+} from '../../services/crafting/helpers';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import { createEndpointLimiter } from '../../middleware/rateLimiter';
 import { requireActiveSeason } from '../../middleware/seasonGuard';

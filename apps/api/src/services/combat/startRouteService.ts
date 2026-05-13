@@ -28,8 +28,11 @@ import type { GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { setAllResources } from '../../services/resourceService';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
-import { routeJson, type RouteServiceResponse } from '../../utils/routeServiceResponse';
-import type { AuthPayload } from '../../middleware/auth';
+import {
+  routeJson,
+  type AuthenticatedRouteServiceRequest,
+  type RouteServiceResponse,
+} from '../../utils/routeServiceResponse';
 
 function tagEventsWithApplicability(
   events: Array<{ title: string; effectType: string; effectValue: number }>,
@@ -58,18 +61,13 @@ import { buildStateUpdates, fetchItemDTOs, fetchMaterialTotals } from '../../ser
 import {
   startSchema,
   pickWeighted,
-} from '../../routes/combat/helpers';
+} from './helpers';
 import { getCachedMobTemplatesByZone } from '../../services/staticDataCacheService';
 import { logger } from '../../logger';
-interface RouteServiceRequest {
-  body?: unknown;
-  query?: unknown;
-  player: AuthPayload;
-}
 
 
-export async function startZoneCombat(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-      const playerId = input.player!.playerId;
+export async function startZoneCombat(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+      const playerId = input.player.playerId;
       await checkActivityLockout(playerId);
       const body = startSchema.parse(input.body);
 
@@ -197,7 +195,7 @@ export async function startZoneCombat(input: RouteServiceRequest): Promise<Route
       const combatOptions = buildPveCombatOptions(potionPool);
 
       const playerCombatant = buildPlayerTemplateCombatant({
-        playerId, username: input.player!.username, playerStats, template: playerTemplate,
+        playerId, username: input.player.username, playerStats, template: playerTemplate,
         stamina: resources.stamina, maxStamina: resources.maxStamina, staminaRegenPerRound: resources.staminaRegenPerRound,
         mana: resources.mana, maxMana: resources.maxMana, manaRegenPerRound: resources.manaRegenPerRound,
         unlockedActions,
@@ -287,7 +285,7 @@ export async function startZoneCombat(input: RouteServiceRequest): Promise<Route
         void broadcastRareLootActivity({
           zoneId,
           actorPlayerId: playerId,
-          actorUsername: input.player!.username,
+          actorUsername: input.player.username,
           loot: lootWithNames,
         }).catch((error: unknown) => {
           logger.error({ err: error, playerId, zoneId }, 'Rare loot activity broadcast failed');

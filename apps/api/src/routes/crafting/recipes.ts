@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '@pocketrealm/database';
 import { type CraftingMaterial } from '@pocketrealm/shared';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { parseMaterials, buildRecipeDiscoveryHint } from './helpers';
+import { parseMaterials, buildRecipeDiscoveryHint } from '../../services/crafting/helpers';
 import { getCachedCraftingRecipes } from '../../services/staticDataCacheService';
 
 export const recipesRouter = Router();

@@ -31,7 +31,7 @@ import { computeZoneModifiers, filterEventModifiers } from '../worldEventService
 import { buildPveCombatOptions, calculateFleeWithGold, serializeXpGrant, toMobTemplate } from '../../utils/routeHelpers.js';
 import type { GrantXpResult } from '../xpService';
 import type { ExplorationOutcomeContext, ExplorationTurnOutcome, AmbushProcessingResult } from './types';
-import { pickWeighted, type NarrativeEvent, type PendingAmbushCombatLog } from '../../routes/exploration/helpers';
+import { pickWeighted, type NarrativeEvent, type PendingAmbushCombatLog } from '../exploration/helpers';
 
 export async function processAmbushOutcome(args: {
   ctx: ExplorationOutcomeContext;

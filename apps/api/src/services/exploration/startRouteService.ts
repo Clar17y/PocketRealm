@@ -47,9 +47,12 @@ import { persistExplorationResults } from '../../services/explorationPersistence
 import {
   startSchema,
   type ZoneFamilyRow,
-} from '../../routes/exploration/helpers';
-import { routeJson, type RouteServiceResponse } from '../../utils/routeServiceResponse';
-import type { AuthPayload } from '../../middleware/auth';
+} from './helpers';
+import {
+  routeJson,
+  type AuthenticatedRouteServiceRequest,
+  type RouteServiceResponse,
+} from '../../utils/routeServiceResponse';
 
 
 function familyHasEligibleMembersForTier(
@@ -62,15 +65,8 @@ function familyHasEligibleMembersForTier(
   );
 }
 
-interface RouteServiceRequest {
-  body?: unknown;
-  query?: unknown;
-  player: AuthPayload;
-}
-
-
-export async function startExploration(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-    const playerId = input.player!.playerId;
+export async function startExploration(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+    const playerId = input.player.playerId;
     await checkActivityLockout(playerId);
     const body = startSchema.parse(input.body);
 
@@ -220,7 +216,7 @@ export async function startExploration(input: RouteServiceRequest): Promise<Rout
     const outcomeResult = await processExplorationOutcomes(
       {
         playerId,
-        username: input.player!.username,
+        username: input.player.username,
         zoneId: body.zoneId,
         zone: { id: zone.id, name: zone.name, difficulty: zone.difficulty },
         hpState,
@@ -305,7 +301,7 @@ export async function startExploration(input: RouteServiceRequest): Promise<Rout
         void broadcastZoneDiscoveryActivity({
           zoneId: body.zoneId,
           actorPlayerId: playerId,
-          actorUsername: input.player!.username,
+          actorUsername: input.player.username,
           discoveredZoneName: neighbor.name,
         }).catch((error: unknown) => {
           logger.error({ err: error, playerId, zoneId: body.zoneId, discoveredZoneId: neighbor.id }, 'Zone discovery activity broadcast failed');

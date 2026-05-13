@@ -40,7 +40,7 @@ import {
 } from './worldEventService';
 import {
   getAllAliveMobsInRoom,
-} from '../routes/combat/helpers';
+} from './combat/helpers';
 import { grantEncounterSiteChestRewardsTx } from './chestService';
 
 /** Shared flee result shape used by both auto-resolve and manual combat. */

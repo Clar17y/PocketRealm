@@ -1,9 +1,21 @@
 import type { Response } from 'express';
+import type { AuthPayload } from '../middleware/auth';
 
 export interface RouteServiceResponse<TBody = unknown> {
   status?: number;
   headers?: Record<string, string>;
   body: TBody;
+}
+
+export interface AuthenticatedRouteServiceRequest {
+  body?: unknown;
+  query?: unknown;
+  player: AuthPayload;
+}
+
+export interface AnonymousRouteServiceRequest {
+  body?: unknown;
+  query?: unknown;
 }
 
 export function routeJson<TBody>(body: TBody): RouteServiceResponse<TBody>;

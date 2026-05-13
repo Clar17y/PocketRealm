@@ -21,8 +21,12 @@ import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { logger } from '../logger';
 import { disconnectAccountSockets, disconnectPlayerSockets, getIo } from '../socket';
 import { issueAccountSession } from '../services/authSessionService';
-import { routeJson, type RouteServiceResponse } from '../utils/routeServiceResponse';
-import type { AuthPayload } from '../middleware/auth';
+import {
+  routeJson,
+  type AnonymousRouteServiceRequest,
+  type AuthenticatedRouteServiceRequest,
+  type RouteServiceResponse,
+} from '../utils/routeServiceResponse';
 
 
 const registerSchema = z.object({
@@ -85,14 +89,8 @@ async function findPlayerByRealmUsername(username: string, seasonId: string | nu
     select: { id: true },
   });
 }
-interface RouteServiceRequest {
-  body?: unknown;
-  query?: unknown;
-  player?: AuthPayload;
-}
 
-
-export async function registerAccount(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function registerAccount(input: AnonymousRouteServiceRequest): Promise<RouteServiceResponse> {
   const body = registerSchema.parse(input.body);
 
   const passwordCheck = validatePassword(body.password);
@@ -241,7 +239,7 @@ export async function registerAccount(input: RouteServiceRequest): Promise<Route
   });
 }
 
-export async function loginAccount(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function loginAccount(input: AnonymousRouteServiceRequest): Promise<RouteServiceResponse> {
   const body = loginSchema.parse(input.body);
   const now = new Date();
 
@@ -338,7 +336,7 @@ export async function loginAccount(input: RouteServiceRequest): Promise<RouteSer
   });
 }
 
-export async function refreshSession(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function refreshSession(input: AnonymousRouteServiceRequest): Promise<RouteServiceResponse> {
   const { refreshToken } = refreshSchema.parse(input.body);
   const now = new Date();
 
@@ -409,10 +407,10 @@ export async function refreshSession(input: RouteServiceRequest): Promise<RouteS
   });
 }
 
-export async function listCharacters(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function listCharacters(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
   const players = await prisma.player.findMany({
     where: {
-      accountId: input.player!.accountId,
+      accountId: input.player.accountId,
       isBot: false,
     },
     select: {
@@ -446,13 +444,13 @@ export async function listCharacters(input: RouteServiceRequest): Promise<RouteS
 
   return routeJson({
     characters,
-    activePlayerId: input.player!.playerId,
+    activePlayerId: input.player.playerId,
   });
 }
 
-export async function listSeasonArchives(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function listSeasonArchives(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
   const archives = await prisma.seasonArchive.findMany({
-    where: { accountId: input.player!.accountId },
+    where: { accountId: input.player.accountId },
     select: {
       id: true,
       username: true,
@@ -497,13 +495,13 @@ export async function listSeasonArchives(input: RouteServiceRequest): Promise<Ro
   });
 }
 
-export async function switchActivePlayer(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function switchActivePlayer(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
   const { playerId } = switchPlayerSchema.parse(input.body);
 
   const player = await prisma.player.findFirst({
     where: {
       id: playerId,
-      accountId: input.player!.accountId,
+      accountId: input.player.accountId,
       isBot: false,
     },
     select: {
@@ -528,7 +526,7 @@ export async function switchActivePlayer(input: RouteServiceRequest): Promise<Ro
   }
 
   const account = await prisma.account.update({
-    where: { id: input.player!.accountId },
+    where: { id: input.player.accountId },
     data: { activePlayerId: player.id },
     select: {
       id: true,
@@ -537,7 +535,7 @@ export async function switchActivePlayer(input: RouteServiceRequest): Promise<Ro
   });
 
   const { accessToken, refreshToken } = await issueAccountSession(
-    input.player!.accountId,
+    input.player.accountId,
     account.role,
     player,
     new Date(),
@@ -554,7 +552,7 @@ export async function switchActivePlayer(input: RouteServiceRequest): Promise<Ro
   });
 }
 
-export async function joinActiveSeason(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function joinActiveSeason(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
   const { username } = joinSeasonSchema.parse(input.body);
   const now = new Date();
 
@@ -572,7 +570,7 @@ export async function joinActiveSeason(input: RouteServiceRequest): Promise<Rout
 
   const existingCharacter = await prisma.player.findFirst({
     where: {
-      accountId: input.player!.accountId,
+      accountId: input.player.accountId,
       seasonId: activeSeason.id,
     },
     select: { id: true },
@@ -620,7 +618,7 @@ export async function joinActiveSeason(input: RouteServiceRequest): Promise<Rout
     const createdPlayer = await tx.player.create({
       data: {
         username,
-        accountId: input.player!.accountId,
+        accountId: input.player.accountId,
         seasonId: activeSeason.id,
         lastActiveAt: now,
         currentZoneId: startingZone.id,
@@ -670,7 +668,7 @@ export async function joinActiveSeason(input: RouteServiceRequest): Promise<Rout
     await ensureStarterEncounterAndNodes(createdPlayer.id, tx);
 
     const account = await tx.account.update({
-      where: { id: input.player!.accountId },
+      where: { id: input.player.accountId },
       data: { activePlayerId: createdPlayer.id },
       select: {
         id: true,
@@ -685,7 +683,7 @@ export async function joinActiveSeason(input: RouteServiceRequest): Promise<Rout
   });
 
   const { accessToken, refreshToken } = await issueAccountSession(
-    input.player!.accountId,
+    input.player.accountId,
     seasonJoin.account.role,
     seasonJoin.player,
     now,
@@ -703,7 +701,7 @@ export async function joinActiveSeason(input: RouteServiceRequest): Promise<Rout
   });
 }
 
-export async function logoutAccount(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function logoutAccount(input: AnonymousRouteServiceRequest): Promise<RouteServiceResponse> {
   const parsed = refreshSchema.safeParse(input.body);
 
   if (parsed.success) {
@@ -726,7 +724,7 @@ export async function logoutAccount(input: RouteServiceRequest): Promise<RouteSe
   return routeJson({ success: true });
 }
 
-export async function verifyEmailAddress(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function verifyEmailAddress(input: AnonymousRouteServiceRequest): Promise<RouteServiceResponse> {
   const { token } = verifyEmailSchema.parse(input.body);
 
   const tokenRecord = await verifyEmailToken(token);
@@ -744,8 +742,8 @@ export async function verifyEmailAddress(input: RouteServiceRequest): Promise<Ro
   });
 }
 
-export async function resendVerificationEmail(input: RouteServiceRequest): Promise<RouteServiceResponse> {
-  const accountId = input.player!.accountId;
+export async function resendVerificationEmail(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
+  const accountId = input.player.accountId;
 
   const account = await prisma.account.findUnique({
     where: { id: accountId },
@@ -770,7 +768,7 @@ export async function resendVerificationEmail(input: RouteServiceRequest): Promi
   return routeJson({ message: 'Verification email sent' });
 }
 
-export async function requestPasswordReset(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function requestPasswordReset(input: AnonymousRouteServiceRequest): Promise<RouteServiceResponse> {
   const { email } = forgotPasswordSchema.parse(input.body);
 
   // Process asynchronously after response is sent
@@ -797,7 +795,7 @@ export async function requestPasswordReset(input: RouteServiceRequest): Promise<
   return routeJson({ message: 'If that email is verified with us, we\'ve sent a reset link.' });
 }
 
-export async function resetAccountPassword(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function resetAccountPassword(input: AnonymousRouteServiceRequest): Promise<RouteServiceResponse> {
   const body = resetPasswordSchema.parse(input.body);
 
   const passwordCheck = validatePassword(body.password);
@@ -839,19 +837,19 @@ export async function resetAccountPassword(input: RouteServiceRequest): Promise<
   return routeJson({ message: 'Password reset successfully. Please log in with your new password.' });
 }
 
-export async function changeAccountEmail(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function changeAccountEmail(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
   const body = changeEmailSchema.parse(input.body);
-  await changePlayerEmail(input.player!.accountId, body.email, body.password);
+  await changePlayerEmail(input.player.accountId, body.email, body.password);
   return routeJson({ message: 'Email updated. Check your inbox to verify your new address.' });
 }
 
-export async function changeAccountPassword(input: RouteServiceRequest): Promise<RouteServiceResponse> {
+export async function changeAccountPassword(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
   const body = changePasswordSchema.parse(input.body);
   const passwordCheck = validatePassword(body.newPassword);
   if (!passwordCheck.valid) {
     throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
   }
-  await changePlayerPassword(input.player!.accountId, body.currentPassword, body.newPassword);
-  disconnectAccountSockets(input.player!.accountId, 'password_changed');
+  await changePlayerPassword(input.player.accountId, body.currentPassword, body.newPassword);
+  disconnectAccountSockets(input.player.accountId, 'password_changed');
   return routeJson({ message: 'Password updated. Please log in again.' });
 }

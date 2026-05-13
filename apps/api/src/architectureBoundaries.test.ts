@@ -101,6 +101,7 @@ describe('architecture boundaries', () => {
       expect(source, serviceFile).not.toContain('Router(');
       expect(source, serviceFile).not.toMatch(/\breq\./);
       expect(source, serviceFile).not.toMatch(/\bres\./);
+      expect(source, serviceFile).not.toMatch(/from ['"][^'"\n]*\/routes\//);
     }
   });
 
