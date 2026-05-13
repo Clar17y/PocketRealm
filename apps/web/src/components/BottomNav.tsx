@@ -22,12 +22,14 @@ const navItems: { id: string; label: string; icon: UiIconName }[] = [
 export function BottomNav({ activeTab, onNavigate, badgeTabs = new Set(), pulseTabs = new Set() }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-[var(--rpg-surface)] border-t border-[var(--rpg-border)] z-40 safe-area-bottom">
-      <div className="max-w-lg mx-auto flex justify-around items-center h-18">
+      <div className="max-w-lg mx-auto flex justify-around items-center h-[var(--rpg-bottom-nav-height)]">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
+              type="button"
               key={item.id}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => onNavigate(item.id)}
               className={cn(
                 'relative flex flex-col items-center justify-center w-full h-full transition-colors',

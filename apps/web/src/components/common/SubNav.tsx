@@ -13,14 +13,13 @@ interface SubNavProps<T extends string = string> {
 
 export function SubNav<T extends string = string>({ tabs, activeId, onSelect, ariaLabel = 'Navigation tabs' }: SubNavProps<T>) {
   return (
-    <div className="flex gap-2 mb-4 overflow-x-auto pb-2" role="tablist" aria-label={ariaLabel}>
+    <nav className="flex gap-2 mb-4 overflow-x-auto pb-2" aria-label={ariaLabel}>
       {tabs.map((tab) => (
         <button
           type="button"
           key={tab.id}
           id={`tab-${tab.id}`}
-          role="tab"
-          aria-selected={tab.id === activeId}
+          aria-current={tab.id === activeId ? 'page' : undefined}
           onClick={() => onSelect(tab.id)}
           className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
             activeId === tab.id
@@ -36,6 +35,6 @@ export function SubNav<T extends string = string>({ tabs, activeId, onSelect, ar
           )}
         </button>
       ))}
-    </div>
+    </nav>
   );
 }

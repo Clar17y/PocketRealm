@@ -343,6 +343,54 @@ describe('useGameController', () => {
     expect(() => renderHook(() => useGameController({ isAuthenticated: false }))).not.toThrow();
   });
 
+  it('groups the world map under the Explore bottom tab', () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.setActiveScreen('zones');
+    });
+
+    expect(hook.result.current.getActiveTab()).toBe('explore');
+  });
+
+  it.each([
+    ['skills', 'inventory'],
+    ['bestiary', 'combat'],
+    ['worldEvents', 'explore'],
+    ['casino', 'explore'],
+    ['training', 'explore'],
+  ] as const)('groups %s under the %s bottom tab', (screen, tab) => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.setActiveScreen(screen);
+    });
+
+    expect(hook.result.current.getActiveTab()).toBe(tab);
+  });
+
+  it('opens the Explore Zone screen for direct explore navigation', () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.handleNavigate('explore');
+    });
+
+    expect(hook.result.current.activeScreen).toBe('explore');
+    expect(hook.result.current.getActiveTab()).toBe('explore');
+  });
+
+  it('opens the world map when the Explore bottom tab is selected', () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.handleBottomNavNavigate('explore');
+    });
+
+    expect(hook.result.current.activeScreen).toBe('zones');
+    expect(hook.result.current.getActiveTab()).toBe('explore');
+  });
+
   it('blocks a stale zone reload immediately after the active zone changes', async () => {
     const hook = renderHook(() => useGameController({ isAuthenticated: false }));
 

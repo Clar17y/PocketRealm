@@ -134,4 +134,34 @@ describe('ChatPanel', () => {
 
     expect(channelTablist.querySelector('[aria-label="Close chat"]')).toBeNull();
   });
+
+  it('positions the closed chat button above the bottom navigation offset', () => {
+    render(
+      React.createElement(ChatPanel, {
+        isOpen: false,
+        toggleChat: vi.fn(),
+        activeChannel: 'world',
+        setActiveChannel: vi.fn(),
+        worldMessages: [],
+        globalActivityMessages: [],
+        zoneMessages: [],
+        casinoMessages: [],
+        presence: { worldOnline: 1, zoneOnline: {} },
+        unreadWorld: 0,
+        unreadZone: 0,
+        unreadCasino: 0,
+        casinoActive: false,
+        sendMessage: vi.fn(),
+        rateLimitError: null,
+        currentZoneId: null,
+        currentZoneName: null,
+        playerId: 'p2',
+        pinnedMessage: null,
+      }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Open chat' }).className).toContain(
+      'bottom-[calc(var(--rpg-bottom-nav-offset)_+_0.75rem)]',
+    );
+  });
 });

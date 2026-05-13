@@ -92,14 +92,25 @@ vi.mock('./GameScreenRenderer', () => ({
   ),
 }));
 
-vi.mock('@/components/common/ChangelogModal', () => ({ ChangelogModal: () => null }));
+vi.mock('@/components/common/ChangelogModal', () => ({ ChangelogModal: () => <div data-testid="changelog-modal" /> }));
 vi.mock('@/components/common/ConfirmModal', () => ({ ConfirmModal: () => null }));
 vi.mock('@/components/common/LootPicker', () => ({ LootPicker: () => null }));
 vi.mock('@/components/common/LootReveal', () => ({ LootReveal: () => null }));
 vi.mock('@/components/common/XpRateTutorial', () => ({ XpRateTutorial: () => null }));
 vi.mock('@/components/common/ErrorBoundary', () => ({ ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('@/components/BottomNav', () => ({ BottomNav: () => null }));
-vi.mock('@/components/common/SubNav', () => ({ SubNav: () => null }));
+vi.mock('@/components/common/SubNav', () => ({
+  SubNav: ({ tabs, ariaLabel = 'Navigation tabs' }: {
+    tabs: Array<{ id: string; label: string }>;
+    ariaLabel?: string;
+  }) => (
+    <nav aria-label={ariaLabel}>
+      {tabs.map((tab) => (
+        <span key={tab.id}>{tab.label}</span>
+      ))}
+    </nav>
+  ),
+}));
 vi.mock('@/components/AchievementToast', () => ({ AchievementToast: () => null }));
 vi.mock('@/components/QuestToast', () => ({ QuestToast: () => null }));
 vi.mock('@/components/ForgeResultToast', () => ({ ForgeResultToast: () => null }));
@@ -108,8 +119,18 @@ vi.mock('@/components/ErrorToast', () => ({ ErrorToast: () => null }));
 vi.mock('@/components/common/ConnectionBanner', () => ({ ConnectionBanner: () => null }));
 vi.mock('@/components/TutorialBanner', () => ({ TutorialBanner: () => null }));
 vi.mock('@/components/VerificationBanner', () => ({ VerificationBanner: () => null }));
-vi.mock('@/components/TutorialDialog', () => ({ TutorialDialog: () => null }));
-vi.mock('@/components/StarterWeaponPopup', () => ({ StarterWeaponPopup: () => null }));
+vi.mock('@/components/TutorialDialog', async () => {
+  const { TUTORIAL_STEPS } = await vi.importActual<typeof import('@/lib/tutorial')>('@/lib/tutorial');
+
+  return {
+    TutorialDialog: ({ tutorialStep, disabled }: { tutorialStep: number; disabled?: boolean }) => (
+      TUTORIAL_STEPS[tutorialStep]?.dialog
+        ? <div data-testid="tutorial-dialog" data-disabled={disabled ? 'true' : 'false'} hidden={disabled} />
+        : null
+    ),
+  };
+});
+vi.mock('@/components/StarterWeaponPopup', () => ({ StarterWeaponPopup: () => <div data-testid="starter-weapon-popup" /> }));
 vi.mock('@/components/ChatPanel', () => ({ ChatPanel: () => null }));
 
 vi.mock('./hooks/useRateLimitToast', () => ({
@@ -168,6 +189,7 @@ function createGameControllerState() {
     activeScreen: 'home',
     setActiveScreen: setActiveScreenMock,
     handleNavigate: vi.fn(),
+    handleBottomNavNavigate: vi.fn(),
     getActiveTab: vi.fn(() => 'home'),
     turns: 100,
     skills: [],
@@ -208,6 +230,10 @@ function createGameControllerState() {
     loadQuests: vi.fn(),
     loadAll: loadAllMock,
   };
+}
+
+function getSubnavText() {
+  return screen.getByRole('navigation', { name: 'Navigation tabs' }).textContent ?? '';
 }
 
 describe('GamePage realm switching', () => {
@@ -317,5 +343,112 @@ describe('GamePage realm switching', () => {
     expect(window.location.search).toContain('support=success');
     expect(window.location.search).toContain('session_id=cs_test_123');
     expect(window.location.search).not.toContain('screen=settings');
+  });
+
+  it('suppresses the changelog while the tutorial is active', () => {
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      tutorialStep: 0,
+      showChangelog: true,
+    });
+
+    render(<GamePage />);
+
+    expect(screen.queryByTestId('changelog-modal')).toBeNull();
+  });
+
+  it('shows the starter weapon popup without a duplicate tutorial dialog', () => {
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      tutorialStep: 1,
+    });
+
+    render(<GamePage />);
+
+    expect(screen.getByTestId('starter-weapon-popup')).toBeTruthy();
+    expect(screen.queryByTestId('tutorial-dialog')).toBeNull();
+  });
+
+  it('delays tutorial dialogs while a blocking modal is active', () => {
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      tutorialStep: 0,
+      confirmAbandonLoot: true,
+    });
+
+    render(<GamePage />);
+
+    expect(screen.getByTestId('tutorial-dialog').getAttribute('data-disabled')).toBe('true');
+  });
+
+  it('delays the starter weapon popup while a blocking modal is active', () => {
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      tutorialStep: 1,
+      lootRevealItems: [{ name: 'Copper Ore', rarity: 'common', quantity: 1 }],
+    });
+
+    render(<GamePage />);
+
+    expect(screen.queryByTestId('starter-weapon-popup')).toBeNull();
+  });
+
+  it('shows the changelog after the tutorial is complete', () => {
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      tutorialStep: 999,
+      showChangelog: true,
+    });
+
+    render(<GamePage />);
+
+    expect(screen.getByTestId('changelog-modal')).toBeTruthy();
+  });
+
+  it('groups dashboard screens under Home without moved destination labels', () => {
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      activeScreen: 'home',
+      getActiveTab: vi.fn(() => 'home'),
+    });
+
+    render(<GamePage />);
+
+    const subnavText = getSubnavText();
+    expect(subnavText).toContain('Dashboard');
+    expect(subnavText).toContain('Quests');
+    expect(subnavText).toContain('Achievements');
+    expect(subnavText).toContain('Rankings');
+    expect(subnavText).not.toContain('Skills');
+    expect(subnavText).not.toContain('Bestiary');
+    expect(subnavText).not.toContain('Events');
+  });
+
+  it('groups moved destination labels under Explore, Inventory, and Combat', () => {
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      activeScreen: 'zones',
+      getActiveTab: vi.fn(() => 'explore'),
+    });
+    const { rerender } = render(<GamePage />);
+    expect(getSubnavText()).toContain('Events');
+    expect(getSubnavText()).toContain('Training');
+    expect(getSubnavText()).toContain('Casino');
+
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      activeScreen: 'inventory',
+      getActiveTab: vi.fn(() => 'inventory'),
+    });
+    rerender(<GamePage />);
+    expect(getSubnavText()).toContain('Skills');
+
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      activeScreen: 'combat',
+      getActiveTab: vi.fn(() => 'combat'),
+    });
+    rerender(<GamePage />);
+    expect(getSubnavText()).toContain('Bestiary');
   });
 });

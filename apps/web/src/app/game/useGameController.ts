@@ -69,6 +69,15 @@ type LootRevealItem = {
   imageSrc?: string;
 };
 
+type BottomNavTarget = 'explore' | 'social';
+
+const bottomTabDefaults: Record<BottomNavTarget, Screen> = {
+  explore: 'zones',
+  social: 'guild',
+};
+
+const isBottomNavTarget = (screen: string): screen is BottomNavTarget => screen in bottomTabDefaults;
+
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
   const [turns, setTurns] = useState(0);
@@ -521,10 +530,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, []);
 
   const getActiveTab = () => {
-    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
-    if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
-    if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
-    if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
+    if (['home', 'achievements', 'quests', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
+    if (['zones', 'explore', 'gathering', 'crafting', 'forge', 'worldEvents', 'casino', 'training'].includes(activeScreen)) return 'explore';
+    if (['inventory', 'equipment', 'skills'].includes(activeScreen)) return 'inventory';
+    if (['combat', 'arena', 'templates', 'talentTree', 'bestiary'].includes(activeScreen)) return 'combat';
     if (['guild', 'friends', 'mail'].includes(activeScreen)) return 'social';
     return 'home';
   };
@@ -633,7 +642,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const casinoActions = useCasinoActions({ setGold, setTurns });
 
-  const handleNavigate = (screen: string) => {
+  const navigateToScreen = (screen: string) => {
     // Auto-skip any active playback when navigating away
     if (playbackActive) {
       if (explorationActions.explorationPlaybackData) {
@@ -661,10 +670,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (activeScreen === 'combat' && screen !== 'combat') {
       setLastCombat(null);
     }
-    // Map bottom nav tab ids to default sub-screens
-    const resolved = screen === 'social' ? 'guild' : screen;
-    setActiveScreen(resolved as Screen);
-    trackEvent('screen_view', { screen: resolved });
+    setActiveScreen(screen as Screen);
+    trackEvent('screen_view', { screen });
+  };
+
+  const handleNavigate = (screen: string) => {
+    navigateToScreen(screen);
+  };
+
+  const handleBottomNavNavigate = (screen: string) => {
+    navigateToScreen(isBottomNavTarget(screen) ? bottomTabDefaults[screen] : screen);
   };
 
   const dismissChangelog = useCallback(() => {
@@ -683,6 +698,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     activeScreen,
     setActiveScreen,
     handleNavigate,
+    handleBottomNavNavigate,
     getActiveTab,
     handleTravelToZone: travelActions.handleTravelToZone,
     confirmAbandonLoot: travelActions.confirmAbandonLoot,

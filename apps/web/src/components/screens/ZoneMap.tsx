@@ -302,66 +302,69 @@ export function ZoneMap({
         <MapPin size={20} color="var(--rpg-gold)" />
       </div>
 
-      {/* Primary action/playback region — stays in the focus area while the map scrolls */}
-      {travelPlaybackData ? (
-        <PlaybackSurface
-          mode="overlay"
-          title="Travel Playback"
-          subtitle={`Travelling to ${travelPlaybackData.destinationName}`}
-          progressLabel={travelPlaybackData.totalHops > 1
-            ? `${travelPlaybackData.currentHop}/${travelPlaybackData.totalHops} to ${travelPlaybackData.finalDestinationName}`
-            : undefined}
-        >
-          <TurnPlayback
-            totalTurns={travelPlaybackData.totalTurns}
-            label={travelPlaybackData.totalHops > 1
-              ? `Travelling to ${travelPlaybackData.destinationName} (${travelPlaybackData.currentHop}/${travelPlaybackData.totalHops} to ${travelPlaybackData.finalDestinationName})`
-              : `Travelling to ${travelPlaybackData.destinationName}`}
-            events={travelPlaybackData.events}
-            aborted={travelPlaybackData.aborted}
-            refundedTurns={travelPlaybackData.refundedTurns}
-            playerHpBefore={travelPlaybackData.playerHpBefore}
-            playerMaxHp={travelPlaybackData.playerMaxHp}
-            combatSpeedMs={combatSpeedMs}
-            explorationSpeedMs={explorationSpeedMs}
-            autoSkipKnownCombat={autoSkipKnownCombat}
-            bestiaryMobs={bestiaryMobs}
-            onComplete={onTravelPlaybackComplete!}
-            onSkip={onTravelPlaybackSkip!}
-            onPushLog={onPushLog}
-            combatLogPrefetch={combatLogPrefetch}
-            playerStartStamina={playerStartStamina}
-            playerStartMana={playerStartMana}
-            playerMaxStamina={playerMaxStamina}
-            playerMaxMana={playerMaxMana}
-            embedded
-          />
-        </PlaybackSurface>
-      ) : selectedZone && selectedZone.discovered && (
-        <div
-          className="sticky top-2 z-20"
-          style={{
-            background: 'color-mix(in srgb, var(--rpg-surface) 94%, transparent)',
-            border: '1px solid var(--rpg-border)',
-            borderRadius: 8,
-            padding: 12,
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.28)',
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)]">
-              {selectedZone.name}
-              {selectedZone.id === currentZoneId && (
-                <span className="ml-2 text-xs text-[var(--rpg-gold)]">(Current)</span>
-              )}
-            </h3>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(selectedZone.difficulty, 5) }).map((_, idx) => (
-                <Star key={idx} size={12} fill="var(--rpg-gold)" color="var(--rpg-gold)" />
-              ))}
-            </div>
-          </div>
+      <div className="contents lg:grid lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] lg:gap-4 lg:items-start">
+        <div className="contents lg:block lg:sticky lg:top-20 lg:z-20">
+          {/* Primary action/playback region — stays in the focus area while the map scrolls */}
+          {travelPlaybackData ? (
+            <PlaybackSurface
+              mode="overlay"
+              title="Travel Playback"
+              subtitle={`Travelling to ${travelPlaybackData.destinationName}`}
+              className="mt-4 lg:mt-0 lg:static"
+              progressLabel={travelPlaybackData.totalHops > 1
+                ? `${travelPlaybackData.currentHop}/${travelPlaybackData.totalHops} to ${travelPlaybackData.finalDestinationName}`
+                : undefined}
+            >
+              <TurnPlayback
+                totalTurns={travelPlaybackData.totalTurns}
+                label={travelPlaybackData.totalHops > 1
+                  ? `Travelling to ${travelPlaybackData.destinationName} (${travelPlaybackData.currentHop}/${travelPlaybackData.totalHops} to ${travelPlaybackData.finalDestinationName})`
+                  : `Travelling to ${travelPlaybackData.destinationName}`}
+                events={travelPlaybackData.events}
+                aborted={travelPlaybackData.aborted}
+                refundedTurns={travelPlaybackData.refundedTurns}
+                playerHpBefore={travelPlaybackData.playerHpBefore}
+                playerMaxHp={travelPlaybackData.playerMaxHp}
+                combatSpeedMs={combatSpeedMs}
+                explorationSpeedMs={explorationSpeedMs}
+                autoSkipKnownCombat={autoSkipKnownCombat}
+                bestiaryMobs={bestiaryMobs}
+                onComplete={onTravelPlaybackComplete!}
+                onSkip={onTravelPlaybackSkip!}
+                onPushLog={onPushLog}
+                combatLogPrefetch={combatLogPrefetch}
+                playerStartStamina={playerStartStamina}
+                playerStartMana={playerStartMana}
+                playerMaxStamina={playerMaxStamina}
+                playerMaxMana={playerMaxMana}
+                embedded
+              />
+            </PlaybackSurface>
+          ) : selectedZone && selectedZone.discovered && (
+            <div
+              className="sticky top-2 z-20 mt-4 lg:static lg:mt-0"
+              style={{
+                background: 'color-mix(in srgb, var(--rpg-surface) 94%, transparent)',
+                border: '1px solid var(--rpg-border)',
+                borderRadius: 8,
+                padding: 12,
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.28)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)]">
+                  {selectedZone.name}
+                  {selectedZone.id === currentZoneId && (
+                    <span className="ml-2 text-xs text-[var(--rpg-gold)]">(Current)</span>
+                  )}
+                </h3>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(selectedZone.difficulty, 5) }).map((_, idx) => (
+                    <Star key={idx} size={12} fill="var(--rpg-gold)" color="var(--rpg-gold)" />
+                  ))}
+                </div>
+              </div>
 
           {(selectedZone.description || selectedZone.arrivalText || ambientText) && (
             <CollapsibleLoreSection title="Zone Lore" storageKey="zone-description">
@@ -525,106 +528,108 @@ export function ZoneMap({
               })()}
             </PixelButton>
           )}
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Tiered map */}
-      <div className={travelPlaybackData ? 'overflow-x-auto pb-1 opacity-60 saturate-50 transition-all' : 'overflow-x-auto pb-1 transition-all'}>
-        <div
-          className="relative mx-auto"
-          style={{ width: svgSize.width, minHeight: svgSize.height }}
-        >
-          {/* SVG connection lines */}
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={svgSize.width}
-            height={svgSize.height}
-            style={{ zIndex: 0 }}
-          >
-            {connections.map((conn) => {
-              const from = zonePositions.get(conn.fromId);
-              const to = zonePositions.get(conn.toId);
-              if (!from || !to) return null;
-              return (
-                <line
-                  key={`${conn.fromId}-${conn.toId}`}
-                  x1={from.x}
-                  y1={from.y}
-                  x2={to.x}
-                  y2={to.y}
-                  stroke="var(--rpg-border)"
-                  strokeWidth={2}
-                  strokeDasharray="6 4"
-                />
-              );
-            })}
-          </svg>
+        <div className="contents lg:block lg:min-w-0 lg:space-y-4">
+          {/* Tiered map */}
+          <div className={travelPlaybackData ? 'mt-4 overflow-x-auto pb-1 opacity-60 saturate-50 transition-all lg:mt-0' : 'mt-4 overflow-x-auto pb-1 transition-all lg:mt-0'}>
+            <div
+              className="relative mx-auto"
+              style={{ width: svgSize.width, minHeight: svgSize.height }}
+            >
+              {/* SVG connection lines */}
+              <svg
+                className="absolute inset-0 pointer-events-none"
+                width={svgSize.width}
+                height={svgSize.height}
+                style={{ zIndex: 0 }}
+              >
+                {connections.map((conn) => {
+                  const from = zonePositions.get(conn.fromId);
+                  const to = zonePositions.get(conn.toId);
+                  if (!from || !to) return null;
+                  return (
+                    <line
+                      key={`${conn.fromId}-${conn.toId}`}
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke="var(--rpg-border)"
+                      strokeWidth={2}
+                      strokeDasharray="6 4"
+                    />
+                  );
+                })}
+              </svg>
 
-          {/* Zone nodes */}
-          {tierRows.map(([tier, rowZones]) => {
-            const rowWidth = rowZones.length * NODE_W + (rowZones.length - 1) * COL_GAP;
-            let maxRowWidth = 0;
-            for (const [, rz] of tierRows) {
-              const w = rz.length * NODE_W + (rz.length - 1) * COL_GAP;
-              if (w > maxRowWidth) maxRowWidth = w;
-            }
-            const offsetX = (maxRowWidth - rowWidth) / 2;
-            const rowY = tierRows.findIndex(([t]) => t === tier) * (NODE_H + ROW_GAP);
+              {/* Zone nodes */}
+              {tierRows.map(([tier, rowZones]) => {
+                const rowWidth = rowZones.length * NODE_W + (rowZones.length - 1) * COL_GAP;
+                let maxRowWidth = 0;
+                for (const [, rz] of tierRows) {
+                  const w = rz.length * NODE_W + (rz.length - 1) * COL_GAP;
+                  if (w > maxRowWidth) maxRowWidth = w;
+                }
+                const offsetX = (maxRowWidth - rowWidth) / 2;
+                const rowY = tierRows.findIndex(([t]) => t === tier) * (NODE_H + ROW_GAP);
 
-            return rowZones.map((zone, colIdx) => {
-              const x = offsetX + colIdx * (NODE_W + COL_GAP);
-              const isCurrent = zone.id === currentZoneId;
-              const isSelected = zone.id === selectedZoneId;
-              const isUndiscovered = !zone.discovered;
+                return rowZones.map((zone, colIdx) => {
+                  const x = offsetX + colIdx * (NODE_W + COL_GAP);
+                  const isCurrent = zone.id === currentZoneId;
+                  const isSelected = zone.id === selectedZoneId;
+                  const isUndiscovered = !zone.discovered;
 
-              return (
-                <button
-                  key={zone.id}
-                  onClick={() => {
-                    if (!isUndiscovered && !playbackActive) setSelectedZoneId(zone.id);
-                  }}
-                  disabled={isUndiscovered}
-                  className="absolute flex flex-col items-center justify-center text-center transition-all"
-                  style={{
-                    left: x,
-                    top: rowY,
-                    width: NODE_W,
-                    height: NODE_H,
-                    zIndex: 1,
-                  }}
-                >
-                  {/* Node card */}
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      background: isUndiscovered
-                        ? 'var(--rpg-background)'
-                        : 'var(--rpg-bg-medium, var(--rpg-surface))',
-                      border: isCurrent
-                        ? '2px solid var(--rpg-gold)'
-                        : isSelected
-                          ? '2px solid var(--rpg-blue-light)'
-                          : '1px solid var(--rpg-border)',
-                      borderRadius: 8,
-                      opacity: isUndiscovered ? 0.4 : 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'flex-start',
-                      paddingTop: 6,
-                      paddingRight: 4,
-                      paddingBottom: 6,
-                      paddingLeft: 4,
-                      boxSizing: 'border-box',
-                      cursor: isUndiscovered ? 'not-allowed' : 'pointer',
-                      boxShadow: isCurrent
-                        ? '0 0 8px var(--rpg-gold)'
-                        : isSelected
-                          ? '0 0 6px var(--rpg-blue-light)'
-                          : 'none',
-                    }}
-                  >
+                  return (
+                    <button
+                      key={zone.id}
+                      onClick={() => {
+                        if (!isUndiscovered && !playbackActive) setSelectedZoneId(zone.id);
+                      }}
+                      disabled={isUndiscovered}
+                      className="absolute flex flex-col items-center justify-center text-center transition-all"
+                      style={{
+                        left: x,
+                        top: rowY,
+                        width: NODE_W,
+                        height: NODE_H,
+                        zIndex: 1,
+                      }}
+                    >
+                      {/* Node card */}
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          background: isUndiscovered
+                            ? 'var(--rpg-background)'
+                            : 'var(--rpg-bg-medium, var(--rpg-surface))',
+                          border: isCurrent
+                            ? '2px solid var(--rpg-gold)'
+                            : isSelected
+                              ? '2px solid var(--rpg-blue-light)'
+                              : '1px solid var(--rpg-border)',
+                          borderRadius: 8,
+                          opacity: isUndiscovered ? 0.4 : 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
+                          paddingTop: 6,
+                          paddingRight: 4,
+                          paddingBottom: 6,
+                          paddingLeft: 4,
+                          boxSizing: 'border-box',
+                          cursor: isUndiscovered ? 'not-allowed' : 'pointer',
+                          boxShadow: isCurrent
+                            ? '0 0 8px var(--rpg-gold)'
+                            : isSelected
+                              ? '0 0 6px var(--rpg-blue-light)'
+                              : 'none',
+                        }}
+                      >
                     {/* Zone icon */}
                     <div
                       style={{
@@ -717,46 +722,49 @@ export function ZoneMap({
                         HERE
                       </span>
                     )}
-                  </div>
-                </button>
-              );
-            });
-          })}
+                      </div>
+                    </button>
+                  );
+                });
+              })}
+            </div>
+          </div>
+
+          {/* Undiscovered zone hints */}
+          {!travelPlaybackData && undiscoveredZones && undiscoveredZones.length > 0 && (
+            <div
+              className="mt-4 lg:mt-0"
+              style={{
+                background: 'var(--rpg-surface)',
+                border: '1px solid var(--rpg-border)',
+                borderRadius: 8,
+                padding: 12,
+              }}
+            >
+              <h3 className="text-sm font-semibold text-[var(--rpg-text-secondary)] mb-2">Undiscovered Paths</h3>
+              <div className="space-y-1.5">
+                {undiscoveredZones.map(uz => {
+                  const fromZone = zones.find(z => z.id === uz.fromZoneId);
+                  return (
+                    <div key={uz.id} className="flex items-center gap-2 px-3 py-2 rounded border border-dashed border-[var(--rpg-border)] opacity-60">
+                      <Lock size={14} className="text-[var(--rpg-text-secondary)] flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-sm text-[var(--rpg-text-secondary)]">???</span>
+                        <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
+                          from {fromZone?.name ?? 'Unknown'} &mdash; {uz.explorationThreshold}% explored to discover
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Activity log */}
+          {activityLog && <div className="mt-4 lg:mt-0"><ActivityLog entries={activityLog} /></div>}
         </div>
       </div>
-
-      {/* Undiscovered zone hints */}
-      {!travelPlaybackData && undiscoveredZones && undiscoveredZones.length > 0 && (
-        <div
-          style={{
-            background: 'var(--rpg-surface)',
-            border: '1px solid var(--rpg-border)',
-            borderRadius: 8,
-            padding: 12,
-          }}
-        >
-          <h3 className="text-sm font-semibold text-[var(--rpg-text-secondary)] mb-2">Undiscovered Paths</h3>
-          <div className="space-y-1.5">
-            {undiscoveredZones.map(uz => {
-              const fromZone = zones.find(z => z.id === uz.fromZoneId);
-              return (
-                <div key={uz.id} className="flex items-center gap-2 px-3 py-2 rounded border border-dashed border-[var(--rpg-border)] opacity-60">
-                  <Lock size={14} className="text-[var(--rpg-text-secondary)] flex-shrink-0" />
-                  <div className="flex-1">
-                    <span className="text-sm text-[var(--rpg-text-secondary)]">???</span>
-                    <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
-                      from {fromZone?.name ?? 'Unknown'} &mdash; {uz.explorationThreshold}% explored to discover
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Activity log */}
-      {activityLog && <ActivityLog entries={activityLog} />}
     </ScreenContainer>
   );
 }

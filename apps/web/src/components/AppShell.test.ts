@@ -67,6 +67,23 @@ describe('AppShell', () => {
     expect(screen.queryByRole('button', { name: /Rook/i })).toBeNull();
   });
 
+  it('uses a wider content frame on desktop viewports', () => {
+    const { container } = render(
+      React.createElement(
+        AppShell,
+        { username: 'Rook', onSettings: vi.fn() },
+        React.createElement('div', null, 'Child'),
+      ),
+    );
+
+    const mainClassName = container.querySelector('main')?.className;
+
+    expect(mainClassName).toContain('lg:max-w-5xl');
+    expect(mainClassName).toContain('pb-[calc(var(--rpg-bottom-nav-offset)_+_1.5rem)]');
+    expect(mainClassName).toContain('var(--rpg-bottom-nav-offset)');
+    expect(mainClassName).not.toContain('pb-[calc(var(--rpg-bottom-nav-offset)+1.5rem)]');
+  });
+
   it('closes the username dropdown before opening settings from the cog', () => {
     const onSettings = vi.fn();
 

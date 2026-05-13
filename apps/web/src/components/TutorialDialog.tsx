@@ -10,9 +10,10 @@ import {
 interface TutorialDialogProps {
   tutorialStep: number;
   onDismiss: () => void;
+  disabled?: boolean;
 }
 
-export function TutorialDialog({ tutorialStep, onDismiss }: TutorialDialogProps) {
+export function TutorialDialog({ tutorialStep, onDismiss, disabled = false }: TutorialDialogProps) {
   const [shownForStep, setShownForStep] = useState<number | null>(null);
   const [visible, setVisible] = useState(false);
   const prevStepRef = useRef<number | null>(null);
@@ -29,7 +30,7 @@ export function TutorialDialog({ tutorialStep, onDismiss }: TutorialDialogProps)
     prevStepRef.current = tutorialStep;
   }, [tutorialStep]);
 
-  if (!visible || shownForStep === null) return null;
+  if (disabled || !visible || shownForStep === null) return null;
 
   const stepDef = TUTORIAL_STEPS[shownForStep];
   if (!stepDef?.dialog) return null;
