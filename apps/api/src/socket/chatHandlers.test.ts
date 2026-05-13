@@ -182,6 +182,29 @@ describe('registerChatHandlers scoped room authorization', () => {
     }));
   });
 
+  it('refreshes scoped rooms on demand and emits the current guild pin', async () => {
+    mockAccountRole('admin');
+    const { io: adminIo } = makeIo();
+    const { socket: adminSocket, handlers: adminHandlers } = makeSocket('admin');
+
+    registerChatHandlers(adminIo, adminSocket);
+    await adminHandlers.get('chat:pin')?.({ channelId: 'guild:guild-current', message: 'Guild notice' });
+
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({ currentZoneId: null } as never);
+    vi.mocked(prisma.guildMember.findUnique).mockResolvedValue({ guildId: 'guild-current' } as never);
+    const { io } = makeIo();
+    const { socket, handlers } = makeSocket('player');
+
+    registerChatHandlers(io, socket);
+    await handlers.get('chat:refresh-rooms')?.();
+
+    expect(socket.join).toHaveBeenCalledWith('chat:guild:guild-current');
+    expect(socket.emit).toHaveBeenCalledWith('chat:pinned', expect.objectContaining({
+      channelId: 'guild:guild-current',
+      message: 'Guild notice',
+    }));
+  });
+
   it('removes stale zone receivers before broadcasting a zone message', async () => {
     const staleSocket = { data: { playerId: 'stale-player' }, leave: vi.fn() };
     const currentSocket = { data: { playerId: 'current-player' }, leave: vi.fn() };

@@ -10,6 +10,9 @@ const { dashboardSpy } = vi.hoisted(() => ({
 const { inventorySpy } = vi.hoisted(() => ({
   inventorySpy: vi.fn(),
 }));
+const { guildScreenSpy } = vi.hoisted(() => ({
+  guildScreenSpy: vi.fn(),
+}));
 
 vi.mock('@/components/screens/Dashboard', () => ({
   Dashboard: (props: unknown) => {
@@ -21,6 +24,13 @@ vi.mock('@/components/screens/Dashboard', () => ({
 vi.mock('@/components/screens/Inventory', () => ({
   Inventory: (props: unknown) => {
     inventorySpy(props);
+    return null;
+  },
+}));
+
+vi.mock('@/components/screens/GuildScreen', () => ({
+  GuildScreen: (props: unknown) => {
+    guildScreenSpy(props);
     return null;
   },
 }));
@@ -233,6 +243,7 @@ function createBaseGc() {
 function renderGameScreen(
   player: { isPremium?: boolean; premiumExpiresAt?: string | null } | null,
   gcOverrides: Partial<ReturnType<typeof createBaseGc>> = {},
+  propOverrides: Partial<React.ComponentProps<typeof GameScreenRenderer>> = {},
 ) {
   render(React.createElement(GameScreenRenderer, {
     gc: { ...createBaseGc(), ...gcOverrides },
@@ -254,9 +265,11 @@ function renderGameScreen(
     deepLinkTab: null,
     pushState: null,
     pushToggle: vi.fn(),
+    onGuildMembershipChange: vi.fn(),
     onLogout: vi.fn(),
     onAccountRefresh: vi.fn(),
     onForceRelogin: vi.fn(),
+    ...propOverrides,
   }));
 }
 
@@ -330,5 +343,15 @@ describe('GameScreenRenderer', () => {
       usedSlots: 1,
       gold: 500,
     });
+  });
+
+  it('forwards guild membership changes to the Guild screen', () => {
+    const onGuildMembershipChange = vi.fn();
+
+    renderGameScreen(null, { activeScreen: 'guild' }, { onGuildMembershipChange });
+
+    expect(guildScreenSpy).toHaveBeenCalledWith(expect.objectContaining({
+      onGuildMembershipChange,
+    }));
   });
 });

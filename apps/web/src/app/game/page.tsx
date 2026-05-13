@@ -307,6 +307,14 @@ export default function GamePage() {
   const canShowChangelog = showChangelog && !tutorialFlowActive && !blockingModalActive;
   const featureTutorialsEnabled = !tutorialFlowActive && !canShowChangelog && !blockingModalActive;
   const canShowStarterWeaponPopup = !blockingModalActive && tutorialStep === TUTORIAL_STEP_STARTER_WEAPON;
+  let activePinnedMessage = chat.pinnedZone;
+  if (chat.activeChannel === 'casino') {
+    activePinnedMessage = null;
+  } else if (chat.activeChannel === 'guild') {
+    activePinnedMessage = chat.pinnedGuild;
+  } else if (chat.activeChannel === 'world') {
+    activePinnedMessage = chat.pinnedWorld;
+  }
 
   return (
     <>
@@ -518,6 +526,7 @@ export default function GamePage() {
           deepLinkTab={deepLinkTab}
           pushState={pushState}
           pushToggle={pushToggle}
+          onGuildMembershipChange={chat.refreshGuildChat}
           onLogout={() => { logout(); router.push('/'); }}
           onAccountRefresh={async () => { await refreshPlayer(); }}
           onForceRelogin={() => {
@@ -536,18 +545,21 @@ export default function GamePage() {
         worldMessages={chat.worldMessages}
         globalActivityMessages={chat.globalActivityMessages}
         zoneMessages={chat.zoneMessages}
+        guildMessages={chat.guildMessages}
         casinoMessages={chat.casinoMessages}
         presence={chat.presence}
         unreadWorld={chat.unreadWorld}
         unreadZone={chat.unreadZone}
+        unreadGuild={chat.unreadGuild}
         unreadCasino={chat.unreadCasino}
+        guildChatLabel={chat.guildChatLabel}
         casinoActive={chat.casinoActive}
         sendMessage={chat.sendMessage}
         rateLimitError={chat.rateLimitError}
         currentZoneId={activeZoneId}
         currentZoneName={currentZone?.name ?? null}
         playerId={player?.id ?? null}
-        pinnedMessage={chat.activeChannel === 'casino' ? null : chat.activeChannel === 'world' ? chat.pinnedWorld : chat.pinnedZone}
+        pinnedMessage={activePinnedMessage}
       />
       <BottomNav
         activeTab={activeTab}

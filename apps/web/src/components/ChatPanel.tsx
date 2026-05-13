@@ -15,11 +15,14 @@ interface ChatPanelProps {
   worldMessages: ChatMessageEvent[];
   globalActivityMessages: ChatMessageEvent[];
   zoneMessages: ChatMessageEvent[];
+  guildMessages: ChatMessageEvent[];
   casinoMessages: ChatMessageEvent[];
   presence: ChatPresenceEvent;
   unreadWorld: number;
   unreadZone: number;
+  unreadGuild: number;
   unreadCasino: number;
+  guildChatLabel: string | null;
   casinoActive: boolean;
   sendMessage: (text: string) => void;
   rateLimitError: string | null;
@@ -37,11 +40,14 @@ export function ChatPanel({
   worldMessages,
   globalActivityMessages,
   zoneMessages,
+  guildMessages,
   casinoMessages,
   presence,
   unreadWorld,
   unreadZone,
+  unreadGuild,
   unreadCasino,
+  guildChatLabel,
   casinoActive,
   sendMessage,
   rateLimitError,
@@ -56,6 +62,7 @@ export function ChatPanel({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const messages = activeChannel === 'world' ? worldMessages
+    : activeChannel === 'guild' ? guildMessages
     : activeChannel === 'casino' ? casinoMessages
     : zoneMessages;
   const visibleGlobalActivity = globalActivityMessages.slice(-CHAT_ACTIVITY_CONSTANTS.VISIBLE_GLOBAL_ACTIVITY_COUNT);
@@ -88,7 +95,7 @@ export function ChatPanel({
     setInput('');
   };
 
-  const totalUnread = unreadWorld + unreadZone + unreadCasino;
+  const totalUnread = unreadWorld + unreadZone + unreadGuild + unreadCasino;
   const worldOnline = presence.worldOnline;
   const zoneOnline = currentZoneId ? (presence.zoneOnline[currentZoneId] ?? 0) : 0;
 
@@ -151,6 +158,26 @@ export function ChatPanel({
                 </span>
               )}
             </button>
+            {guildChatLabel && (
+              <button
+                role="tab"
+                aria-selected={activeChannel === 'guild'}
+                onClick={() => setActiveChannel('guild')}
+                title={guildChatLabel}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
+                  activeChannel === 'guild'
+                    ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
+                    : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                }`}
+              >
+                Guild
+                {unreadGuild > 0 && activeChannel !== 'guild' && (
+                  <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[var(--rpg-red)] text-[9px] text-white px-0.5">
+                    {unreadGuild}
+                  </span>
+                )}
+              </button>
+            )}
             {casinoActive && (
               <button
                 role="tab"
