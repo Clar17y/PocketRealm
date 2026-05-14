@@ -1,12 +1,8 @@
+import { ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { getAllTalentNodes, getTalentNode } from '@pocketrealm/shared/constants/talentTreeDefinitions';
 import { prisma } from '@pocketrealm/database';
 import {
-  SKILL_POINT_CONSTANTS,
-  CHARACTER_CONSTANTS,
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  getAllTalentNodes,
-  getTalentNode,
-  type SkillPointAllocationData,
-} from '@pocketrealm/shared';
+  SKILL_POINT_CONSTANTS, CHARACTER_CONSTANTS, type SkillPointAllocationData } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { skillPointAllocationsSchema } from '../utils/jsonColumnSchemas';

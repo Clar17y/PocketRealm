@@ -55,10 +55,7 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
   },
   [TUTORIAL_STEP_STARTER_WEAPON]: {
     banner: 'Kessa Ironweld has a weapon for you. Choose wisely!',
-    dialog: {
-      title: 'A Gift from the Forge',
-      body: "Kessa Ironweld, Millbrook\u2019s blacksmith, won\u2019t let you leave town bare-handed. Pick a weapon \u2014 sword, bow, or staff \u2014 and she\u2019ll see you off.",
-    },
+    dialog: null,
     pulseTab: null,
     navigateTo: null,
   },
@@ -116,7 +113,7 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
       title: 'Zone Travel',
       body: 'Crafting can only be done in towns. Open the World Map to see connected zones and travel to Millbrook, the nearest town. Travelling costs turns based on distance.',
     },
-    pulseTab: 'home',
+    pulseTab: 'explore',
     navigateTo: 'zones',
   },
   [TUTORIAL_STEP_REFINE]: {

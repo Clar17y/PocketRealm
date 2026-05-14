@@ -3,14 +3,15 @@ pocketrealm/                       # npm workspaces monorepo
 ├── apps/
 │   ├── api/                       # Express backend (port 4000)
 │   │   ├── src/
-│   │   │   ├── index.ts           # App entry, middleware, route registration
-│   │   │   ├── routes/            # 23 route modules (~145 endpoints)
+│   │   │   ├── index.ts           # Process startup, HTTP server, timers, shutdown
+│   │   │   ├── app.ts             # Express app construction, middleware, route registration
+│   │   │   ├── routes/            # Thin HTTP boundary modules mounted in app.ts
 │   │   │   │   ├── combat/        # Modularized: start, logs, sites, helpers
 │   │   │   │   ├── crafting/      # Modularized: craft, forge, recipes, salvage
 │   │   │   │   └── exploration/   # Modularized: start, estimate, helpers
-│   │   │   ├── services/          # 49 service files + tests
+│   │   │   ├── services/          # Business workflows, DB access, socket side effects
 │   │   │   ├── middleware/        # auth.ts, admin.ts, errorHandler.ts
-│   │   │   ├── socket/            # Socket.IO: chat, casino, auth
+│   │   │   ├── socket/            # Socket.IO: chat, casino, auth, Redis adapter
 │   │   │   └── __mocks__/         # Test mocks (database)
 │   │   ├── .env.example
 │   │   └── vitest.config.ts
@@ -19,32 +20,32 @@ pocketrealm/                       # npm workspaces monorepo
 │       ├── src/
 │       │   ├── app/               # Next.js App Router
 │       │   │   ├── game/          # Main game page
-│       │   │   │   ├── hooks/     # Game-specific hooks (7 files)
+│       │   │   │   ├── hooks/     # Game-specific controller/action hooks
 │       │   │   │   └── screens/   # ArenaScreen, CombatScreen
 │       │   │   ├── login/
 │       │   │   └── register/
-│       │   ├── components/        # 85+ component files
-│       │   │   ├── screens/       # 25 game screens
+│       │   ├── components/        # 210 component files
+│       │   │   ├── screens/       # 67 game screens/modules
 │       │   │   ├── combat/        # Combat playback UI
 │       │   │   ├── exploration/   # Exploration playback UI
-│       │   │   ├── guild/         # 9 guild UI components
+│       │   │   ├── guild/         # 15 guild UI components
 │       │   │   ├── leaderboard/   # Leaderboard table
 │       │   │   ├── playback/      # Turn-based animation
-│       │   │   ├── common/        # 29 shared components
+│       │   │   ├── common/        # 74 shared components
 │       │   │   └── ui/            # Base UI primitives (Slider, ToggleSwitch)
-│       │   ├── hooks/             # 6 shared hooks
-│       │   └── lib/               # 34 files
-│       │       └── api/           # 13 modularized API client files
+│       │   ├── hooks/             # 24 shared hooks
+│       │   └── lib/               # 58 client utilities/modules
+│       │       └── api/           # 23 modularized API client files
 │       ├── .env.example
 │       ├── tailwind.config.ts
 │       └── vitest.config.ts
 │
 ├── packages/
-│   ├── shared/                    # Types, constants, utilities (no deps)
+│   ├── shared/                    # Types, constants, utilities; top-level and explicit subpath exports
 │   │   └── src/
 │   │       ├── types/             # 14 type files
-│   │       ├── constants/         # 10 constant/definition files
-│   │       │   ├── gameConstants.ts   # 43 tunable constant groups (1254 lines)
+│   │       ├── constants/         # Constant/definition files
+│   │       │   ├── gameConstants.ts   # Tunable gameplay constant groups
 │   │       │   ├── mobPrefixes.ts
 │   │       │   ├── achievementDefinitions.ts
 │   │       │   ├── bossTemplateDefinitions.ts
@@ -74,14 +75,14 @@ pocketrealm/                       # npm workspaces monorepo
 │   │
 │   └── database/                  # Prisma schema and client
 │       ├── prisma/
-│       │   ├── schema.prisma      # ~1022 lines, 50 models
+│       │   ├── schema.prisma      # 1358 lines, 75 models
 │       │   ├── seed.ts            # Database seeding
-│       │   └── migrations/        # 61 migration files
+│       │   └── migrations/        # 97 migration directories
 │       └── src/
 │           └── index.ts           # Prisma client singleton
 │
 ├── docs/
-│   ├── plans/                     # 118+ feature design documents
+│   ├── plans/                     # Historical feature design documents
 │   ├── design/                    # Design specifications
 │   ├── testing/                   # Manual testing phase notes
 │   ├── ui/                        # Screen state documentation
@@ -89,8 +90,10 @@ pocketrealm/                       # npm workspaces monorepo
 │   └── sql/                       # Migration helpers
 │
 ├── scripts/
-│   ├── setup-worktree.sh          # Create isolated worktree + DB
-│   └── teardown-worktree.sh       # Remove worktree + drop DB
+│   ├── setup-worktree.ps1         # Create isolated Windows worktree + DB
+│   ├── teardown-worktree.ps1      # Remove Windows worktree + drop DB
+│   ├── setup-worktree.sh          # Git Bash/Unix worktree lifecycle
+│   └── teardown-worktree.sh       # Git Bash/Unix worktree lifecycle
 │
 ├── docker-compose.yml             # PostgreSQL 16 + Redis 7
 ├── package.json                   # Workspace root

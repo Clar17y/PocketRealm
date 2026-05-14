@@ -1,3 +1,4 @@
+import { EXPEDITION_ROOM_COMPOSITIONS } from '@pocketrealm/shared/constants/expeditionDefinitions';
 import type {
   ExpeditionRoomDefinition,
   ExpeditionRoomType,
@@ -5,10 +6,7 @@ import type {
   ExpeditionTheme,
   ExpeditionThemeMob,
 } from '@pocketrealm/shared';
-import {
-  EXPEDITION_ROOM_COMPOSITIONS,
-  EXPEDITION_CONSTANTS,
-} from '@pocketrealm/shared';
+import { EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
 
 const MAX_TIER_INDEX = 2;
 

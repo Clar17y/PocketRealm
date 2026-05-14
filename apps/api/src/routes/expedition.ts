@@ -26,7 +26,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { paginationSchema, buildPagination } from '../utils/routeHelpers';
-import { EXPEDITION_THEMES } from '@pocketrealm/shared';
+import { EXPEDITION_THEMES } from '@pocketrealm/shared/constants/expeditionDefinitions';
 import { getIo } from '../socket';
 import { requireActiveSeason } from '../middleware/seasonGuard';
 

@@ -73,8 +73,8 @@ describe('getTemplatePickerSections', () => {
       },
     ];
 
-    vi.doMock('@pocketrealm/shared', async () => {
-      const actual = await vi.importActual<typeof import('@pocketrealm/shared')>('@pocketrealm/shared');
+    vi.doMock('@pocketrealm/shared/constants/talentTreeDefinitions', async () => {
+      const actual = await vi.importActual<typeof import('@pocketrealm/shared/constants/talentTreeDefinitions')>('@pocketrealm/shared/constants/talentTreeDefinitions');
       return {
         ...actual,
         getAllTalentNodes: () => mockedTalentNodes,
@@ -97,14 +97,14 @@ describe('getTemplatePickerSections', () => {
       ]);
       expect(utility?.actions.map((action) => action.id)).toContain('minor_heal');
     } finally {
-      vi.doUnmock('@pocketrealm/shared');
+      vi.doUnmock('@pocketrealm/shared/constants/talentTreeDefinitions');
       vi.resetModules();
     }
   });
 
   it('places future always-available actions by shared metadata when they are not explicitly ordered', async () => {
-    vi.doMock('@pocketrealm/shared', async () => {
-      const actual = await vi.importActual<typeof import('@pocketrealm/shared')>('@pocketrealm/shared');
+    vi.doMock('@pocketrealm/shared/constants/combatActionDefinitions', async () => {
+      const actual = await vi.importActual<typeof import('@pocketrealm/shared/constants/combatActionDefinitions')>('@pocketrealm/shared/constants/combatActionDefinitions');
       return {
         ...actual,
         ALWAYS_AVAILABLE_ACTION_IDS: new Set([...actual.ALWAYS_AVAILABLE_ACTION_IDS, 'battle_cry']),
@@ -121,14 +121,14 @@ describe('getTemplatePickerSections', () => {
       expect(combatCore?.actions.map((action) => action.id)).not.toContain('battle_cry');
       expect(utility?.actions.map((action) => action.id)).toContain('battle_cry');
     } finally {
-      vi.doUnmock('@pocketrealm/shared');
+      vi.doUnmock('@pocketrealm/shared/constants/combatActionDefinitions');
       vi.resetModules();
     }
   });
 
   it('places future unlocked non-talent actions by shared metadata when they are present in unlockedActions', async () => {
-    vi.doMock('@pocketrealm/shared', async () => {
-      const actual = await vi.importActual<typeof import('@pocketrealm/shared')>('@pocketrealm/shared');
+    vi.doMock('@pocketrealm/shared/constants/combatActionDefinitions', async () => {
+      const actual = await vi.importActual<typeof import('@pocketrealm/shared/constants/combatActionDefinitions')>('@pocketrealm/shared/constants/combatActionDefinitions');
       return {
         ...actual,
         BASE_ACTION_DEFINITIONS: {
@@ -157,7 +157,7 @@ describe('getTemplatePickerSections', () => {
       expect(combatCore?.actions.map((action) => action.id)).not.toContain('field_bandage');
       expect(utility?.actions.map((action) => action.id)).toContain('field_bandage');
     } finally {
-      vi.doUnmock('@pocketrealm/shared');
+      vi.doUnmock('@pocketrealm/shared/constants/combatActionDefinitions');
       vi.resetModules();
     }
   });

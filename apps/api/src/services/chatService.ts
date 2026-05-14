@@ -1,5 +1,6 @@
+import { resolveAchievementTitleDisplay } from '@pocketrealm/shared/utils/titleDisplay';
 import { prisma, type Prisma } from '@pocketrealm/database';
-import { CHAT_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
+import { CHAT_CONSTANTS } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';

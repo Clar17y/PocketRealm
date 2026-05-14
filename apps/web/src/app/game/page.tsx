@@ -20,6 +20,7 @@ import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
 import { LootReveal } from '@/components/common/LootReveal';
+import { OnboardingUiProvider } from '@/components/common/OnboardingUiContext';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { BottomNav } from '@/components/BottomNav';
@@ -98,6 +99,7 @@ export default function GamePage() {
   const {
     activeScreen, setActiveScreen,
     handleNavigate,
+    handleBottomNavNavigate,
     getActiveTab,
     turns,
     skills,
@@ -296,6 +298,15 @@ export default function GamePage() {
   }
 
   const activeTab = getActiveTab();
+  const tutorialFlowActive = isTutorialActive(tutorialStep) || tutorialStep === TUTORIAL_STEP_DONE;
+  const blockingModalActive = Boolean(
+    confirmAbandonLoot ||
+    (lootRevealItems?.length ?? 0) > 0 ||
+    (pendingLootSession && !pendingLootSession.minimized),
+  );
+  const canShowChangelog = showChangelog && !tutorialFlowActive && !blockingModalActive;
+  const featureTutorialsEnabled = !tutorialFlowActive && !canShowChangelog && !blockingModalActive;
+  const canShowStarterWeaponPopup = !blockingModalActive && tutorialStep === TUTORIAL_STEP_STARTER_WEAPON;
   let activePinnedMessage = chat.pinnedZone;
   if (chat.activeChannel === 'casino') {
     activePinnedMessage = null;
@@ -309,31 +320,32 @@ export default function GamePage() {
     <>
       <ConnectionBanner />
       <ErrorBoundary>
-      {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
-      {confirmAbandonLoot && (
-        <ConfirmModal
-          title="Abandon Loot?"
-          message="You have unclaimed overflow loot. Travelling to another zone will leave it behind forever."
-          confirmLabel="Travel Anyway"
-          cancelLabel="Stay"
-          variant="warning"
-          onConfirm={abandonLootAndTravel}
-          onCancel={cancelAbandonLoot}
-        />
-      )}
-      {lootRevealItems && lootRevealItems.length > 0 && (
-        <LootReveal items={lootRevealItems} onContinue={handleDismissLootReveal} />
-      )}
-      {pendingLootSession && !pendingLootSession.minimized && (
-        <LootPicker
-          sessionId={pendingLootSession.sessionId}
-          items={pendingLootSession.items}
-          availableSlots={Math.max(0, inventoryCapacity - inventoryUsedSlots)}
-          onClaim={handleClaimLoot}
-          onDismiss={handleDismissLoot}
-        />
-      )}
-      <AppShell
+        <OnboardingUiProvider featureTutorialsEnabled={featureTutorialsEnabled}>
+          {canShowChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
+          {confirmAbandonLoot && (
+            <ConfirmModal
+              title="Abandon Loot?"
+              message="You have unclaimed overflow loot. Travelling to another zone will leave it behind forever."
+              confirmLabel="Travel Anyway"
+              cancelLabel="Stay"
+              variant="warning"
+              onConfirm={abandonLootAndTravel}
+              onCancel={cancelAbandonLoot}
+            />
+          )}
+          {lootRevealItems && lootRevealItems.length > 0 && (
+            <LootReveal items={lootRevealItems} onContinue={handleDismissLootReveal} />
+          )}
+          {pendingLootSession && !pendingLootSession.minimized && (
+            <LootPicker
+              sessionId={pendingLootSession.sessionId}
+              items={pendingLootSession.items}
+              availableSlots={Math.max(0, inventoryCapacity - inventoryUsedSlots)}
+              onClaim={handleClaimLoot}
+              onDismiss={handleDismissLoot}
+            />
+          )}
+          <AppShell
         turns={turns}
         username={player?.username}
         mailUnreadCount={mailUnreadCount}
@@ -396,17 +408,9 @@ export default function GamePage() {
           <SubNav
             tabs={[
               { id: 'home', label: 'Dashboard' },
-              { id: 'zones', label: 'Map' },
-              { id: 'worldEvents', label: 'Events' },
-              { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
               { id: 'quests', label: 'Quests', badge: quests.filter(q => q.status === 'completed').length },
+              { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
               { id: 'leaderboard', label: 'Rankings' },
-              { id: 'bestiary', label: 'Bestiary' },
-              { id: 'skills', label: 'Skills' },
-              ...(currentZone?.zoneType === 'town' ? [
-                { id: 'casino', label: 'Casino' },
-                { id: 'training', label: 'Training' },
-              ] : []),
               ...(player?.role === 'admin' ? [{ id: 'admin', label: 'Admin' }] : []),
             ]}
             activeId={activeScreen}
@@ -417,10 +421,16 @@ export default function GamePage() {
         {activeTab === 'explore' && (
           <SubNav
             tabs={[
-              { id: 'explore', label: 'Explore' },
+              { id: 'zones', label: 'Map' },
+              { id: 'explore', label: 'Explore Zone' },
               { id: 'gathering', label: 'Gathering' },
               { id: 'crafting', label: 'Crafting' },
               { id: 'forge', label: 'Forge' },
+              { id: 'worldEvents', label: 'Events' },
+              ...(currentZone?.zoneType === 'town' ? [
+                { id: 'training', label: 'Training' },
+                { id: 'casino', label: 'Casino' },
+              ] : []),
             ]}
             activeId={activeScreen}
             onSelect={(id) => setActiveScreen(id as Screen)}
@@ -432,6 +442,7 @@ export default function GamePage() {
             tabs={[
               { id: 'inventory', label: 'Items' },
               { id: 'equipment', label: 'Equipment' },
+              { id: 'skills', label: 'Skills' },
             ]}
             activeId={activeScreen}
             onSelect={(id) => setActiveScreen(id as Screen)}
@@ -444,6 +455,7 @@ export default function GamePage() {
               { id: 'combat', label: 'Combat' },
               { id: 'templates', label: 'Templates' },
               { id: 'talentTree', label: 'Skill Tree' },
+              { id: 'bestiary', label: 'Bestiary' },
               { id: 'arena', label: 'Arena', badge: pvpNotificationCount },
             ]}
             activeId={activeScreen}
@@ -551,12 +563,13 @@ export default function GamePage() {
       />
       <BottomNav
         activeTab={activeTab}
-        onNavigate={handleNavigate}
+        onNavigate={handleBottomNavNavigate}
         badgeTabs={badgeTabs}
         pulseTabs={tutorialPulseTabs}
       />
       <TutorialDialog
         tutorialStep={tutorialStep}
+        disabled={blockingModalActive}
         onDismiss={() => {
           if (tutorialStep === TUTORIAL_STEP_WELCOME) {
             advanceTutorial(TUTORIAL_STEP_WELCOME);
@@ -565,7 +578,7 @@ export default function GamePage() {
           }
         }}
       />
-      {tutorialStep === TUTORIAL_STEP_STARTER_WEAPON && (
+      {canShowStarterWeaponPopup && (
         <StarterWeaponPopup onSelect={handleClaimStarterWeapon} />
       )}
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
@@ -573,7 +586,8 @@ export default function GamePage() {
       <ForgeResultToast />
       <RateLimitToast />
       <ErrorToast />
-    </ErrorBoundary>
+        </OnboardingUiProvider>
+      </ErrorBoundary>
     </>
   );
 }

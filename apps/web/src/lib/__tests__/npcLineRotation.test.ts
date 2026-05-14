@@ -2,8 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getNextNpcLine } from '../npcLineRotation';
 
-// Mock the shared module
-vi.mock('@pocketrealm/shared', () => ({
+vi.mock('@pocketrealm/shared/constants/npcDialogue', () => ({
   NPC_DIALOGUE: {
     'test-npc': {
       name: 'Test NPC',

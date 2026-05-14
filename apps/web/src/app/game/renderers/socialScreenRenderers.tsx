@@ -11,7 +11,6 @@ import { MailScreen } from '@/components/screens/MailScreen';
 import { Quests } from '@/components/screens/Quests';
 import { Settings } from '@/components/screens/Settings';
 import { Templates } from '@/components/screens/Templates';
-import { applyStateUpdates } from '../applyStateUpdates';
 import type { GameControllerState, GameScreenPlayer, GameScreenRendererProps, MailRecipient } from './gameScreenRenderer.types';
 
 export function SettingsScreenRenderer({
@@ -133,9 +132,9 @@ export function QuestsScreenRenderer({ gc }: { gc: GameControllerState }) {
       onReroll={gc.handleRerollQuest}
       onShopPurchase={(updates) => {
         if (updates) {
-          applyStateUpdates(updates, gc.stateSetters);
+          void gc.handleStateUpdates(updates);
         }
-        gc.loadAll();
+        void gc.loadAll();
       }}
       zones={gc.zones.filter((zone) => zone.discovered).map((zone) => ({
         id: zone.id,
@@ -166,7 +165,7 @@ export function GuildScreenRenderer({
       playerId={player?.id ?? null}
       characterLevel={gc.characterProgression.characterLevel}
       initialTab={gc.activeScreen === 'guild' && deepLinkTab ? deepLinkTab as 'expeditions' : undefined}
-      onStateUpdates={(updates) => applyStateUpdates(updates, gc.stateSetters)}
+      onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
       onExpeditionContextChange={setExpeditionContext}
       onGuildMembershipChange={onGuildMembershipChange}
       showNpcDialogue={gc.showNpcDialogue}
@@ -186,7 +185,7 @@ export function FriendsScreenRenderer({
   return (
     <FriendsScreen
       playerId={player?.id ?? null}
-      onStateUpdates={(updates) => applyStateUpdates(updates, gc.stateSetters)}
+      onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
       onFriendCountsChanged={() => void gc.loadFriendCounts()}
       combatSpeedMs={gc.combatLogSpeedMs}
       onNavigateToMail={(recipientId, recipientName) => {
@@ -262,7 +261,7 @@ export function CasinoScreenRenderer({
 export function AdminScreenRenderer({ gc }: { gc: GameControllerState }) {
   return (
     <AdminScreen
-      onStateUpdates={(updates) => applyStateUpdates(updates, gc.stateSetters)}
+      onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
       setTurns={gc.setTurns}
       reloadZones={gc.reloadZones}
     />

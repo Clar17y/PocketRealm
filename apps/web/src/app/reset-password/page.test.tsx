@@ -24,10 +24,12 @@ afterEach(() => {
 });
 
 describe('ResetPasswordPage', () => {
-  it('renders the submit button inert before hydration to avoid native GET form submits', () => {
+  it('renders the submit button inert and omits auth fields before hydration', () => {
     const html = renderToString(React.createElement(ResetPasswordPage));
 
     expect(html).toContain('type="button"');
     expect(html).not.toContain('disabled=""');
+    expect(html).not.toContain('id="password"');
+    expect(html).not.toContain('id="confirmPassword"');
   });
 });

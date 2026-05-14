@@ -2,7 +2,7 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';
 import { grantCacheLootTx } from './cacheLootService';
 import { getInventoryState } from './inventoryService';
-import type { NarrativeEvent, PendingResourceDiscovery, PendingEncounterSiteDiscovery, PendingAmbushCombatLog, EncounterSiteSize } from '../routes/exploration/helpers';
+import type { NarrativeEvent, PendingResourceDiscovery, PendingEncounterSiteDiscovery, PendingAmbushCombatLog, EncounterSiteSize } from './exploration/helpers';
 
 interface PendingCacheLootEntry {
   turnOccurred: number;

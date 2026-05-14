@@ -41,7 +41,7 @@ export function AppShell({
       <ZoneBackground imageSrc={backgroundSrc} />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] z-40 pt-[env(safe-area-inset-top)] rpg-header-border">
-        <div className="max-w-lg mx-auto h-14 px-4 flex items-center justify-between">
+        <div className="max-w-lg lg:max-w-5xl mx-auto h-14 px-4 flex items-center justify-between">
           <h1 className="text-lg font-bold text-[var(--rpg-gold)] font-almendra rpg-gold-text-glow">PocketRealm</h1>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
@@ -157,7 +157,7 @@ export function AppShell({
       <div className="h-4 shrink-0 mt-[env(safe-area-inset-top)]" />
 
       {/* Main Content */}
-      <main className="w-full max-w-lg mx-auto px-4 pt-2 pb-24 flex-1">
+      <main className="w-full max-w-lg lg:max-w-5xl mx-auto px-4 pt-2 pb-[calc(var(--rpg-bottom-nav-offset)_+_1.5rem)] flex-1">
         {children}
       </main>
     </div>

@@ -1,7 +1,8 @@
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { prisma, Prisma } from '@pocketrealm/database';
 import type { CombatTemplate, CombatTemplateSlot } from '@pocketrealm/database';
 import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@pocketrealm/shared';
-import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, PREMIUM_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
 

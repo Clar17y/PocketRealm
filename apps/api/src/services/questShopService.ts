@@ -1,10 +1,11 @@
+import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared/constants/achievementDefinitions';
 import { prisma, Prisma } from '@pocketrealm/database';
 import {
   GUILD_CONTRACT_DEFINITIONS,
   GUILD_CONTRACT_CONSTANTS,
   getAllMobPrefixes,
 } from '@pocketrealm/shared';
-import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+
 import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { emitAchievementNotifications } from './achievementService';

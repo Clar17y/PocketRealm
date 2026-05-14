@@ -5,12 +5,10 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import {
-  EffectPill, roomTypeBadge,
-  RoomProgressBar, MobCardGrid, CombatRoundLog, TemplateQuickSwitch,
-  ThreatMeter,
-} from '@/components/common/combat';
+  EffectPill, roomTypeBadge, RoomProgressBar, MobCardGrid, CombatRoundLog, TemplateQuickSwitch, ThreatMeter, } from '@/components/common/combat';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
-import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES } from '@pocketrealm/shared';
+import { EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
+import { EXPEDITION_THEMES } from '@pocketrealm/shared/constants/expeditionDefinitions';
 import type {
   ExpeditionData,
   ExpeditionMemberData,

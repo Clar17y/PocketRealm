@@ -112,8 +112,8 @@ vi.mock('../../services/explorationTrackingService', async () => {
     buildTrackableMobFamiliesByZone: vi.fn(),
   };
 });
-vi.mock('./helpers', async () => {
-  const actual = await vi.importActual<typeof import('./helpers')>('./helpers');
+vi.mock('../../services/exploration/helpers', async () => {
+  const actual = await vi.importActual<typeof import('../../services/exploration/helpers')>('../../services/exploration/helpers');
   return {
     ...actual,
     pickWeighted: vi.fn((items: unknown[], weightKey: string) => {
@@ -247,7 +247,7 @@ import {
   applyTrackedFamilyWeightBias,
   buildEncounterSiteMobs,
   type ZoneFamilyRow,
-} from './helpers';
+} from '../../services/exploration/helpers';
 import { getCachedZoneMobFamilies } from '../../services/staticDataCacheService';
 import { buildTrackableMobFamiliesByZone } from '../../services/explorationTrackingService';
 import { processExplorationOutcomes, type ExplorationOutcomeContext } from '../../services/explorationOutcomeService';

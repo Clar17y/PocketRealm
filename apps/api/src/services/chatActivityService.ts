@@ -1,21 +1,7 @@
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { Prisma, prisma } from '@pocketrealm/database';
 import {
-  CHAT_ACTIVITY_CONSTANTS,
-  CHAT_ACTIVITY_EVENT_TYPES,
-  CHAT_ACTIVITY_SCOPES,
-  CHAT_CONSTANTS,
-  ITEM_RARITY_CONSTANTS,
-  formatChatActivityMessage,
-  getNpcActivityReactionLine,
-  getNpcActivityRelevance,
-  isRarityAtLeast,
-  type ChatActivityEventType,
-  type ChatActivityRecord,
-  type ChatActivityScope,
-  type ChatChannelType,
-  type ChatNpcActivityReactionResponse,
-  type NpcKey,
-} from '@pocketrealm/shared';
+  CHAT_ACTIVITY_CONSTANTS, CHAT_ACTIVITY_EVENT_TYPES, CHAT_ACTIVITY_SCOPES, CHAT_CONSTANTS, ITEM_RARITY_CONSTANTS, formatChatActivityMessage, getNpcActivityReactionLine, getNpcActivityRelevance, isRarityAtLeast, type ChatActivityEventType, type ChatActivityRecord, type ChatActivityScope, type ChatChannelType, type ChatNpcActivityReactionResponse } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { getIo } from '../socket';
 import { emitSystemMessage } from './systemMessageService';

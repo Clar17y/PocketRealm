@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { trackEvent, trackOnce } from '@/lib/analytics';
+import { trackEvent } from '@/lib/analytics';
 import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
@@ -10,13 +10,9 @@ import {
   TUTORIAL_STEP_WELCOME,
   TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_SAVE_TEMPLATE,
-  TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_COMBAT,
-  TUTORIAL_STEP_GATHER,
   TUTORIAL_STEP_TRAVEL,
-  TUTORIAL_STEP_REFINE,
-  TUTORIAL_STEP_CRAFT,
   TUTORIAL_STEP_EQUIP,
   TUTORIAL_STEP_DONE,
   TUTORIAL_COMPLETED,
@@ -26,34 +22,24 @@ import {
   type BottomTab,
 } from '@/lib/tutorial';
 import {
-  allocatePlayerAttribute,
-  craft,
   getHpState,
-  mine,
-  rest,
-  restEstimate,
   getResources,
   activateTemplate,
   type ApiResponse,
   type WorldEventResponse,
   type SkillPointState,
-  exchangeGold,
-  placeRouletteBet,
 } from '@/lib/api';
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
-import type { RouletteBetType } from '@pocketrealm/shared';
 import { STAMINA_CONSTANTS, MANA_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
-import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { buildLastCombat, isMobKnown } from './combatHelpers';
 export { isMobKnown } from './combatHelpers';
 import { useActivityLog, nowStamp } from './hooks/useActivityLog';
-import { recordTurnsSpent } from '../../lib/activityTracker';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
 import { useBestiary } from './hooks/useBestiary';
 import { useGathering } from './hooks/useGathering';
@@ -71,8 +57,10 @@ import { useSocialCounts } from './hooks/useSocialCounts';
 import { useTutorialProgression } from './hooks/useTutorialProgression';
 import { useTravelActions } from './hooks/useTravelActions';
 import { useGameBootstrap } from './hooks/useGameBootstrap';
-
-type AttributeType = keyof CharacterProgression['attributes'];
+import { useGatheringActions } from './hooks/useGatheringActions';
+import { useCraftingActions } from './hooks/useCraftingActions';
+import { useResourceActions } from './hooks/useResourceActions';
+import { useCasinoActions } from './hooks/useCasinoActions';
 
 type LootRevealItem = {
   name: string;
@@ -80,6 +68,15 @@ type LootRevealItem = {
   quantity: number;
   imageSrc?: string;
 };
+
+type BottomNavTarget = 'explore' | 'social';
+
+const bottomTabDefaults: Record<BottomNavTarget, Screen> = {
+  explore: 'zones',
+  social: 'guild',
+};
+
+const isBottomNavTarget = (screen: string): screen is BottomNavTarget => screen in bottomTabDefaults;
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
@@ -533,10 +530,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, []);
 
   const getActiveTab = () => {
-    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
-    if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
-    if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
-    if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
+    if (['home', 'achievements', 'quests', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
+    if (['zones', 'explore', 'gathering', 'crafting', 'forge', 'worldEvents', 'casino', 'training'].includes(activeScreen)) return 'explore';
+    if (['inventory', 'equipment', 'skills'].includes(activeScreen)) return 'inventory';
+    if (['combat', 'arena', 'templates', 'talentTree', 'bestiary'].includes(activeScreen)) return 'combat';
     if (['guild', 'friends', 'mail'].includes(activeScreen)) return 'social';
     return 'home';
   };
@@ -604,7 +601,48 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     simpleAction, pushLog, setTurns, setGold, advanceTutorial,
   });
 
-  const handleNavigate = (screen: string) => {
+  const gatheringActions = useGatheringActions({
+    activeZoneId,
+    runAction,
+    pushLog,
+    setTurns,
+    setActionError,
+    stateSetters,
+    updateQuestProgress,
+    loadGatheringNodes,
+    advanceTutorial,
+    logActiveEvents,
+  });
+
+  const craftingActions = useCraftingActions({
+    craftingRecipes,
+    runAction,
+    pushLog,
+    setTurns,
+    setActionError,
+    stateSetters,
+    updateQuestProgress,
+    advanceTutorial,
+  });
+
+  const resourceActions = useResourceActions({
+    hpState,
+    turns,
+    quickRestHealPercent,
+    tutorialStep,
+    runAction,
+    pushLog,
+    setTurns,
+    setActionError,
+    setCharacterProgression,
+    setHpState,
+    stateSetters,
+    advanceTutorial,
+  });
+
+  const casinoActions = useCasinoActions({ setGold, setTurns });
+
+  const navigateToScreen = (screen: string) => {
     // Auto-skip any active playback when navigating away
     if (playbackActive) {
       if (explorationActions.explorationPlaybackData) {
@@ -632,226 +670,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (activeScreen === 'combat' && screen !== 'combat') {
       setLastCombat(null);
     }
-    // Map bottom nav tab ids to default sub-screens
-    const resolved = screen === 'social' ? 'guild' : screen;
-    setActiveScreen(resolved as Screen);
-    trackEvent('screen_view', { screen: resolved });
+    setActiveScreen(screen as Screen);
+    trackEvent('screen_view', { screen });
   };
 
-  const handleMine = async (playerNodeId: string, turnSpend: number) => {
-    if (!activeZoneId) return;
-
-    await runAction('gathering', async () => {
-      const res = await mine(playerNodeId, turnSpend);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Gathering failed');
-        return;
-      }
-
-      setTurns(data.turns.currentTurns);
-      updateQuestProgress(data.questProgress);
-      recordTurnsSpent(activeZoneId, turnSpend);
-
-      const newLogs: ActivityLogEntry[] = [];
-      const gatheredSkillName = data.xp?.skillType
-        ? data.xp.skillType.charAt(0).toUpperCase() + data.xp.skillType.slice(1)
-        : 'Gathering';
-
-      if (data.xp?.leveledUp) {
-        newLogs.push({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `${gatheredSkillName} leveled up to ${data.xp.newLevel}!`,
-        });
-      }
-
-      logActiveEvents(data.activeEvents);
-
-      if (data.yieldBreakdown?.eventTitle && data.yieldBreakdown.eventModifier !== 1) {
-        const isUp = data.yieldBreakdown.eventModifier > 1;
-        if (isUp) {
-          const bonusPct = Math.round((data.yieldBreakdown.eventModifier - 1) * 100);
-          const rawTotal = data.yieldBreakdown.rawTotalYield;
-          const yieldDiff = rawTotal != null ? data.results.totalYield - rawTotal : null;
-          newLogs.push({
-            timestamp: nowStamp(),
-            type: 'success',
-            message: `${data.yieldBreakdown.eventTitle}: +${bonusPct}% yield bonus${yieldDiff != null ? ` (+${yieldDiff} items)` : ''}`,
-          });
-        } else {
-          const turnPenaltyPct = Math.round((1 / data.yieldBreakdown.eventModifier - 1) * 100);
-          newLogs.push({
-            timestamp: nowStamp(),
-            type: 'warning',
-            message: `${data.yieldBreakdown.eventTitle}: +${turnPenaltyPct}% turn cost`,
-          });
-        }
-      }
-
-      if (data.gemCrit) {
-        const qty = data.gemCrit.gemsFound;
-        newLogs.push({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: qty === 1
-            ? `Gem crit! Found a ${data.gemCrit.gemName}!`
-            : `Gem crits! Found ${qty}x ${data.gemCrit.gemName}!`,
-        });
-      }
-
-      if (data.node.nodeDepleted) {
-        newLogs.push({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Node depleted! Gathered ${data.results.totalYield} resource(s).`,
-        });
-      } else {
-        newLogs.push({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Gathered ${data.results.totalYield} resource(s). ${data.node.remainingCapacity} remaining.`,
-        });
-      }
-
-      pushLog(...newLogs);
-      applyStateUpdates(data.stateUpdates, stateSetters);
-      const gatherType = data.xp?.skillType ?? 'mining';
-      trackEvent('action', { type: gatherType, turns: turnSpend, zone: activeZoneId ?? undefined });
-      if (data.xp?.leveledUp) {
-        trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });
-      }
-      await loadGatheringNodes();
-      advanceTutorial(TUTORIAL_STEP_GATHER);
-    });
+  const handleNavigate = (screen: string) => {
+    navigateToScreen(screen);
   };
 
-  const handleCraft = async (recipeId: string, quantity: number = 1) => {
-    await runAction('crafting', async () => {
-      const recipe = craftingRecipes.find((entry) => entry.id === recipeId);
-      const res = await craft(recipeId, quantity);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Crafting failed');
-        return;
-      }
-
-      setTurns(data.turns.currentTurns);
-      updateQuestProgress(data.questProgress);
-
-      const newLogs: ActivityLogEntry[] = [];
-      const timestamp = nowStamp();
-      const skillName = data.xp.skillType.charAt(0).toUpperCase() + data.xp.skillType.slice(1);
-
-      if (recipe) {
-        const materialsUsed = recipe.materials
-          .map((material) => {
-            const meta = recipe.materialTemplates.find((template) => template.id === material.templateId);
-            const consumed = material.quantity * data.crafted.quantity;
-            return `${meta?.name ?? 'Unknown'} x${consumed}`;
-          })
-          .join(', ');
-
-        newLogs.push({
-          timestamp,
-          type: 'info',
-          message: `Used materials: ${materialsUsed}.`,
-        });
-      }
-
-      newLogs.push({
-        timestamp,
-        type: 'success',
-        message: `Crafted ${recipe?.resultTemplate.name ?? 'item'} x${data.crafted.quantity}.`,
-      });
-
-      for (const detail of data.craftedItemDetails ?? []) {
-        if (!detail.isCrit || !detail.bonusStats) continue;
-        const rarityLabel = detail.rarity !== 'uncommon' ? ` ${detail.rarity}` : '';
-        for (const [stat, value] of Object.entries(detail.bonusStats)) {
-          newLogs.push({
-            timestamp,
-            type: 'success',
-            message: `Critical${rarityLabel} craft! +${formatStatValue(stat, value)} ${prettyStatName(stat)}.`,
-          });
-        }
-      }
-
-      newLogs.push({
-        timestamp,
-        type: 'success',
-        message: `Gained ${data.xp.xpAfterEfficiency.toLocaleString()} ${skillName} XP.`,
-      });
-
-      if (data.xp?.leveledUp) {
-        newLogs.push({
-          timestamp,
-          type: 'success',
-          message: `${skillName} leveled up to ${data.xp.newLevel}!`,
-        });
-      }
-
-      if (data.xp?.atDailyCap) {
-        newLogs.push({
-          timestamp,
-          type: 'info',
-          message: `${skillName} has reached the daily XP cap.`,
-        });
-      }
-
-      pushLog(...newLogs);
-      applyStateUpdates(data.stateUpdates, stateSetters);
-      const craftTurns = recipe ? recipe.turnCost * quantity : 50;
-      trackEvent('action', { type: data.xp.skillType, turns: craftTurns });
-      trackOnce('first_craft', { skill: data.xp.skillType });
-      if (data.xp?.leveledUp) {
-        trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });
-      }
-      advanceTutorial(TUTORIAL_STEP_REFINE);
-      advanceTutorial(TUTORIAL_STEP_CRAFT);
-    });
-  };
-
-  const handleAllocateAttribute = async (attribute: AttributeType, points = 1) => {
-    await runAction('allocate_attribute', async () => {
-      const res = await allocatePlayerAttribute(attribute, points);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Failed to allocate attribute points');
-        return;
-      }
-
-      setCharacterProgression(res.data);
-
-      const hpRes = await getHpState();
-      if (hpRes.data) setHpState(hpRes.data);
-
-      if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS && res.data.attributePoints === 0) {
-        advanceTutorial(TUTORIAL_STEP_ATTRIBUTE_POINTS);
-      }
-    });
-  };
-
-  const handleQuickRest = async () => {
-    if (!hpState || hpState.currentHp >= hpState.maxHp || hpState.isRecovering || turns <= 0) return;
-
-    await runAction('quick_rest', async () => {
-      const estimate = await restEstimate(10);
-      if (!estimate.data?.healPerTurn) return;
-      const missingHp = hpState.maxHp - hpState.currentHp;
-      const targetHeal = missingHp * (quickRestHealPercent / 100);
-      const rawTurns = Math.ceil(targetHeal / estimate.data.healPerTurn);
-      const turnsToSpend = Math.max(10, Math.ceil(rawTurns / 10) * 10);
-      const actualTurns = Math.min(turnsToSpend, turns);
-      const result = await rest(actualTurns);
-      if (result.data) {
-        const healed = result.data.currentHp - hpState.currentHp;
-        setTurns(result.data.turns.currentTurns);
-        setHpState(prev => ({ ...prev, currentHp: result.data!.currentHp, maxHp: result.data!.maxHp }));
-        applyStateUpdates(result.data.stateUpdates, stateSetters);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
-        trackEvent('action', { type: 'rest', turns: actualTurns });
-      }
-    });
+  const handleBottomNavNavigate = (screen: string) => {
+    navigateToScreen(isBottomNavTarget(screen) ? bottomTabDefaults[screen] : screen);
   };
 
   const dismissChangelog = useCallback(() => {
@@ -861,30 +689,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const openChangelog = useCallback(() => setShowChangelog(true), []);
 
-  const handleExchangeGold = useCallback(async (turnAmount: number) => {
-    const result = await exchangeGold(turnAmount);
-    if (result.data) {
-      setGold(result.data.goldBalance);
-      setTurns(result.data.turnsRemaining);
-    }
-  }, []);
-
-  const handlePlaceBet = useCallback(async (betType: RouletteBetType, betValue: string, amount: number) => {
-    const result = await placeRouletteBet(betType, betValue, amount);
-    if (result.data) {
-      setGold(result.data.goldRemaining);
-    }
-  }, []);
-
   const handleDismissLootReveal = useCallback(() => {
     setLootRevealItems(null);
   }, []);
+
+  const handleStateUpdates = useCallback(async (updates: StateUpdates) => {
+    applyStateUpdates(updates, stateSetters);
+    if (updates.currentZoneId !== undefined) {
+      await refreshCraftingRecipes().catch(() => undefined);
+    }
+  }, [refreshCraftingRecipes, stateSetters]);
 
   return {
     // Navigation
     activeScreen,
     setActiveScreen,
     handleNavigate,
+    handleBottomNavNavigate,
     getActiveTab,
     handleTravelToZone: travelActions.handleTravelToZone,
     confirmAbandonLoot: travelActions.confirmAbandonLoot,
@@ -1031,10 +852,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleCombatPlaybackComplete,
     handleTravelPlaybackComplete: travelActions.handleTravelPlaybackComplete,
     handleTravelPlaybackSkip: travelActions.handleTravelPlaybackSkip,
-    handleMine,
-    handleCraft,
+    handleMine: gatheringActions.handleMine,
+    handleCraft: craftingActions.handleCraft,
     ...inventoryActions,
-    handleAllocateAttribute,
+    handleAllocateAttribute: resourceActions.handleAllocateAttribute,
     loadAll,
     loadPvpNotificationCount,
     handleSetCombatLogSpeed,
@@ -1043,7 +864,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetDefaultExploreTurns,
     handleSetQuickRestHealPercent,
     handleSetDefaultRefiningMax,
-    handleQuickRest,
+    handleQuickRest: resourceActions.handleQuickRest,
 
     // Inventory & backpack
     inventoryCapacity,
@@ -1059,12 +880,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     stateSetters,
 
     // Casino & Training
-    handleExchangeGold,
-    handlePlaceBet,
+    handleExchangeGold: casinoActions.handleExchangeGold,
+    handlePlaceBet: casinoActions.handlePlaceBet,
 
     // Loot reveal
     lootRevealItems,
     handleDismissLootReveal,
+    handleStateUpdates,
 
     // Encounter site combat
     refreshPendingEncounters,

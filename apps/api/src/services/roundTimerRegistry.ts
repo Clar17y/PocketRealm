@@ -19,6 +19,18 @@ const timers = new Map<string, Entry>();
 const RETRY_BASE_MS = 5_000;
 const RETRY_MAX_MS = 5 * 60_000;
 const MAX_RETRY_ATTEMPTS = 3;
+export const ROUND_TIMER_WORKER_MODE = 'single';
+const configuredTimerWorkerMode = process.env.ROUND_TIMER_WORKER_MODE ?? ROUND_TIMER_WORKER_MODE;
+export const timerWorkerMode = configuredTimerWorkerMode === ROUND_TIMER_WORKER_MODE
+  ? configuredTimerWorkerMode
+  : ROUND_TIMER_WORKER_MODE;
+
+if (configuredTimerWorkerMode !== ROUND_TIMER_WORKER_MODE) {
+  logger.warn(
+    { configuredTimerWorkerMode, supportedMode: ROUND_TIMER_WORKER_MODE },
+    'Unsupported round timer worker mode configured; using single-process timers',
+  );
+}
 
 function key(kind: ScheduledRoundKind, id: string): string {
   return `${kind}:${id}`;
@@ -112,7 +124,7 @@ export const roundTimerRegistry = {
     }
 
     logger.info(
-      { bossTimers: bossRows.length, expeditionTimers: expRows.length },
+      { bossTimers: bossRows.length, expeditionTimers: expRows.length, timerWorkerMode },
       'Round timer registry rehydrated',
     );
   },

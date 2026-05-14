@@ -1,7 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 
 vi.mock('@/lib/api', () => ({
   createTemplate: vi.fn(),

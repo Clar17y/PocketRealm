@@ -51,6 +51,7 @@ function createBaseGc() {
     activeScreen: 'home',
     setActiveScreen: vi.fn(),
     handleNavigate: vi.fn(),
+    handleBottomNavNavigate: vi.fn(),
     turns: 1200,
     setTurns: vi.fn(),
     gold: 500,

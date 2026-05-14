@@ -1,9 +1,7 @@
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { describe, expect, it } from 'vitest';
 import type { ActionDefinition, CombatTemplateSlotData } from '@pocketrealm/shared';
-import {
-  BASE_ACTION_DEFINITIONS,
-  COMBAT_ACTION_CONSTANTS,
-} from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import {
   resolveAction,
   resolveInteraction,

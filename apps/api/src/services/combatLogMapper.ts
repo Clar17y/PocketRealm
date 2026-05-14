@@ -1,5 +1,4 @@
-import { getActionDefinition } from '@pocketrealm/shared';
-
+import { getActionDefinition } from '@pocketrealm/shared/constants/combatActionDefinitions';
 /**
  * Maps template combat engine log entries (combatant-indexed fields) to
  * the frontend response shape (actor-relative fields).

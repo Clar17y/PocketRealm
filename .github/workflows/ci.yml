@@ -52,21 +52,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build packages
-        run: npm run build:packages
-
       - name: Validate migrations
-        run: npx prisma migrate deploy
-        working-directory: packages/database
+        run: npm run db:migrate:deploy
 
-      - name: Build API
-        run: npm run build -w apps/api
-
-      - name: Build Web
-        run: npm run build -w apps/web
-
-      - name: Test game engine
-        run: npm run test:engine
-
-      - name: Test API
-        run: npm run test:api
+      - name: Verify build and tests
+        run: npm run verify:ci

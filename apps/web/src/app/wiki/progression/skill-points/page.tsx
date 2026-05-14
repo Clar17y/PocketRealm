@@ -1,15 +1,10 @@
+import { TALENT_TREE_DEFINITIONS } from '@pocketrealm/shared/constants/talentTreeDefinitions';
 import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
-  ALL_SKILLS,
-  CHARACTER_CONSTANTS,
-  PREMIUM_CONSTANTS,
-  SKILL_CONSTANTS,
-  SKILL_POINT_CONSTANTS,
-  TALENT_TREE_DEFINITIONS,
-} from '@pocketrealm/shared';
+  ALL_SKILLS, CHARACTER_CONSTANTS, PREMIUM_CONSTANTS, SKILL_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
 

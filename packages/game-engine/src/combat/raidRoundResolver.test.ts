@@ -1,3 +1,5 @@
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/bossTemplateDefinitions';
 import { describe, it, expect } from 'vitest';
 import type {
   CombatantStats,
@@ -8,7 +10,7 @@ import type {
   ExpeditionMobState,
   CombatPotion,
 } from '@pocketrealm/shared';
-import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS, HIT_CURVE_CONSTANTS } from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS, HIT_CURVE_CONSTANTS } from '@pocketrealm/shared';
 import { resolveRaidRound } from './raidRoundResolver';
 import type { RaidRoundRng } from './raidRoundResolver';
 import { calculateHitChance } from './damageCalculator';

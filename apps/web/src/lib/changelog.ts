@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.59',
+    date: '2026-05-14',
+    title: 'Navigation, Onboarding, and Town Recovery',
+    summary:
+      'Explore now opens to the Map, Home navigation is tighter, onboarding prompts queue more calmly, chat stays clear of mobile action controls, and desktop layouts make better use of wider screens. If you are knocked out and wake up in town, crafting and forge screens now update immediately instead of showing the old zone facility state until refresh.',
+  },
+  {
     version: '0.58',
     date: '2026-05-12',
     title: 'Guild Chat',

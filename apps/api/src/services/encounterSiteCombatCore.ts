@@ -1,8 +1,7 @@
+import { BASE_ACTION_DEFINITIONS, ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { prisma } from '@pocketrealm/database';
 import {
   ENCOUNTER_SITE_CONSTANTS,
-  BASE_ACTION_DEFINITIONS,
-  ALWAYS_AVAILABLE_ACTION_IDS,
   makeEncounterMobId,
   parseEncounterMobSlot,
   getMobPrefixDefinition,
@@ -41,7 +40,7 @@ import {
 } from './worldEventService';
 import {
   getAllAliveMobsInRoom,
-} from '../routes/combat/helpers';
+} from './combat/helpers';
 import { grantEncounterSiteChestRewardsTx } from './chestService';
 
 /** Shared flee result shape used by both auto-resolve and manual combat. */

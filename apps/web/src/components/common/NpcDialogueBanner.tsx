@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getNpcName, NPC_DIALOGUE_CONSTANTS, type DialogueEvent, type NpcKey } from '@pocketrealm/shared';
+import { NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+import { getNpcName, type DialogueEvent, type NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { getNextNpcLine } from '../../lib/npcLineRotation';
 import { useSessionStorageToggle } from '../../hooks/useSessionStorageToggle';
 import { useNpcActivityReaction } from '../../hooks/useNpcActivityReaction';

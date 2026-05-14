@@ -15,18 +15,31 @@ PocketRealm is deployed as a split stack: the Next.js web app on Vercel and the 
 - Build: `npm install && npm run build:api`
 - Start: `npm run start:api`
 - Health check path: `/health/ready` (see [Health Check Endpoints](#health-check-endpoints))
-- Background timers: none fixed-cadence. Boss and expedition rounds resolve via an in-process `setTimeout` registry keyed by `nextRoundAt`, rehydrated from DB on boot. Other maintenance work is activity-triggered or lazy-on-touch. See `docs/superpowers/specs/2026-04-11-event-driven-scheduling-design.md`.
+- Background timers: none fixed-cadence. Boss and expedition rounds resolve via an in-process `setTimeout` registry keyed by `nextRoundAt`, rehydrated from DB on boot. Run exactly one API worker while `ROUND_TIMER_WORKER_MODE=single`. Other maintenance work is activity-triggered or lazy-on-touch. See `docs/superpowers/specs/2026-04-11-event-driven-scheduling-design.md`.
 - Metrics logger (60 s, in-memory only; does not touch Postgres)
 
 ### Database (Neon Postgres)
 - Managed Postgres with daily automated backups — see [Backup Verification & Restore](#backup-verification--restore)
-- Migrations: `npm run db:migrate` (dev) / `npx prisma migrate deploy` (prod, via Render build step)
+- Migrations: `npm run db:migrate` (dev) / `npm run db:migrate:deploy` (prod/CI)
 - Connection pooling: see [Database Connection Pool](#database-connection-pool)
 
 ### Cache (Redis)
-- Used for rate limiting, equipment stats cache, guild modifier cache, drop table cache, active player tracking
+- Used for rate limiting, equipment stats cache, guild modifier cache, drop table cache, active player tracking, and Socket.IO fan-out
 
 ---
+
+## Runtime Topology
+
+Production currently supports horizontal socket fan-out through the Socket.IO Redis adapter, but round ownership is intentionally single-worker. Keep the Render API service at one process/instance and set `ROUND_TIMER_WORKER_MODE=single` until a distributed timer lease is implemented.
+
+What scales today:
+- Multiple browser clients connected to one API instance.
+- Socket.IO room fan-out through Redis when a second API instance is introduced for non-timer traffic.
+- Stateless request handlers that rely on Postgres/Redis for shared state.
+
+What must remain single-owner today:
+- Boss encounter and guild expedition round timers. The registry is in-process and rehydrates `nextRoundAt` rows on boot.
+- Any deployment shape that runs more than one API process without a timer lease risks duplicate round resolution. Use one Render instance/worker for the API until that lease exists.
 
 ## Environment Variables
 
@@ -44,6 +57,7 @@ All variables are required in production unless marked optional. Set them in Ren
 | `CORS_ORIGINS` | yes | `http://localhost:3002,http://127.0.0.1:3002` | Comma-separated allowed web origins. Production: the Vercel domain. |
 | `LOG_LEVEL` | no | `info` (prod), `debug` (dev/test) | pino log level — see [Logging](#logging) |
 | `APP_VERSION` | no | (root `package.json#version`) | Override for the version reported by `/health` and Sentry. If unset, the API reads root `package.json#version` at runtime — see [Release Versioning](#release-versioning) |
+| `ROUND_TIMER_WORKER_MODE` | no | `single` | Timer ownership mode. Only `single` is supported today; keep one API worker/instance until distributed leases exist. |
 | `SENTRY_DSN` | yes (prod), no (dev) | — | Server-side Sentry project DSN. Leave unset to disable Sentry. See [Sentry Error Tracking](#sentry-error-tracking). |
 | `SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Overrides `NODE_ENV` for the Sentry environment tag (`production` / `staging`). |
 | `SENTRY_AUTH_TOKEN` | yes (web build-time) | — | Sentry CLI token used by `next build` to upload web source maps. Not read by the API. |

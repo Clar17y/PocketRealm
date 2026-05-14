@@ -1,5 +1,6 @@
 import { prisma } from '@pocketrealm/database';
-import { EXPEDITION_THEMES, BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
+import { EXPEDITION_THEMES } from '@pocketrealm/shared/constants/expeditionDefinitions';
+import { BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
 import type { ExpeditionTheme, ExpeditionThemeMob } from '@pocketrealm/shared';
 
 type MobRole = 'trash' | 'elite' | 'caster' | 'add' | 'mini_boss' | 'final_boss';

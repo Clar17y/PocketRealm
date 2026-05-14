@@ -1,10 +1,7 @@
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
-import {
-  BASE_ACTION_DEFINITIONS,
-  ALWAYS_AVAILABLE_ACTION_IDS,
-} from '@pocketrealm/shared';
 import { COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import type { ActionDefinition } from '@pocketrealm/shared';
 

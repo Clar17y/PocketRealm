@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { LastCombatLogEntry } from '@/app/game/gameController.types';
-import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
 import { formatHitBreakdown } from './combatLogEntryUtils';
 import { handleKeyActivate } from '@/lib/utils';

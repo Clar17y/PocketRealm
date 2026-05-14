@@ -16,7 +16,6 @@ import { itemImageSrc, monsterImageSrc, skillIconSrc, zoneImageSrc } from '@/lib
 import { titleCaseFromSnake } from '@/lib/format';
 import { hasActivePremium } from '@/lib/premium';
 import { TUTORIAL_STEP_EXPLORE } from '@/lib/tutorial';
-import { applyStateUpdates } from '../applyStateUpdates';
 import { isMobKnown } from '../combatHelpers';
 import type { Screen } from '../gameController.types';
 import { CombatScreen } from '../screens/CombatScreen';
@@ -314,7 +313,7 @@ export function CombatScreenRenderer({ gc, player }: SharedCoreRendererProps) {
       bestiaryMobs={gc.bestiaryMobs.map((mob) => ({ id: mob.id, isDiscovered: mob.isDiscovered }))}
       templates={gc.templates}
       onActivateTemplate={gc.handleTemplateSaved}
-      onStateUpdates={(updates) => applyStateUpdates(updates, gc.stateSetters)}
+      onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
       refreshPendingEncounters={gc.refreshPendingEncounters}
       setError={gc.setActionError}
       onPendingEncounterPageChange={gc.handlePendingEncounterPageChange}
@@ -356,7 +355,7 @@ export function ArenaScreenRenderer({ gc, player }: SharedCoreRendererProps) {
       currentTurns={gc.turns}
       playerId={player?.id ?? null}
       isInTown={gc.currentZone?.zoneType === 'town'}
-      onStateUpdates={(updates) => applyStateUpdates(updates, gc.stateSetters)}
+      onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
       onNotificationsChanged={() => void gc.loadPvpNotificationCount()}
       onNavigate={(screen) => gc.setActiveScreen(screen as Screen)}
       combatSpeedMs={gc.combatLogSpeedMs}

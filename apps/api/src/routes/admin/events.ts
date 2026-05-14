@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { WORLD_EVENT_TEMPLATES } from '@pocketrealm/shared';
+import { WORLD_EVENT_TEMPLATES } from '@pocketrealm/shared/constants/worldEventTemplates';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   cancelAdminEvent,

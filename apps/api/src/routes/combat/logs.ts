@@ -5,7 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { enrichLootWithNames } from '../../services/lootService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
-import { lootDropWithNameSchema } from './helpers';
+import { lootDropWithNameSchema } from '../../services/combat/helpers';
 import { paginationSchema, buildPagination } from '../../utils/routeHelpers.js';
 import { parseJsonRecord } from '../../utils/jsonColumnSchemas';
 

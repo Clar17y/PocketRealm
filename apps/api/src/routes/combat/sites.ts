@@ -9,7 +9,7 @@ import { getEventModifiersForEntity, type EventModifierBadge } from '../../servi
 import {
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
-} from './helpers';
+} from '../../services/combat/helpers';
 import {
   autoResolveEncounterRoom,
   startManualEncounterRoom,

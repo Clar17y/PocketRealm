@@ -103,6 +103,14 @@ describe('ChatPanel', () => {
     expect(channelTablist.querySelector('[aria-label="Close chat"]')).toBeNull();
   });
 
+  it('positions the closed chat button above the bottom navigation offset', () => {
+    renderChatPanel({ isOpen: false });
+
+    expect(screen.getByRole('button', { name: 'Open chat' }).className).toContain(
+      'bottom-[calc(var(--rpg-bottom-nav-offset)_+_0.75rem)]',
+    );
+  });
+
   it('renders the guild tab only when guild chat is available', () => {
     const { rerender } = renderChatPanel({ guildChatLabel: null });
 

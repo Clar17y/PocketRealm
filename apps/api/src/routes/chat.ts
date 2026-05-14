@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { NPC_DIALOGUE, type NpcKey } from '@pocketrealm/shared';
+import { NPC_DIALOGUE, type NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { getNpcActivityReaction } from '../services/chatActivityService';

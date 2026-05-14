@@ -5,16 +5,15 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Star, Plus, ArrowUp, ArrowDown, X, ChevronLeft } from 'lucide-react';
 import {
-  createTemplate,
-  updateTemplate,
-  deleteTemplate,
-  activateTemplate,
-} from '@/lib/api';
+  createTemplate, updateTemplate, deleteTemplate, activateTemplate, } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
 import { handleKeyActivate } from '@/lib/utils';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
-import { BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, PREMIUM_CONSTANTS, getAllTalentNodes } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { BUFF_EFFECTS, DEBUFF_EFFECTS } from '@pocketrealm/shared/constants/combatEffectNames';
+import { getAllTalentNodes } from '@pocketrealm/shared/constants/talentTreeDefinitions';
 import type { CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 import { ConfirmModal } from '@/components/common/ConfirmModal';

@@ -1,7 +1,5 @@
-import {
-  WORLD_EVENT_TEMPLATES,
-  WORLD_EVENT_CONSTANTS,
-} from '@pocketrealm/shared';
+import { WORLD_EVENT_TEMPLATES } from '@pocketrealm/shared/constants/worldEventTemplates';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 import { prisma } from '@pocketrealm/database';
 import { broadcastZoneDiscoveryActivity } from './chatActivityService';
 import { logger } from '../logger';
@@ -25,7 +23,7 @@ import {
   pickEncounterSize,
   buildEncounterSiteMobs,
   getNodeSizeName,
-} from '../routes/exploration/helpers';
+} from './exploration/helpers';
 import { processAmbushOutcome } from './explorationOutcome/ambush';
 import type { ExplorationOutcomeContext, ExplorationOutcomeResult } from './explorationOutcome/types';
 export type { ExplorationOutcomeContext, ExplorationOutcomeResult } from './explorationOutcome/types';

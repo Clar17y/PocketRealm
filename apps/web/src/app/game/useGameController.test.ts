@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameController } from './useGameController';
-import { getZoneEvents, getZones } from '@/lib/api';
+import { getCraftingRecipes, getZoneEvents, getZones } from '@/lib/api';
 import type { InventoryItemDTO } from '@pocketrealm/shared';
 
 vi.mock('@/lib/analytics', () => ({
@@ -343,6 +343,54 @@ describe('useGameController', () => {
     expect(() => renderHook(() => useGameController({ isAuthenticated: false }))).not.toThrow();
   });
 
+  it('groups the world map under the Explore bottom tab', () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.setActiveScreen('zones');
+    });
+
+    expect(hook.result.current.getActiveTab()).toBe('explore');
+  });
+
+  it.each([
+    ['skills', 'inventory'],
+    ['bestiary', 'combat'],
+    ['worldEvents', 'explore'],
+    ['casino', 'explore'],
+    ['training', 'explore'],
+  ] as const)('groups %s under the %s bottom tab', (screen, tab) => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.setActiveScreen(screen);
+    });
+
+    expect(hook.result.current.getActiveTab()).toBe(tab);
+  });
+
+  it('opens the Explore Zone screen for direct explore navigation', () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.handleNavigate('explore');
+    });
+
+    expect(hook.result.current.activeScreen).toBe('explore');
+    expect(hook.result.current.getActiveTab()).toBe('explore');
+  });
+
+  it('opens the world map when the Explore bottom tab is selected', () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    act(() => {
+      hook.result.current.handleBottomNavNavigate('explore');
+    });
+
+    expect(hook.result.current.activeScreen).toBe('zones');
+    expect(hook.result.current.getActiveTab()).toBe('explore');
+  });
+
   it('blocks a stale zone reload immediately after the active zone changes', async () => {
     const hook = renderHook(() => useGameController({ isAuthenticated: false }));
 
@@ -389,5 +437,26 @@ describe('useGameController', () => {
         imageSrc: '/items/Boar Hide Boots',
       },
     ]);
+  });
+
+  it('refreshes crafting context after a generic state update changes the active zone', async () => {
+    vi.mocked(getCraftingRecipes).mockResolvedValue({
+      data: {
+        recipes: [],
+        zoneCraftingLevel: null,
+        zoneName: 'Millbrook',
+      },
+      error: null,
+    } as never);
+
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    await act(async () => {
+      await hook.result.current.handleStateUpdates({ currentZoneId: 'zone-town' });
+    });
+
+    expect(getCraftingRecipes).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.zoneCraftingLevel).toBeNull();
+    expect(hook.result.current.zoneCraftingName).toBe('Millbrook');
   });
 });

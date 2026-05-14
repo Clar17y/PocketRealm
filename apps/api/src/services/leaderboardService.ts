@@ -1,6 +1,7 @@
+import { resolveAchievementTitleDisplay } from '@pocketrealm/shared/utils/titleDisplay';
 import { randomUUID } from 'crypto';
 import { prisma, Prisma } from '@pocketrealm/database';
-import { CROWN_CONSTANTS, LEADERBOARD_CONSTANTS, SEASON_STATUSES, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
+import { CROWN_CONSTANTS, LEADERBOARD_CONSTANTS, SEASON_STATUSES } from '@pocketrealm/shared';
 import type { TitleStyleVariant } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';

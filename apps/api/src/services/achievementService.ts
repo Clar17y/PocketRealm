@@ -1,11 +1,11 @@
-import { prisma } from '@pocketrealm/database';
-import { refundPlayerTurnsTx } from './turnBankService';
 import {
   ALL_ACHIEVEMENTS,
   ACHIEVEMENTS_BY_STAT_KEY,
   ACHIEVEMENTS_BY_FAMILY_KEY,
   ACHIEVEMENTS_BY_ID,
-} from '@pocketrealm/shared';
+} from '@pocketrealm/shared/constants/achievementDefinitions';
+import { prisma } from '@pocketrealm/database';
+import { refundPlayerTurnsTx } from './turnBankService';
 import type { AchievementDef, PlayerAchievementProgress } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';

@@ -7,7 +7,7 @@ import { getPlayerTaxRate, calculateEffectiveTurns } from '../../services/guildT
 import { getActiveZoneModifiers } from '../../services/worldEventService';
 import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
 import { EXPLORATION_CONSTANTS, PREMIUM_CONSTANTS } from '@pocketrealm/shared';
-import { estimateQuerySchema } from './helpers';
+import { estimateQuerySchema } from '../../services/exploration/helpers';
 
 export const estimateRouter = Router();
 

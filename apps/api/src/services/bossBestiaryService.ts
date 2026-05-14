@@ -1,5 +1,6 @@
 import { prisma } from '@pocketrealm/database';
-import { BOSS_TEMPLATES, BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
+import { BOSS_TEMPLATES } from '@pocketrealm/shared/constants/bossTemplateDefinitions';
+import { BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
 import { getCachedBossMobTemplates } from './staticDataCacheService';
 
 const { DISCOVERED_THRESHOLD: HP_THRESHOLD, STATS_THRESHOLD, ROTATION_THRESHOLD } = BESTIARY_UNLOCK_CONSTANTS;

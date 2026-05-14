@@ -5,7 +5,8 @@ vi.mock('./inventoryService', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
-import { EXPEDITION_SHOP_ITEMS, EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
+import { EXPEDITION_SHOP_ITEMS } from '@pocketrealm/shared/constants/expeditionDefinitions';
+import { EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
 import { getShopItems, getPlayerTokens, purchaseShopItem } from './expeditionShopService';
 import { getInventoryState } from './inventoryService';
 

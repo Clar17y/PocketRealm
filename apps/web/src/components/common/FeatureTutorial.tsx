@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react';
 import { ModalOverlay } from './ModalOverlay';
+import { useOnboardingUi } from './OnboardingUiContext';
 
 interface FeatureTutorialProps {
   storageKey: string;
@@ -12,16 +13,22 @@ interface FeatureTutorialProps {
 
 export function FeatureTutorial({ storageKey, title, children, condition = true }: FeatureTutorialProps) {
   const [show, setShow] = useState(false);
+  const { featureTutorialsEnabled } = useOnboardingUi();
+  const canShowTutorial = condition && featureTutorialsEnabled;
 
   useEffect(() => {
-    if (condition && !localStorage.getItem(storageKey)) {
-      setShow(true);
+    if (!canShowTutorial) {
+      setShow(false);
+      return;
     }
-  }, [storageKey, condition]);
 
-  if (!show) return null;
+    setShow(localStorage.getItem(storageKey) === null);
+  }, [storageKey, canShowTutorial]);
+
+  if (!canShowTutorial || !show) return null;
 
   const dismiss = () => {
+    if (!canShowTutorial) return;
     localStorage.setItem(storageKey, '1');
     setShow(false);
   };

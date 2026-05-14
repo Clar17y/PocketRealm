@@ -197,6 +197,10 @@ try {
   & npm run db:generate
   if ($LASTEXITCODE -ne 0) { throw "npm run db:generate failed with exit code $LASTEXITCODE" }
 
+  Write-Info 'Building workspace packages...'
+  & npm run build:packages
+  if ($LASTEXITCODE -ne 0) { throw "npm run build:packages failed with exit code $LASTEXITCODE" }
+
   Write-Info 'Running migrations...'
   & npm run db:migrate
   if ($LASTEXITCODE -ne 0) { throw "npm run db:migrate failed with exit code $LASTEXITCODE" }

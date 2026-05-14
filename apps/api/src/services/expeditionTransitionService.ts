@@ -1,10 +1,8 @@
+import { EXPEDITION_THEMES_BY_ID } from '@pocketrealm/shared/constants/expeditionDefinitions';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { logger } from '../logger';
 import {
-  EXPEDITION_CONSTANTS,
-  EXPEDITION_THEMES_BY_ID,
-  type ExpeditionRoomDefinition,
-} from '@pocketrealm/shared';
+  EXPEDITION_CONSTANTS, type ExpeditionRoomDefinition } from '@pocketrealm/shared';
 import { generateExpeditionRooms } from '@pocketrealm/game-engine';
 import { awardRoomTokens, awardCompletionBonus, distributeRoomLoot } from './expeditionLootService';
 import type { ExpeditionContributor } from './expeditionLootService';

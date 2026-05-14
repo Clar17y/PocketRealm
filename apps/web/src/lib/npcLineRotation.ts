@@ -1,4 +1,4 @@
-import { NPC_DIALOGUE, type NpcKey, type DialogueEvent } from '@pocketrealm/shared';
+import { NPC_DIALOGUE, type NpcKey, type DialogueEvent } from '@pocketrealm/shared/constants/npcDialogue';
 import { getTopZone } from './activityTracker';
 
 const SHOWN_KEY_PREFIX = 'npc-lines-shown:';
