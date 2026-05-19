@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { formatNumber } from '@/lib/format';
 
 function Var({ children }: { children: ReactNode }) {
   return <span className="var-player">{children}</span>;
@@ -13,7 +14,11 @@ function Enemy({ children }: { children: ReactNode }) {
 }
 
 function Const({ children }: { children: ReactNode }) {
-  return <span className="var-constant">{children}</span>;
+  return (
+    <span className="var-constant">
+      {typeof children === 'number' ? formatNumber(children) : children}
+    </span>
+  );
 }
 
 function Op({ children }: { children: ReactNode }) {

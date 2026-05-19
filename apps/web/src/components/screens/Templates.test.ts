@@ -2,6 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import type { ResourceState } from '@pocketrealm/shared';
 
 vi.mock('@/lib/api', () => ({
   createTemplate: vi.fn(),
@@ -29,12 +30,23 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderTemplates(unlockedActions: string[] = []) {
+const defaultResourceState: ResourceState = {
+  current: 100,
+  max: 100,
+  regenPerRound: 10,
+  regenPerSecond: 1,
+  restHealPerTurn: 0,
+};
+
+function renderTemplates(
+  unlockedActions: string[] = [],
+  overrides: { staminaState?: ResourceState; manaState?: ResourceState } = {},
+) {
   return render(React.createElement(Templates, {
     templates: [],
     unlockedActions,
-    staminaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 0 },
-    manaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 0 },
+    staminaState: overrides.staminaState ?? defaultResourceState,
+    manaState: overrides.manaState ?? defaultResourceState,
     onLoadTemplates: vi.fn().mockResolvedValue(undefined),
     onNavigate: vi.fn(),
     onTemplateSaved: vi.fn(),
@@ -69,5 +81,29 @@ describe('Templates picker', () => {
     expect(screen.getByText('Light Attack')).toBeTruthy();
     expect(screen.getByText('Minor Heal')).toBeTruthy();
     expect(screen.queryByText('Defend')).toBeNull();
+  });
+
+  it('limits resource preview decimals to two places', () => {
+    getTemplatePickerSections.mockReturnValue([
+      {
+        key: 'combat-core',
+        title: 'Custom Combat',
+        actions: [BASE_ACTION_DEFINITIONS.light_attack],
+      },
+    ]);
+
+    renderTemplates([], {
+      staminaState: { ...defaultResourceState, regenPerRound: 1.2345 },
+      manaState: { ...defaultResourceState, regenPerRound: 0.333333333 },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /new template/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add action/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(screen.getByText('1.23/cycle')).toBeTruthy();
+    expect(screen.getByText('0.33/cycle')).toBeTruthy();
+    expect(screen.queryByText(/1\.2345/)).toBeNull();
+    expect(screen.queryByText(/0\.333333/)).toBeNull();
   });
 });

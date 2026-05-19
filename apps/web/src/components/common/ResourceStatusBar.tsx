@@ -1,6 +1,7 @@
 'use client';
 
 import { HP_CONSTANTS } from '@pocketrealm/shared';
+import { formatNumber } from '@/lib/format';
 
 interface ResourceStatusBarProps {
   currentHp: number;
@@ -41,7 +42,7 @@ function ResourceBar({
         </span>
         {typeof regenPerSecond === 'number' && regenPerSecond > 0 && (
           <span className="text-[8px] font-pixel text-white/70 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
-            +{parseFloat(regenPerSecond.toFixed(2))}/s
+            +{formatNumber(regenPerSecond)}/s
           </span>
         )}
       </div>

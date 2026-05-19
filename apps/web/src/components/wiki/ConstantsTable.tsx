@@ -1,3 +1,5 @@
+import { formatNumber } from '@/lib/format';
+
 interface ConstantsTableRow {
   name: string;
   value: string | number;
@@ -24,7 +26,7 @@ export function ConstantsTable({ rows }: ConstantsTableProps) {
             <td>
               <code>{row.name}</code>
             </td>
-            <td>{row.value}</td>
+            <td>{typeof row.value === 'number' ? formatNumber(row.value) : row.value}</td>
             <td>{row.description}</td>
           </tr>
         ))}

@@ -9,6 +9,7 @@ import { cumulativeProbability } from '@pocketrealm/game-engine';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
+import { formatPercent } from '@/lib/format';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
 
@@ -60,12 +61,12 @@ export default function ProbabilityPage() {
       <h2>Per-Turn Rates</h2>
       <ConstantsTable
         rows={[
-          { name: 'AMBUSH_CHANCE_PER_TURN', value: EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN, description: 'Chance of an ambush encounter each turn' },
-          { name: 'ENCOUNTER_SITE_CHANCE_PER_TURN', value: EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN, description: 'Chance of discovering an encounter site each turn' },
-          { name: 'RESOURCE_NODE_CHANCE', value: EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE, description: 'Chance of discovering a resource node each turn' },
-          { name: 'HIDDEN_CACHE_CHANCE', value: EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE, description: 'Chance of finding a hidden cache each turn' },
-          { name: 'EVENT_DISCOVERY_CHANCE_PER_TURN', value: WORLD_EVENT_CONSTANTS.EVENT_DISCOVERY_CHANCE_PER_TURN, description: 'Chance of discovering an eligible world event each turn' },
-          { name: 'TRAVEL_AMBUSH_CHANCE_PER_TURN', value: EXPLORATION_CONSTANTS.TRAVEL_AMBUSH_CHANCE_PER_TURN, description: 'Chance of a travel ambush each travel turn' },
+          { name: 'AMBUSH_CHANCE_PER_TURN', value: formatPercent(EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN), description: 'Chance of an ambush encounter each turn' },
+          { name: 'ENCOUNTER_SITE_CHANCE_PER_TURN', value: formatPercent(EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN), description: 'Chance of discovering an encounter site each turn' },
+          { name: 'RESOURCE_NODE_CHANCE', value: formatPercent(EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE), description: 'Chance of discovering a resource node each turn' },
+          { name: 'HIDDEN_CACHE_CHANCE', value: formatPercent(EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE), description: 'Chance of finding a hidden cache each turn' },
+          { name: 'EVENT_DISCOVERY_CHANCE_PER_TURN', value: formatPercent(WORLD_EVENT_CONSTANTS.EVENT_DISCOVERY_CHANCE_PER_TURN), description: 'Chance of discovering an eligible world event each turn' },
+          { name: 'TRAVEL_AMBUSH_CHANCE_PER_TURN', value: formatPercent(EXPLORATION_CONSTANTS.TRAVEL_AMBUSH_CHANCE_PER_TURN), description: 'Chance of a travel ambush each travel turn' },
           { name: 'RESULT_RATE_MULTIPLIER', value: `${EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER}x`, description: 'Tracking multiplier applied to ambush and encounter-site rates' },
           { name: 'BONUS_MULTIPLIER', value: `${PREMIUM_CONSTANTS.BONUS_MULTIPLIER}x`, description: 'Champion multiplier applied to hidden cache chance' },
           { name: 'MIN_EXPLORATION_TURNS', value: EXPLORATION_CONSTANTS.MIN_EXPLORATION_TURNS, description: 'Minimum turns per exploration' },
@@ -109,7 +110,7 @@ export default function ProbabilityPage() {
       <p>
         When a world event is eligible for discovery, exploration performs a
         separate event roll at{' '}
-        <strong>{WORLD_EVENT_CONSTANTS.EVENT_DISCOVERY_CHANCE_PER_TURN}</strong>{' '}
+        <strong>{formatPercent(WORLD_EVENT_CONSTANTS.EVENT_DISCOVERY_CHANCE_PER_TURN)}</strong>{' '}
         per turn. This roll is independent of ambushes, encounter sites,
         resource nodes, hidden caches, and zone exits.
       </p>
@@ -117,7 +118,7 @@ export default function ProbabilityPage() {
       <h2>Travel Ambushes</h2>
       <p>
         Zone travel uses its own ambush model. Each travel turn has a{' '}
-        <strong>{(EXPLORATION_CONSTANTS.TRAVEL_AMBUSH_CHANCE_PER_TURN * 100).toFixed(0)}%</strong>{' '}
+        <strong>{formatPercent(EXPLORATION_CONSTANTS.TRAVEL_AMBUSH_CHANCE_PER_TURN)}</strong>{' '}
         chance to trigger a travel ambush; this is separate from the standard
         exploration ambush rate.
       </p>

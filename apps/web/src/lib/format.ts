@@ -2,8 +2,18 @@ export function titleCaseFromSnake(input: string): string {
   return input.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 2,
+});
+
 export function formatNumber(n: number): string {
-  return n.toLocaleString();
+  if (!Number.isFinite(n)) return String(n);
+  const normalized = Math.abs(n) < 0.005 ? 0 : n;
+  return NUMBER_FORMATTER.format(normalized);
+}
+
+export function formatPercent(ratio: number): string {
+  return `${formatNumber(ratio * 100)}%`;
 }
 
 /** Format durability to 2 decimal places (omits decimals for whole numbers). */

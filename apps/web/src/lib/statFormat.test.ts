@@ -81,6 +81,10 @@ describe('formatStatValue', () => {
   it('formats fractional non-percent stat as-is', () => {
     expect(formatStatValue('luck', 3.7)).toBe('3.7');
   });
+
+  it('limits fractional non-percent stats to two decimal places', () => {
+    expect(formatStatValue('luck', 3.777)).toBe('3.78');
+  });
 });
 
 // ── formatSignedStatValue ────────────────────────────────────────────
@@ -109,6 +113,11 @@ describe('formatSignedStatValue', () => {
   it('uses absolute value for formatting (negative does not double-negate)', () => {
     // -5 -> Math.abs(-5) = 5 -> formatStatValue('attack', 5) = '5' -> '-5'
     expect(formatSignedStatValue('attack', -5)).toBe('-5');
+  });
+
+  it('does not show a negative sign for tiny values that display as zero', () => {
+    expect(formatSignedStatValue('luck', -0.00000001)).toBe('0');
+    expect(formatSignedStatValue('critChance', -0.00000001)).toBe('0%');
   });
 
   it('zero percent stat has no sign', () => {
