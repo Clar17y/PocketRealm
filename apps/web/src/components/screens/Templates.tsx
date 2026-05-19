@@ -18,6 +18,7 @@ import type { CombatTemplateData, CombatTemplateSlotData, SlotCondition, Conditi
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
+import { formatNumber } from '@/lib/format';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { getTemplatePickerSections } from './templatePickerActions';
 
@@ -112,8 +113,8 @@ function needsEffectName(c: SlotCondition): boolean {
 // --- Condition summary helper ---
 
 function conditionSummary(c: SlotCondition): string {
-  if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} < ${c.threshold ?? 50}%`;
-  if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} > ${c.threshold ?? 50}%`;
+  if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} < ${formatNumber(c.threshold ?? 50)}%`;
+  if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} > ${formatNumber(c.threshold ?? 50)}%`;
   if (c.type === 'has_buff') return `${c.effectName ?? 'buff'} active`;
   if (c.type === 'has_debuff') return `${c.effectName ?? 'debuff'} active`;
   if (c.type === 'no_buff') return `${c.effectName ?? 'buff'} missing`;
@@ -167,8 +168,8 @@ function groupBadge(group: string) {
 function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) {
   return (
     <div className="flex gap-2 text-[10px] text-[var(--rpg-text-secondary)]">
-      {cost.stamina > 0 && <span>Stam: <span className="font-pixel text-[12px]">{cost.stamina}</span></span>}
-      {cost.mana > 0 && <span>Mana: <span className="font-pixel text-[12px]">{cost.mana}</span></span>}
+      {cost.stamina > 0 && <span>Stam: <span className="font-pixel text-[12px]">{formatNumber(cost.stamina)}</span></span>}
+      {cost.mana > 0 && <span>Mana: <span className="font-pixel text-[12px]">{formatNumber(cost.mana)}</span></span>}
       {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
     </div>
   );
@@ -691,19 +692,19 @@ export function Templates({
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{cycleCost.stamina}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{formatNumber(cycleCost.stamina)}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{cycleCost.mana}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{formatNumber(cycleCost.mana)}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{staminaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{formatNumber(staminaPerCycle)}/cycle</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{manaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{formatNumber(manaPerCycle)}/cycle</span>
               </div>
             </div>
             <div className="mt-2 space-y-1 text-xs">

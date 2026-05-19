@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { relativeTime, titleCaseFromSnake } from './format';
+import { formatNumber, formatPercent, relativeTime, titleCaseFromSnake } from './format';
 
 describe('titleCaseFromSnake', () => {
   it('converts snake_case to Title Case', () => {
@@ -24,6 +24,43 @@ describe('titleCaseFromSnake', () => {
 
   it('handles already capitalized input', () => {
     expect(titleCaseFromSnake('HELLO_WORLD')).toBe('HELLO WORLD');
+  });
+});
+
+describe('formatNumber', () => {
+  it('limits fractional digits to two and strips trailing zeroes', () => {
+    expect(formatNumber(1.2345)).toBe('1.23');
+    expect(formatNumber(1.2)).toBe('1.2');
+    expect(formatNumber(1)).toBe('1');
+  });
+
+  it('rounds tiny floating point residue down to zero', () => {
+    expect(formatNumber(0.00000001)).toBe('0');
+    expect(formatNumber(0.0009)).toBe('0');
+  });
+
+  it('shows real sub-cent values instead of rounding them to zero', () => {
+    expect(formatNumber(0.001)).toBe('<0.01');
+    expect(formatNumber(0.0049)).toBe('<0.01');
+    expect(formatNumber(-0.0049)).toBe('-<0.01');
+    expect(formatNumber(0.005)).toBe('0.01');
+  });
+
+  it('keeps locale grouping for large values', () => {
+    expect(formatNumber(12345.678)).toBe('12,345.68');
+  });
+});
+
+describe('formatPercent', () => {
+  it('formats ratios as percentages with at most two decimal places', () => {
+    expect(formatPercent(0.0015)).toBe('0.15%');
+    expect(formatPercent(0.0001)).toBe('0.01%');
+    expect(formatPercent(0.04)).toBe('4%');
+  });
+
+  it('keeps real sub-cent percentages while hiding residue', () => {
+    expect(formatPercent(0.00001)).toBe('<0.01%');
+    expect(formatPercent(0.000009)).toBe('0%');
   });
 });
 

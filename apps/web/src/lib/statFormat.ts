@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, Target, Zap } from 'lucide-react';
+import { formatNumber } from './format';
 
 export interface StatDisplayMeta {
   icon: LucideIcon;
@@ -59,11 +60,12 @@ export function prettyStatName(stat: string): string {
 
 export function formatStatValue(stat: string, value: number): string {
   if (PERCENT_STATS.has(stat)) return `${Math.round(value * 100)}%`;
-  return String(value);
+  return formatNumber(value);
 }
 
 export function formatSignedStatValue(stat: string, value: number): string {
   const formatted = formatStatValue(stat, Math.abs(value));
+  if (formatted === '0' || formatted === '0%') return formatted;
   if (value > 0) return `+${formatted}`;
   if (value < 0) return `-${formatted}`;
   return formatted;
