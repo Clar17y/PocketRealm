@@ -6,10 +6,18 @@ const NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
+const MIN_NON_ZERO_DISPLAY_VALUE = 0.001;
+const MIN_TWO_DECIMAL_ROUNDING_VALUE = 0.005;
+const SUB_TWO_DECIMAL_DISPLAY = '<0.01';
+
 export function formatNumber(n: number): string {
   if (!Number.isFinite(n)) return String(n);
-  const normalized = Math.abs(n) < 0.005 ? 0 : n;
-  return NUMBER_FORMATTER.format(normalized);
+  const absValue = Math.abs(n);
+  if (absValue < MIN_NON_ZERO_DISPLAY_VALUE) return '0';
+  if (absValue < MIN_TWO_DECIMAL_ROUNDING_VALUE) {
+    return n < 0 ? `-${SUB_TWO_DECIMAL_DISPLAY}` : SUB_TWO_DECIMAL_DISPLAY;
+  }
+  return NUMBER_FORMATTER.format(n);
 }
 
 export function formatPercent(ratio: number): string {

@@ -36,6 +36,14 @@ describe('formatNumber', () => {
 
   it('rounds tiny floating point residue down to zero', () => {
     expect(formatNumber(0.00000001)).toBe('0');
+    expect(formatNumber(0.0009)).toBe('0');
+  });
+
+  it('shows real sub-cent values instead of rounding them to zero', () => {
+    expect(formatNumber(0.001)).toBe('<0.01');
+    expect(formatNumber(0.0049)).toBe('<0.01');
+    expect(formatNumber(-0.0049)).toBe('-<0.01');
+    expect(formatNumber(0.005)).toBe('0.01');
   });
 
   it('keeps locale grouping for large values', () => {
@@ -48,6 +56,11 @@ describe('formatPercent', () => {
     expect(formatPercent(0.0015)).toBe('0.15%');
     expect(formatPercent(0.0001)).toBe('0.01%');
     expect(formatPercent(0.04)).toBe('4%');
+  });
+
+  it('keeps real sub-cent percentages while hiding residue', () => {
+    expect(formatPercent(0.00001)).toBe('<0.01%');
+    expect(formatPercent(0.000009)).toBe('0%');
   });
 });
 

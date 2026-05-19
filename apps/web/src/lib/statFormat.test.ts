@@ -120,6 +120,11 @@ describe('formatSignedStatValue', () => {
     expect(formatSignedStatValue('critChance', -0.00000001)).toBe('0%');
   });
 
+  it('keeps the sign for real sub-cent stat values', () => {
+    expect(formatSignedStatValue('luck', 0.001)).toBe('+<0.01');
+    expect(formatSignedStatValue('luck', -0.001)).toBe('-<0.01');
+  });
+
   it('zero percent stat has no sign', () => {
     expect(formatSignedStatValue('critChance', 0)).toBe('0%');
   });
