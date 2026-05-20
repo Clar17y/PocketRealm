@@ -262,6 +262,7 @@ describe('CombatScreen encounter site locking', () => {
       expect(props.refreshPendingEncounters).toHaveBeenCalled();
     });
 
+    expect(props.refreshPendingEncounters).toHaveBeenCalledWith({ includeEncounterSiteId: 'site-1' });
     expect(combatApiMocks.startEncounterRoom).not.toHaveBeenCalled();
   });
 });
