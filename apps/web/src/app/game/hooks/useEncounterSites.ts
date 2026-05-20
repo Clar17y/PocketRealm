@@ -1,9 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getEncounterSites } from '@/lib/api';
+import { getEncounterSites, type EncounterSitesQuery, type EncounterSitesResponse } from '@/lib/api';
 import { useVisibleInterval } from '@/hooks/usePageVisible';
 import type { Screen, PendingEncounter } from '../gameController.types';
 
 const PENDING_ENCOUNTER_PAGE_SIZE = 8;
+
+export interface RefreshPendingEncounterOptions {
+  background?: boolean;
+  includeEncounterSiteId?: string;
+}
+
+function mapEncounterSites(sites: EncounterSitesResponse['encounterSites']): PendingEncounter[] {
+  return sites.map((site) => ({
+    encounterSiteId: site.encounterSiteId,
+    zoneId: site.zoneId,
+    zoneName: site.zoneName,
+    mobFamilyId: site.mobFamilyId,
+    mobFamilyName: site.mobFamilyName,
+    siteName: site.siteName,
+    size: site.size,
+    totalMobs: site.totalMobs,
+    aliveMobs: site.aliveMobs,
+    defeatedMobs: site.defeatedMobs,
+    decayedMobs: site.decayedMobs,
+    nextMobTemplateId: site.nextMobTemplateId,
+    nextMobName: site.nextMobName,
+    nextMobPrefix: site.nextMobPrefix,
+    nextMobDisplayName: site.nextMobDisplayName,
+    discoveredAt: site.discoveredAt,
+    currentRoom: site.currentRoom,
+    totalRooms: site.totalRooms,
+    roomMobCounts: site.roomMobCounts,
+    currentRoomMobs: site.currentRoomMobs ?? [],
+    eventModifiers: site.eventModifiers,
+    totalTurnCost: site.totalTurnCost,
+  }));
+}
 
 export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen, currentZoneId: string | null) {
   const [pendingEncounters, setPendingEncounters] = useState<PendingEncounter[]>([]);
@@ -31,7 +63,7 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
   const latestPendingRequestRef = useRef(0);
   const [pendingClockMs, setPendingClockMs] = useState(() => Date.now());
 
-  const refreshPendingEncounters = useCallback(async (options?: { background?: boolean }) => {
+  const refreshPendingEncounters = useCallback(async (options?: RefreshPendingEncounterOptions) => {
     if (!isAuthenticated) return undefined;
     const isBackground = options?.background ?? false;
     const requestId = ++latestPendingRequestRef.current;
@@ -42,13 +74,15 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
     setPendingEncountersError(null);
 
     try {
-      const res = await getEncounterSites({
+      const query: EncounterSitesQuery = {
         page: pendingEncounterPage,
         pageSize: PENDING_ENCOUNTER_PAGE_SIZE,
         zoneId: pendingEncounterZoneFilter === 'all' ? undefined : pendingEncounterZoneFilter,
         mobFamilyId: pendingEncounterMobFilter === 'all' ? undefined : pendingEncounterMobFilter,
         sort: pendingEncounterSort,
-      });
+      };
+
+      const res = await getEncounterSites(query);
 
       if (latestPendingRequestRef.current !== requestId) return;
 
@@ -67,42 +101,41 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
         return [];
       }
 
-      if (pendingEncounterPage > res.data.pagination.totalPages) {
-        setPendingEncounterPage(res.data.pagination.totalPages);
-        return [];
+      const mappedEncounters = mapEncounterSites(res.data.encounterSites);
+      let returnedEncounters = mappedEncounters;
+
+      if (
+        options?.includeEncounterSiteId &&
+        !mappedEncounters.some(site => site.encounterSiteId === options.includeEncounterSiteId)
+      ) {
+        for (let page = 1; page <= res.data.pagination.totalPages; page++) {
+          if (page === res.data.pagination.page) continue;
+
+          const pageRes = await getEncounterSites({ ...query, page });
+          if (latestPendingRequestRef.current !== requestId) return;
+          if (!pageRes.data) continue;
+
+          const activeEncounter = mapEncounterSites(pageRes.data.encounterSites)
+            .find(site => site.encounterSiteId === options.includeEncounterSiteId);
+          if (activeEncounter) {
+            returnedEncounters = [...mappedEncounters, activeEncounter];
+            break;
+          }
+        }
       }
 
-      const mappedEncounters = res.data.encounterSites.map((site) => ({
-        encounterSiteId: site.encounterSiteId,
-        zoneId: site.zoneId,
-        zoneName: site.zoneName,
-        mobFamilyId: site.mobFamilyId,
-        mobFamilyName: site.mobFamilyName,
-        siteName: site.siteName,
-        size: site.size,
-        totalMobs: site.totalMobs,
-        aliveMobs: site.aliveMobs,
-        defeatedMobs: site.defeatedMobs,
-        decayedMobs: site.decayedMobs,
-        nextMobTemplateId: site.nextMobTemplateId,
-        nextMobName: site.nextMobName,
-        nextMobPrefix: site.nextMobPrefix,
-        nextMobDisplayName: site.nextMobDisplayName,
-        discoveredAt: site.discoveredAt,
-        currentRoom: site.currentRoom,
-        totalRooms: site.totalRooms,
-        roomMobCounts: site.roomMobCounts,
-        currentRoomMobs: site.currentRoomMobs ?? [],
-        eventModifiers: site.eventModifiers,
-        totalTurnCost: site.totalTurnCost,
-      }));
+      if (pendingEncounterPage > res.data.pagination.totalPages) {
+        setPendingEncounterPage(res.data.pagination.totalPages);
+        return returnedEncounters;
+      }
+
       setPendingEncounters(mappedEncounters);
       setPendingEncounterPagination(res.data.pagination);
       setPendingEncounterFilters({
         zones: res.data.filters.zones,
         mobs: res.data.filters.mobFamilies,
       });
-      return mappedEncounters;
+      return returnedEncounters;
     } finally {
       if (!isBackground && latestPendingRequestRef.current === requestId) {
         setPendingEncountersLoading(false);

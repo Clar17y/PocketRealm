@@ -3,7 +3,6 @@ import { redis } from '../redis';
 import {
   COMBAT_CONSTANTS,
   makeEncounterMobId,
-  parseEncounterMobSlot,
   type RaidRoundInput,
   type RaidParticipant,
   type RaidThreatEntry,
@@ -497,10 +496,8 @@ export async function resolveManualEncounterRound(
 
     // Mark defeated mobs
     if (roomCleared) {
-      for (const mob of state.mobs) {
-        const slot = parseEncounterMobSlot(mob.id);
-        if (slot === null) continue;
-        const target = mobs.find(m => m.slot === slot && (m.room ?? 1) === state.currentRoom);
+      for (const roomMobSlot of state.roomMobSlots) {
+        const target = mobs.find(m => m.slot === roomMobSlot.slot && (m.room ?? 1) === state.currentRoom);
         if (target && target.status === 'alive') target.status = 'defeated';
       }
     }

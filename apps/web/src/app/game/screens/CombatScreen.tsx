@@ -23,6 +23,7 @@ import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
 import { getMobPrefixDefinition, HP_CONSTANTS, TUTORIAL_STEP_COMBAT } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
+import type { RefreshPendingEncounterOptions } from '../hooks/useEncounterSites';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
 import { EncounterSiteCombatView } from '@/components/encounter/EncounterSiteCombatView';
@@ -100,7 +101,7 @@ interface CombatScreenProps {
   templates?: CombatTemplateData[];
   onActivateTemplate?: (templateId: string) => void;
   onStateUpdates?: (updates: StateUpdates) => void;
-  refreshPendingEncounters?: () => Promise<PendingEncounter[] | undefined>;
+  refreshPendingEncounters?: (options?: RefreshPendingEncounterOptions) => Promise<PendingEncounter[] | undefined>;
   setError?: (msg: string | null) => void;
   activeEncounterSiteId?: string | null;
   onActiveEncounterSiteIdChange?: (id: string | null) => void;
@@ -364,7 +365,7 @@ export function CombatScreen({
             }}
             onAdvanceRoom={async () => {
               onActiveEncounterSiteIdChange?.(null);
-              const refreshedSites = await refreshPendingEncounters?.();
+              const refreshedSites = await refreshPendingEncounters?.({ includeEncounterSiteId: activeSiteCombat.siteId });
               const refreshedSite = refreshedSites?.find((site) => site.encounterSiteId === activeSiteCombat.siteId);
               if (!refreshedSite) {
                 throw new Error('Encounter site is no longer available');
