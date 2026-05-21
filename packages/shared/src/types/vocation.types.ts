@@ -69,6 +69,31 @@ export interface VocationSnapshot {
   unlockedTechniqueIds: string[];
 }
 
+export interface VocationStateDto {
+  vocationId: VocationId;
+  xp: number;
+  rank: number;
+  xpForCurrentRank: number;
+  xpForNextRank: number;
+  masteryPointsEarned: number;
+  availableMasteryPoints: number;
+  spentPoints: number;
+  learnedTechniqueIds: string[];
+}
+
+export interface VocationDailyCapDto {
+  dayStart: string;
+  turnsSpent: number;
+  turnsLimit: number;
+  turnsRemaining: number;
+}
+
+export interface VocationSnapshotResponse {
+  playerId: string;
+  vocations: VocationStateDto[];
+  dailyCap: VocationDailyCapDto;
+}
+
 export interface VocationBranchDefinition {
   id: VocationBranchId;
   name: string;

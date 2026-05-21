@@ -8,8 +8,11 @@ import {
   VOCATION_IDS,
   VOCATION_MASTERY,
   type TaxInfo,
+  type VocationDailyCapDto,
   type VocationId,
   type VocationMentorTown,
+  type VocationSnapshotResponse,
+  type VocationStateDto,
 } from '@pocketrealm/shared';
 import { Prisma, prisma, type PlayerVocation, type PlayerVocationDailyCap } from '@pocketrealm/database';
 import { AppError } from '../middleware/errorHandler';
@@ -17,30 +20,7 @@ import { getDayStart } from '../utils/dateHelpers';
 import { spendWithTaxTx, taxInfoFromResult, type TaxResult } from './guildTaxService';
 import type { SpendTurnsResult } from './turnBankService';
 
-export interface VocationStateDto {
-  vocationId: VocationId;
-  xp: number;
-  rank: number;
-  xpForCurrentRank: number;
-  xpForNextRank: number;
-  masteryPointsEarned: number;
-  availableMasteryPoints: number;
-  spentPoints: number;
-  learnedTechniqueIds: string[];
-}
-
-export interface VocationDailyCapDto {
-  dayStart: string;
-  turnsSpent: number;
-  turnsLimit: number;
-  turnsRemaining: number;
-}
-
-export interface VocationSnapshotResponse {
-  playerId: string;
-  vocations: VocationStateDto[];
-  dailyCap: VocationDailyCapDto;
-}
+export type { VocationDailyCapDto, VocationSnapshotResponse, VocationStateDto };
 
 export interface VocationActionResult {
   snapshot: VocationSnapshotResponse;
