@@ -592,6 +592,7 @@ export async function buildParticipantForEncounterSite(
       sortOrder: s.sortOrder,
     })),
     actionDefinitions: filteredActions,
+    equipmentActionModifiers: prep.equipmentStats.actionModifiers ?? [],
     hp: currentHp,
     maxHp,
     stamina: prep.resources.stamina,

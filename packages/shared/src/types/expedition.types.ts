@@ -2,6 +2,7 @@ import type { BossActiveEffect } from './worldEvent.types';
 import type { BossTargetMode, BossTemplateAction } from './bossTemplate.types';
 import type { CombatantStats, CombatPotion, PotionConsumed } from './combat.types';
 import type { ActionDefinition, SlotCondition } from './combatAction.types';
+import type { EquipmentActionModifier } from './vocation.types';
 
 // --- Expedition Status ---
 
@@ -57,6 +58,7 @@ export interface RaidParticipant {
   stats: CombatantStats;
   template: { actionId: string; condition?: SlotCondition; thenActionId?: string; sortOrder: number }[];
   actionDefinitions: Record<string, ActionDefinition>;
+  equipmentActionModifiers?: EquipmentActionModifier[];
   hp: number;
   maxHp: number;
   stamina: number;

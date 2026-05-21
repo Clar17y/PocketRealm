@@ -117,6 +117,10 @@ export interface FreshTemplateData {
   potionPool: CombatPotion[];
 }
 
+interface FreshTemplateOptions {
+  actionModifiers?: EquipmentActionModifier[];
+}
+
 /**
  * Fetch a player's current template, unlocked actions, and potion pool.
  * Called each round so mid-combat template switches take effect.
@@ -124,24 +128,26 @@ export interface FreshTemplateData {
 export async function fetchFreshTemplateData(
   playerId: string,
   maxHp: number,
+  options: FreshTemplateOptions = {},
 ): Promise<FreshTemplateData> {
   const [template, skillPoints, equipmentStats] = await Promise.all([
     getActiveTemplate(playerId),
     getSkillPoints(playerId),
-    getEquipmentStats(playerId),
+    options.actionModifiers === undefined ? getEquipmentStats(playerId) : Promise.resolve(null),
   ]);
+  const actionModifiers = options.actionModifiers ?? equipmentStats?.actionModifiers;
 
   const unlockedSet = new Set(skillPoints.unlockedActions);
   const actionDefinitions: Record<string, ActionDefinition> = {};
   for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
     if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      actionDefinitions[id] = applyActionModifiers(def, equipmentStats.actionModifiers);
+      actionDefinitions[id] = applyActionModifiers(def, actionModifiers);
     }
   }
   for (const slot of template) {
     for (const actionId of [slot.actionId, slot.thenActionId]) {
       if (actionId && !actionDefinitions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
-        actionDefinitions[actionId] = applyActionModifiers(BASE_ACTION_DEFINITIONS[actionId]!, equipmentStats.actionModifiers);
+        actionDefinitions[actionId] = applyActionModifiers(BASE_ACTION_DEFINITIONS[actionId]!, actionModifiers);
       }
     }
   }

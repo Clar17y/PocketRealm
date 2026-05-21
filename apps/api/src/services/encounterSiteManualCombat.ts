@@ -363,7 +363,9 @@ export async function resolveManualEncounterRound(
   }
 
   // Refresh template from DB so mid-combat template switches take effect
-  const fresh = await fetchFreshTemplateData(playerId, state.participant.maxHp);
+  const fresh = await fetchFreshTemplateData(playerId, state.participant.maxHp, {
+    actionModifiers: state.participant.equipmentActionModifiers ?? [],
+  });
   state.participant.template = fresh.playerTemplate.map(s => ({
     actionId: s.actionId,
     condition: s.condition,
