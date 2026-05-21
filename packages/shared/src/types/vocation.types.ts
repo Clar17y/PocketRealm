@@ -135,16 +135,20 @@ export interface CraftMarkDefinition {
 }
 
 export interface CraftMark {
-  id: string;
   markId: string;
+  name: string;
   sourceTechniqueId: string;
-  value: number;
+  description: string;
+  itemStatBenefits?: readonly ItemStatModifier[];
+  itemStatDrawbacks?: readonly ItemStatModifier[];
+  actionModifiers?: readonly EquipmentActionModifier[];
 }
 
 export interface EquipmentActionModifier {
   modifierId: string;
   equipmentSlots: readonly EquipmentSlot[];
   actionTypes: readonly CombatActionType[];
+  actionIds?: readonly string[];
   benefits: readonly EquipmentActionModifierEntry[];
   drawbacks: readonly EquipmentActionModifierEntry[];
 }

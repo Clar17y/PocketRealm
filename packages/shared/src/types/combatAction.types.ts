@@ -55,6 +55,8 @@ export interface ActionDefinition {
   damageMultiplier?: number;
   /** Accuracy modifier added to hit roll */
   accuracyModifier?: number;
+  /** Craft mark durability metadata consumed by later durability phases */
+  durabilityWearMultiplier?: number;
   /** Defence reduction applied to target receiving this action */
   defenceReduction?: number;
   /** Damage reduction percentage when defending (0-1) */
