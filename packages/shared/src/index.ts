@@ -33,3 +33,5 @@ export * from './utils/tierUtils';
 export * from './utils/mobUtils';
 export * from './utils/repairUtils';
 export * from './utils/vocationProgress';
+export * from './utils/vocationMapping';
+export * from './utils/vocationTechniqueEffects';
