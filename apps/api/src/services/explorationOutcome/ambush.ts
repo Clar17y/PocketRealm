@@ -203,6 +203,7 @@ export async function processAmbushOutcome(args: {
     manaRegenPerRound: resources.manaRegenPerRound,
     unlockedActions: explorationUnlockedActions,
     perActionScaling,
+    actionModifiers: equipmentStats.actionModifiers,
   });
   const combatantB = mobToTemplateCombatant(prefixedMob);
   const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);

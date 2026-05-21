@@ -389,6 +389,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
           manaRegenPerRound: resources.manaRegenPerRound,
           unlockedActions,
           perActionScaling,
+          actionModifiers: equipmentStats.actionModifiers,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
         const combatOptions = buildPveCombatOptions(potionPool);

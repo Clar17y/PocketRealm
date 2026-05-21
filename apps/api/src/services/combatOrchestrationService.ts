@@ -1,7 +1,7 @@
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
-import { buildPlayerCombatStats, type TemplateCombatant, } from '@pocketrealm/game-engine';
+import { applyEquipmentActionModifiers, buildPlayerCombatStats, type TemplateCombatant, } from '@pocketrealm/game-engine';
 import {
-  COMBAT_CONSTANTS, GUILD_CONSTANTS, type ActionDefinition, type CombatPotion, type CombatTemplateSlotData, type LootDrop, type QuestProgressUpdate, type PerActionScaling } from '@pocketrealm/shared';
+  COMBAT_CONSTANTS, GUILD_CONSTANTS, type ActionDefinition, type CombatPotion, type CombatTemplateSlotData, type EquipmentActionModifier, type LootDrop, type QuestProgressUpdate, type PerActionScaling } from '@pocketrealm/shared';
 import { Prisma } from '@pocketrealm/database';
 import { rollAndGrantLootWithCapacity } from './lootService';
 import type { GrantedItemIds } from './stateUpdateHelpers';
@@ -125,22 +125,23 @@ export async function fetchFreshTemplateData(
   playerId: string,
   maxHp: number,
 ): Promise<FreshTemplateData> {
-  const [template, skillPoints] = await Promise.all([
+  const [template, skillPoints, equipmentStats] = await Promise.all([
     getActiveTemplate(playerId),
     getSkillPoints(playerId),
+    getEquipmentStats(playerId),
   ]);
 
   const unlockedSet = new Set(skillPoints.unlockedActions);
   const actionDefinitions: Record<string, ActionDefinition> = {};
   for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
     if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      actionDefinitions[id] = def;
+      actionDefinitions[id] = applyActionModifiers(def, equipmentStats.actionModifiers);
     }
   }
   for (const slot of template) {
     for (const actionId of [slot.actionId, slot.thenActionId]) {
       if (actionId && !actionDefinitions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
-        actionDefinitions[actionId] = BASE_ACTION_DEFINITIONS[actionId]!;
+        actionDefinitions[actionId] = applyActionModifiers(BASE_ACTION_DEFINITIONS[actionId]!, equipmentStats.actionModifiers);
       }
     }
   }
@@ -167,12 +168,13 @@ export function buildPlayerTemplateCombatant(params: {
   manaRegenPerRound: number;
   unlockedActions: string[];
   perActionScaling?: PerActionScaling;
+  actionModifiers?: EquipmentActionModifier[];
 }): TemplateCombatant {
   const unlockedSet = new Set(params.unlockedActions);
   const filteredActions: Record<string, ActionDefinition> = {};
   for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
     if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      filteredActions[id] = def;
+      filteredActions[id] = applyActionModifiers(def, params.actionModifiers);
     }
   }
   return {
@@ -189,6 +191,17 @@ export function buildPlayerTemplateCombatant(params: {
     actionDefinitions: filteredActions,
     perActionScaling: params.perActionScaling,
   };
+}
+
+function applyActionModifiers(
+  action: ActionDefinition,
+  modifiers: EquipmentActionModifier[] | undefined,
+): ActionDefinition {
+  if (!modifiers || modifiers.length === 0) {
+    return action;
+  }
+
+  return applyEquipmentActionModifiers({ action, modifiers });
 }
 
 // ── Apply guild combat modifiers ─────────────────────────────────────

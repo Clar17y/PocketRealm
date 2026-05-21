@@ -397,6 +397,30 @@ describe('buildPlayerTemplateCombatant', () => {
     expect(result.actionDefinitions).toHaveProperty('minor_heal');
     expect(result.actionDefinitions).toHaveProperty('frost_nova');
   });
+
+  it('applies equipped craft mark action modifiers to available actions', () => {
+    const result = buildPlayerTemplateCombatant({
+      playerId: 'p1',
+      username: 'Test',
+      playerStats: makeStats(),
+      template: [],
+      stamina: 0, maxStamina: 0, staminaRegenPerRound: 0,
+      mana: 0, maxMana: 0, manaRegenPerRound: 0,
+      unlockedActions: [],
+      actionModifiers: [{
+        modifierId: 'blood_groove_heavy_tradeoff',
+        equipmentSlots: ['main_hand'],
+        actionTypes: ['heavy_attack'],
+        benefits: [{ stat: 'damage', value: 0.1, isPercent: true }],
+        drawbacks: [{ stat: 'resourceCost', value: 0.2, isPercent: true }],
+      }],
+    });
+
+    const heavyAttack = result.actionDefinitions.heavy_attack;
+    expect(heavyAttack?.damageMultiplier).toBeCloseTo(2.2);
+    expect(heavyAttack?.cost.stamina).toBe(42);
+    expect(heavyAttack).not.toBeUndefined();
+  });
 });
 
 // =====================================================================

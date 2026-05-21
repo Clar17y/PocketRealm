@@ -1,6 +1,6 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import type { EquipmentSlot, SkillType } from '@pocketrealm/shared';
-import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS } from '@pocketrealm/shared';
+import type { EquipmentActionModifier, EquipmentSlot, SkillType } from '@pocketrealm/shared';
+import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS, getEquipmentActionModifiers, parseCraftMarks } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { cachedQuery, invalidateCache } from './cacheService';
 
@@ -24,6 +24,7 @@ export interface EquipmentStats {
   critChance: number;
   critDamage: number;
   inventorySlots: number;
+  actionModifiers?: EquipmentActionModifier[];
 }
 
 export function isSkillType(value: string): value is SkillType {
@@ -72,6 +73,7 @@ async function computeEquipmentStats(playerId: string): Promise<EquipmentStats> 
         select: {
           currentDurability: true,
           bonusStats: true,
+          craftMarks: true,
           template: {
             select: {
               baseStats: true,
@@ -95,11 +97,17 @@ async function computeEquipmentStats(playerId: string): Promise<EquipmentStats> 
   let critChance = 0;
   let critDamage = 0;
   let inventorySlots = 0;
+  const actionModifiers: EquipmentActionModifier[] = [];
 
   for (const slot of equipped) {
     // Broken gear contributes zero stats
     const cur = slot.item?.currentDurability ?? slot.item?.template?.maxDurability ?? 1;
     if (cur <= 0) continue;
+
+    actionModifiers.push(...getEquipmentActionModifiers({
+      slot: slot.slot,
+      craftMarks: parseCraftMarks(slot.item?.craftMarks),
+    }));
 
     const baseStats = slot.item?.template?.baseStats as Record<string, unknown> | null | undefined;
     const bonusStats = slot.item?.bonusStats as Record<string, unknown> | null | undefined;
@@ -122,7 +130,7 @@ async function computeEquipmentStats(playerId: string): Promise<EquipmentStats> 
     }
   }
 
-  return { attack, rangedPower, magicPower, accuracy, armor, magicDefence, health, dodge, luck, critChance, critDamage, inventorySlots };
+  return { attack, rangedPower, magicPower, accuracy, armor, magicDefence, health, dodge, luck, critChance, critDamage, inventorySlots, actionModifiers };
 }
 
 export async function equipItem(

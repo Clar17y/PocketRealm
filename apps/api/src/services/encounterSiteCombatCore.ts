@@ -20,6 +20,7 @@ import {
   type EncounterMobSlot,
 } from '@pocketrealm/shared';
 import {
+  applyEquipmentActionModifiers,
   resolveRaidRound,
   buildEncounterRaidMob,
   buildPlayerCombatStats,
@@ -557,13 +558,19 @@ export async function buildParticipantForEncounterSite(
   const filteredActions: Record<string, ActionDefinition> = {};
   for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
     if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      filteredActions[id] = def;
+      filteredActions[id] = applyEquipmentActionModifiers({
+        action: def,
+        modifiers: prep.equipmentStats.actionModifiers ?? [],
+      });
     }
   }
   for (const slot of prep.playerTemplate) {
     for (const actionId of [slot.actionId, slot.thenActionId]) {
       if (actionId && !filteredActions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
-        filteredActions[actionId] = BASE_ACTION_DEFINITIONS[actionId]!;
+        filteredActions[actionId] = applyEquipmentActionModifiers({
+          action: BASE_ACTION_DEFINITIONS[actionId]!,
+          modifiers: prep.equipmentStats.actionModifiers ?? [],
+        });
       }
     }
   }

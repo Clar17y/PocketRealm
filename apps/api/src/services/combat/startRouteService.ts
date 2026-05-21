@@ -200,6 +200,7 @@ export async function startZoneCombat(input: AuthenticatedRouteServiceRequest): 
         mana: resources.mana, maxMana: resources.maxMana, manaRegenPerRound: resources.manaRegenPerRound,
         unlockedActions,
         perActionScaling,
+        actionModifiers: equipmentStats.actionModifiers,
       });
       const mobCombatant = mobToTemplateCombatant(finalMob);
 
