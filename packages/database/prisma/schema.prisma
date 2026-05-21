@@ -116,6 +116,9 @@ model Player {
   turnBank           TurnBank?
   rouletteBets       RouletteBet[]
   skills             PlayerSkill[]
+  vocations          PlayerVocation[]
+  vocationDailyCap   PlayerVocationDailyCap?
+  vocationCounters   PlayerVocationCounter[]
   equipment          PlayerEquipment[]
   items              Item[]
   bestiary           PlayerBestiary[]
@@ -341,6 +344,57 @@ model PlayerSkill {
   @@map("player_skills")
 }
 
+model PlayerVocation {
+  playerId      String   @map("player_id")
+  vocationId    String   @map("vocation_id") @db.VarChar(32)
+  xp            Int      @default(0)
+  rank          Int      @default(0)
+  masteryPoints Int      @default(0) @map("mastery_points")
+  spentPoints   Int      @default(0) @map("spent_points")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  player     Player                      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  techniques PlayerVocationTechnique[]
+
+  @@id([playerId, vocationId])
+  @@map("player_vocations")
+}
+
+model PlayerVocationTechnique {
+  playerId    String   @map("player_id")
+  vocationId  String   @map("vocation_id") @db.VarChar(32)
+  techniqueId String   @map("technique_id") @db.VarChar(96)
+  learnedAt   DateTime @default(now()) @map("learned_at")
+
+  vocation PlayerVocation @relation(fields: [playerId, vocationId], references: [playerId, vocationId], onDelete: Cascade)
+
+  @@id([playerId, vocationId, techniqueId])
+  @@map("player_vocation_techniques")
+}
+
+model PlayerVocationDailyCap {
+  playerId   String   @id @map("player_id")
+  dayStart   DateTime @map("day_start")
+  turnsSpent Int      @default(0) @map("turns_spent")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("player_vocation_daily_caps")
+}
+
+model PlayerVocationCounter {
+  playerId String @map("player_id")
+  statKey  String @map("stat_key") @db.VarChar(128)
+  value    Int    @default(0)
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([playerId, statKey])
+  @@map("player_vocation_counters")
+}
+
 // =============================================================================
 // EQUIPMENT
 // =============================================================================
@@ -398,6 +452,7 @@ model Item {
   maxDurability     Int?     @map("max_durability")
   quantity          Int      @default(1)
   bonusStats        Json?    @map("bonus_stats")
+  craftMarks        Json?    @map("craft_marks")
   createdAt         DateTime @default(now()) @map("created_at")
   inStash           Boolean  @default(false) @map("in_stash")
   isSoulbound       Boolean  @default(false) @map("is_soulbound")
@@ -645,6 +700,7 @@ model CraftingRecipe {
   id               String  @id @default(uuid())
   seasonId         String? @map("season_id")
   skillType        String  @map("skill_type") @db.VarChar(32)
+  vocationId       String? @map("vocation_id") @db.VarChar(32)
   requiredLevel    Int     @map("required_level")
   resultTemplateId String  @map("result_template_id")
   isAdvanced       Boolean @default(false) @map("is_advanced")
@@ -662,6 +718,7 @@ model CraftingRecipe {
   @@index([seasonId])
   @@index([isAdvanced])
   @@index([mobFamilyId])
+  @@index([vocationId])
   @@map("crafting_recipes")
 }
 

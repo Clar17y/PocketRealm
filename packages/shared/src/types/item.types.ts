@@ -42,6 +42,7 @@ export interface Item {
   maxDurability: number | null;
   quantity: number;
   bonusStats: ItemStats | null;
+  craftMarks: CraftMarks | null;
   createdAt: Date;
   inStash: boolean;
 }
@@ -49,6 +50,7 @@ export interface Item {
 export type ItemType = 'weapon' | 'armor' | 'resource' | 'consumable';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type WeightClass = 'heavy' | 'medium' | 'light';
+export type CraftMarks = unknown;
 
 export interface ItemStats {
   attack?: number;

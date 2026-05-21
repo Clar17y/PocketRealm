@@ -54,6 +54,7 @@ describe('toInventoryItemDTO', () => {
       maxDurability: 100,
       quantity: 1,
       bonusStats: { attack: 5 },
+      craftMarks: null,
       createdAt: '2026-01-01T00:00:00.000Z',
       template: {
         id: 'tpl-1',
@@ -148,6 +149,7 @@ describe('buildInventoryStateUpdates', () => {
   const mockDTO = {
     id: 'item-1', templateId: 'tpl-1', ownerId: 'p1', rarity: 'common' as const,
     currentDurability: null, maxDurability: null, quantity: 1, bonusStats: null,
+    craftMarks: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     template: { id: 'tpl-1', name: 'Ore', itemType: 'resource', weightClass: null, slot: null, tier: 1, baseStats: {}, requiredSkill: 'mining', requiredLevel: 1, maxDurability: 0, stackable: true, sellPrice: 5, flavorText: null },
     equippedSlot: null,

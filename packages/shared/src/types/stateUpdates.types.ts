@@ -1,4 +1,5 @@
 import type { HpState } from './hp.types';
+import type { CraftMarks } from './item.types';
 import type { PlayerBuffData } from './shop.types';
 
 /** Mirrors the frontend InventoryItem shape (apps/web/src/lib/api/items.ts:22-34) */
@@ -11,6 +12,7 @@ export interface InventoryItemDTO {
   maxDurability: number | null;
   quantity: number;
   bonusStats: Record<string, number> | null;
+  craftMarks?: CraftMarks | null;
   createdAt: string;
   template: {
     id: string;

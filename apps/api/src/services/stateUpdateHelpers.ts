@@ -27,8 +27,9 @@ type PrismaItemWithTemplate = NonNullable<
 >;
 
 /** Input type accepted by toInventoryItemDTO — the Prisma shape with optional extras. */
-type ItemWithTemplateInput = Omit<PrismaItemWithTemplate, 'bonusStats'> & {
+type ItemWithTemplateInput = Omit<PrismaItemWithTemplate, 'bonusStats' | 'craftMarks'> & {
   bonusStats?: Record<string, number> | null;
+  craftMarks?: unknown | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,7 @@ export function toInventoryItemDTO(
     maxDurability: item.maxDurability,
     quantity: item.quantity,
     bonusStats: item.bonusStats ?? null,
+    craftMarks: item.craftMarks ?? null,
     createdAt: item.createdAt instanceof Date
       ? item.createdAt.toISOString()
       : String(item.createdAt),
