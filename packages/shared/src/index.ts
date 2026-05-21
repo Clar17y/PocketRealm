@@ -18,15 +18,18 @@ export * from './types/expedition.types';
 export type { ShopItemData, PlayerBuffData, ShopPurchaseResult } from './types/shop.types';
 export * from './types/friend.types';
 export * from './types/stateUpdates.types';
+export * from './types/vocation.types';
 
 // Constants
 export * from './constants/gameConstants';
 export * from './constants/mobPrefixes';
 export * from './constants/chatActivity';
 export * from './constants/tutorialConstants';
+export * from './constants/vocationDefinitions';
 
 // Utils
 export * from './utils/achievementChains';
 export * from './utils/tierUtils';
 export * from './utils/mobUtils';
 export * from './utils/repairUtils';
+export * from './utils/vocationProgress';

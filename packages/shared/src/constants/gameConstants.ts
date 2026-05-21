@@ -130,6 +130,14 @@ export const SKILL_CONSTANTS = {
   MAX_XP_BOOST: 0.50,
 } as const;
 
+export const VOCATION_MASTERY = {
+  DAILY_HONING_TURN_LIMIT: 120,
+  ACTIVE_XP_PER_TURN: 10,
+  PASSIVE_CRAFT_XP_MULTIPLIER: 0.2,
+  PASSIVE_GATHER_XP_MULTIPLIER: 0.15,
+  RESPEC_REFUND_RATE: 0.6,
+} as const;
+
 export const CHARACTER_CONSTANTS = {
   /** Character XP gained from skill XP after skill-side efficiency is applied. */
   XP_RATIO: 0.3,
