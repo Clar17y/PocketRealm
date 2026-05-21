@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { resolveGatheringVocation, resolveRecipeVocation } from './vocationMapping';
+import { GATHERING_SKILLS, type SkillType } from '../types/player.types';
+import { normalizeGatheringSkillType, resolveGatheringVocation, resolveRecipeVocation } from './vocationMapping';
 
 describe('vocationMapping', () => {
   it('prefers valid explicit recipe vocation ids', () => {
@@ -47,6 +48,16 @@ describe('vocationMapping', () => {
     expect(resolveGatheringVocation('mining')).toBe('prospector');
     expect(resolveGatheringVocation('woodcutting')).toBe('forester');
     expect(resolveGatheringVocation('foraging')).toBe('herbalist');
+    expect(resolveGatheringVocation('herbalism')).toBe('herbalist');
+    expect(resolveGatheringVocation('Herbalism')).toBe('herbalist');
     expect(resolveGatheringVocation('alchemy')).toBeNull();
+  });
+
+  it('normalizes compatibility aliases to supported gathering skill types', () => {
+    expect(normalizeGatheringSkillType('herbalism')).toBe('foraging');
+    expect(normalizeGatheringSkillType('Herbalism')).toBe('foraging');
+    expect(normalizeGatheringSkillType('foraging')).toBe('foraging');
+    expect(normalizeGatheringSkillType('alchemy')).toBeNull();
+    expect(GATHERING_SKILLS.includes('herbalism' as SkillType)).toBe(false);
   });
 });

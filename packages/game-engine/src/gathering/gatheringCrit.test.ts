@@ -33,6 +33,10 @@ describe('calculateGemCritChance', () => {
     // levelsAbove clamped to 0
     expect(calculateGemCritChance(3, 10, 0)).toBeCloseTo(0.03);
   });
+
+  it('applies an explicit crit chance bonus after champion multiplier', () => {
+    expect(calculateGemCritChance(5, 5, 0, 2, 0.04)).toBeCloseTo(0.10);
+  });
 });
 
 describe('rollGemCrit', () => {
@@ -56,6 +60,12 @@ describe('rollGemCrit', () => {
   it('applies champion multiplier when provided', () => {
     const result = rollGemCrit({ skillLevel: 5, nodeLevel: 5, luckStat: 0 }, 0.04, 2);
     expect(result.critChance).toBeCloseTo(0.06);
+    expect(result.isCrit).toBe(true);
+  });
+
+  it('uses explicit crit chance bonus from input', () => {
+    const result = rollGemCrit({ skillLevel: 5, nodeLevel: 5, luckStat: 0, critChanceBonus: 0.04 }, 0.05);
+    expect(result.critChance).toBeCloseTo(0.07);
     expect(result.isCrit).toBe(true);
   });
 });
@@ -93,5 +103,11 @@ describe('rollGemCritBatch', () => {
     expect(typeof result.gemsFound).toBe('number');
     expect(result.gemsFound).toBeGreaterThanOrEqual(0);
     expect(result.gemsFound).toBeLessThanOrEqual(10);
+  });
+
+  it('uses explicit crit chance bonus from input for batch rolls', () => {
+    const result = rollGemCritBatch({ ...input, critChanceBonus: 0.04 }, 3, [0.05, 0.06, 0.08]);
+    expect(result.critChance).toBeCloseTo(0.07);
+    expect(result.gemsFound).toBe(2);
   });
 });

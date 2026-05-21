@@ -35,3 +35,4 @@ export * from './utils/repairUtils';
 export * from './utils/vocationProgress';
 export * from './utils/vocationMapping';
 export * from './utils/vocationTechniqueEffects';
+export * from './utils/gatheringResourceCategory';
