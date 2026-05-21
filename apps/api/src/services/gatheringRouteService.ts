@@ -4,7 +4,7 @@ import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONST
 import { createActivityLog, type ActivityType } from '../services/activityLogService';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
-import { addStackableItemTx, getInventoryState, assertNotOverEncumbered } from '../services/inventoryService';
+import { addStackableItemTx, getInventoryState, assertNotOverEncumbered, getStackIdentityKey } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
@@ -278,10 +278,18 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
 
   const resourceTemplateId = await getResourceTemplateId(template.resourceType);
 
-  // Check backpack capacity — resources stack, so only block if no existing stack
-  const existingStack = await prisma.item.findFirst({
-    where: { ownerId: playerId, templateId: resourceTemplateId, inStash: false },
+  // Check backpack capacity: gathered resources merge only into the normal unmarked stack.
+  const normalResourceStackKey = getStackIdentityKey({
+    templateId: resourceTemplateId,
+    rarity: 'common',
+    bonusStats: null,
+    craftMarks: null,
   });
+  const stackCandidates = await prisma.item.findMany({
+    where: { ownerId: playerId, templateId: resourceTemplateId, inStash: false },
+    select: { templateId: true, rarity: true, bonusStats: true, craftMarks: true },
+  });
+  const existingStack = stackCandidates.find((item) => getStackIdentityKey(item) === normalResourceStackKey) ?? null;
   if (existingStack) {
     // Resource will stack onto existing item — no new slot needed, skip encumbrance check
   } else {
@@ -467,10 +475,9 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
   }, { statKeys: gatherAchKeys });
 
   // --- Build stateUpdates ---
-  // Classify resource item as created or updated based on existingStack check done earlier
   const resourceItemIds = [stack.itemId];
-  const inventoryAdded: string[] = existingStack ? [] : resourceItemIds;
-  const inventoryUpdated: string[] = existingStack ? resourceItemIds : [];
+  const inventoryAdded: string[] = stack.created ? resourceItemIds : [];
+  const inventoryUpdated: string[] = stack.created ? [] : resourceItemIds;
 
   // Include gem item in the appropriate bucket if a gem crit occurred
   if (gemCrit) {

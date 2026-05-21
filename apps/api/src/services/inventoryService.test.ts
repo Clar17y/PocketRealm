@@ -40,7 +40,9 @@ describe('addStackableItem', () => {
 
   it('updates existing stack', async () => {
     mockPrisma.itemTemplate.findUnique.mockResolvedValue({ id: 'tpl-1', stackable: true });
-    mockPrisma.item.findFirst.mockResolvedValue({ id: 'item-1', quantity: 5 });
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'item-1', quantity: 5, rarity: 'common', bonusStats: null, craftMarks: null },
+    ]);
     mockPrisma.item.update.mockResolvedValue({ id: 'item-1', quantity: 8 });
 
     const result = await addStackableItem('p1', 'tpl-1', 3);
@@ -53,7 +55,7 @@ describe('addStackableItem', () => {
 
   it('creates new stack when none exists', async () => {
     mockPrisma.itemTemplate.findUnique.mockResolvedValue({ id: 'tpl-1', stackable: true });
-    mockPrisma.item.findFirst.mockResolvedValue(null);
+    mockPrisma.item.findMany.mockResolvedValue([]);
     mockPrisma.item.create.mockResolvedValue({ id: 'new-item', quantity: 5 });
 
     const result = await addStackableItem('p1', 'tpl-1', 5);
@@ -156,20 +158,48 @@ describe('getUsedSlots', () => {
 
   it('counts each stackable template as 1 slot', async () => {
     mockPrisma.item.findMany.mockResolvedValue([
-      { templateId: 'stack-a', template: { stackable: true } },
-      { templateId: 'stack-a', template: { stackable: true } },
-      { templateId: 'stack-b', template: { stackable: true } },
+      { templateId: 'stack-a', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
+      { templateId: 'stack-a', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
+      { templateId: 'stack-b', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
     ]);
     const result = await getUsedSlots('p1');
     expect(result).toBe(2);
   });
 
+  it('counts marked and unmarked stackable stacks with the same template as separate slots', async () => {
+    mockPrisma.item.findMany.mockResolvedValue([
+      { templateId: 'stack-a', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
+      {
+        templateId: 'stack-a',
+        rarity: 'common',
+        bonusStats: null,
+        craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+        template: { stackable: true },
+      },
+    ]);
+
+    const result = await getUsedSlots('p1');
+
+    expect(result).toBe(2);
+  });
+
+  it('still counts identical unmarked stackable stacks as one slot', async () => {
+    mockPrisma.item.findMany.mockResolvedValue([
+      { templateId: 'stack-a', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
+      { templateId: 'stack-a', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
+    ]);
+
+    const result = await getUsedSlots('p1');
+
+    expect(result).toBe(1);
+  });
+
   it('counts mixed stackable and non-stackable correctly', async () => {
     mockPrisma.item.findMany.mockResolvedValue([
-      { templateId: 'stack-a', template: { stackable: true } },
-      { templateId: 'stack-a', template: { stackable: true } },
-      { templateId: 'non-stack-1', template: { stackable: false } },
-      { templateId: 'non-stack-2', template: { stackable: false } },
+      { templateId: 'stack-a', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
+      { templateId: 'stack-a', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: true } },
+      { templateId: 'non-stack-1', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: false } },
+      { templateId: 'non-stack-2', rarity: 'common', bonusStats: null, craftMarks: null, template: { stackable: false } },
     ]);
     const result = await getUsedSlots('p1');
     expect(result).toBe(3); // 1 stackable group + 2 non-stackable

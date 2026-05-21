@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mockPrisma } from '../__test__/setup';
-import { depositItem, withdrawItem, listStash } from './stashService';
+import { depositItem, withdrawItem, withdrawBatch, listStash } from './stashService';
 
 // Mock inventoryService capacity functions
 vi.mock('./inventoryService', async (importOriginal) => {
@@ -31,6 +31,8 @@ function makeItem(overrides: Record<string, unknown> = {}) {
     quantity: 1,
     currentDurability: 100,
     maxDurability: 100,
+    bonusStats: null,
+    craftMarks: null,
     inStash: false,
     template: { stackable: false },
     equipment: [],
@@ -78,6 +80,7 @@ describe('depositItem', () => {
       makeItem({ quantity: 5, template: { stackable: true } })
     );
     mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.findMany.mockResolvedValue([]);
 
     await depositItem('p1', 'item-1', 5);
 
@@ -92,7 +95,9 @@ describe('depositItem', () => {
       makeItem({ quantity: 5, template: { stackable: true } })
     );
     mockPrisma.item.update.mockResolvedValue({});
-    mockPrisma.item.findFirst.mockResolvedValue({ id: 'stash-item', quantity: 3 });
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'stash-item', templateId: 'tpl-1', rarity: 'common', quantity: 3, bonusStats: null, craftMarks: null },
+    ]);
     mockPrisma.item.delete.mockResolvedValue({});
 
     await depositItem('p1', 'item-1', 5);
@@ -106,12 +111,39 @@ describe('depositItem', () => {
     });
   });
 
-  it('splits partial stackable deposit', async () => {
+  it('does not merge a marked stackable deposit into an unmarked stash stack', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(
-      makeItem({ quantity: 10, template: { stackable: true } })
+      makeItem({
+        quantity: 5,
+        template: { stackable: true },
+        craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+      })
     );
     mockPrisma.item.update.mockResolvedValue({});
-    mockPrisma.item.findFirst.mockResolvedValue(null);
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'stash-item', templateId: 'tpl-1', rarity: 'common', quantity: 3, bonusStats: null, craftMarks: null },
+    ]);
+
+    await depositItem('p1', 'item-1', 5);
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: { inStash: true },
+    });
+    expect(mockPrisma.item.delete).not.toHaveBeenCalled();
+  });
+
+  it('splits partial stackable deposit', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({
+        quantity: 10,
+        template: { stackable: true },
+        bonusStats: { luck: 1 },
+        craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+      })
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.findMany.mockResolvedValue([]);
     mockPrisma.item.create.mockResolvedValue({});
 
     await depositItem('p1', 'item-1', 3);
@@ -122,7 +154,17 @@ describe('depositItem', () => {
       data: { quantity: 7 },
     });
     // Create new stash stack
-    expect(mockPrisma.item.create).toHaveBeenCalled();
+    expect(mockPrisma.item.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        ownerId: 'p1',
+        templateId: 'tpl-1',
+        rarity: 'common',
+        quantity: 3,
+        bonusStats: { luck: 1 },
+        craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+        inStash: true,
+      }),
+    }));
   });
 
   it('merges partial stackable into existing stash stack', async () => {
@@ -130,7 +172,9 @@ describe('depositItem', () => {
       makeItem({ quantity: 10, template: { stackable: true } })
     );
     mockPrisma.item.update.mockResolvedValue({});
-    mockPrisma.item.findFirst.mockResolvedValue({ id: 'stash-item', quantity: 5 });
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'stash-item', templateId: 'tpl-1', rarity: 'common', quantity: 5, bonusStats: null, craftMarks: null },
+    ]);
 
     await depositItem('p1', 'item-1', 3);
 
@@ -157,8 +201,66 @@ describe('withdrawItem', () => {
 
   it('throws when backpack is full', async () => {
     mockGetInventoryState.mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
+    mockPrisma.item.findUnique.mockResolvedValue(makeItem({ inStash: true }));
 
     await expect(withdrawItem('p1', 'item-1')).rejects.toThrow('Backpack is full');
+  });
+
+  it('allows withdrawing to a full backpack when a matching unmarked stack exists', async () => {
+    mockGetInventoryState.mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ inStash: true, quantity: 3, template: { stackable: true } })
+    );
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'bp-item', templateId: 'tpl-1', rarity: 'common', quantity: 7, bonusStats: null, craftMarks: null },
+    ]);
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.delete.mockResolvedValue({});
+
+    await withdrawItem('p1', 'item-1');
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'bp-item' },
+      data: { quantity: 10 },
+    });
+  });
+
+  it('allows withdrawing to a full backpack when a matching marked stack exists', async () => {
+    const craftMarks = [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }];
+    mockGetInventoryState.mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ inStash: true, quantity: 3, template: { stackable: true }, craftMarks })
+    );
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'bp-marked', templateId: 'tpl-1', rarity: 'common', quantity: 7, bonusStats: null, craftMarks },
+    ]);
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.delete.mockResolvedValue({});
+
+    await withdrawItem('p1', 'item-1');
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'bp-marked' },
+      data: { quantity: 10 },
+    });
+  });
+
+  it('rejects withdrawing to a full backpack when only a nonmatching same-template stack exists', async () => {
+    mockGetInventoryState.mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({
+        inStash: true,
+        quantity: 3,
+        template: { stackable: true },
+        craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+      })
+    );
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'bp-unmarked', templateId: 'tpl-1', rarity: 'common', quantity: 7, bonusStats: null, craftMarks: null },
+    ]);
+
+    await expect(withdrawItem('p1', 'item-1')).rejects.toThrow('Backpack is full');
+    expect(mockPrisma.item.update).not.toHaveBeenCalled();
   });
 
   it('throws when item not in stash', async () => {
@@ -176,7 +278,9 @@ describe('withdrawItem', () => {
       makeItem({ inStash: true, quantity: 3, template: { stackable: true } })
     );
     mockPrisma.item.update.mockResolvedValue({});
-    mockPrisma.item.findFirst.mockResolvedValue({ id: 'bp-item', quantity: 7 });
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'bp-item', templateId: 'tpl-1', rarity: 'common', quantity: 7, bonusStats: null, craftMarks: null },
+    ]);
     mockPrisma.item.delete.mockResolvedValue({});
 
     await withdrawItem('p1', 'item-1');
@@ -190,12 +294,35 @@ describe('withdrawItem', () => {
     });
   });
 
+  it('does not merge a marked stackable withdraw into an unmarked backpack stack', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({
+        inStash: true,
+        quantity: 3,
+        template: { stackable: true },
+        craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+      })
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'bp-item', templateId: 'tpl-1', rarity: 'common', quantity: 7, bonusStats: null, craftMarks: null },
+    ]);
+
+    await withdrawItem('p1', 'item-1');
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: { inStash: false },
+    });
+    expect(mockPrisma.item.delete).not.toHaveBeenCalled();
+  });
+
   it('splits partial stackable withdraw', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(
       makeItem({ inStash: true, quantity: 10, template: { stackable: true } })
     );
     mockPrisma.item.update.mockResolvedValue({});
-    mockPrisma.item.findFirst.mockResolvedValue(null);
+    mockPrisma.item.findMany.mockResolvedValue([]);
     mockPrisma.item.create.mockResolvedValue({});
 
     await withdrawItem('p1', 'item-1', 4);
@@ -212,7 +339,9 @@ describe('withdrawItem', () => {
       makeItem({ inStash: true, quantity: 10, template: { stackable: true } })
     );
     mockPrisma.item.update.mockResolvedValue({});
-    mockPrisma.item.findFirst.mockResolvedValue({ id: 'bp-item', quantity: 3 });
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'bp-item', templateId: 'tpl-1', rarity: 'common', quantity: 3, bonusStats: null, craftMarks: null },
+    ]);
 
     await withdrawItem('p1', 'item-1', 5);
 
@@ -220,6 +349,64 @@ describe('withdrawItem', () => {
       where: { id: 'bp-item' },
       data: { quantity: 8 },
     });
+  });
+});
+
+describe('withdrawBatch', () => {
+  it('treats marked and unmarked same-template stackables as separate capacity identities', async () => {
+    mockGetInventoryState.mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
+    mockPrisma.item.findMany
+      .mockResolvedValueOnce([
+        makeItem({
+          id: 'stash-marked',
+          inStash: true,
+          quantity: 2,
+          template: { stackable: true },
+          craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+        }),
+        makeItem({
+          id: 'stash-unmarked',
+          inStash: true,
+          quantity: 2,
+          template: { stackable: true },
+        }),
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'bp-marked',
+          templateId: 'tpl-1',
+          rarity: 'common',
+          quantity: 5,
+          bonusStats: null,
+          craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'bp-marked',
+          templateId: 'tpl-1',
+          rarity: 'common',
+          quantity: 5,
+          bonusStats: null,
+          craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+        },
+      ])
+      .mockResolvedValue([]);
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.delete.mockResolvedValue({});
+
+    const result = await withdrawBatch('p1', ['stash-marked', 'stash-unmarked']);
+
+    expect(result).toEqual({
+      withdrawnCount: 1,
+      addedItemIds: [],
+      updatedItemIds: ['bp-marked'],
+    });
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'bp-marked' },
+      data: { quantity: 7 },
+    });
+    expect(mockPrisma.item.delete).toHaveBeenCalledWith({ where: { id: 'stash-marked' } });
   });
 });
 

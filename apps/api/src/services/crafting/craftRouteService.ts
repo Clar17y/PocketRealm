@@ -10,10 +10,14 @@ import {
   ITEM_RARITY_CONSTANTS,
   PREMIUM_CONSTANTS,
   isRarityAtLeast,
+  applyCraftTechniqueEffects,
+  getEligibleTechniquesForCraft,
+  resolveRecipeVocation,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
   type ItemType,
+  type VocationTechniqueDefinition,
 } from '@pocketrealm/shared';
 import {
   calculateCraftingCrit,
@@ -21,7 +25,7 @@ import {
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
+import { consumeItemsByTemplateTx, getStackIdentityKey, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
 import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta, fetchMaterialTotals, buildInventoryStateUpdates } from '../../services/stateUpdateHelpers';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
@@ -30,6 +34,7 @@ import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../../services/buffService';
 import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
 import { trackProgress } from '../../services/progressService';
+import { grantPassiveVocationXpTx, getVocationSnapshot } from '../../services/vocationService';
 import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isSkillType,
@@ -48,6 +53,84 @@ import {
   type RouteServiceResponse,
 } from '../../utils/routeServiceResponse';
 
+type PersistedCraftMark = {
+  markId: string;
+  name: string;
+  sourceTechniqueId: string;
+  description: string;
+  itemStatBenefits: unknown[];
+  itemStatDrawbacks: unknown[];
+  actionModifiers: unknown[];
+};
+
+function scalePositiveQuantity(quantity: number, multiplier: number): number {
+  if (multiplier > 1) return Math.max(quantity, Math.ceil(quantity * multiplier));
+  if (multiplier < 1) return Math.max(1, Math.floor(quantity * multiplier));
+  return quantity;
+}
+
+function scaleTurnCost(turnCost: number, multiplier: number): number {
+  if (turnCost <= 0) return 0;
+  return Math.max(1, Math.ceil(turnCost * multiplier));
+}
+
+function buildCraftMarks(
+  technique: VocationTechniqueDefinition | null,
+  marks: ReturnType<typeof applyCraftTechniqueEffects>['craftMarks'],
+): PersistedCraftMark[] | null {
+  if (!technique || marks.length === 0) return null;
+
+  return marks.map((mark) => ({
+    markId: mark.markId,
+    name: mark.name,
+    sourceTechniqueId: technique.id,
+    description: mark.description,
+    itemStatBenefits: [...mark.itemStatBenefits],
+    itemStatDrawbacks: [...mark.itemStatDrawbacks],
+    actionModifiers: [...(mark.actionModifiers ?? [])],
+  }));
+}
+
+async function findMatchingStack(
+  itemClient: Pick<Prisma.TransactionClient['item'], 'findMany'>,
+  input: {
+    playerId: string;
+    templateId: string;
+    inStash: boolean;
+    rarity: string;
+    bonusStats: unknown;
+    craftMarks: PersistedCraftMark[] | null;
+  },
+): Promise<{ id: string; quantity: number } | null> {
+  const candidates = await itemClient.findMany({
+    where: { ownerId: input.playerId, templateId: input.templateId, inStash: input.inStash },
+    select: { id: true, quantity: true, rarity: true, bonusStats: true, craftMarks: true },
+  });
+  const expectedKey = getStackIdentityKey(input);
+
+  return candidates.find((candidate) => (
+    getStackIdentityKey({
+      templateId: input.templateId,
+      rarity: candidate.rarity,
+      bonusStats: candidate.bonusStats,
+      craftMarks: candidate.craftMarks,
+    }) === expectedKey
+  )) ?? null;
+}
+
+async function incrementVocationCounterTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  statKey: string,
+  increment: number,
+): Promise<void> {
+  if (increment <= 0) return;
+  await tx.playerVocationCounter.upsert({
+    where: { playerId_statKey: { playerId, statKey } },
+    create: { playerId, statKey, value: increment },
+    update: { value: { increment } },
+  });
+}
 
 export async function craftItem(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
     const playerId = input.player.playerId;
@@ -95,10 +178,51 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
 
     const quantity = body.quantity;
     const materials = parseMaterials(recipe.materials);
+    const vocationId = resolveRecipeVocation({
+      recipeVocationId: recipe.vocationId,
+      resultSlot: recipe.resultTemplate.slot,
+      resultItemType: recipe.resultTemplate.itemType,
+      recipeSkillType: recipe.skillType,
+    });
+
+    if (body.techniqueId && !vocationId) {
+      throw new AppError(400, 'Vocation is not available for this recipe', 'VOCATION_NOT_AVAILABLE');
+    }
+
+    let selectedTechnique: VocationTechniqueDefinition | null = null;
+    if (body.techniqueId && vocationId) {
+      const learnedTechniques = await prisma.playerVocationTechnique.findMany({
+        where: { playerId, vocationId },
+        select: { techniqueId: true },
+      });
+      const eligibleTechniques = getEligibleTechniquesForCraft({
+        vocationId,
+        learnedTechniqueIds: learnedTechniques.map((technique) => technique.techniqueId),
+        recipeId: recipe.id,
+        skillType: recipe.skillType,
+        resultItemType: recipe.resultTemplate.itemType,
+        resultSlot: recipe.resultTemplate.slot,
+        resultRarity: null,
+      });
+      selectedTechnique = eligibleTechniques.find((technique) => technique.id === body.techniqueId) ?? null;
+      if (!selectedTechnique) {
+        throw new AppError(400, 'Technique is not eligible for this craft', 'TECHNIQUE_NOT_ELIGIBLE');
+      }
+    }
+
+    const techniqueEffects = applyCraftTechniqueEffects(selectedTechnique);
+    const craftMarks = buildCraftMarks(selectedTechnique, techniqueEffects.craftMarks);
+    const materialCosts = materials.map((mat) => ({
+      ...mat,
+      totalQuantity: scalePositiveQuantity(mat.quantity * quantity, techniqueEffects.materialCostMultiplier),
+    }));
+    const outputQuantity = recipe.resultTemplate.stackable
+      ? Math.max(1, quantity + techniqueEffects.outputQuantityDelta)
+      : quantity;
 
     // Validate inventory has all materials
-    for (const mat of materials) {
-      const needed = mat.quantity * quantity;
+    for (const mat of materialCosts) {
+      const needed = mat.totalQuantity;
       const available = await getTotalQuantityByTemplate(playerId, mat.templateId);
       if (available < needed) {
         throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
@@ -107,8 +231,13 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
 
     // Check backpack capacity before spending turns
     if (recipe.resultTemplate.stackable) {
-      const existingStack = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
+      const existingStack = await findMatchingStack(prisma.item, {
+        playerId,
+        templateId: recipe.resultTemplateId,
+        inStash: false,
+        rarity: 'common',
+        bonusStats: null,
+        craftMarks,
       });
       if (!existingStack) {
         const { availableSlots } = await getInventoryState(playerId);
@@ -184,14 +313,14 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     }
 
     // Single transaction: spend turns + consume materials + create items
-    const baseTurnCost = recipe.turnCost * quantity;
+    const adjustedTurnCost = scaleTurnCost(recipe.turnCost * quantity, techniqueEffects.turnCostMultiplier);
     const { turnSpend, taxResult, newItemIds, updatedItemIds, craftedItemDetails, fullyConsumedIds, partiallyConsumedIds } = await prisma.$transaction(async (tx) => {
-      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, adjustedTurnCost);
 
       const allFullyConsumed: string[] = [];
       const allPartiallyConsumed: string[] = [];
-      for (const mat of materials) {
-        const consumeResult = await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
+      for (const mat of materialCosts) {
+        const consumeResult = await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.totalQuantity);
         allFullyConsumed.push(...consumeResult.fullyConsumedIds);
         allPartiallyConsumed.push(...consumeResult.partiallyConsumedIds);
       }
@@ -206,15 +335,19 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       }> = [];
 
       if (recipe.resultTemplate.stackable) {
-        const existing = await tx.item.findFirst({
-          where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
-          select: { id: true, quantity: true },
+        const existing = await findMatchingStack(tx.item, {
+          playerId,
+          templateId: recipe.resultTemplateId,
+          inStash: false,
+          rarity: 'common',
+          bonusStats: null,
+          craftMarks,
         });
 
         if (existing) {
           const updated = await tx.item.update({
             where: { id: existing.id },
-            data: { quantity: existing.quantity + quantity },
+            data: { quantity: existing.quantity + outputQuantity },
             select: { id: true },
           });
           updatedItemIds.push(updated.id);
@@ -224,9 +357,10 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
               ownerId: playerId,
               templateId: recipe.resultTemplateId,
               rarity: 'common',
-              quantity,
+              quantity: outputQuantity,
               maxDurability: craftedMax,
               currentDurability: craftedMax,
+              ...(craftMarks ? { craftMarks: craftMarks as Prisma.InputJsonValue } : {}),
             },
             select: { id: true },
           });
@@ -243,6 +377,8 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
               maxDurability: craftedMax,
               currentDurability: craftedMax,
               bonusStats: rolled.bonusStats,
+              // Launch marks do not multiply non-stackable outputs; output deltas are stackable-only.
+              ...(craftMarks ? { craftMarks: craftMarks as Prisma.InputJsonValue } : {}),
             },
             select: { id: true },
           });
@@ -256,6 +392,23 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
             });
           } else {
             itemDetails.push({ id: created.id, isCrit: false, rarity: rolled.rarity });
+          }
+        }
+      }
+
+      if (vocationId) {
+        await grantPassiveVocationXpTx({
+          tx,
+          playerId,
+          vocationId,
+          source: 'craft',
+          baseXp: recipe.xpReward * quantity,
+        });
+        await incrementVocationCounterTx(tx, playerId, `vocation_crafts_${vocationId}`, outputQuantity);
+        if (selectedTechnique) {
+          await incrementVocationCounterTx(tx, playerId, `vocation_technique_uses_${selectedTechnique.id}`, 1);
+          for (const mark of craftMarks ?? []) {
+            await incrementVocationCounterTx(tx, playerId, `vocation_mark_crafted_${mark.markId}`, outputQuantity);
           }
         }
       }
@@ -353,13 +506,14 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     const craftingBuffBadges: EventModifierBadge[] = [];
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
 
-    const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta, materialTotals] = await Promise.all([
+    const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta, materialTotals, vocationSnapshot] = await Promise.all([
       fetchItemDTOs(newItemIds),
       fetchItemDTOs([...partiallyConsumedIds, ...updatedItemIds]),
       fetchSkillDTOs(playerId),
       fetchCharacterProgression(playerId),
       fetchInventoryMeta(playerId),
       fetchMaterialTotals(playerId),
+      vocationId ? getVocationSnapshot(playerId) : Promise.resolve(null),
     ]);
 
     return routeJson({
@@ -386,6 +540,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
         }),
         skills,
         characterProgression,
+        ...(vocationSnapshot ? { vocations: vocationSnapshot } : {}),
       },
     });
 }

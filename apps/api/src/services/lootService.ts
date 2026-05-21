@@ -3,7 +3,7 @@ import { rollBonusStatsForRarity, rollDropRarity } from '@pocketrealm/game-engin
 import type { EquipmentSlot, ItemStats, ItemType, LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { cachedQuery } from './cacheService';
-import { getInventoryState } from './inventoryService';
+import { getInventoryState, getStackIdentityKey } from './inventoryService';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';
 import type { GrantedItemIds } from './stateUpdateHelpers';
 
@@ -59,10 +59,10 @@ export async function rollAndGrantLootWithCapacity(
   const existingStacks = stackableTemplateIds.length > 0
     ? await prisma.item.findMany({
         where: { ownerId: playerId, templateId: { in: stackableTemplateIds }, inStash: false },
-        select: { id: true, templateId: true, quantity: true },
+        select: { id: true, templateId: true, quantity: true, rarity: true, bonusStats: true, craftMarks: true },
       })
     : [];
-  const stackMap = new Map(existingStacks.map(s => [s.templateId, s]));
+  const stackMap = new Map(existingStacks.map((stack) => [getStackIdentityKey(stack), stack]));
 
   let slotsUsed = usedSlots;
   const drops: LootDrop[] = [];
@@ -83,7 +83,13 @@ export async function rollAndGrantLootWithCapacity(
     if (quantity <= 0) continue;
 
     if (entry.itemTemplate.stackable) {
-      const existingStack = stackMap.get(entry.itemTemplateId);
+      const stackKey = getStackIdentityKey({
+        templateId: entry.itemTemplateId,
+        rarity: 'common',
+        bonusStats: null,
+        craftMarks: null,
+      });
+      const existingStack = stackMap.get(stackKey);
       if (!existingStack && slotsUsed >= capacity) {
         overflow.push({
           templateId: entry.itemTemplateId,
@@ -108,7 +114,7 @@ export async function rollAndGrantLootWithCapacity(
           data: { ownerId: playerId, templateId: entry.itemTemplateId, quantity, rarity: 'common' },
           select: { id: true, templateId: true, quantity: true },
         });
-        stackMap.set(entry.itemTemplateId, newItem);
+        stackMap.set(stackKey, { ...newItem, rarity: 'common', bonusStats: null, craftMarks: null });
         slotsUsed++;
         newItemIds.push(newItem.id);
       }

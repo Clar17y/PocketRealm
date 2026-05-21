@@ -1,34 +1,64 @@
 import { prisma, Prisma } from '@pocketrealm/database';
 import { AppError } from '../middleware/errorHandler';
-import { getInventoryState } from './inventoryService';
+import { getInventoryState, getStackIdentityKey } from './inventoryService';
+
+type StackableMoveItem = {
+  id: string;
+  ownerId: string;
+  templateId: string;
+  rarity: string;
+  quantity: number;
+  bonusStats?: unknown;
+  craftMarks?: unknown;
+  template: { stackable: boolean };
+};
+
+export type StashMoveResult = {
+  itemId: string;
+  merged: boolean;
+};
+
+async function findMatchingTargetStack(
+  tx: Prisma.TransactionClient,
+  item: StackableMoveItem,
+  targetInStash: boolean,
+): Promise<{ id: string; quantity: number } | null> {
+  const targetKey = getStackIdentityKey(item);
+  const candidates = await tx.item.findMany({
+    where: { ownerId: item.ownerId, templateId: item.templateId, inStash: targetInStash },
+    select: { id: true, quantity: true, templateId: true, rarity: true, bonusStats: true, craftMarks: true },
+  });
+
+  return candidates.find((candidate) => getStackIdentityKey(candidate) === targetKey) ?? null;
+}
 
 // Shared logic for moving stackable items between backpack (inStash=false) and stash (inStash=true)
 async function moveStackableItem(
   tx: Prisma.TransactionClient,
-  item: { id: string; ownerId: string; templateId: string; rarity: string; quantity: number; template: { stackable: boolean } },
+  item: StackableMoveItem,
   moveQty: number,
-  targetInStash: boolean
-): Promise<void> {
+  targetInStash: boolean,
+  knownTarget?: { id: string; quantity: number } | null,
+): Promise<StashMoveResult> {
   if (!item.template.stackable) {
     await tx.item.update({ where: { id: item.id }, data: { inStash: targetInStash } });
-    return;
+    return { itemId: item.id, merged: false };
   }
 
   // Full stack move for stackable items: merge into existing target stack if one exists
   if (moveQty >= item.quantity) {
-    const existingTarget = await tx.item.findFirst({
-      where: { ownerId: item.ownerId, templateId: item.templateId, inStash: targetInStash },
-    });
+    const existingTarget = knownTarget ?? await findMatchingTargetStack(tx, item, targetInStash);
     if (existingTarget) {
       await tx.item.update({
         where: { id: existingTarget.id },
         data: { quantity: existingTarget.quantity + item.quantity },
       });
       await tx.item.delete({ where: { id: item.id } });
+      return { itemId: existingTarget.id, merged: true };
     } else {
       await tx.item.update({ where: { id: item.id }, data: { inStash: targetInStash } });
+      return { itemId: item.id, merged: false };
     }
-    return;
   }
 
   // Partial stack split: reduce source, merge into or create target
@@ -37,17 +67,16 @@ async function moveStackableItem(
     data: { quantity: item.quantity - moveQty },
   });
 
-  const existingTarget = await tx.item.findFirst({
-    where: { ownerId: item.ownerId, templateId: item.templateId, inStash: targetInStash },
-  });
+  const existingTarget = knownTarget ?? await findMatchingTargetStack(tx, item, targetInStash);
 
   if (existingTarget) {
     await tx.item.update({
       where: { id: existingTarget.id },
       data: { quantity: existingTarget.quantity + moveQty },
     });
+    return { itemId: existingTarget.id, merged: true };
   } else {
-    await tx.item.create({
+    const created = await tx.item.create({
       data: {
         ownerId: item.ownerId,
         templateId: item.templateId,
@@ -56,8 +85,12 @@ async function moveStackableItem(
         maxDurability: null,
         currentDurability: null,
         inStash: targetInStash,
+        ...(item.bonusStats ? { bonusStats: item.bonusStats as Prisma.InputJsonValue } : {}),
+        ...(item.craftMarks ? { craftMarks: item.craftMarks as Prisma.InputJsonValue } : {}),
       },
+      select: { id: true },
     });
+    return { itemId: created.id, merged: false };
   }
 }
 
@@ -88,15 +121,8 @@ export async function withdrawItem(
   playerId: string,
   itemId: string,
   quantity?: number
-): Promise<void> {
-  // Capacity check before transaction (low-concurrency single-player context)
-  const { usedSlots, capacity } = await getInventoryState(playerId);
-
-  if (usedSlots >= capacity) {
-    throw new AppError(400, 'Backpack is full', 'BACKPACK_FULL');
-  }
-
-  await prisma.$transaction(async (tx) => {
+): Promise<StashMoveResult> {
+  return prisma.$transaction(async (tx) => {
     const item = await tx.item.findUnique({
       where: { id: itemId },
       include: { template: true },
@@ -109,7 +135,17 @@ export async function withdrawItem(
       throw new AppError(400, 'Invalid quantity', 'INVALID_QUANTITY');
     }
 
-    await moveStackableItem(tx, item, withdrawQty, false);
+    const matchingTarget = item.template.stackable
+      ? await findMatchingTargetStack(tx, item, false)
+      : null;
+    if (!matchingTarget) {
+      const { usedSlots, capacity } = await getInventoryState(playerId);
+      if (usedSlots >= capacity) {
+        throw new AppError(400, 'Backpack is full', 'BACKPACK_FULL');
+      }
+    }
+
+    return moveStackableItem(tx, item, withdrawQty, false, matchingTarget);
   });
 }
 
@@ -142,7 +178,7 @@ export async function depositBatch(
 export async function withdrawBatch(
   playerId: string,
   itemIds: string[]
-): Promise<{ withdrawnCount: number }> {
+): Promise<{ withdrawnCount: number; addedItemIds: string[]; updatedItemIds: string[] }> {
   const uniqueIds = [...new Set(itemIds)];
   let { availableSlots } = await getInventoryState(playerId);
 
@@ -161,29 +197,41 @@ export async function withdrawBatch(
     const existingBackpackStacks = stackableTemplateIds.length > 0
       ? await tx.item.findMany({
           where: { ownerId: playerId, templateId: { in: stackableTemplateIds }, inStash: false },
-          select: { id: true, templateId: true },
+          select: { id: true, templateId: true, rarity: true, bonusStats: true, craftMarks: true },
         })
       : [];
-    const backpackStackSet = new Set(existingBackpackStacks.map((s) => s.templateId));
+    const backpackStackSet = new Set(existingBackpackStacks.map((stack) => getStackIdentityKey(stack)));
 
     let withdrawnCount = 0;
+    const addedItemIds: string[] = [];
+    const updatedItemIds: string[] = [];
     for (const itemId of uniqueIds) {
       const item = itemMap.get(itemId);
       if (!item || item.ownerId !== playerId) continue;
       if (!item.inStash) continue;
 
-      const willMerge = item.template.stackable && backpackStackSet.has(item.templateId);
+      const itemStackKey = getStackIdentityKey(item);
+      const willMerge = item.template.stackable && backpackStackSet.has(itemStackKey);
       if (!willMerge && availableSlots <= 0) break;
 
-      await moveStackableItem(tx, item, item.quantity, false);
+      const moveResult = await moveStackableItem(tx, item, item.quantity, false);
       withdrawnCount++;
+      if (moveResult.merged) {
+        updatedItemIds.push(moveResult.itemId);
+      } else {
+        addedItemIds.push(moveResult.itemId);
+      }
       if (!willMerge) {
         availableSlots--;
         // Track newly created backpack stack so subsequent same-template items merge correctly
-        if (item.template.stackable) backpackStackSet.add(item.templateId);
+        if (item.template.stackable) backpackStackSet.add(itemStackKey);
       }
     }
-    return { withdrawnCount };
+    return {
+      withdrawnCount,
+      addedItemIds: [...new Set(addedItemIds)],
+      updatedItemIds: [...new Set(updatedItemIds)],
+    };
   });
 }
 

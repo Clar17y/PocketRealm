@@ -428,32 +428,17 @@ inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
 
-  // Pre-fetch templateId to detect merges after withdrawal
-  const sourceItem = await prisma.item.findUnique({
-    where: { id: body.itemId },
-    select: { templateId: true },
-  });
-  if (!sourceItem) throw new AppError(404, 'Item not found', 'NOT_FOUND');
-
-  await withdrawItem(playerId, body.itemId, body.quantity);
-
-  // After withdrawal, find the resulting backpack item (may differ from body.itemId if merged)
-  const backpackItem = await prisma.item.findFirst({
-    where: { ownerId: playerId, templateId: sourceItem.templateId, inStash: false },
-    select: { id: true },
-  });
-  const resultItemId = backpackItem?.id ?? body.itemId;
-  const wasMerge = resultItemId !== body.itemId;
+  const withdrawResult = await withdrawItem(playerId, body.itemId, body.quantity);
 
   const [itemDTOs, inventoryMeta, materialTotals] = await Promise.all([
-    fetchItemDTOs([resultItemId]),
+    fetchItemDTOs([withdrawResult.itemId]),
     fetchInventoryMeta(playerId),
     fetchMaterialTotals(playerId),
   ]);
   res.json({
     success: true,
     stateUpdates: {
-      ...(wasMerge
+      ...(withdrawResult.merged
         ? { inventoryUpdated: itemDTOs }
         : { inventoryAdded: itemDTOs }),
       inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
@@ -467,15 +452,17 @@ inventoryRouter.post('/stash/withdraw/batch', asyncHandler(async (req, res) => {
   const body = stashBatchSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await withdrawBatch(playerId, body.itemIds);
-  const [itemDTOs, inventoryMeta, materialTotals] = await Promise.all([
-    fetchItemDTOs(body.itemIds),
+  const [addedDTOs, updatedDTOs, inventoryMeta, materialTotals] = await Promise.all([
+    result.addedItemIds.length > 0 ? fetchItemDTOs(result.addedItemIds) : Promise.resolve([]),
+    result.updatedItemIds.length > 0 ? fetchItemDTOs(result.updatedItemIds) : Promise.resolve([]),
     fetchInventoryMeta(playerId),
     fetchMaterialTotals(playerId),
   ]);
   res.json({
-    ...result,
+    withdrawnCount: result.withdrawnCount,
     stateUpdates: {
-      inventoryAdded: itemDTOs,
+      ...(addedDTOs.length > 0 ? { inventoryAdded: addedDTOs } : {}),
+      ...(updatedDTOs.length > 0 ? { inventoryUpdated: updatedDTOs } : {}),
       inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
       materialTotals,
     },

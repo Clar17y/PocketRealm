@@ -17,6 +17,70 @@ interface InventoryClient {
   };
 }
 
+export interface StackIdentityInput {
+  templateId: string;
+  rarity?: string | null;
+  bonusStats?: unknown;
+  craftMarks?: unknown;
+}
+
+type CanonicalJson =
+  | null
+  | string
+  | number
+  | boolean
+  | CanonicalJson[]
+  | { [key: string]: CanonicalJson };
+
+export function getStackIdentityKey(input: StackIdentityInput): string {
+  return JSON.stringify({
+    templateId: input.templateId,
+    rarity: input.rarity ?? 'common',
+    bonusStats: canonicalizeJson(input.bonusStats),
+    craftMarks: canonicalizeCraftMarks(input.craftMarks),
+  });
+}
+
+function canonicalizeJson(value: unknown): CanonicalJson {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) return value.map(canonicalizeJson);
+  if (typeof value !== 'object') return null;
+
+  const output: { [key: string]: CanonicalJson } = {};
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    output[key] = canonicalizeJson((value as Record<string, unknown>)[key]);
+  }
+  return output;
+}
+
+function canonicalizeCraftMarks(value: unknown): CanonicalJson {
+  if (!Array.isArray(value) || value.length === 0) return null;
+
+  const marks = value
+    .filter((mark): mark is Record<string, unknown> => mark !== null && typeof mark === 'object' && !Array.isArray(mark))
+    .map((mark) => ({
+      markId: canonicalizeJson(mark.markId),
+      name: canonicalizeJson(mark.name),
+      sourceTechniqueId: canonicalizeJson(mark.sourceTechniqueId),
+      description: canonicalizeJson(mark.description),
+      itemStatBenefits: canonicalizeJson(mark.itemStatBenefits),
+      itemStatDrawbacks: canonicalizeJson(mark.itemStatDrawbacks),
+      actionModifiers: canonicalizeJson(mark.actionModifiers),
+    }))
+    .sort((left, right) => {
+      const leftMark = typeof left.markId === 'string' ? left.markId : '';
+      const rightMark = typeof right.markId === 'string' ? right.markId : '';
+      if (leftMark !== rightMark) return leftMark.localeCompare(rightMark);
+      const leftTechnique = typeof left.sourceTechniqueId === 'string' ? left.sourceTechniqueId : '';
+      const rightTechnique = typeof right.sourceTechniqueId === 'string' ? right.sourceTechniqueId : '';
+      return leftTechnique.localeCompare(rightTechnique);
+    });
+
+  return marks.length > 0 ? marks : null;
+}
+
 async function addStackableItemWithClient(
   client: InventoryClient,
   playerId: string,
@@ -40,10 +104,19 @@ async function addStackableItemWithClient(
     throw new AppError(400, 'Template is not stackable', 'NOT_STACKABLE');
   }
 
-  const existing = await client.item.findFirst({
+  const candidates = await client.item.findMany({
     where: { ownerId: playerId, templateId: itemTemplateId, inStash },
-    select: { id: true, quantity: true },
+    select: { id: true, quantity: true, rarity: true, bonusStats: true, craftMarks: true },
   });
+  const stackKey = getStackIdentityKey({ templateId: itemTemplateId, rarity: 'common', bonusStats: null, craftMarks: null });
+  const existing = candidates.find((candidate) => (
+    getStackIdentityKey({
+      templateId: itemTemplateId,
+      rarity: candidate.rarity,
+      bonusStats: candidate.bonusStats,
+      craftMarks: candidate.craftMarks,
+    }) === stackKey
+  ));
 
   if (existing) {
     const updated = await client.item.update({
@@ -194,15 +267,16 @@ export async function getUsedSlots(playerId: string): Promise<number> {
       inStash: false,
       equipment: { none: {} },
     },
-    select: { templateId: true, template: { select: { stackable: true } } },
+    select: { templateId: true, rarity: true, bonusStats: true, craftMarks: true, template: { select: { stackable: true } } },
   });
 
-  const stackableTemplates = new Set<string>();
+  const stackableKeys = new Set<string>();
   let count = 0;
   for (const item of items) {
     if (item.template.stackable) {
-      if (!stackableTemplates.has(item.templateId)) {
-        stackableTemplates.add(item.templateId);
+      const stackKey = getStackIdentityKey(item);
+      if (!stackableKeys.has(stackKey)) {
+        stackableKeys.add(stackKey);
         count++;
       }
     } else {

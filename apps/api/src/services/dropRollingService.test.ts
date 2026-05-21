@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock inventoryService before importing the module under test
-vi.mock('./inventoryService', () => ({
-  addStackableItemTx: vi.fn().mockResolvedValue({ itemId: 'stack-1', quantity: 1 }),
-}));
+vi.mock('./inventoryService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./inventoryService')>();
+  return {
+    ...actual,
+    addStackableItemTx: vi.fn().mockResolvedValue({ itemId: 'stack-1', quantity: 1 }),
+  };
+});
 
 // Mock pickWeighted so we can control which drop entry is selected
 vi.mock('../utils/pickWeighted.js', () => ({
@@ -348,7 +352,7 @@ describe('rollAndGrantDropsTx', () => {
       mockedRandomInt.mockReturnValue(1);
       const tx = makeTx({
         item: {
-          findMany: vi.fn().mockResolvedValue([{ templateId: 'mat-1' }]),
+          findMany: vi.fn().mockResolvedValue([{ templateId: 'mat-1', rarity: 'common', bonusStats: null, craftMarks: null }]),
           create: vi.fn(),
         },
         itemTemplate: { findMany: vi.fn().mockResolvedValue([{ id: 'mat-1', name: 'Iron Ore' }]) },
@@ -357,6 +361,33 @@ describe('rollAndGrantDropsTx', () => {
       const result = await rollAndGrantDropsTx(tx, 'p1', [stackableEntry], 1, 'common', 5);
 
       expect(result.slotsConsumed).toBe(0);
+    });
+
+    it('overflows stackable drops when only a marked same-template stack exists and no slots remain', async () => {
+      mockedPickWeighted.mockReturnValue(stackableEntry);
+      mockedRandomInt.mockReturnValue(1);
+      const tx = makeTx({
+        item: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              templateId: 'mat-1',
+              rarity: 'common',
+              bonusStats: null,
+              craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+            },
+          ]),
+          create: vi.fn(),
+        },
+        itemTemplate: { findMany: vi.fn().mockResolvedValue([{ id: 'mat-1', name: 'Iron Ore' }]) },
+      });
+
+      const result = await rollAndGrantDropsTx(tx, 'p1', [stackableEntry], 1, 'common', 0);
+
+      expect(result.loot).toEqual([]);
+      expect(result.overflow).toEqual([
+        expect.objectContaining({ templateId: 'mat-1', quantity: 1, rarity: 'common' }),
+      ]);
+      expect(mockedAddStackable).not.toHaveBeenCalled();
     });
 
     it('does not consume an extra slot when same stackable is rolled twice', async () => {
