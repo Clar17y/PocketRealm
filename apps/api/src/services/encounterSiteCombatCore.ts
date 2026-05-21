@@ -345,16 +345,25 @@ export function resolveEncounterRoomCombat(
 }
 
 /** Count player and mob hits from encounter site round logs for durability degradation. */
-export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): { playerHitsLanded: number; mobHitsLanded: number } {
+export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): {
+  playerHitsLanded: number;
+  mobHitsLanded: number;
+  playerWeaponActionIds: string[];
+} {
   let playerHitsLanded = 0;
   let mobHitsLanded = 0;
+  const playerWeaponActionIds: string[] = [];
   for (const log of roundLogs) {
     for (const action of log.phases.playerAttacks) {
       if ('hit' in action && action.hit) {
         playerHitsLanded++;
+        playerWeaponActionIds.push(action.actionId);
         if ('splashCascade' in action && action.splashCascade) {
           for (const splash of action.splashCascade) {
-            if (splash.hit) playerHitsLanded++;
+            if (splash.hit) {
+              playerHitsLanded++;
+              playerWeaponActionIds.push(action.actionId);
+            }
           }
         }
       }
@@ -365,7 +374,7 @@ export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): { playe
       }
     }
   }
-  return { playerHitsLanded, mobHitsLanded };
+  return { playerHitsLanded, mobHitsLanded, playerWeaponActionIds };
 }
 
 // ---------------------------------------------------------------------------

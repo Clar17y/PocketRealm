@@ -243,6 +243,7 @@ function createGameControllerState() {
     isOffline: false,
     loadAchievements: vi.fn(),
     loadQuests: vi.fn(),
+    handleLoadVocations: vi.fn(),
     loadAll: loadAllMock,
   };
 }

@@ -9,6 +9,11 @@ vi.mock('../services/vocationService', () => ({
   respecVocation: vi.fn(),
 }));
 
+vi.mock('../services/achievementService', () => ({
+  checkAchievements: vi.fn().mockResolvedValue([]),
+  emitAchievementNotifications: vi.fn(),
+}));
+
 import { mockPrisma } from '../__test__/setup';
 import { AppError, errorHandler } from '../middleware/errorHandler';
 import { generateAccessToken } from '../middleware/auth';
@@ -20,6 +25,7 @@ import {
   type VocationActionResult,
   type VocationSnapshotResponse,
 } from '../services/vocationService';
+import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { vocationsRouter } from './vocations';
 
 const PLAYER_ID = 'player-1';
@@ -76,6 +82,7 @@ describe('vocations router', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.player.update.mockResolvedValue({});
+    vi.mocked(checkAchievements).mockResolvedValue([]);
   });
 
   it('requires authentication', async () => {
@@ -112,6 +119,37 @@ describe('vocations router', () => {
       vocationId: 'prospector',
       turns: 3,
     });
+    expect(checkAchievements).toHaveBeenCalledWith(PLAYER_ID, {
+      statKeys: expect.arrayContaining([
+        'totalVocationHonedTurns',
+        'vocationHonedTurns_prospector',
+        'highestVocationRank',
+        'vocationRank5Count',
+        'vocationRank10Count',
+      ]),
+    });
+  });
+
+  it('emits vocation achievement notifications after honing unlocks one', async () => {
+    vi.mocked(honeVocation).mockResolvedValue(actionResult);
+    const achievement = {
+      id: 'vocation_honing_1200',
+      category: 'skills',
+      title: 'Bench Time',
+      description: 'Spend time honing.',
+      threshold: 1200,
+      tier: 1,
+      statKey: 'totalVocationHonedTurns',
+    } as const;
+    vi.mocked(checkAchievements).mockResolvedValue([achievement]);
+
+    const res = await request(buildApp())
+      .post('/api/v1/vocations/hone')
+      .set(authHeader())
+      .send({ vocationId: 'prospector', turns: 3 });
+
+    expect(res.status).toBe(200);
+    expect(emitAchievementNotifications).toHaveBeenCalledWith(PLAYER_ID, [achievement]);
   });
 
   it.each([0, 101])('rejects invalid hone turns %s without delegating', async (turns) => {
@@ -148,6 +186,12 @@ describe('vocations router', () => {
       playerId: PLAYER_ID,
       vocationId: 'prospector',
       techniqueId: 'prospector_clean_split',
+    });
+    expect(checkAchievements).toHaveBeenCalledWith(PLAYER_ID, {
+      statKeys: expect.arrayContaining([
+        'totalVocationTechniquesLearned',
+        'vocationTechniqueVocationCount',
+      ]),
     });
   });
 

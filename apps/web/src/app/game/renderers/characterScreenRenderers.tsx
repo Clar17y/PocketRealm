@@ -7,6 +7,7 @@ import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
 import { Equipment } from '@/components/screens/Equipment';
 import { Inventory } from '@/components/screens/Inventory';
 import { Skills } from '@/components/screens/Skills';
+import { Vocations } from '@/components/screens/Vocations';
 import { TalentTree } from '@/components/screens/TalentTree';
 import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { itemImageSrc, skillIconSrc } from '@/lib/assets';
@@ -57,6 +58,7 @@ export function InventoryScreenRenderer({
           durability,
           baseStats: item.template.baseStats,
           bonusStats: item.bonusStats ?? null,
+          craftMarks: item.craftMarks ?? null,
           requiredSkill: item.template.requiredSkill ?? null,
           requiredLevel: item.template.requiredLevel ?? 1,
           salvageCost,
@@ -184,6 +186,21 @@ export function SkillsScreenRenderer({ gc }: { gc: GameControllerState }) {
           xpRate: number;
           color: string;
         }>}
+    />
+  );
+}
+
+export function VocationsScreenRenderer({ gc }: { gc: GameControllerState }) {
+  return (
+    <Vocations
+      snapshot={gc.vocationState}
+      availableTurns={gc.turns}
+      currentZoneName={gc.currentZone?.name ?? null}
+      currentZoneType={gc.currentZone?.zoneType ?? null}
+      busyAction={gc.busyAction}
+      onHone={gc.handleHoneVocation}
+      onLearnTechnique={gc.handleLearnVocationTechnique}
+      onRespec={gc.handleRespecVocation}
     />
   );
 }

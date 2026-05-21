@@ -1,3 +1,5 @@
+import type { CraftMarks } from '@pocketrealm/shared';
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -14,6 +16,7 @@ export interface InventoryItem {
   durability?: { current: number; max: number } | null;
   baseStats?: Record<string, unknown>;
   bonusStats?: Record<string, unknown> | null;
+  craftMarks?: CraftMarks | null;
   requiredSkill?: string | null;
   requiredLevel?: number | null;
   salvageCost: number | null;
@@ -28,6 +31,7 @@ export interface InventoryStashItem {
   rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   type: string;
   durability?: { current: number; max: number } | null;
+  craftMarks?: CraftMarks | null;
   sellPrice: number | null;
   salvageCost: number | null;
 }

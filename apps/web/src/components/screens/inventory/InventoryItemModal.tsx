@@ -1,5 +1,12 @@
 import { Coins, X } from 'lucide-react';
-import { repairTurnCost } from '@pocketrealm/shared';
+import {
+  parseCraftMarks,
+  repairTurnCost,
+  type CraftMark,
+  type EquipmentActionModifier,
+  type EquipmentActionModifierEntry,
+  type ItemStatModifier,
+} from '@pocketrealm/shared';
 import { PixelButton } from '@/components/PixelButton';
 import { PixelCard } from '@/components/PixelCard';
 import { StatBar } from '@/components/StatBar';
@@ -50,6 +57,74 @@ function getItemBorderColor(rarity: InventoryItem['rarity']) {
   }
 }
 
+function formatMarkValue(value: number, isPercent: boolean) {
+  const absolute = Math.abs(value);
+  const formatted = isPercent ? `${Math.round(absolute * 100)}%` : absolute.toLocaleString();
+  if (value > 0) return `+${formatted}`;
+  if (value < 0) return `-${formatted}`;
+  return formatted;
+}
+
+function markStatLine(entry: ItemStatModifier, tone: 'benefit' | 'drawback') {
+  const { icon: Icon, cssClass, label } = statDisplayMeta(entry.stat);
+  const valueClass = tone === 'drawback' ? 'text-[var(--rpg-red)]' : signedClass(entry.value, cssClass);
+  return (
+    <div key={`${tone}-${entry.stat}-${entry.value}`} className="flex items-center gap-2 text-sm">
+      <Icon size={15} className={cssClass} />
+      <span className="text-[var(--rpg-text-secondary)]">{label}</span>
+      <span className={`ml-auto font-pixel text-[11px] ${valueClass}`}>
+        {formatMarkValue(entry.value, entry.isPercent)}
+      </span>
+    </div>
+  );
+}
+
+function actionTargetLabel(modifier: EquipmentActionModifier) {
+  const targets = modifier.actionIds?.length ? modifier.actionIds : modifier.actionTypes;
+  return targets.map(titleCaseFromSnake).join(', ');
+}
+
+function actionModifierLine(
+  modifier: EquipmentActionModifier,
+  entry: EquipmentActionModifierEntry,
+  tone: 'benefit' | 'drawback',
+) {
+  const valueClass = tone === 'drawback' ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-green-light)]';
+  return (
+    <div key={`${modifier.modifierId}-${tone}-${entry.stat}-${entry.value}`} className="flex items-center gap-2 text-sm">
+      <span className="text-[var(--rpg-text-secondary)]">{actionTargetLabel(modifier)}</span>
+      <span className="text-[var(--rpg-text-secondary)]">{titleCaseFromSnake(entry.stat)}</span>
+      <span className={`ml-auto font-pixel text-[11px] ${valueClass}`}>
+        {formatMarkValue(entry.value, entry.isPercent)}
+      </span>
+    </div>
+  );
+}
+
+function CraftMarkDetails({ marks }: { marks: CraftMark[] }) {
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-semibold text-[var(--rpg-gold)]">Craft Marks</div>
+      {marks.map((mark) => (
+        <div key={mark.markId} className="rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-background)] p-3 space-y-2">
+          <div>
+            <div className="text-sm font-semibold text-[var(--rpg-text-primary)]">{mark.name}</div>
+            <div className="text-xs text-[var(--rpg-text-secondary)] mt-0.5">{mark.description}</div>
+          </div>
+          <div className="space-y-1">
+            {(mark.itemStatBenefits ?? []).map((entry) => markStatLine(entry, 'benefit'))}
+            {(mark.itemStatDrawbacks ?? []).map((entry) => markStatLine(entry, 'drawback'))}
+            {(mark.actionModifiers ?? []).flatMap((modifier) => [
+              ...modifier.benefits.map((entry) => actionModifierLine(modifier, entry, 'benefit')),
+              ...modifier.drawbacks.map((entry) => actionModifierLine(modifier, entry, 'drawback')),
+            ])}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function InventoryItemModal({
   item,
   busy,
@@ -76,6 +151,8 @@ export function InventoryItemModal({
   const isBackpack = item.slot === 'backpack';
   const hasAnyStats = baseEntries.length > 0 || (typeof inventorySlots === 'number' && inventorySlots !== 0);
   const hasAnyBonusStats = bonusEntries.length > 0;
+  const craftMarks = parseCraftMarks(item.craftMarks);
+  const hasCraftMarks = craftMarks.length > 0;
   const isEquipment = item.type === 'weapon' || item.type === 'armor';
   const isConsumable = item.type === 'consumable';
   const isEquippable = Boolean(item.slot && isEquipment);
@@ -150,7 +227,7 @@ export function InventoryItemModal({
           item.description !== item.type ? 'italic' : ''
         }`}>{item.description}</p>
 
-        {(item.durability || hasAnyStats || hasAnyBonusStats || item.requiredSkill || (item.type === 'armor' && (item.requiredLevel ?? 0) > 0)) && (
+        {(item.durability || hasAnyStats || hasAnyBonusStats || hasCraftMarks || item.requiredSkill || (item.type === 'armor' && (item.requiredLevel ?? 0) > 0)) && (
           <div className="space-y-3 mb-4">
             {item.durability && item.durability.max > 0 && (
               <div>
@@ -230,6 +307,10 @@ export function InventoryItemModal({
                   })}
                 </div>
               </div>
+            )}
+
+            {hasCraftMarks && (
+              <CraftMarkDetails marks={craftMarks} />
             )}
 
             {item.requiredSkill ? (

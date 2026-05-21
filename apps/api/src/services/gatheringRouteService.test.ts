@@ -9,7 +9,7 @@ import { applyGuildTaxTx, getPlayerTaxRateTx } from './guildTaxService';
 import { grantSkillXp } from './xpService';
 import { grantPassiveVocationXpTx, getVocationSnapshot } from './vocationService';
 import { rollGemCritBatch } from '@pocketrealm/game-engine';
-import { buildPagination } from '../utils/routeHelpers.js';
+import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
 
 vi.mock('./activityLogService', () => ({
   createActivityLog: vi.fn().mockResolvedValue({ id: 'log-1' }),
@@ -348,6 +348,19 @@ describe('mineResourceNode vocation technique integration', () => {
       results: { actions: 1, totalYield: 1 },
       stateUpdates: { vocations: { playerId: PLAYER_ID } },
     });
+    expect(trackAchievements).toHaveBeenCalledWith(
+      PLAYER_ID,
+      expect.objectContaining({ totalGatheringActions: 1, totalTurnsSpent: 30 }),
+      {
+        statKeys: expect.arrayContaining([
+          'totalVocationGathers',
+          'vocationGathers_prospector',
+          'highestVocationRank',
+          'vocationRank5Count',
+          'vocationRank10Count',
+        ]),
+      },
+    );
   });
 
   it('applies a selected learned gathering technique to turn cost before spending turns', async () => {
@@ -479,6 +492,13 @@ describe('mineResourceNode vocation technique integration', () => {
     expect(result.body).toMatchObject({
       gemCrit: { itemTemplateId: GEM_TEMPLATE_ID, gemsFound: 1, critChance: 0.07 },
     });
+    expect(trackAchievements).toHaveBeenCalledWith(
+      PLAYER_ID,
+      expect.any(Object),
+      {
+        statKeys: expect.arrayContaining(['totalVocationGatherCrits']),
+      },
+    );
     expect(mockPrisma.playerVocationCounter.upsert).toHaveBeenCalledWith({
       where: { playerId_statKey: { playerId: PLAYER_ID, statKey: 'vocation_gather_crits_prospector_bright_inclusion_gem_crit' } },
       create: { playerId: PLAYER_ID, statKey: 'vocation_gather_crits_prospector_bright_inclusion_gem_crit', value: 1 },

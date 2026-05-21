@@ -35,6 +35,7 @@ describe('countEncounterSiteHits', () => {
     });
     const result = countEncounterSiteHits([log]);
     expect(result.playerHitsLanded).toBe(1);
+    expect(result.playerWeaponActionIds).toEqual(['a']);
   });
 
   it('counts splash cascade hits', () => {
@@ -55,6 +56,7 @@ describe('countEncounterSiteHits', () => {
     const result = countEncounterSiteHits([log]);
     // 1 primary hit + 1 splash hit (second splash missed)
     expect(result.playerHitsLanded).toBe(2);
+    expect(result.playerWeaponActionIds).toEqual(['a', 'a']);
   });
 
   it('counts mob hits (non-dodged targets with damage)', () => {

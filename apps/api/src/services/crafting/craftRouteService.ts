@@ -461,6 +461,19 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     if (craftCounters.totalLegendariesCrafted) craftAchKeys.push('totalLegendariesCrafted');
     if (xpGrant.newLevel) craftAchKeys.push('highestSkillLevel');
     if (xpGrant.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) craftAchKeys.push('highestCharacterLevel');
+    if (vocationId) {
+      craftAchKeys.push(
+        'totalVocationCrafts',
+        `vocationCrafts_${vocationId}`,
+        'highestVocationRank',
+        'vocationRank5Count',
+        'vocationRank10Count',
+        'vocationRank20Count',
+      );
+      if (craftMarks && craftMarks.length > 0) {
+        craftAchKeys.push('totalVocationCraftMarks', 'distinctVocationCraftMarks');
+      }
+    }
     await trackAchievements(playerId, craftCounters, { statKeys: craftAchKeys });
 
     const log = await createActivityLog({

@@ -175,6 +175,10 @@ export default function GamePage() {
   }, [activeScreen, gc.loadQuests]);
 
   useEffect(() => {
+    if (activeScreen === 'vocations') void gc.handleLoadVocations();
+  }, [activeScreen, gc.handleLoadVocations]);
+
+  useEffect(() => {
     if (activeScreen === 'casino') {
       chat.joinCasino();
       return () => chat.leaveCasino();
@@ -443,6 +447,7 @@ export default function GamePage() {
               { id: 'inventory', label: 'Items' },
               { id: 'equipment', label: 'Equipment' },
               { id: 'skills', label: 'Skills' },
+              { id: 'vocations', label: 'Vocations' },
             ]}
             activeId={activeScreen}
             onSelect={(id) => setActiveScreen(id as Screen)}

@@ -7,6 +7,7 @@ import { getTotalQuantityByTemplate, getInventoryState, consumeItemsByTemplateTx
 import { spendWithTaxTx } from '../guildTaxService';
 import { grantSkillXp } from '../xpService';
 import { grantPassiveVocationXpTx, getVocationSnapshot } from '../vocationService';
+import { trackAchievements } from '../../utils/routeHelpers.js';
 
 vi.mock('../../logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
@@ -249,6 +250,19 @@ describe('craftItem vocation integration', () => {
       create: { playerId: PLAYER_ID, statKey: 'vocation_crafts_weaponsmith', value: 1 },
       update: { value: { increment: 1 } },
     });
+    expect(trackAchievements).toHaveBeenCalledWith(
+      PLAYER_ID,
+      expect.objectContaining({ totalTurnsSpent: 5 }),
+      {
+        statKeys: expect.arrayContaining([
+          'totalVocationCrafts',
+          'vocationCrafts_weaponsmith',
+          'highestVocationRank',
+          'vocationRank5Count',
+          'vocationRank10Count',
+        ]),
+      },
+    );
   });
 
   it('crafts normally without vocation XP or technique effects when no vocation resolves', async () => {
@@ -292,7 +306,7 @@ describe('craftItem vocation integration', () => {
         sourceTechniqueId: 'weaponsmith_blood_groove',
         itemStatBenefits: [{ stat: 'attack', value: 0.05, isPercent: true }],
         itemStatDrawbacks: [{ stat: 'critDamage', value: -0.02, isPercent: true }],
-        actionModifiers: [],
+        actionModifiers: expect.any(Array),
       }),
     ]);
     expect(mockPrisma.playerVocationCounter.upsert).toHaveBeenCalledWith({
@@ -310,6 +324,16 @@ describe('craftItem vocation integration', () => {
       create: { playerId: PLAYER_ID, statKey: 'vocation_mark_crafted_weaponsmith_blood_groove_blood_groove_mark', value: 1 },
       update: { value: { increment: 1 } },
     });
+    expect(trackAchievements).toHaveBeenCalledWith(
+      PLAYER_ID,
+      expect.objectContaining({ totalTurnsSpent: 5 }),
+      {
+        statKeys: expect.arrayContaining([
+          'totalVocationCraftMarks',
+          'distinctVocationCraftMarks',
+        ]),
+      },
+    );
   });
 
   it('rejects an unlearned or ineligible technique', async () => {

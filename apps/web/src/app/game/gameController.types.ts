@@ -10,6 +10,7 @@ export type Screen =
   | 'combat'
   | 'settings'
   | 'skills'
+  | 'vocations'
   | 'equipment'
   | 'zones'
   | 'bestiary'

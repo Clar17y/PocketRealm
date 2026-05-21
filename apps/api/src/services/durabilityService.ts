@@ -20,11 +20,24 @@ type CombatHitEntry = Pick<CombatLogEntry, 'actor' | 'damage' | 'evaded'> & {
   combatantBAction?: string;
 };
 
+type WeaponActionId = string | null;
+
 interface DurabilityHitCounts {
   playerHitsLanded: number;
   mobHitsLanded: number;
-  playerWeaponActionIds: string[];
-  mobWeaponActionIds: string[];
+  playerWeaponActionIds: WeaponActionId[];
+  mobWeaponActionIds: WeaponActionId[];
+}
+
+export interface DurabilityEquipmentSnapshotItem {
+  itemId: string;
+  slot: string;
+  itemName: string;
+  itemType: string;
+  currentDurability: number | null;
+  maxDurability: number | null;
+  templateMaxDurability: number;
+  craftMarks: unknown;
 }
 
 /** Count hits that landed from a combat log for durability degradation. */
@@ -70,46 +83,44 @@ export async function degradeEquippedDurabilityByHits(
   playerHitsLanded: number,
   mobHitsLanded: number,
   degradationMultiplier: number = 1,
-  options: { weaponActionIds?: readonly string[] } = {},
+  options: {
+    weaponActionIds?: readonly WeaponActionId[];
+    equipmentSnapshot?: readonly DurabilityEquipmentSnapshotItem[];
+  } = {},
 ): Promise<DurabilityLoss[]> {
-  const weaponDegradation = round2(playerHitsLanded * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
+  const weaponBaseDegradation = DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier;
+  const weaponActionIds = normalizeWeaponActionIds(playerHitsLanded, options.weaponActionIds);
+  const weaponDegradation = round2(playerHitsLanded * weaponBaseDegradation);
   const armorDegradation = round2(mobHitsLanded * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
 
   if (weaponDegradation <= 0 && armorDegradation <= 0) return [];
 
-  const equipped = await prisma.playerEquipment.findMany({
-    where: { playerId, itemId: { not: null } },
-    include: {
-      item: { include: { template: true } },
-    },
-  });
+  const equipped = options.equipmentSnapshot ?? await getEquippedDurabilitySnapshot(playerId);
 
   const losses: DurabilityLoss[] = [];
-  const uniqueItems = new Map<string, { item: NonNullable<(typeof equipped)[number]['item']>; slot: string }>();
-  for (const eq of equipped) {
-    if (eq.item) uniqueItems.set(eq.item.id, { item: eq.item, slot: eq.slot });
+  const uniqueItems = new Map<string, DurabilityEquipmentSnapshotItem>();
+  for (const item of equipped) {
+    uniqueItems.set(item.itemId, item);
   }
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     for (const equippedItem of uniqueItems.values()) {
-      const { item, slot } = equippedItem;
-      const template = item.template;
-      const isWeapon = template.itemType === 'weapon';
-      const isArmor = template.itemType === 'armor';
+      const isWeapon = equippedItem.itemType === 'weapon';
+      const isArmor = equippedItem.itemType === 'armor';
       if (!isWeapon && !isArmor) continue;
 
       const amount = isWeapon
-        ? round2(weaponDegradation * getWeaponWearMultiplier(item, slot, options.weaponActionIds))
+        ? calculateWeaponWearAmount(equippedItem, weaponBaseDegradation, weaponActionIds)
         : armorDegradation;
       if (amount <= 0) continue;
 
-      const maxDurability = item.maxDurability ?? template.maxDurability;
-      const currentDurability = item.currentDurability ?? maxDurability;
+      const maxDurability = equippedItem.maxDurability ?? equippedItem.templateMaxDurability;
+      const currentDurability = equippedItem.currentDurability ?? maxDurability;
 
       // Normalize persisted values if missing
-      if (item.maxDurability === null || item.currentDurability === null) {
+      if (equippedItem.maxDurability === null || equippedItem.currentDurability === null) {
         await tx.item.update({
-          where: { id: item.id },
+          where: { id: equippedItem.itemId },
           data: {
             maxDurability,
             currentDurability,
@@ -128,9 +139,9 @@ export async function degradeEquippedDurabilityByHits(
         newCurrent <= warningThreshold;
 
       losses.push({
-        itemId: item.id,
+        itemId: equippedItem.itemId,
         amount: round2(amount),
-        itemName: template.name,
+        itemName: equippedItem.itemName,
         newDurability: newCurrent,
         maxDurability,
         isBroken: nowBroken && !wasBroken,
@@ -140,7 +151,7 @@ export async function degradeEquippedDurabilityByHits(
       if (newCurrent === currentDurability) continue;
 
       await tx.item.update({
-        where: { id: item.id },
+        where: { id: equippedItem.itemId },
         data: { currentDurability: newCurrent },
       });
     }
@@ -151,53 +162,88 @@ export async function degradeEquippedDurabilityByHits(
   return losses;
 }
 
+export async function getEquippedDurabilitySnapshot(playerId: string): Promise<DurabilityEquipmentSnapshotItem[]> {
+  const equipped = await prisma.playerEquipment.findMany({
+    where: { playerId, itemId: { not: null } },
+    include: {
+      item: { include: { template: true } },
+    },
+  });
+
+  return equipped.flatMap((entry): DurabilityEquipmentSnapshotItem[] => {
+    if (!entry.item) return [];
+    return [{
+      itemId: entry.item.id,
+      slot: entry.slot,
+      itemName: entry.item.template.name,
+      itemType: entry.item.template.itemType,
+      currentDurability: entry.item.currentDurability,
+      maxDurability: entry.item.maxDurability,
+      templateMaxDurability: entry.item.template.maxDurability,
+      craftMarks: entry.item.craftMarks,
+    }];
+  });
+}
+
 function countCombatWear(log: CombatHitEntry[]): DurabilityHitCounts {
   let playerHitsLanded = 0;
   let mobHitsLanded = 0;
-  const playerWeaponActionIds: string[] = [];
-  const mobWeaponActionIds: string[] = [];
+  const playerWeaponActionIds: WeaponActionId[] = [];
+  const mobWeaponActionIds: WeaponActionId[] = [];
 
   for (const entry of log) {
     if (entry.evaded || entry.damage === undefined) continue;
 
     if (entry.actor === 'combatantA') {
       playerHitsLanded++;
-      if (entry.combatantAAction) playerWeaponActionIds.push(entry.combatantAAction);
+      playerWeaponActionIds.push(entry.combatantAAction ?? null);
     } else if (entry.actor === 'combatantB') {
       mobHitsLanded++;
-      if (entry.combatantBAction) mobWeaponActionIds.push(entry.combatantBAction);
+      mobWeaponActionIds.push(entry.combatantBAction ?? null);
     }
   }
 
   return { playerHitsLanded, mobHitsLanded, playerWeaponActionIds, mobWeaponActionIds };
 }
 
-function getWeaponWearMultiplier(
-  item: { craftMarks?: unknown },
-  slot: string,
-  actionIds: readonly string[] | undefined,
+function normalizeWeaponActionIds(
+  hitCount: number,
+  actionIds: readonly WeaponActionId[] | undefined,
+): WeaponActionId[] {
+  return Array.from({ length: Math.max(0, hitCount) }, (_entry, index) => actionIds?.[index] ?? null);
+}
+
+function calculateWeaponWearAmount(
+  item: DurabilityEquipmentSnapshotItem,
+  baseDegradation: number,
+  actionIds: readonly WeaponActionId[],
 ): number {
-  if (!actionIds || actionIds.length === 0) return 1;
+  if (actionIds.length === 0 || baseDegradation <= 0) return 0;
 
   const modifiers = getEquipmentActionModifiers({
-    slot,
+    slot: item.slot,
     craftMarks: parseCraftMarks(item.craftMarks),
   });
-  if (modifiers.length === 0) return 1;
+  if (modifiers.length === 0) return round2(actionIds.length * baseDegradation);
 
   let total = 0;
   for (const actionId of actionIds) {
+    if (!actionId) {
+      total += baseDegradation;
+      continue;
+    }
+
     const action = BASE_ACTION_DEFINITIONS[actionId];
     if (!action) {
-      total += 1;
+      total += baseDegradation;
       continue;
     }
 
     const modified = applyEquipmentActionModifiers({ action, modifiers });
-    total += sanitizeWearMultiplier(modified.durabilityWearMultiplier);
+    total += baseDegradation * sanitizeWearMultiplier(modified.durabilityWearMultiplier);
   }
 
-  return total / actionIds.length;
+  return round2(total);
 }
 
 function sanitizeWearMultiplier(multiplier: number | undefined): number {

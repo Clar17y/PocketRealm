@@ -39,10 +39,10 @@ export function useCraftingActions({
   updateQuestProgress,
   advanceTutorial,
 }: UseCraftingActionsParams) {
-  const handleCraft = useCallback(async (recipeId: string, quantity: number = 1) => {
+  const handleCraft = useCallback(async (recipeId: string, quantity: number = 1, techniqueId?: string) => {
     await runAction('crafting', async () => {
       const recipe = craftingRecipes.find((entry) => entry.id === recipeId);
-      const res = await craft(recipeId, quantity);
+      const res = await craft(recipeId, quantity, techniqueId);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Crafting failed');

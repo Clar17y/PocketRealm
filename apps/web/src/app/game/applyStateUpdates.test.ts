@@ -22,6 +22,7 @@ function makeSetters(): StateSetters {
     setMaterialTotals: vi.fn(),
     setActiveEncounterSiteId: vi.fn(),
     setActiveZoneId: vi.fn(),
+    setVocations: vi.fn(),
   };
 }
 
@@ -167,6 +168,24 @@ describe('applyStateUpdates', () => {
     const skills = [{ id: 's1', skillType: 'mining', level: 5, xp: 1000, dailyXpGained: 200 }];
     applyStateUpdates({ skills }, setters);
     expect(setters.setSkills).toHaveBeenCalledWith(skills);
+  });
+
+  it('sets vocation snapshot when provided', () => {
+    const setters = makeSetters();
+    const vocations = {
+      playerId: 'player-1',
+      vocations: [],
+      dailyCap: {
+        dayStart: '2026-05-21T00:00:00.000Z',
+        turnsSpent: 10,
+        turnsLimit: 100,
+        turnsRemaining: 90,
+      },
+    };
+
+    applyStateUpdates({ vocations }, setters);
+
+    expect(setters.setVocations).toHaveBeenCalledWith(vocations);
   });
 
   it('sets characterProgression when provided', () => {

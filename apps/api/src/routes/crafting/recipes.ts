@@ -48,6 +48,7 @@ recipesRouter.get('/', asyncHandler(async (req, res) => {
 
         return {
           id: r.id,
+          vocationId: r.vocationId ?? null,
           skillType: r.skillType,
           requiredLevel: r.requiredLevel,
           resultTemplate: r.resultTemplate,

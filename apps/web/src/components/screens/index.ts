@@ -3,6 +3,7 @@ export { Exploration } from './Exploration';
 export { Inventory } from './Inventory';
 export { Equipment } from './Equipment';
 export { Skills } from './Skills';
+export { Vocations } from './Vocations';
 export { ZoneMap } from './ZoneMap';
 export { Bestiary } from './Bestiary';
 export { Crafting } from './Crafting';

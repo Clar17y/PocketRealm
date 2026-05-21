@@ -1,4 +1,4 @@
-import type { StateUpdates, InventoryItemDTO, HpState, SkillStateDTO, PlayerBuffData, ResourceStateDTO } from '@pocketrealm/shared';
+import type { StateUpdates, InventoryItemDTO, HpState, SkillStateDTO, PlayerBuffData, ResourceStateDTO, VocationSnapshotResponse } from '@pocketrealm/shared';
 
 export interface StateSetters {
   setInventory: (updater: (prev: InventoryItemDTO[]) => InventoryItemDTO[]) => void;
@@ -17,6 +17,7 @@ export interface StateSetters {
   setMaterialTotals: (mt: Record<string, number>) => void;
   setActiveEncounterSiteId: (id: string | null) => void;
   setActiveZoneId: (id: string | null) => void;
+  setVocations: (vocations: VocationSnapshotResponse) => void;
 }
 
 export function applyStateUpdates(
@@ -69,6 +70,7 @@ export function applyStateUpdates(
   if (updates.inventoryUsedSlots !== undefined) setters.setInventoryUsedSlots(updates.inventoryUsedSlots);
   if (updates.characterProgression !== undefined) setters.setCharacterProgression(updates.characterProgression);
   if (updates.materialTotals !== undefined) setters.setMaterialTotals(updates.materialTotals);
+  if (updates.vocations !== undefined) setters.setVocations(updates.vocations);
   if (updates.activeEncounterSiteId !== undefined) setters.setActiveEncounterSiteId(updates.activeEncounterSiteId);
   if (updates.currentZoneId !== undefined) setters.setActiveZoneId(updates.currentZoneId);
 }

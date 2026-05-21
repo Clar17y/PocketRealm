@@ -24,14 +24,18 @@ import {
 import {
   getHpState,
   getResources,
+  getVocations,
+  honeVocation as apiHoneVocation,
+  learnVocationTechnique as apiLearnVocationTechnique,
+  respecVocation as apiRespecVocation,
   activateTemplate,
   type ApiResponse,
   type WorldEventResponse,
   type SkillPointState,
 } from '@/lib/api';
-import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
+import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO, VocationId, VocationSnapshotResponse } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
+import { getVocationDefinition, STAMINA_CONSTANTS, MANA_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
@@ -143,6 +147,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [zoneCraftingName, setZoneCraftingName] = useState<string | null>(null);
   const [craftingRecipes, setCraftingRecipes] = useState<Array<{
     id: string;
+    vocationId: VocationId | null;
     skillType: string;
     requiredLevel: number;
     isAdvanced: boolean;
@@ -177,6 +182,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3
   });
   const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
+  const [vocationState, setVocationState] = useState<VocationSnapshotResponse | null>(null);
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [incomingFriendRequestCount, setIncomingFriendRequestCount] = useState(0);
@@ -338,6 +344,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setMaterialTotals,
     setActiveEncounterSiteId,
     setActiveZoneId: setActiveZoneIdImmediate,
+    setVocations: setVocationState,
   }), [setActiveZoneIdImmediate, showLootRevealForItems]);
   // State setters are stable; only ref-synchronizing callbacks need to stay in deps.
 
@@ -453,6 +460,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setZoneCraftingName,
     setTemplates,
     setGuildTaxRate,
+    setVocations: setVocationState,
   });
 
   const achievements = useAchievements(isAuthenticated, loadAll);
@@ -461,6 +469,73 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     loadAchievements, loadAchievementUnclaimedCount,
     handleClaimAchievement, handleSetActiveTitle,
   } = achievements;
+
+  const handleLoadVocations = useCallback(async () => {
+    const response = await getVocations();
+    if (response.data) {
+      setVocationState(response.data);
+    }
+  }, []);
+
+  const handleHoneVocation = useCallback(async (vocationId: VocationId, turnsToSpend: number) => {
+    await runAction('vocations', async () => {
+      const response = await apiHoneVocation(vocationId, turnsToSpend);
+      const data = response.data;
+      if (!data) {
+        setActionError(response.error?.message ?? 'Vocation honing failed');
+        return;
+      }
+
+      setVocationState(data.snapshot);
+      if (data.turnSpend) {
+        setTurns(data.turnSpend.currentTurns);
+      }
+
+      const vocationName = getVocationDefinition(vocationId)?.name ?? vocationId;
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `Honed ${vocationName} for ${turnsToSpend} turn${turnsToSpend !== 1 ? 's' : ''}.`,
+      });
+    });
+  }, [pushLog, runAction, setActionError, setTurns]);
+
+  const handleLearnVocationTechnique = useCallback(async (vocationId: VocationId, techniqueId: string) => {
+    await runAction('vocations', async () => {
+      const response = await apiLearnVocationTechnique(vocationId, techniqueId);
+      const data = response.data;
+      if (!data) {
+        setActionError(response.error?.message ?? 'Technique learning failed');
+        return;
+      }
+
+      setVocationState(data.snapshot);
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `Learned ${data.vocation.vocationId} technique.`,
+      });
+    });
+  }, [pushLog, runAction, setActionError]);
+
+  const handleRespecVocation = useCallback(async (vocationId: VocationId) => {
+    await runAction('vocations', async () => {
+      const response = await apiRespecVocation(vocationId);
+      const data = response.data;
+      if (!data) {
+        setActionError(response.error?.message ?? 'Vocation respec failed');
+        return;
+      }
+
+      setVocationState(data.snapshot);
+      const vocationName = getVocationDefinition(vocationId)?.name ?? vocationId;
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'info',
+        message: `Reset ${vocationName} techniques with a partial mastery refund.`,
+      });
+    });
+  }, [pushLog, runAction, setActionError]);
 
   const {
     quests, questState, questsLoading, questsError,
@@ -532,7 +607,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const getActiveTab = () => {
     if (['home', 'achievements', 'quests', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
     if (['zones', 'explore', 'gathering', 'crafting', 'forge', 'worldEvents', 'casino', 'training'].includes(activeScreen)) return 'explore';
-    if (['inventory', 'equipment', 'skills'].includes(activeScreen)) return 'inventory';
+    if (['inventory', 'equipment', 'skills', 'vocations'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena', 'templates', 'talentTree', 'bestiary'].includes(activeScreen)) return 'combat';
     if (['guild', 'friends', 'mail'].includes(activeScreen)) return 'social';
     return 'home';
@@ -758,6 +833,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleLoadSkillPoints,
     handleAllocateSkillPoint,
     handleRespecSkillPoints,
+    vocationState,
+    handleLoadVocations,
+    handleHoneVocation,
+    handleLearnVocationTechnique,
+    handleRespecVocation,
     templates,
     handleLoadTemplates,
     handleTemplateSaved,

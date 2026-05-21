@@ -600,6 +600,19 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
   const gatherAchKeys = ['totalGatheringActions'];
   if (xpGrant.newLevel) gatherAchKeys.push('highestSkillLevel');
   if (xpGrant.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) gatherAchKeys.push('highestCharacterLevel');
+  if (vocationId) {
+    gatherAchKeys.push(
+      'totalVocationGathers',
+      `vocationGathers_${vocationId}`,
+      'highestVocationRank',
+      'vocationRank5Count',
+      'vocationRank10Count',
+      'vocationRank20Count',
+    );
+    if (gemCrit) {
+      gatherAchKeys.push('totalVocationGatherCrits');
+    }
+  }
   await trackAchievements(playerId, {
     totalGatheringActions: actions,
     totalTurnsSpent: turnSpend.spent,

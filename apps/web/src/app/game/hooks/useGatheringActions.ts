@@ -36,11 +36,11 @@ export function useGatheringActions({
   advanceTutorial,
   logActiveEvents,
 }: UseGatheringActionsParams) {
-  const handleMine = useCallback(async (playerNodeId: string, turnSpend: number) => {
+  const handleMine = useCallback(async (playerNodeId: string, turnSpend: number, techniqueId?: string) => {
     if (!activeZoneId) return;
 
     await runAction('gathering', async () => {
-      const res = await mine(playerNodeId, turnSpend);
+      const res = await mine(playerNodeId, turnSpend, techniqueId);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Gathering failed');

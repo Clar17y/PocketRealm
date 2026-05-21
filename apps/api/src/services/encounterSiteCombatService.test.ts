@@ -63,6 +63,7 @@ const serviceMocks = vi.hoisted(() => ({
   getInventoryState: vi.fn(),
   deductConsumedPotions: vi.fn(),
   degradeEquippedDurabilityByHits: vi.fn(),
+  getEquippedDurabilitySnapshot: vi.fn(),
 }));
 
 // Mock DB modules so tests don't require JWT_SECRET / DB connection
@@ -81,7 +82,10 @@ vi.mock('./activityLogService', () => ({}));
 vi.mock('./potionService', () => ({ deductConsumedPotions: serviceMocks.deductConsumedPotions }));
 vi.mock('./stateUpdateHelpers', () => ({}));
 vi.mock('./worldEventService', () => ({}));
-vi.mock('./durabilityService', () => ({ degradeEquippedDurabilityByHits: serviceMocks.degradeEquippedDurabilityByHits }));
+vi.mock('./durabilityService', () => ({
+  degradeEquippedDurabilityByHits: serviceMocks.degradeEquippedDurabilityByHits,
+  getEquippedDurabilitySnapshot: serviceMocks.getEquippedDurabilitySnapshot,
+}));
 vi.mock('./xpService', () => ({}));
 vi.mock('./buffService', () => ({}));
 vi.mock('./zoneExplorationService', () => ({}));
@@ -114,6 +118,7 @@ beforeEach(() => {
   serviceMocks.getInventoryState.mockResolvedValue({ availableSlots: 10 });
   serviceMocks.deductConsumedPotions.mockResolvedValue({ deducted: [] });
   serviceMocks.degradeEquippedDurabilityByHits.mockResolvedValue([]);
+  serviceMocks.getEquippedDurabilitySnapshot.mockResolvedValue([]);
   combatOrchestrationMocks.splitAndGrantXp.mockResolvedValue([]);
   redisMock.del.mockResolvedValue(1);
 });

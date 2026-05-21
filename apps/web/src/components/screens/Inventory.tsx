@@ -115,6 +115,7 @@ export function Inventory({
             rarity: item.rarity,
             type: item.template.itemType,
             durability: isEquip && max > 0 ? { current: item.currentDurability ?? max, max } : null,
+            craftMarks: item.craftMarks ?? null,
             sellPrice: item.template.sellPrice ?? null,
             salvageCost: isEquip && getSalvageCostRef.current ? getSalvageCostRef.current(item.template.id) : null,
           };

@@ -1,4 +1,4 @@
-import type { QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
+import type { CraftMarks, QuestProgressUpdate, StateUpdates, VocationId } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { EventModifierBadge } from './combat';
 
@@ -29,6 +29,7 @@ export interface InventoryItem {
   maxDurability: number | null;
   quantity: number;
   bonusStats: Record<string, number> | null;
+  craftMarks?: CraftMarks | null;
   createdAt: string;
   template: InventoryItemTemplate;
   equippedSlot: string | null;
@@ -170,7 +171,7 @@ export async function getGatheringNodes(query: GatheringNodesQuery = {}) {
   return fetchApi<GatheringNodesResponse>(`/api/v1/gathering/nodes${suffix ? `?${suffix}` : ''}`);
 }
 
-export async function mine(playerNodeId: string, turns: number) {
+export async function mine(playerNodeId: string, turns: number, techniqueId?: string) {
   return fetchApi<{
     logId: string;
     turns: TurnStateResponse;
@@ -231,7 +232,7 @@ export async function mine(playerNodeId: string, turns: number) {
     stateUpdates?: StateUpdates;
   }>('/api/v1/gathering/mine', {
     method: 'POST',
-    body: JSON.stringify({ playerNodeId, turns }),
+    body: JSON.stringify({ playerNodeId, turns, ...(techniqueId ? { techniqueId } : {}) }),
   });
 }
 
@@ -241,6 +242,7 @@ export async function getCraftingRecipes() {
   return fetchApi<{
     recipes: Array<{
       id: string;
+      vocationId: VocationId | null;
       skillType: string;
       requiredLevel: number;
       isAdvanced: boolean;
@@ -272,7 +274,7 @@ export async function getCraftingRecipes() {
   }>('/api/v1/crafting/recipes');
 }
 
-export async function craft(recipeId: string, quantity: number = 1) {
+export async function craft(recipeId: string, quantity: number = 1, techniqueId?: string) {
   return fetchApi<{
     logId: string;
     turns: TurnStateResponse;
@@ -304,7 +306,7 @@ export async function craft(recipeId: string, quantity: number = 1) {
     stateUpdates?: StateUpdates;
   }>('/api/v1/crafting/craft', {
     method: 'POST',
-    body: JSON.stringify({ recipeId, quantity }),
+    body: JSON.stringify({ recipeId, quantity, ...(techniqueId ? { techniqueId } : {}) }),
   });
 }
 
