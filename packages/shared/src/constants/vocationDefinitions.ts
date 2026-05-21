@@ -74,7 +74,7 @@ export const VOCATION_DEFINITIONS = [
     craftTech('weaponsmith_keen_edge', 'weaponsmith', 'weaponsmith_blades', 'Keen Edge', 'Draw a harder bevel onto forged blades.', 1, 1, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, craftStat('attack', 0.04)),
     craftTech('weaponsmith_tempered_spine', 'weaponsmith', 'weaponsmith_blades', 'Tempered Spine', 'Leave the back of a blade springy enough to survive bad parries.', 3, 1, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, durability(0.08)),
     craftTech('weaponsmith_blood_groove', 'weaponsmith', 'weaponsmith_blades', 'Blood Groove', 'Cut weight without losing the line of force.', 6, 2, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, mark('blood_groove_mark', 'Blood Groove Mark', 'A forged groove that favors decisive melee hits while making the edge harder to maintain.', ['weapon'], FORGE_WEAPON_SLOTS, [{ stat: 'attack', value: 0.05, isPercent: true }], [{ stat: 'critDamage', value: -0.02, isPercent: true }], [
-      markActionMod('weaponsmith_blood_groove_heavy_tradeoff', FORGE_WEAPON_SLOTS, ['heavy_attack', 'skill_attack'], 'damage', 0.05),
+      highWearMarkActionMod('weaponsmith_blood_groove_heavy_tradeoff', FORGE_WEAPON_SLOTS, ['heavy_attack', 'skill_attack'], 'damage', 0.05, 0.08),
     ])),
     craftTech('weaponsmith_anvil_rebound', 'weaponsmith', 'weaponsmith_hammers', 'Anvil Rebound', 'Use hammer rebound to shape heavier heads cleanly.', 2, 1, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, craftTurns(0.04)),
     actionTech('weaponsmith_crushing_poll', 'weaponsmith', 'weaponsmith_hammers', 'Crushing Poll', 'Balance blunt heads for stronger heavy blows.', 5, 2, FORGE_WEAPON_SLOTS, ['heavy_attack'], actionMod('weaponsmith_crushing_poll_force', FORGE_WEAPON_SLOTS, ['heavy_attack'], 'damage', 0.05)),
@@ -98,7 +98,7 @@ export const VOCATION_DEFINITIONS = [
     craftTech('staffwright_wide_channel', 'staffwright', 'staffwright_channels', 'Wide Channel', 'Open a broader mana path through the staff core.', 1, 1, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, craftStat('magicPower', 0.04)),
     actionTech('staffwright_runed_grip', 'staffwright', 'staffwright_channels', 'Runed Grip', 'Keep spellwork steady during hostile motion.', 3, 1, FORGE_WEAPON_SLOTS, ['damage_spell', 'debuff_spell'], actionMod('staffwright_runed_grip_accuracy', FORGE_WEAPON_SLOTS, ['damage_spell', 'debuff_spell'], 'accuracy', 0.04)),
     craftTech('staffwright_silver_inlay', 'staffwright', 'staffwright_channels', 'Silver Inlay', 'Lay silver into the channel to hold stronger charge.', 6, 2, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, mark('silver_inlay_mark', 'Silver Inlay Mark', 'A bright channel mark that favors magic power while pulling power away from mundane accuracy.', ['weapon'], FORGE_WEAPON_SLOTS, [{ stat: 'magicPower', value: 0.05, isPercent: true }], [{ stat: 'accuracy', value: -0.02, isPercent: true }], [
-      markActionMod('staffwright_silver_inlay_spell_charge', FORGE_WEAPON_SLOTS, ['damage_spell'], 'damage', 0.05),
+      highWearMarkActionMod('staffwright_silver_inlay_spell_charge', FORGE_WEAPON_SLOTS, ['damage_spell'], 'damage', 0.05, 0.08),
     ])),
     craftTech('staffwright_clear_focus', 'staffwright', 'staffwright_focuses', 'Clear Focus', 'Seat a focus without clouding its center.', 2, 1, 'jewelcrafting', ['weapon'], FORGE_WEAPON_SLOTS, rarity('uncommon', 0.04)),
     actionTech('staffwright_ward_knot', 'staffwright', 'staffwright_focuses', 'Ward Knot', 'Tie focus cords to answer defensive casting.', 5, 2, FORGE_WEAPON_SLOTS, ['ward', 'buff'], actionMod('staffwright_ward_knot_defence', FORGE_WEAPON_SLOTS, ['ward', 'buff'], 'defence', 0.05)),
@@ -457,6 +457,23 @@ function markActionMod(
     actionTypes,
     benefits: [{ stat, value, isPercent: true }],
     drawbacks: [actionDrawbackFor(stat)],
+  };
+}
+
+function highWearMarkActionMod(
+  modifierId: string,
+  equipmentSlots: readonly EquipmentSlot[],
+  actionTypes: readonly CombatActionType[],
+  stat: EquipmentActionModifierStat,
+  value: number,
+  wearValue: number,
+): EquipmentActionModifier {
+  return {
+    modifierId,
+    equipmentSlots,
+    actionTypes,
+    benefits: [{ stat, value, isPercent: true }],
+    drawbacks: [{ stat: 'durabilityWear', value: wearValue, isPercent: true }],
   };
 }
 

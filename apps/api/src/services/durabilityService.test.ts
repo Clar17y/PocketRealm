@@ -10,13 +10,17 @@ beforeEach(() => {
 
 function makeEquipped(items: Array<{
   id: string;
+  slot?: string;
+  craftMarks?: unknown;
   currentDurability: number | null;
   maxDurability: number | null;
   template: { name: string; itemType: string; maxDurability: number };
 }>) {
   return items.map((item) => ({
+    slot: item.slot,
     item: {
       id: item.id,
+      craftMarks: item.craftMarks,
       currentDurability: item.currentDurability,
       maxDurability: item.maxDurability,
       template: item.template,
@@ -26,9 +30,9 @@ function makeEquipped(items: Array<{
 
 /** Helper: build a combat log with N player hits and M mob hits. */
 function makeLog(playerHits: number, mobHits: number) {
-  const log: Array<{ actor: 'combatantA' | 'combatantB'; damage: number; evaded: boolean }> = [];
-  for (let i = 0; i < playerHits; i++) log.push({ actor: 'combatantA', damage: 5, evaded: false });
-  for (let i = 0; i < mobHits; i++) log.push({ actor: 'combatantB', damage: 3, evaded: false });
+  const log: Array<{ actor: 'combatantA' | 'combatantB'; damage: number; evaded: boolean; combatantAAction?: string; combatantBAction?: string }> = [];
+  for (let i = 0; i < playerHits; i++) log.push({ actor: 'combatantA', damage: 5, evaded: false, combatantAAction: 'normal_attack' });
+  for (let i = 0; i < mobHits; i++) log.push({ actor: 'combatantB', damage: 3, evaded: false, combatantBAction: 'normal_attack' });
   return log;
 }
 
@@ -338,6 +342,80 @@ describe('degradeEquippedDurability', () => {
     // weapon: 10 * 0.03 * 1 = 0.30
     const losses = await degradeEquippedDurability('p1', makeLog(10, 0));
     expect(losses[0].amount).toBe(0.3);
+  });
+
+  it('applies craft mark durability wear to matching weapon actions', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue(
+      makeEquipped([
+        {
+          id: 'weapon-1',
+          slot: 'main_hand',
+          craftMarks: [{
+            markId: 'blood_groove_mark',
+            name: 'Blood Groove Mark',
+            sourceTechniqueId: 'weaponsmith_blood_groove',
+            description: 'A high-force groove that wears faster.',
+            actionModifiers: [{
+              modifierId: 'blood_groove_heavy_tradeoff',
+              equipmentSlots: ['main_hand'],
+              actionTypes: ['heavy_attack'],
+              benefits: [{ stat: 'damage', value: 0.05, isPercent: true }],
+              drawbacks: [{ stat: 'durabilityWear', value: 0.5, isPercent: true }],
+            }],
+          }],
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Grooved Sword', itemType: 'weapon', maxDurability: 100 },
+        },
+      ])
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+
+    const log = Array.from({ length: 10 }, () => ({
+      actor: 'combatantA' as const,
+      damage: 5,
+      evaded: false,
+      combatantAAction: 'heavy_attack',
+    }));
+
+    const losses = await degradeEquippedDurability('p1', log);
+
+    expect(losses).toHaveLength(1);
+    expect(losses[0].amount).toBe(0.45);
+    expect(losses[0].newDurability).toBe(49.55);
+  });
+
+  it('does not apply craft mark durability wear to non-matching actions', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue(
+      makeEquipped([
+        {
+          id: 'weapon-1',
+          slot: 'main_hand',
+          craftMarks: [{
+            markId: 'blood_groove_mark',
+            name: 'Blood Groove Mark',
+            sourceTechniqueId: 'weaponsmith_blood_groove',
+            description: 'A high-force groove that wears faster.',
+            actionModifiers: [{
+              modifierId: 'blood_groove_heavy_tradeoff',
+              equipmentSlots: ['main_hand'],
+              actionTypes: ['heavy_attack'],
+              benefits: [{ stat: 'damage', value: 0.05, isPercent: true }],
+              drawbacks: [{ stat: 'durabilityWear', value: 0.5, isPercent: true }],
+            }],
+          }],
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Grooved Sword', itemType: 'weapon', maxDurability: 100 },
+        },
+      ])
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+
+    const losses = await degradeEquippedDurability('p1', makeLog(10, 0));
+
+    expect(losses[0].amount).toBe(0.3);
+    expect(losses[0].newDurability).toBe(49.7);
   });
 });
 

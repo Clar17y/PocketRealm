@@ -1,27 +1,42 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import { DURABILITY_CONSTANTS, type CombatLogEntry, type CombatActor, type DurabilityLoss } from '@pocketrealm/shared';
+import {
+  DURABILITY_CONSTANTS,
+  getEquipmentActionModifiers,
+  parseCraftMarks,
+  type CombatLogEntry,
+  type CombatActor,
+  type DurabilityLoss,
+} from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { applyEquipmentActionModifiers } from '@pocketrealm/game-engine';
 import { invalidateEquipmentCache } from './equipmentService';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-type CombatHitEntry = Pick<CombatLogEntry, 'actor' | 'damage' | 'evaded'>;
+type CombatHitEntry = Pick<CombatLogEntry, 'actor' | 'damage' | 'evaded'> & {
+  combatantAAction?: string;
+  combatantBAction?: string;
+};
+
+interface DurabilityHitCounts {
+  playerHitsLanded: number;
+  mobHitsLanded: number;
+  playerWeaponActionIds: string[];
+  mobWeaponActionIds: string[];
+}
 
 /** Count hits that landed from a combat log for durability degradation. */
 export function countCombatHits(log: CombatHitEntry[]): {
   playerHitsLanded: number;
   mobHitsLanded: number;
 } {
-  let playerHitsLanded = 0;
-  let mobHitsLanded = 0;
-  for (const entry of log) {
-    if (!entry.evaded && entry.damage !== undefined) {
-      if (entry.actor === 'combatantA') playerHitsLanded++;
-      else if (entry.actor === 'combatantB') mobHitsLanded++;
-    }
-  }
-  return { playerHitsLanded, mobHitsLanded };
+  const counts = countCombatWear(log);
+  return {
+    playerHitsLanded: counts.playerHitsLanded,
+    mobHitsLanded: counts.mobHitsLanded,
+  };
 }
 
 /**
@@ -36,10 +51,14 @@ export async function degradeEquippedDurability(
   perspective: CombatActor = 'combatantA',
   degradationMultiplier: number = 1,
 ): Promise<DurabilityLoss[]> {
-  const hits = countCombatHits(combatLog);
+  const hits = countCombatWear(combatLog);
   const myHits = perspective === 'combatantA' ? hits.playerHitsLanded : hits.mobHitsLanded;
   const theirHits = perspective === 'combatantA' ? hits.mobHitsLanded : hits.playerHitsLanded;
-  return degradeEquippedDurabilityByHits(playerId, myHits, theirHits, degradationMultiplier);
+  const myWeaponActionIds = perspective === 'combatantA' ? hits.playerWeaponActionIds : hits.mobWeaponActionIds;
+
+  return degradeEquippedDurabilityByHits(playerId, myHits, theirHits, degradationMultiplier, {
+    weaponActionIds: myWeaponActionIds,
+  });
 }
 
 /**
@@ -51,6 +70,7 @@ export async function degradeEquippedDurabilityByHits(
   playerHitsLanded: number,
   mobHitsLanded: number,
   degradationMultiplier: number = 1,
+  options: { weaponActionIds?: readonly string[] } = {},
 ): Promise<DurabilityLoss[]> {
   const weaponDegradation = round2(playerHitsLanded * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
   const armorDegradation = round2(mobHitsLanded * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
@@ -65,21 +85,22 @@ export async function degradeEquippedDurabilityByHits(
   });
 
   const losses: DurabilityLoss[] = [];
-  const uniqueItems = new Map<string, (typeof equipped)[number]['item']>();
+  const uniqueItems = new Map<string, { item: NonNullable<(typeof equipped)[number]['item']>; slot: string }>();
   for (const eq of equipped) {
-    if (eq.item) uniqueItems.set(eq.item.id, eq.item);
+    if (eq.item) uniqueItems.set(eq.item.id, { item: eq.item, slot: eq.slot });
   }
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    for (const item of uniqueItems.values()) {
-      if (!item) continue;
-
+    for (const equippedItem of uniqueItems.values()) {
+      const { item, slot } = equippedItem;
       const template = item.template;
       const isWeapon = template.itemType === 'weapon';
       const isArmor = template.itemType === 'armor';
       if (!isWeapon && !isArmor) continue;
 
-      const amount = isWeapon ? weaponDegradation : armorDegradation;
+      const amount = isWeapon
+        ? round2(weaponDegradation * getWeaponWearMultiplier(item, slot, options.weaponActionIds))
+        : armorDegradation;
       if (amount <= 0) continue;
 
       const maxDurability = item.maxDurability ?? template.maxDurability;
@@ -128,4 +149,59 @@ export async function degradeEquippedDurabilityByHits(
   await invalidateEquipmentCache(playerId);
 
   return losses;
+}
+
+function countCombatWear(log: CombatHitEntry[]): DurabilityHitCounts {
+  let playerHitsLanded = 0;
+  let mobHitsLanded = 0;
+  const playerWeaponActionIds: string[] = [];
+  const mobWeaponActionIds: string[] = [];
+
+  for (const entry of log) {
+    if (entry.evaded || entry.damage === undefined) continue;
+
+    if (entry.actor === 'combatantA') {
+      playerHitsLanded++;
+      if (entry.combatantAAction) playerWeaponActionIds.push(entry.combatantAAction);
+    } else if (entry.actor === 'combatantB') {
+      mobHitsLanded++;
+      if (entry.combatantBAction) mobWeaponActionIds.push(entry.combatantBAction);
+    }
+  }
+
+  return { playerHitsLanded, mobHitsLanded, playerWeaponActionIds, mobWeaponActionIds };
+}
+
+function getWeaponWearMultiplier(
+  item: { craftMarks?: unknown },
+  slot: string,
+  actionIds: readonly string[] | undefined,
+): number {
+  if (!actionIds || actionIds.length === 0) return 1;
+
+  const modifiers = getEquipmentActionModifiers({
+    slot,
+    craftMarks: parseCraftMarks(item.craftMarks),
+  });
+  if (modifiers.length === 0) return 1;
+
+  let total = 0;
+  for (const actionId of actionIds) {
+    const action = BASE_ACTION_DEFINITIONS[actionId];
+    if (!action) {
+      total += 1;
+      continue;
+    }
+
+    const modified = applyEquipmentActionModifiers({ action, modifiers });
+    total += sanitizeWearMultiplier(modified.durabilityWearMultiplier);
+  }
+
+  return total / actionIds.length;
+}
+
+function sanitizeWearMultiplier(multiplier: number | undefined): number {
+  return typeof multiplier === 'number' && Number.isFinite(multiplier) && multiplier > 0
+    ? multiplier
+    : 1;
 }
