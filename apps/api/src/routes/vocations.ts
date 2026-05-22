@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { VOCATION_IDS } from '@pocketrealm/shared';
+import { VOCATION_IDS, VOCATION_MASTERY } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import {
   getVocationSnapshot,
@@ -15,7 +15,7 @@ const vocationIdSchema = z.enum(VOCATION_IDS);
 
 const honeSchema = z.object({
   vocationId: vocationIdSchema,
-  turns: z.number().int().positive().max(100),
+  turns: z.number().int().positive().max(VOCATION_MASTERY.HONE_ACTION_TURN_LIMIT),
 });
 
 const learnTechniqueSchema = z.object({

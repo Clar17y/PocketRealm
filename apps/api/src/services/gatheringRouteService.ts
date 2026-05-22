@@ -428,6 +428,7 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     ? techniqueEffects.outputQuantityDelta
     : 0;
   const gemCritChanceBonus = getGemCritChanceBonus(techniqueEffects);
+  // XP per action: scaled by node level requirement
   const xpPerAction = GATHERING_CONSTANTS.XP_PER_ACTION_BASE
     + Math.floor(template.levelRequired / GATHERING_CONSTANTS.XP_LEVEL_SCALING_DIVISOR);
 
@@ -461,15 +462,17 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     const techniqueYieldBonus = innerActions * techniqueOutputDelta;
     const innerUnclampedRawYield = Math.max(1, Math.floor(innerActions * effectiveYieldPerAction) + techniqueYieldBonus);
     const innerRawYield = Math.min(innerUnclampedRawYield, effectiveCapacity);
-    const eventAdjustedYield = eventMultiplier > 1
+    // yield_up events grant a bonus the player keeps in full, even when it exceeds node capacity.
+    const innerTotalYield = eventMultiplier > 1
       ? Math.max(1, Math.floor(innerRawYield * eventMultiplier))
       : innerRawYield;
-    const innerTotalYield = Math.min(eventAdjustedYield, effectiveCapacity);
-    const capacityAfterYield = effectiveCapacity - innerTotalYield;
+    // Node capacity can only ever drop by what the node actually held; clamp separately for capacity tracking.
+    const capacityConsumed = Math.min(innerTotalYield, effectiveCapacity);
+    const capacityAfterYield = effectiveCapacity - capacityConsumed;
     const capacityPreserved = capacityAfterYield > 0
       && techniqueEffects.capacityPreserveChance > 0
       && Math.random() < techniqueEffects.capacityPreserveChance;
-    const preservedCapacity = capacityPreserved ? capacityAfterYield + innerTotalYield : capacityAfterYield;
+    const preservedCapacity = capacityPreserved ? capacityAfterYield + capacityConsumed : capacityAfterYield;
     const innerNewCapacity = Math.max(0, Math.min(preservedCapacity, effectiveCapacity, template.maxCapacity));
     const innerNodeDepleted = innerNewCapacity <= 0;
 
@@ -551,7 +554,6 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
   // Consume shop gathering yield buff (one use per gather action)
   if (shopGatheringYield > 0) await consumeBuffStandalone(playerId, 'gathering_yield');
 
-  // XP: scaled by node level requirement
   const rawXp = actions * xpPerAction;
   const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp, undefined, guildMods.xpBoost || undefined);
 

@@ -6,6 +6,7 @@ import {
   getPartialRespecRefund,
   getVocationDefinition,
   VOCATION_DEFINITIONS,
+  VOCATION_MASTERY,
   type VocationDefinition,
   type VocationId,
   type VocationSnapshotResponse,
@@ -27,8 +28,6 @@ interface VocationsProps {
   onLearnTechnique: (vocationId: VocationId, techniqueId: string) => void | Promise<void>;
   onRespec: (vocationId: VocationId) => void | Promise<void>;
 }
-
-const HONE_ACTION_LIMIT = 100;
 
 function mentorLabel(mentorTown: VocationDefinition['mentorTown']) {
   return mentorTown === 'millbrook' ? 'Millbrook' : 'Thornwall';
@@ -81,7 +80,7 @@ export function Vocations({
   const canUseMentor = inMentorTown(selectedDefinition, currentZoneName, currentZoneType);
   const maxHoneTurns = Math.max(
     0,
-    Math.min(availableTurns, snapshot?.dailyCap.turnsRemaining ?? 0, HONE_ACTION_LIMIT),
+    Math.min(availableTurns, snapshot?.dailyCap.turnsRemaining ?? 0, VOCATION_MASTERY.HONE_ACTION_TURN_LIMIT),
   );
   const isBusy = busyAction === 'vocations';
 
