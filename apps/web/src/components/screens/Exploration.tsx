@@ -148,6 +148,11 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
     && prospectableResourceNodes.some((node) => node.resourceNodeId === selectedProspectingResourceNodeId)
       ? selectedProspectingResourceNodeId
       : null;
+  const focusOptions: Array<{ mode: ExplorationFocusMode; label: string; disabled: boolean }> = [
+    { mode: 'none', label: 'None', disabled: false },
+    { mode: 'tracking', label: 'Track', disabled: availableTrackingFamilies.length === 0 },
+    { mode: 'prospecting', label: 'Prospect', disabled: prospectableResourceNodes.length === 0 },
+  ];
 
   const calculateProbabilities = (turns: number) => {
     const trackedResultRateMultiplier = activeTrackingFamilyId
@@ -392,69 +397,63 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
           {!tutorialLocked && (
             <PixelCard>
               <div className="space-y-3">
-                <div className="space-y-3">
-                  <div className="relative">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Focus</h3>
-                      {focusMode === 'tracking' ? (
-                        <button
-                          type="button"
-                          aria-label="Tracking info"
-                          aria-expanded={trackingInfoOpen}
-                          onFocus={() => setTrackingInfoOpen(true)}
-                          onBlur={() => setTrackingInfoOpen(false)}
-                          onMouseEnter={() => setTrackingInfoOpen(true)}
-                          onMouseLeave={() => setTrackingInfoOpen(false)}
-                          className="rounded-full text-[var(--rpg-text-secondary)] transition-colors hover:text-[var(--rpg-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rpg-gold)]"
-                        >
-                          <Info size={14} />
-                        </button>
-                      ) : null}
-                    </div>
-                    {focusMode === 'tracking' && trackingInfoOpen ? (
-                      <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3 shadow-lg">
-                        <p className="text-xs text-[var(--rpg-text-secondary)]">
-                          Reduce total yield to bias ambushes and sites toward one discovered mob family.
-                        </p>
-                        <p className="mt-2 text-xs text-[var(--rpg-text-secondary)] opacity-70">
-                          Tracking never bypasses unlocked tiers, and non-family outcomes still remain.
-                        </p>
-                      </div>
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Focus</h3>
+                    {focusMode === 'tracking' ? (
+                      <button
+                        type="button"
+                        aria-label="Tracking info"
+                        aria-expanded={trackingInfoOpen}
+                        onFocus={() => setTrackingInfoOpen(true)}
+                        onBlur={() => setTrackingInfoOpen(false)}
+                        onMouseEnter={() => setTrackingInfoOpen(true)}
+                        onMouseLeave={() => setTrackingInfoOpen(false)}
+                        className="rounded-full text-[var(--rpg-text-secondary)] transition-colors hover:text-[var(--rpg-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rpg-gold)]"
+                      >
+                        <Info size={14} />
+                      </button>
                     ) : null}
                   </div>
-                  <div className="grid grid-cols-3 gap-2" role="group" aria-label="Exploration focus">
-                    {([
-                      { mode: 'none' as const, label: 'None', disabled: false },
-                      { mode: 'tracking' as const, label: 'Track', disabled: availableTrackingFamilies.length === 0 },
-                      { mode: 'prospecting' as const, label: 'Prospect', disabled: prospectableResourceNodes.length === 0 },
-                    ]).map((option) => {
-                      const isSelected = focusMode === option.mode;
-                      return (
-                        <button
-                          key={option.mode}
-                          type="button"
-                          aria-pressed={isSelected}
-                          disabled={option.disabled}
-                          onClick={() => {
-                            setFocusMode(option.mode);
-                            if (option.mode === 'tracking') {
-                              setSelectedTrackingFamilyId((prev) => prev ?? availableTrackingFamilies[0]?.mobFamilyId ?? null);
-                            }
-                            if (option.mode === 'prospecting') {
-                              setSelectedProspectingResourceNodeId((prev) => prev ?? prospectableResourceNodes[0]?.resourceNodeId ?? null);
-                            }
-                          }}
-                          className={`px-3 py-1.5 text-sm rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                            isSelected
-                              ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
-                              : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {focusMode === 'tracking' && trackingInfoOpen ? (
+                    <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3 shadow-lg">
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">
+                        Reduce total yield to bias ambushes and sites toward one discovered mob family.
+                      </p>
+                      <p className="mt-2 text-xs text-[var(--rpg-text-secondary)] opacity-70">
+                        Tracking never bypasses unlocked tiers, and non-family outcomes still remain.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Exploration focus">
+                  {focusOptions.map((option) => {
+                    const isSelected = focusMode === option.mode;
+                    return (
+                      <button
+                        key={option.mode}
+                        type="button"
+                        aria-pressed={isSelected}
+                        disabled={option.disabled}
+                        onClick={() => {
+                          setFocusMode(option.mode);
+                          if (option.mode === 'tracking') {
+                            setSelectedTrackingFamilyId((prev) => prev ?? availableTrackingFamilies[0]?.mobFamilyId ?? null);
+                          }
+                          if (option.mode === 'prospecting') {
+                            setSelectedProspectingResourceNodeId((prev) => prev ?? prospectableResourceNodes[0]?.resourceNodeId ?? null);
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-sm rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isSelected
+                            ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
+                            : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {!prospectingEnabled && (trackableMobFamilies.length === 0 ? (

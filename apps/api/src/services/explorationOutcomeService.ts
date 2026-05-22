@@ -85,6 +85,13 @@ export async function processExplorationOutcomes(
   let wasKnockedOut = false;
   let respawnedTo: { townId: string; townName: string } | null = null;
   let zoneExitDiscovered = false;
+  const weightedResourceNodes = prospectingResourceNodeId
+    ? applyProspectingResourceWeightBias(
+        resourceNodes,
+        prospectingResourceNodeId,
+        prospectingSkillLevel ?? 1,
+      )
+    : resourceNodes;
 
   function familyHasTierEligibleMember(family: ZoneFamilyRow): boolean {
     return family.mobFamily.members.some(
@@ -197,13 +204,6 @@ export async function processExplorationOutcomes(
     }
 
     if (outcome.type === 'resource_node' && resourceNodes.length > 0) {
-      const weightedResourceNodes = prospectingResourceNodeId
-        ? applyProspectingResourceWeightBias(
-            resourceNodes,
-            prospectingResourceNodeId,
-            prospectingSkillLevel ?? 1,
-          )
-        : resourceNodes;
       const nodeTemplate = pickWeighted(weightedResourceNodes, 'discoveryWeight') as typeof resourceNodes[number] | null;
       if (!nodeTemplate) continue;
 
