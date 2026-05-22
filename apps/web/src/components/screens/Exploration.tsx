@@ -396,18 +396,20 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                   <div className="relative">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Focus</h3>
-                      <button
-                        type="button"
-                        aria-label="Tracking info"
-                        aria-expanded={trackingInfoOpen}
-                        onFocus={() => setTrackingInfoOpen(true)}
-                        onBlur={() => setTrackingInfoOpen(false)}
-                        onMouseEnter={() => setTrackingInfoOpen(true)}
-                        onMouseLeave={() => setTrackingInfoOpen(false)}
-                        className="rounded-full text-[var(--rpg-text-secondary)] transition-colors hover:text-[var(--rpg-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rpg-gold)]"
-                      >
-                        <Info size={14} />
-                      </button>
+                      {focusMode === 'tracking' ? (
+                        <button
+                          type="button"
+                          aria-label="Tracking info"
+                          aria-expanded={trackingInfoOpen}
+                          onFocus={() => setTrackingInfoOpen(true)}
+                          onBlur={() => setTrackingInfoOpen(false)}
+                          onMouseEnter={() => setTrackingInfoOpen(true)}
+                          onMouseLeave={() => setTrackingInfoOpen(false)}
+                          className="rounded-full text-[var(--rpg-text-secondary)] transition-colors hover:text-[var(--rpg-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rpg-gold)]"
+                        >
+                          <Info size={14} />
+                        </button>
+                      ) : null}
                     </div>
                     {focusMode === 'tracking' && trackingInfoOpen ? (
                       <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3 shadow-lg">
