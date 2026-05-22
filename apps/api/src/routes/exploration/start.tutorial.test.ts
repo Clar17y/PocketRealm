@@ -375,7 +375,12 @@ describe('exploration tutorial path', () => {
     // Should spend the requested turns, not 100 (called via transaction)
     expect(mockSpendPlayerTurnsTx).toHaveBeenCalledWith(expect.anything(), 'p1', 500);
     // Should call simulateExploration (exitChance is null when no undiscovered neighbors, spawnRateMultiplier is 1 with no zone families)
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1, null);
+    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, {
+      spawnRateMultiplier: 1,
+      encounterSiteRateMultiplier: 1,
+      resourceNodeRateMultiplier: 1,
+      hiddenCacheChanceOverride: null,
+    });
   });
 
   it('passes Champion-adjusted hidden cache chance into simulateExploration for premium players', async () => {
@@ -403,8 +408,12 @@ describe('exploration tutorial path', () => {
     expect(mockSimulateExploration).toHaveBeenCalledWith(
       500,
       null,
-      1,
-      EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * 1.1,
+      {
+        spawnRateMultiplier: 1,
+        encounterSiteRateMultiplier: 1,
+        resourceNodeRateMultiplier: 1,
+        hiddenCacheChanceOverride: EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * 1.1,
+      },
     );
   });
 
