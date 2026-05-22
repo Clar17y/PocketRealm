@@ -26,7 +26,7 @@ vi.mock('../services/stateUpdateHelpers', () => ({
 import { mockPrisma } from '../__test__/setup';
 import { errorHandler } from '../middleware/errorHandler';
 import { generateAccessToken } from '../middleware/auth';
-import { depositItem, withdrawItem, withdrawBatch } from '../services/stashService';
+import { depositItem, depositBatch, withdrawItem, withdrawBatch } from '../services/stashService';
 import { fetchItemDTOs } from '../services/stateUpdateHelpers';
 import { inventoryRouter } from './inventory';
 
@@ -121,6 +121,33 @@ describe('inventory stash routes', () => {
     });
     expect(depositItem).toHaveBeenCalledWith('player-1', itemId, 3);
     expect(fetchItemDTOs).toHaveBeenCalledWith([itemId]);
+  });
+
+  it('only reports actually-deposited items as removed when batch deposit skips some', async () => {
+    const skippedId = '33333333-3333-4333-8333-333333333333';
+    vi.mocked(depositBatch).mockResolvedValue({ depositedCount: 1, depositedItemIds: [itemId] });
+
+    const res = await request(buildApp())
+      .post('/api/v1/inventory/stash/deposit/batch')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ itemIds: [itemId, skippedId] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.depositedCount).toBe(1);
+    expect(res.body.stateUpdates.inventoryRemoved).toEqual([itemId]);
+  });
+
+  it('omits inventoryRemoved when a batch deposit deposits nothing', async () => {
+    vi.mocked(depositBatch).mockResolvedValue({ depositedCount: 0, depositedItemIds: [] });
+
+    const res = await request(buildApp())
+      .post('/api/v1/inventory/stash/deposit/batch')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ itemIds: [itemId] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.depositedCount).toBe(0);
+    expect(res.body.stateUpdates).not.toHaveProperty('inventoryRemoved');
   });
 
   it('returns the affected marked backpack stack when withdraw merges beside an unmarked same-template stack', async () => {

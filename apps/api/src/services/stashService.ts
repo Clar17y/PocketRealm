@@ -152,7 +152,7 @@ export async function withdrawItem(
 export async function depositBatch(
   playerId: string,
   itemIds: string[]
-): Promise<{ depositedCount: number }> {
+): Promise<{ depositedCount: number; depositedItemIds: string[] }> {
   const uniqueIds = [...new Set(itemIds)];
   return prisma.$transaction(async (tx) => {
     // Batch-fetch all items in one query
@@ -162,16 +162,19 @@ export async function depositBatch(
     });
     const itemMap = new Map(items.map((item) => [item.id, item]));
 
-    let depositedCount = 0;
+    // Track which items were actually deposited so the route only reports those
+    // as removed from the backpack; skipped items (equipped, already stashed,
+    // or not owned) must stay in the inventory state.
+    const depositedItemIds: string[] = [];
     for (const itemId of uniqueIds) {
       const item = itemMap.get(itemId);
       if (!item || item.ownerId !== playerId) continue;
       if (item.equipment.length > 0) continue;
       if (item.inStash) continue;
       await moveStackableItem(tx, item, item.quantity, true);
-      depositedCount++;
+      depositedItemIds.push(itemId);
     }
-    return { depositedCount };
+    return { depositedCount: depositedItemIds.length, depositedItemIds };
   });
 }
 

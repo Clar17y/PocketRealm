@@ -414,9 +414,9 @@ inventoryRouter.post('/stash/deposit/batch', asyncHandler(async (req, res) => {
     fetchMaterialTotals(playerId),
   ]);
   res.json({
-    ...result,
+    depositedCount: result.depositedCount,
     stateUpdates: {
-      inventoryRemoved: body.itemIds,
+      ...(result.depositedItemIds.length > 0 ? { inventoryRemoved: result.depositedItemIds } : {}),
       inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
       materialTotals,
     },
