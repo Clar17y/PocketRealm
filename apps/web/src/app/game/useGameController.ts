@@ -99,6 +99,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     ambientTexts: Record<string, string> | null;
     environmentalTexts: Record<string, string> | null;
     trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
+    prospectableResourceNodes?: Array<{
+      resourceNodeId: string;
+      resourceType: string;
+      skillRequired: string;
+      levelRequired: number;
+    }>;
     exploration: {
       turnsExplored: number;
       turnsToExplore: number | null;
