@@ -28,6 +28,7 @@ export interface EquipmentStats {
 }
 
 type NumericEquipmentStatKey = Exclude<keyof EquipmentStats, 'actionModifiers'>;
+type StatTotals = Record<NumericEquipmentStatKey, number>;
 
 const NUMERIC_EQUIPMENT_STAT_KEYS: readonly NumericEquipmentStatKey[] = [
   'attack',
@@ -129,7 +130,7 @@ async function computeEquipmentStats(playerId: string): Promise<EquipmentStats> 
   return { ...totals, actionModifiers };
 }
 
-function createEmptyStatTotals(): Record<NumericEquipmentStatKey, number> {
+function createEmptyStatTotals(): StatTotals {
   return {
     attack: 0,
     rangedPower: 0,
@@ -146,7 +147,7 @@ function createEmptyStatTotals(): Record<NumericEquipmentStatKey, number> {
   };
 }
 
-function readItemStats(statSources: ReadonlyArray<Record<string, unknown> | null | undefined>): Record<NumericEquipmentStatKey, number> {
+function readItemStats(statSources: ReadonlyArray<Record<string, unknown> | null | undefined>): StatTotals {
   const itemStats = createEmptyStatTotals();
   for (const stats of statSources) {
     if (!stats) continue;
@@ -161,7 +162,7 @@ function readItemStats(statSources: ReadonlyArray<Record<string, unknown> | null
 }
 
 function applyCraftMarkStatModifiers(
-  itemStats: Record<NumericEquipmentStatKey, number>,
+  itemStats: StatTotals,
   craftMarks: readonly CraftMark[],
 ): void {
   const baseItemStats = { ...itemStats };
@@ -176,8 +177,8 @@ function applyCraftMarkStatModifiers(
 }
 
 function applyCraftMarkStatModifier(
-  itemStats: Record<NumericEquipmentStatKey, number>,
-  baseItemStats: Record<NumericEquipmentStatKey, number>,
+  itemStats: StatTotals,
+  baseItemStats: StatTotals,
   modifier: ItemStatModifier,
 ): void {
   itemStats[modifier.stat] += modifier.isPercent

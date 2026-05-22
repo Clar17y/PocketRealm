@@ -122,14 +122,13 @@ interface VocationCounterStatRow {
   value?: number | bigint | null;
 }
 
-type VocationStatKey =
+type StaticVocationStatKey =
   | VocationSummaryStatKey
   | VocationHonedTurnsKey
   | VocationCraftsKey
-  | VocationGathersKey
-  | DynamicVocationStatKey;
+  | VocationGathersKey;
 type VocationStats =
-  & Record<Exclude<VocationStatKey, DynamicVocationStatKey>, number>
+  & Record<StaticVocationStatKey, number>
   & Partial<Record<DynamicVocationStatKey, number>>;
 
 function toStatNumber(value: unknown): number {
