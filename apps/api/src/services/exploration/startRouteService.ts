@@ -14,13 +14,13 @@ import {
   EXPLORATION_TRACKING_CONSTANTS,
   RESOURCE_PROSPECTING_CONSTANTS,
   TUTORIAL_STEP_EXPLORE,
-  type SkillType,
 } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { trackProgress } from '../../services/progressService';
 import { setAllResources } from '../../services/resourceService';
+import { toGatheringSkillType } from '../../services/resourceProspectingService';
 import { assertCanAct, assertInZone, trackAchievements } from '../../utils/routeHelpers.js';
 import { preparePlayerForCombat } from '../../services/combatOrchestrationService';
 import { getEquipmentStats } from '../../services/equipmentService';
@@ -158,7 +158,7 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
     }
 
     if (prospectingNode) {
-      prospectingSkillLevel = await getSkillLevel(playerId, prospectingNode.skillRequired as SkillType);
+      prospectingSkillLevel = await getSkillLevel(playerId, toGatheringSkillType(prospectingNode.skillRequired));
     }
 
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);

@@ -28,6 +28,7 @@ import {
   type ApiResponse,
   type WorldEventResponse,
   type SkillPointState,
+  type ProspectableResourceNodeResponse,
 } from '@/lib/api';
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
@@ -99,12 +100,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     ambientTexts: Record<string, string> | null;
     environmentalTexts: Record<string, string> | null;
     trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
-    prospectableResourceNodes?: Array<{
-      resourceNodeId: string;
-      resourceType: string;
-      skillRequired: string;
-      levelRequired: number;
-    }>;
+    prospectableResourceNodes?: ProspectableResourceNodeResponse[];
     exploration: {
       turnsExplored: number;
       turnsToExplore: number | null;

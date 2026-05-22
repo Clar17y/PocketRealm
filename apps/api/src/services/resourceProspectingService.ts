@@ -18,7 +18,7 @@ type WeightedResourceNode = {
   levelRequired: number;
 };
 
-function toGatheringSkillType(value: string): SkillType {
+export function toGatheringSkillType(value: string): SkillType {
   return GATHERING_SKILLS.includes(value as SkillType) ? value as SkillType : 'mining';
 }
 

@@ -23,15 +23,9 @@ import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import { getNpcLine } from '@pocketrealm/shared/constants/npcDialogue';
+import type { ProspectableResourceNodeResponse } from '@/lib/api/combat';
 
 type ExplorationFocusMode = 'none' | 'tracking' | 'prospecting';
-
-interface ProspectableResourceNodeOption {
-  resourceNodeId: string;
-  resourceType: string;
-  skillRequired: string;
-  levelRequired: number;
-}
 
 interface ExplorationProps {
   currentZone: {
@@ -47,7 +41,7 @@ interface ExplorationProps {
     tiers: Record<string, number> | null;
   } | null;
   trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
-  prospectableResourceNodes?: ProspectableResourceNodeOption[];
+  prospectableResourceNodes?: ProspectableResourceNodeResponse[];
   skills?: Array<{ skillType: string; level: number }>;
   availableTurns: number;
   onStartExploration: (
