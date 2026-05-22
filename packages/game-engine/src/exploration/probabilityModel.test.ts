@@ -92,6 +92,26 @@ describe('estimateExploration', () => {
       cumulativeProbability(EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * 2, 100),
     );
   });
+
+  it('supports separate rate multipliers for prospecting', () => {
+    const est = estimateExploration(1000, null, {
+      spawnRateMultiplier: 1,
+      encounterSiteRateMultiplier: 1 / 3,
+      resourceNodeRateMultiplier: 3,
+    });
+
+    expect(est.expectedAmbushes).toBeCloseTo(5);
+    expect(est.expectedEncounterSites).toBeCloseTo(0.5);
+    expect(est.resourceNodeChance).toBeCloseTo(cumulativeProbability(0.0015, 1000));
+  });
+
+  it('keeps the legacy scalar multiplier behavior for ambushes and sites only', () => {
+    const est = estimateExploration(1000, null, 0.75);
+
+    expect(est.expectedAmbushes).toBeCloseTo(3.75);
+    expect(est.expectedEncounterSites).toBeCloseTo(1.125);
+    expect(est.resourceNodeChance).toBeCloseTo(cumulativeProbability(0.0005, 1000));
+  });
 });
 
 describe('simulateExploration', () => {
@@ -129,6 +149,22 @@ describe('simulateExploration', () => {
       .mockReturnValue(0.9);
     const outcomes = simulateExploration(1, null, 1, 0.5);
     expect(outcomes.some((o) => o.type === 'hidden_cache')).toBe(true);
+  });
+
+  it('uses separate rate multipliers for resource node checks', () => {
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.9) // ambush
+      .mockReturnValueOnce(0.9) // site
+      .mockReturnValueOnce(0.001) // resource node: hit with 3x multiplier
+      .mockReturnValue(0.9);
+
+    const outcomes = simulateExploration(1, null, {
+      spawnRateMultiplier: 1,
+      encounterSiteRateMultiplier: 1,
+      resourceNodeRateMultiplier: 3,
+    });
+
+    expect(outcomes.some((o) => o.type === 'resource_node')).toBe(true);
   });
 
   it('results are sorted by turnOccurred', () => {
