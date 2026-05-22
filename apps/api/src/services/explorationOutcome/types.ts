@@ -53,6 +53,8 @@ export interface ExplorationOutcomeContext {
   };
   mobToFamilyMap: Map<string, string>;
   trackingFamilyId: string | null;
+  prospectingResourceNodeId: string | null;
+  prospectingSkillLevel: number | null;
   cachedZoneEvents: WorldEventData[];
   cachedWorldEvents: WorldEventData[];
   isTutorialExplore: boolean;
@@ -60,6 +62,8 @@ export interface ExplorationOutcomeContext {
     id: string;
     discoveryWeight: number;
     resourceType: string;
+    skillRequired: string;
+    levelRequired: number;
     minCapacity: number;
     maxCapacity: number;
   }>;

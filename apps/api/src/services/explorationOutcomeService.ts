@@ -10,6 +10,7 @@ import { getCachedBossMobTemplates } from './staticDataCacheService';
 import { getIo } from '../socket';
 import { emitSystemMessage } from './systemMessageService';
 import { applyTrackedFamilyWeightBias } from './explorationTrackingService';
+import { applyProspectingResourceWeightBias } from './resourceProspectingService';
 import {
   pickWeighted,
   randomIntInclusive,
@@ -46,6 +47,8 @@ export async function processExplorationOutcomes(
     explorationProgress,
     spawnMods,
     trackingFamilyId,
+    prospectingResourceNodeId,
+    prospectingSkillLevel,
     cachedZoneEvents,
     cachedWorldEvents,
     resourceNodes,
@@ -194,7 +197,14 @@ export async function processExplorationOutcomes(
     }
 
     if (outcome.type === 'resource_node' && resourceNodes.length > 0) {
-      const nodeTemplate = pickWeighted(resourceNodes, 'discoveryWeight') as typeof resourceNodes[number] | null;
+      const weightedResourceNodes = prospectingResourceNodeId
+        ? applyProspectingResourceWeightBias(
+            resourceNodes,
+            prospectingResourceNodeId,
+            prospectingSkillLevel ?? 1,
+          )
+        : resourceNodes;
+      const nodeTemplate = pickWeighted(weightedResourceNodes, 'discoveryWeight') as typeof resourceNodes[number] | null;
       if (!nodeTemplate) continue;
 
       const capacity = randomIntInclusive(nodeTemplate.minCapacity, nodeTemplate.maxCapacity);

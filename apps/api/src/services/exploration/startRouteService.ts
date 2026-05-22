@@ -12,7 +12,9 @@ import {
   type PotionConsumed,
   type QuestProgressUpdate,
   EXPLORATION_TRACKING_CONSTANTS,
+  RESOURCE_PROSPECTING_CONSTANTS,
   TUTORIAL_STEP_EXPLORE,
+  type SkillType,
 } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
@@ -32,7 +34,7 @@ import { getIo } from '../../socket';
 import { logger } from '../../logger';
 import { deductConsumedPotions } from '../../services/potionService';
 import { getCombatBuffsWithUses } from '../../services/buffService';
-import { getMainHandAttackSkill } from '../../services/combatStatsService';
+import { getMainHandAttackSkill, getSkillLevel } from '../../services/combatStatsService';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers';
 import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
@@ -88,7 +90,9 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
     });
     const isTutorialExplore = playerRecord?.tutorialStep === TUTORIAL_STEP_EXPLORE;
     const trackingFamilyId = isTutorialExplore ? null : body.trackingFamilyId ?? null;
+    const prospectingResourceNodeId = isTutorialExplore ? null : body.prospectingResourceNodeId ?? null;
     let effectiveTrackingFamilyId = trackingFamilyId;
+    let prospectingSkillLevel: number | null = null;
 
     const zone = await prisma.zone.findUnique({ where: { id: body.zoneId } });
     if (!zone) {
@@ -139,6 +143,22 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
       if (!trackingFamily || !familyHasEligibleMembersForTier(trackingFamily, body.zoneId, selectedTier)) {
         effectiveTrackingFamilyId = null;
       }
+    }
+
+    const prospectingNode = prospectingResourceNodeId
+      ? resourceNodes.find((node) => node.id === prospectingResourceNodeId)
+      : null;
+
+    if (prospectingResourceNodeId && !prospectingNode) {
+      throw new AppError(
+        400,
+        'That resource cannot be prospected in this zone.',
+        'INVALID_PROSPECTING_RESOURCE',
+      );
+    }
+
+    if (prospectingNode) {
+      prospectingSkillLevel = await getSkillLevel(playerId, prospectingNode.skillRequired as SkillType);
     }
 
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);
@@ -208,9 +228,20 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
       ? EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * PREMIUM_CONSTANTS.BONUS_MULTIPLIER
       : null;
 
+    const explorationRateOptions = {
+      spawnRateMultiplier,
+      encounterSiteRateMultiplier: prospectingResourceNodeId
+        ? RESOURCE_PROSPECTING_CONSTANTS.ENCOUNTER_SITE_RATE_MULTIPLIER
+        : 1,
+      resourceNodeRateMultiplier: prospectingResourceNodeId
+        ? RESOURCE_PROSPECTING_CONSTANTS.RESOURCE_NODE_RATE_MULTIPLIER
+        : 1,
+      hiddenCacheChanceOverride: hiddenCacheChance,
+    };
+
     const outcomes = isTutorialExplore
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
-      : simulateExploration(effectiveTurns, effectiveExitChance, spawnRateMultiplier, hiddenCacheChance);
+      : simulateExploration(effectiveTurns, effectiveExitChance, explorationRateOptions);
 
     // --- Process all outcome events ---
     const outcomeResult = await processExplorationOutcomes(
@@ -234,6 +265,8 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
         spawnMods,
         mobToFamilyMap,
         trackingFamilyId: effectiveTrackingFamilyId,
+        prospectingResourceNodeId,
+        prospectingSkillLevel,
         cachedZoneEvents,
         cachedWorldEvents,
         isTutorialExplore,

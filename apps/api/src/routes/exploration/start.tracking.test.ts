@@ -75,6 +75,7 @@ vi.mock('../../services/potionService', () => ({
 }));
 vi.mock('../../services/combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
+  getSkillLevel: vi.fn().mockResolvedValue(1),
 }));
 vi.mock('../../services/guildUpgradeService', () => ({
   getPlayerGuildModifiers: vi.fn().mockResolvedValue({
@@ -248,22 +249,25 @@ import {
   buildEncounterSiteMobs,
   type ZoneFamilyRow,
 } from '../../services/exploration/helpers';
-import { getCachedZoneMobFamilies } from '../../services/staticDataCacheService';
+import { getCachedResourceNodesByZone, getCachedZoneMobFamilies } from '../../services/staticDataCacheService';
 import { buildTrackableMobFamiliesByZone } from '../../services/explorationTrackingService';
 import { processExplorationOutcomes, type ExplorationOutcomeContext } from '../../services/explorationOutcomeService';
 import { simulateExploration } from '@pocketrealm/game-engine';
-import { EXPLORATION_TRACKING_CONSTANTS, TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
+import { EXPLORATION_TRACKING_CONSTANTS, RESOURCE_PROSPECTING_CONSTANTS, TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
 import { addExplorationTurns, getExplorationPercent } from '../../services/zoneExplorationService';
 import { getUndiscoveredNeighborZones } from '../../services/zoneDiscoveryService';
+import { getSkillLevel } from '../../services/combatStatsService';
 
 const mockBuildTrackableMobFamiliesByZone = buildTrackableMobFamiliesByZone as ReturnType<typeof vi.fn>;
 const mockBuildEncounterSiteMobs = buildEncounterSiteMobs as ReturnType<typeof vi.fn>;
+const mockGetCachedResourceNodesByZone = getCachedResourceNodesByZone as ReturnType<typeof vi.fn>;
 const mockGetCachedZoneMobFamilies = getCachedZoneMobFamilies as ReturnType<typeof vi.fn>;
 const mockProcessExplorationOutcomes = processExplorationOutcomes as ReturnType<typeof vi.fn>;
 const mockSimulateExploration = simulateExploration as ReturnType<typeof vi.fn>;
 const mockAddExplorationTurns = addExplorationTurns as ReturnType<typeof vi.fn>;
 const mockGetExplorationPercent = getExplorationPercent as ReturnType<typeof vi.fn>;
 const mockGetUndiscoveredNeighborZones = getUndiscoveredNeighborZones as ReturnType<typeof vi.fn>;
+const mockGetSkillLevel = getSkillLevel as ReturnType<typeof vi.fn>;
 
 function findHandler(method: string, path: string) {
   const layer = (startRouter as any).stack.find(
@@ -282,6 +286,8 @@ function mockRes() {
 }
 
 const ZONE_ID = '00000000-0000-0000-0000-000000000001';
+const RESOURCE_NODE_ID = '00000000-0000-0000-0000-000000000010';
+const OTHER_RESOURCE_NODE_ID = '00000000-0000-0000-0000-000000000011';
 
 const BASE_EXPLORATION_OUTCOME_CONTEXT = {
   playerId: 'p1',
@@ -353,7 +359,10 @@ const BASE_EXPLORATION_OUTCOME_CONTEXT = {
   resourceNodes: [],
   undiscoveredNeighbors: [],
   thresholdByToId: new Map(),
-} satisfies Omit<ExplorationOutcomeContext, 'zoneFamilies' | 'mobToFamilyMap' | 'trackingFamilyId'>;
+} satisfies Omit<
+  ExplorationOutcomeContext,
+  'zoneFamilies' | 'mobToFamilyMap' | 'trackingFamilyId' | 'prospectingResourceNodeId' | 'prospectingSkillLevel'
+>;
 
 function createZoneFamily({
   mobFamilyId,
@@ -401,6 +410,8 @@ function createOutcomeContext(
     zoneFamilies,
     mobToFamilyMap: overrides.mobToFamilyMap ?? buildMobToFamilyMap(zoneFamilies),
     trackingFamilyId: overrides.trackingFamilyId ?? null,
+    prospectingResourceNodeId: overrides.prospectingResourceNodeId ?? null,
+    prospectingSkillLevel: overrides.prospectingSkillLevel ?? null,
   };
 }
 
@@ -426,6 +437,8 @@ describe('POST /exploration/start tracking contract', () => {
       },
     ]));
     mockGetCachedZoneMobFamilies.mockResolvedValue([]);
+    mockGetCachedResourceNodesByZone.mockResolvedValue([]);
+    mockGetSkillLevel.mockResolvedValue(1);
     mockGetUndiscoveredNeighborZones.mockResolvedValue([]);
     mockProcessExplorationOutcomes.mockResolvedValue({
       events: [],
@@ -485,6 +498,132 @@ describe('POST /exploration/start tracking contract', () => {
     );
   });
 
+  it('rejects requests that include both tracking and resource prospecting', async () => {
+    const trackingFamilyId = '22222222-2222-2222-2222-222222222222';
+    mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
+      [ZONE_ID, [{ mobFamilyId: trackingFamilyId, name: 'Spiders' }]],
+    ]));
+    mockGetCachedResourceNodesByZone.mockResolvedValue([
+      {
+        id: RESOURCE_NODE_ID,
+        zoneId: ZONE_ID,
+        resourceType: 'copper_ore',
+        skillRequired: 'mining',
+        levelRequired: 1,
+        discoveryWeight: 100,
+        minCapacity: 20,
+        maxCapacity: 100,
+      },
+    ]);
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        trackingFamilyId,
+        prospectingResourceNodeId: RESOURCE_NODE_ID,
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/start');
+    await handler(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(mockSimulateExploration).not.toHaveBeenCalled();
+  });
+
+  it('rejects a prospecting resource that is not in the selected zone', async () => {
+    mockGetCachedResourceNodesByZone.mockResolvedValue([
+      {
+        id: OTHER_RESOURCE_NODE_ID,
+        zoneId: ZONE_ID,
+        resourceType: 'oak_log',
+        skillRequired: 'woodcutting',
+        levelRequired: 1,
+        discoveryWeight: 100,
+        minCapacity: 20,
+        maxCapacity: 100,
+      },
+    ]);
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        prospectingResourceNodeId: RESOURCE_NODE_ID,
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/start');
+    await handler(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        code: 'INVALID_PROSPECTING_RESOURCE',
+      }),
+    );
+    expect(mockSimulateExploration).not.toHaveBeenCalled();
+  });
+
+  it('passes prospecting rate options and skill context to outcome processing', async () => {
+    mockGetCachedResourceNodesByZone.mockResolvedValue([
+      {
+        id: RESOURCE_NODE_ID,
+        zoneId: ZONE_ID,
+        resourceType: 'copper_ore',
+        skillRequired: 'mining',
+        levelRequired: 1,
+        discoveryWeight: 100,
+        minCapacity: 20,
+        maxCapacity: 100,
+      },
+    ]);
+    mockGetSkillLevel.mockResolvedValue(7);
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        tier: 1,
+        prospectingResourceNodeId: RESOURCE_NODE_ID,
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/start');
+    await handler(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockGetSkillLevel).toHaveBeenCalledWith('p1', 'mining');
+    expect(mockSimulateExploration).toHaveBeenCalledWith(
+      500,
+      null,
+      {
+        spawnRateMultiplier: 1,
+        encounterSiteRateMultiplier: RESOURCE_PROSPECTING_CONSTANTS.ENCOUNTER_SITE_RATE_MULTIPLIER,
+        resourceNodeRateMultiplier: RESOURCE_PROSPECTING_CONSTANTS.RESOURCE_NODE_RATE_MULTIPLIER,
+        hiddenCacheChanceOverride: null,
+      },
+    );
+    expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trackingFamilyId: null,
+        prospectingResourceNodeId: RESOURCE_NODE_ID,
+        prospectingSkillLevel: 7,
+      }),
+      expect.any(Array),
+    );
+  });
+
   it('passes tracking context through to outcome processing and applies the penalty', async () => {
     const trackingFamilyId = '22222222-2222-2222-2222-222222222222';
     mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
@@ -532,7 +671,16 @@ describe('POST /exploration/start tracking contract', () => {
     const handler = findHandler('post', '/start');
     await handler(req, res, next);
 
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER, null);
+    expect(mockSimulateExploration).toHaveBeenCalledWith(
+      500,
+      null,
+      {
+        spawnRateMultiplier: EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER,
+        encounterSiteRateMultiplier: 1,
+        resourceNodeRateMultiplier: 1,
+        hiddenCacheChanceOverride: null,
+      },
+    );
     expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({ trackingFamilyId }),
       expect.any(Array),
@@ -754,7 +902,16 @@ describe('POST /exploration/start tracking contract', () => {
     await handler(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1, null);
+    expect(mockSimulateExploration).toHaveBeenCalledWith(
+      500,
+      null,
+      {
+        spawnRateMultiplier: 1,
+        encounterSiteRateMultiplier: 1,
+        resourceNodeRateMultiplier: 1,
+        hiddenCacheChanceOverride: null,
+      },
+    );
     expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({
         trackingFamilyId: null,
@@ -780,6 +937,44 @@ describe('POST /exploration/start tracking contract', () => {
 
     expect(mockBuildTrackableMobFamiliesByZone).not.toHaveBeenCalled();
     expect(mockSimulateExploration).not.toHaveBeenCalled();
+  });
+
+  it('ignores prospecting entirely during tutorial exploration', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: TUTORIAL_STEP_EXPLORE });
+    mockGetCachedResourceNodesByZone.mockResolvedValue([
+      {
+        id: RESOURCE_NODE_ID,
+        zoneId: ZONE_ID,
+        resourceType: 'copper_ore',
+        skillRequired: 'mining',
+        levelRequired: 1,
+        discoveryWeight: 100,
+        minCapacity: 20,
+        maxCapacity: 100,
+      },
+    ]);
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        prospectingResourceNodeId: RESOURCE_NODE_ID,
+      },
+    } as any;
+    const res = mockRes();
+    const handler = findHandler('post', '/start');
+    await handler(req, res, vi.fn());
+
+    expect(mockGetSkillLevel).not.toHaveBeenCalled();
+    expect(mockSimulateExploration).not.toHaveBeenCalled();
+    expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prospectingResourceNodeId: null,
+        prospectingSkillLevel: null,
+      }),
+      expect.any(Array),
+    );
   });
 
   it('boosts tracked family weights while suppressing non-tracked ones', () => {
@@ -846,6 +1041,61 @@ describe('POST /exploration/start tracking contract', () => {
       expect.objectContaining({
         type: 'encounter_site',
         details: expect.objectContaining({ mobFamilyId: 'family-rat' }),
+      }),
+    );
+  });
+
+  it('biases resource-node selection toward the prospected target', async () => {
+    const realProcessExplorationOutcomes = await loadRealProcessExplorationOutcomes();
+    const context = {
+      ...createOutcomeContext({
+        zoneFamilies: [],
+        resourceNodes: [
+          {
+            id: OTHER_RESOURCE_NODE_ID,
+            discoveryWeight: 100,
+            resourceType: 'oak_log',
+            skillRequired: 'woodcutting',
+            levelRequired: 1,
+            minCapacity: 20,
+            maxCapacity: 20,
+          },
+          {
+            id: RESOURCE_NODE_ID,
+            discoveryWeight: 100,
+            resourceType: 'copper_ore',
+            skillRequired: 'mining',
+            levelRequired: 1,
+            minCapacity: 20,
+            maxCapacity: 20,
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000012',
+            discoveryWeight: 100,
+            resourceType: 'forest_sage',
+            skillRequired: 'foraging',
+            levelRequired: 1,
+            minCapacity: 20,
+            maxCapacity: 20,
+          },
+        ] as any,
+      }),
+      prospectingResourceNodeId: RESOURCE_NODE_ID,
+      prospectingSkillLevel: 1,
+    } as ExplorationOutcomeContext & {
+      prospectingResourceNodeId: string;
+      prospectingSkillLevel: number;
+    };
+
+    const result = await realProcessExplorationOutcomes(
+      context,
+      [{ turnOccurred: 10, type: 'resource_node' }],
+    );
+
+    expect(result.pendingResources[0]).toEqual(
+      expect.objectContaining({
+        resourceNodeId: RESOURCE_NODE_ID,
+        resourceType: 'copper_ore',
       }),
     );
   });
