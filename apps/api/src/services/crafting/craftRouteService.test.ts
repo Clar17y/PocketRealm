@@ -329,6 +329,8 @@ describe('craftItem vocation integration', () => {
       expect.objectContaining({ totalTurnsSpent: 5 }),
       {
         statKeys: expect.arrayContaining([
+          'totalVocationTechniqueUses',
+          'distinctVocationTechniquesUsed',
           'totalVocationCraftMarks',
           'distinctVocationCraftMarks',
         ]),

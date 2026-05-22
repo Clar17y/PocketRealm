@@ -473,6 +473,9 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       if (craftMarks && craftMarks.length > 0) {
         craftAchKeys.push('totalVocationCraftMarks', 'distinctVocationCraftMarks');
       }
+      if (selectedTechnique) {
+        craftAchKeys.push('totalVocationTechniqueUses', 'distinctVocationTechniquesUsed');
+      }
     }
     await trackAchievements(playerId, craftCounters, { statKeys: craftAchKeys });
 

@@ -179,6 +179,33 @@ describe('getEquipmentStats', () => {
     expect(stats.attack).toBe(5);
     expect(stats.actionModifiers).toEqual([actionModifier]);
   });
+
+  it('applies item stat benefits and drawbacks from valid equipped craft marks', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      {
+        slot: 'main_hand',
+        item: {
+          currentDurability: 10,
+          craftMarks: [{
+            markId: 'bowyer_tight_string_tight_string_mark',
+            name: 'Tight String Mark',
+            sourceTechniqueId: 'bowyer_tight_string',
+            description: 'A taut string mark.',
+            itemStatBenefits: [{ stat: 'rangedPower', value: 0.04, isPercent: true }],
+            itemStatDrawbacks: [{ stat: 'accuracy', value: -0.02, isPercent: true }],
+            actionModifiers: [],
+          }],
+          template: { baseStats: { rangedPower: 100, accuracy: 50 }, maxDurability: 50 },
+          bonusStats: { rangedPower: 25 },
+        },
+      },
+    ]);
+
+    const stats = await getEquipmentStats('p1');
+
+    expect(stats.rangedPower).toBe(130);
+    expect(stats.accuracy).toBe(49);
+  });
 });
 
 describe('equipItem', () => {

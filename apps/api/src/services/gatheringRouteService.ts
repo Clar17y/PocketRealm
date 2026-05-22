@@ -612,6 +612,9 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     if (gemCrit) {
       gatherAchKeys.push('totalVocationGatherCrits');
     }
+    if (selectedTechnique) {
+      gatherAchKeys.push('totalVocationTechniqueUses', 'distinctVocationTechniquesUsed');
+    }
   }
   await trackAchievements(playerId, {
     totalGatheringActions: actions,

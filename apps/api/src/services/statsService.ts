@@ -29,6 +29,8 @@ type CrownStatKey = `crowns_${CrownGroup}`;
 type VocationHonedTurnsKey = `vocationHonedTurns_${VocationId}`;
 type VocationCraftsKey = `vocationCrafts_${VocationId}`;
 type VocationGathersKey = `vocationGathers_${VocationId}`;
+type VocationTechniqueUsesKey = `vocationTechniqueUses_${string}`;
+type VocationRespecsKey = `vocationRespecs_${VocationId}`;
 type VocationSummaryStatKey =
   | 'totalVocationHonedTurns'
   | 'highestVocationRank'
@@ -48,7 +50,11 @@ type VocationSummaryStatKey =
 
 export type StatKey = CounterKey | DerivedStatKey | CrownStatKey;
 
-export type ResolvedStats = Record<StatKey, number> & Record<string, number>;
+type DynamicVocationStatKey = VocationTechniqueUsesKey | VocationRespecsKey;
+
+export type ResolvedStats =
+  & Record<StatKey, number>
+  & Partial<Record<DynamicVocationStatKey, number>>;
 
 const TOTAL_PREFIX_COUNT = getAllMobPrefixes().length;
 
@@ -116,8 +122,15 @@ interface VocationCounterStatRow {
   value?: number | bigint | null;
 }
 
-type VocationStatKey = VocationSummaryStatKey | VocationHonedTurnsKey | VocationCraftsKey | VocationGathersKey;
-type VocationStats = Record<VocationStatKey, number> & Record<string, number>;
+type VocationStatKey =
+  | VocationSummaryStatKey
+  | VocationHonedTurnsKey
+  | VocationCraftsKey
+  | VocationGathersKey
+  | DynamicVocationStatKey;
+type VocationStats =
+  & Record<Exclude<VocationStatKey, DynamicVocationStatKey>, number>
+  & Partial<Record<DynamicVocationStatKey, number>>;
 
 function toStatNumber(value: unknown): number {
   const numeric = typeof value === 'bigint' ? Number(value) : Number(value ?? 0);
@@ -388,7 +401,10 @@ export async function resolveStats(playerId: string, statKeys: string[]): Promis
   const result: Record<string, number> = {};
   for (const key of statKeys) {
     if (key in all) {
-      result[key] = all[key as StatKey];
+      const value = all[key as keyof ResolvedStats];
+      if (typeof value === 'number') {
+        result[key] = value;
+      }
     }
   }
   return result;

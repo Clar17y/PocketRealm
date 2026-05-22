@@ -379,6 +379,16 @@ describe('mineResourceNode vocation technique integration', () => {
       create: { playerId: PLAYER_ID, statKey: 'vocation_technique_uses_prospector_quiet_pick', value: 1 },
       update: { value: { increment: 1 } },
     });
+    expect(trackAchievements).toHaveBeenCalledWith(
+      PLAYER_ID,
+      expect.objectContaining({ totalGatheringActions: 2, totalTurnsSpent: 58 }),
+      {
+        statKeys: expect.arrayContaining([
+          'totalVocationTechniqueUses',
+          'distinctVocationTechniquesUsed',
+        ]),
+      },
+    );
   });
 
   it('applies a selected learned gathering technique to yield when inventory pressure allows', async () => {
