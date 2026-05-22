@@ -37,15 +37,18 @@ type VocationSummaryStatKey =
   | 'vocationRank20Count'
   | 'totalVocationTechniquesLearned'
   | 'vocationTechniqueVocationCount'
+  | 'totalVocationTechniqueUses'
+  | 'distinctVocationTechniquesUsed'
   | 'totalVocationCrafts'
   | 'totalVocationGathers'
   | 'totalVocationCraftMarks'
   | 'distinctVocationCraftMarks'
-  | 'totalVocationGatherCrits';
+  | 'totalVocationGatherCrits'
+  | 'totalVocationRespecs';
 
 export type StatKey = CounterKey | DerivedStatKey | CrownStatKey;
 
-export type ResolvedStats = Record<StatKey, number>;
+export type ResolvedStats = Record<StatKey, number> & Record<string, number>;
 
 const TOTAL_PREFIX_COUNT = getAllMobPrefixes().length;
 
@@ -114,7 +117,7 @@ interface VocationCounterStatRow {
 }
 
 type VocationStatKey = VocationSummaryStatKey | VocationHonedTurnsKey | VocationCraftsKey | VocationGathersKey;
-type VocationStats = Record<VocationStatKey, number>;
+type VocationStats = Record<VocationStatKey, number> & Record<string, number>;
 
 function toStatNumber(value: unknown): number {
   const numeric = typeof value === 'bigint' ? Number(value) : Number(value ?? 0);
@@ -199,8 +202,19 @@ async function resolveVocationStats(playerId: string): Promise<VocationStats> {
       if (value > 0) stats.distinctVocationCraftMarks += 1;
       continue;
     }
+    if (row.stat_key.startsWith('vocation_technique_uses_')) {
+      const techniqueId = row.stat_key.slice('vocation_technique_uses_'.length);
+      stats.totalVocationTechniqueUses += value;
+      if (value > 0) stats.distinctVocationTechniquesUsed += 1;
+      stats[`vocationTechniqueUses_${techniqueId}`] = value;
+      continue;
+    }
     if (row.stat_key.startsWith('vocation_gather_crits_')) {
       stats.totalVocationGatherCrits += value;
+      continue;
+    }
+    if (row.stat_key === 'vocation_respecs_total') {
+      stats.totalVocationRespecs = value;
       continue;
     }
 
@@ -218,6 +232,10 @@ async function resolveVocationStats(playerId: string): Promise<VocationStats> {
       if (row.stat_key === `vocation_gathers_${vocationId}`) {
         stats[`vocationGathers_${vocationId}`] = value;
         stats.totalVocationGathers += value;
+        break;
+      }
+      if (row.stat_key === `vocation_respecs_${vocationId}`) {
+        stats[`vocationRespecs_${vocationId}`] = value;
         break;
       }
     }
@@ -239,11 +257,14 @@ function buildEmptyVocationStats(): VocationStats {
     vocationRank20Count: 0,
     totalVocationTechniquesLearned: 0,
     vocationTechniqueVocationCount: 0,
+    totalVocationTechniqueUses: 0,
+    distinctVocationTechniquesUsed: 0,
     totalVocationCrafts: 0,
     totalVocationGathers: 0,
     totalVocationCraftMarks: 0,
     distinctVocationCraftMarks: 0,
     totalVocationGatherCrits: 0,
+    totalVocationRespecs: 0,
   } as VocationStats;
 
   for (const vocationId of VOCATION_IDS) {

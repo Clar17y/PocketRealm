@@ -153,6 +153,10 @@ describe('achievementDefinitions', () => {
         titleReward: 'Technique Keeper',
         statKey: 'totalVocationTechniquesLearned',
       });
+      expect(ACHIEVEMENTS_BY_ID.get('vocation_technique_uses_50')).toMatchObject({
+        titleReward: 'Method in Hand',
+        statKey: 'totalVocationTechniqueUses',
+      });
       expect(ACHIEVEMENTS_BY_ID.get('vocation_marks_100')).toMatchObject({
         category: 'crafting',
         titleReward: 'Marked Artisan',

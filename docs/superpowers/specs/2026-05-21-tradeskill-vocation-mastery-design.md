@@ -103,7 +103,7 @@ Gathering techniques are selected per gather action:
 Example techniques:
 
 - Weaponsmith `Sharpened Edge`: more melee damage, lower max durability.
-- Bowyer `Tight Draw`: more ranged power, higher stamina cost or faster durability loss.
+- Bowyer `Tight String`: more ranged power and stronger light/normal/skill shots from the marked bow, with faster durability loss and a small accuracy tradeoff.
 - Staffwright `Overcharged Focus`: more magic power, higher mana cost.
 - Staffwright `Efficient Channel`: lower mana cost, lower magic power or effect strength.
 - Armorer `Reinforced Plate`: more defence, lower evasion or dodge.
@@ -166,11 +166,12 @@ Vocations integrate with the existing achievement/title system.
 | Mastery | Long-term honing investment | Reach Bowyer rank 10, 25, 50 |
 | Deed | Using techniques in play | Craft 50 Tight-Drawn bows |
 | Branch | Specializing inside a vocation | Learn 5 Draw branch techniques |
+| Technique Use | Repeatedly applying chosen methods | Use vocation techniques 50 times |
 | Combat Mark | Supplying a playstyle | Craft 25 items marked for `heavy_attack` |
 | Gathering Technique | Field expertise | Find 100 gems while using Careful Extraction |
 | Prestige | Rare/high-tier accomplishments | Craft an epic item with a high-tier mark |
 
-Titles should include both broad vocation titles and branch/deed titles:
+Titles should include both broad vocation titles and branch/deed titles. The launch implementation uses natural per-vocation focus titles for early identity, including `Stone Reader`, `Stringwright`, `Edgekeeper`, `Wardweaver`, `Facet-Speaker`, and `Retort Keeper`.
 
 - Broad examples: `Master Bowyer`, `Master Alchemist`, `Master Jeweller`
 - Branch/deed examples: `Trueflight`, `Edgewright`, `Bulwark Maker`, `Spellweaver`, `Clean Cutter`
@@ -242,6 +243,16 @@ Launch includes:
 - Combat profile marks, including family and named-action modifiers.
 - Achievement/title hooks.
 - Mentor/town gating.
+
+Launch tuning constants:
+
+- Active honing cap: 120 turns per UTC day across all vocations.
+- Active honing XP: 10 vocation XP per honing turn.
+- Passive craft mastery XP: 20% of the craft's base turn cost.
+- Passive gathering mastery XP: 15% of the gather action's base turn cost.
+- Technique respec refund: 60% of spent mastery points, preserving vocation XP/rank.
+
+These values intentionally make daily active honing the reliable specialization path for seasonal characters while still allowing permanent-realm characters to broaden across many vocations over time.
 
 Out of scope for launch:
 

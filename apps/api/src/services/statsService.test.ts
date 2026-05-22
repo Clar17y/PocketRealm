@@ -157,9 +157,12 @@ describe('statsService', () => {
           { stat_key: 'vocation_crafts_weaponsmith', value: 80 },
           { stat_key: 'vocation_crafts_tailor', value: 20 },
           { stat_key: 'vocation_gathers_prospector', value: 55 },
+          { stat_key: 'vocation_technique_uses_weaponsmith_blood_groove', value: 18 },
+          { stat_key: 'vocation_technique_uses_prospector_bright_inclusion', value: 9 },
           { stat_key: 'vocation_mark_crafted_weaponsmith_blood_groove_blood_groove_mark', value: 12 },
           { stat_key: 'vocation_mark_crafted_tailor_pocket_layout_pocket_layout_mark', value: 4 },
           { stat_key: 'vocation_gather_crits_prospector_bright_inclusion_gem_crit', value: 7 },
+          { stat_key: 'vocation_respecs_total', value: 2 },
         ]);
       mockPrisma.playerStats.findUnique.mockResolvedValue(null);
 
@@ -177,9 +180,12 @@ describe('statsService', () => {
       expect(result.vocationCrafts_weaponsmith).toBe(80);
       expect(result.totalVocationGathers).toBe(55);
       expect(result.vocationGathers_prospector).toBe(55);
+      expect(result.totalVocationTechniqueUses).toBe(27);
+      expect(result.distinctVocationTechniquesUsed).toBe(2);
       expect(result.totalVocationCraftMarks).toBe(16);
       expect(result.distinctVocationCraftMarks).toBe(2);
       expect(result.totalVocationGatherCrits).toBe(7);
+      expect(result.totalVocationRespecs).toBe(2);
     });
   });
 

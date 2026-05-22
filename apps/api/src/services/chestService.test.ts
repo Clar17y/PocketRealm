@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./inventoryService', () => ({
-  addStackableItemTx: vi.fn().mockResolvedValue({ itemId: 'stack-1', quantity: 1 }),
-}));
+vi.mock('./inventoryService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./inventoryService')>();
+
+  return {
+    ...actual,
+    addStackableItemTx: vi.fn().mockResolvedValue({ itemId: 'stack-1', quantity: 1 }),
+  };
+});
 
 import { mockPrisma } from '../__test__/setup';
 import { grantEncounterSiteChestRewardsTx } from './chestService';

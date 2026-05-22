@@ -84,7 +84,7 @@ export const VOCATION_DEFINITIONS = [
     branch('bowyer_stringcraft', 'Stringcraft', 'Tension, release, and cleaner ranged shots.'),
     branch('bowyer_limbcraft', 'Limbcraft', 'Balanced limbs and resilient bow bodies.'),
   ], [
-    craftTech('bowyer_tight_string', 'bowyer', 'bowyer_stringcraft', 'Tight String', 'Twist a string that returns power without drifting.', 1, 1, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, craftStat('rangedPower', 0.04)),
+    craftTech('bowyer_tight_string', 'bowyer', 'bowyer_stringcraft', 'Tight String', 'Twist a string that returns power without drifting.', 1, 1, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, tightStringMark()),
     actionTech('bowyer_silent_release', 'bowyer', 'bowyer_stringcraft', 'Silent Release', 'Tune the string for cleaner opening shots.', 3, 1, FORGE_WEAPON_SLOTS, ['light_attack', 'normal_attack'], actionMod('bowyer_silent_release_accuracy', FORGE_WEAPON_SLOTS, ['light_attack', 'normal_attack'], 'accuracy', 0.04)),
     craftTech('bowyer_waxed_loop', 'bowyer', 'bowyer_stringcraft', 'Waxed Loop', 'Protect loops from fraying under hard draws.', 5, 2, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, durability(0.08)),
     craftTech('bowyer_even_limb', 'bowyer', 'bowyer_limbcraft', 'Even Limb', 'Tillering makes both limbs carry equal stress.', 2, 1, 'weaponsmithing', ['weapon'], FORGE_WEAPON_SLOTS, craftStat('accuracy', 0.03)),
@@ -386,6 +386,28 @@ function mark(
       actionModifiers,
     },
   };
+}
+
+function tightStringMark(): VocationTechniqueEffect {
+  return mark(
+    'tight_string_mark',
+    'Tight String Mark',
+    'A taut string mark that pushes simple shots harder while wearing the bow faster under repeated draw.',
+    ['weapon'],
+    FORGE_WEAPON_SLOTS,
+    [{ stat: 'rangedPower', value: 0.04, isPercent: true }],
+    [{ stat: 'accuracy', value: -0.02, isPercent: true }],
+    [
+      highWearMarkActionMod(
+        'bowyer_tight_string_snap_tradeoff',
+        FORGE_WEAPON_SLOTS,
+        ['light_attack', 'normal_attack', 'skill_attack'],
+        'damage',
+        0.04,
+        0.08,
+      ),
+    ],
+  );
 }
 
 function amount(value: number): VocationTechniqueEffect {
