@@ -726,6 +726,13 @@ describe('resolveManualEncounterRound', () => {
 
     await resolveManualEncounterRound(playerId, siteId, {});
 
+    expect(routeHelperMocks.serializeEncounterSiteMobs).toHaveBeenCalledWith([
+      { slot: 1, mobTemplateId: 'goblin', role: 'trash', prefix: null, status: 'defeated', room: 1 },
+      { slot: 2, mobTemplateId: 'goblin', role: 'trash', prefix: null, status: 'alive', room: 2 },
+    ]);
+    expect(databaseMocks.tx.encounterSite.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ currentRoom: 2 }),
+    }));
     expect(combatOrchestrationMocks.splitAndGrantXp).toHaveBeenCalledWith(
       playerId,
       20,

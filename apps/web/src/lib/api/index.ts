@@ -71,6 +71,7 @@ export type {
   EncounterSitesResponse,
   EncounterSiteFightSummary,
   EncounterSiteFightsResponse,
+  ProspectableResourceNodeResponse,
 } from './combat';
 
 export {

@@ -24,6 +24,41 @@ export interface ExplorationEstimate {
   expectedEncounterSites: number;
 }
 
+export interface ExplorationRateOptions {
+  spawnRateMultiplier?: number;
+  encounterSiteRateMultiplier?: number;
+  resourceNodeRateMultiplier?: number;
+  hiddenCacheChanceOverride?: number | null;
+}
+
+interface NormalizedExplorationRateOptions {
+  spawnRateMultiplier: number;
+  encounterSiteRateMultiplier: number;
+  resourceNodeRateMultiplier: number;
+  hiddenCacheChanceOverride: number | null;
+}
+
+function normalizeExplorationRateOptions(
+  rateOptionsOrSpawnMultiplier: number | ExplorationRateOptions = 1,
+  legacyHiddenCacheChanceOverride: number | null = null,
+): NormalizedExplorationRateOptions {
+  if (typeof rateOptionsOrSpawnMultiplier === 'number') {
+    return {
+      spawnRateMultiplier: rateOptionsOrSpawnMultiplier,
+      encounterSiteRateMultiplier: 1,
+      resourceNodeRateMultiplier: 1,
+      hiddenCacheChanceOverride: legacyHiddenCacheChanceOverride,
+    };
+  }
+
+  return {
+    spawnRateMultiplier: rateOptionsOrSpawnMultiplier.spawnRateMultiplier ?? 1,
+    encounterSiteRateMultiplier: rateOptionsOrSpawnMultiplier.encounterSiteRateMultiplier ?? 1,
+    resourceNodeRateMultiplier: rateOptionsOrSpawnMultiplier.resourceNodeRateMultiplier ?? 1,
+    hiddenCacheChanceOverride: rateOptionsOrSpawnMultiplier.hiddenCacheChanceOverride ?? null,
+  };
+}
+
 /**
  * Calculate cumulative probability for an event occurring
  * over N turns, given per-turn probability p.
@@ -44,20 +79,28 @@ export function cumulativeProbability(perTurnChance: number, turns: number): num
 export function estimateExploration(
   turns: number,
   zoneExitChance: number | null = null,
-  spawnRateMultiplier: number = 1,
+  rateOptionsOrSpawnMultiplier: number | ExplorationRateOptions = 1,
   hiddenCacheChanceOverride: number | null = null,
 ): ExplorationEstimate {
-  const ambushRate = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * spawnRateMultiplier;
-  const siteRate = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * spawnRateMultiplier;
-  const hiddenCacheChance = hiddenCacheChanceOverride != null
-    ? hiddenCacheChanceOverride
+  const rateOptions = normalizeExplorationRateOptions(
+    rateOptionsOrSpawnMultiplier,
+    hiddenCacheChanceOverride,
+  );
+  const ambushRate = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * rateOptions.spawnRateMultiplier;
+  const siteRate = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN
+    * rateOptions.spawnRateMultiplier
+    * rateOptions.encounterSiteRateMultiplier;
+  const resourceNodeRate = EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE
+    * rateOptions.resourceNodeRateMultiplier;
+  const hiddenCacheChance = rateOptions.hiddenCacheChanceOverride != null
+    ? rateOptions.hiddenCacheChanceOverride
     : EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE;
   return {
     turns,
     ambushChance: cumulativeProbability(ambushRate, turns),
     encounterSiteChance: cumulativeProbability(siteRate, turns),
     resourceNodeChance: cumulativeProbability(
-      EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE,
+      resourceNodeRate,
       turns
     ),
     hiddenCacheChance: cumulativeProbability(
@@ -79,16 +122,24 @@ export function estimateExploration(
 export function simulateExploration(
   turns: number,
   zoneExitChance: number | null = null,
-  spawnRateMultiplier: number = 1,
+  rateOptionsOrSpawnMultiplier: number | ExplorationRateOptions = 1,
   hiddenCacheChanceOverride: number | null = null,
 ): ExplorationOutcome[] {
   const outcomes: ExplorationOutcome[] = [];
   let canDiscoverZoneExit = zoneExitChance != null && zoneExitChance > 0;
   let canDiscoverEvent = true;
-  const ambushChance = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * spawnRateMultiplier;
-  const siteChance = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * spawnRateMultiplier;
-  const hiddenCacheChance = hiddenCacheChanceOverride != null
-    ? hiddenCacheChanceOverride
+  const rateOptions = normalizeExplorationRateOptions(
+    rateOptionsOrSpawnMultiplier,
+    hiddenCacheChanceOverride,
+  );
+  const ambushChance = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * rateOptions.spawnRateMultiplier;
+  const siteChance = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN
+    * rateOptions.spawnRateMultiplier
+    * rateOptions.encounterSiteRateMultiplier;
+  const resourceNodeChance = EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE
+    * rateOptions.resourceNodeRateMultiplier;
+  const hiddenCacheChance = rateOptions.hiddenCacheChanceOverride != null
+    ? rateOptions.hiddenCacheChanceOverride
     : EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE;
 
   for (let t = 1; t <= turns; t++) {
@@ -100,7 +151,7 @@ export function simulateExploration(
       outcomes.push({ type: 'encounter_site', turnOccurred: t });
     }
 
-    if (Math.random() < EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE) {
+    if (Math.random() < resourceNodeChance) {
       outcomes.push({ type: 'resource_node', turnOccurred: t });
     }
 

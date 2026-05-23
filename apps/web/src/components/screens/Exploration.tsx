@@ -9,12 +9,13 @@ import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { ResourceStatusBar } from '../common/ResourceStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Info, Loader2, Mountain, Play } from 'lucide-react';
-import { EXPLORATION_CONSTANTS, EXPLORATION_TRACKING_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
+import { EXPLORATION_CONSTANTS, EXPLORATION_TRACKING_CONSTANTS, HP_CONSTANTS, RESOURCE_PROSPECTING_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
+import { titleCaseFromSnake } from '@/lib/format';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
 import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
@@ -22,7 +23,9 @@ import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import { getNpcLine } from '@pocketrealm/shared/constants/npcDialogue';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import type { ProspectableResourceNodeResponse } from '@/lib/api/combat';
+
+type ExplorationFocusMode = 'none' | 'tracking' | 'prospecting';
 
 interface ExplorationProps {
   currentZone: {
@@ -38,8 +41,15 @@ interface ExplorationProps {
     tiers: Record<string, number> | null;
   } | null;
   trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
+  prospectableResourceNodes?: ProspectableResourceNodeResponse[];
+  skills?: Array<{ skillType: string; level: number }>;
   availableTurns: number;
-  onStartExploration: (turns: number, tier?: number, trackingFamilyId?: string) => void;
+  onStartExploration: (
+    turns: number,
+    tier?: number,
+    trackingFamilyId?: string,
+    prospectingResourceNodeId?: string,
+  ) => void;
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   isOverEncumbered?: boolean;
@@ -84,7 +94,7 @@ interface ExplorationProps {
   combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, trackableMobFamilies = [], availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, isOffline, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, trackableMobFamilies = [], prospectableResourceNodes = [], skills = [], availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, isOffline, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const strangerLineRef = useRef<string | null>(null);
   const prevPlaybackDataRef = useRef(playbackData);
 
@@ -100,8 +110,9 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
-  const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [focusMode, setFocusMode] = useState<ExplorationFocusMode>('none');
   const [selectedTrackingFamilyId, setSelectedTrackingFamilyId] = useState<string | null>(null);
+  const [selectedProspectingResourceNodeId, setSelectedProspectingResourceNodeId] = useState<string | null>(null);
   const [trackingInfoOpen, setTrackingInfoOpen] = useState(false);
 
   const unlockedTierNumbers = getUnlockedTiers(
@@ -117,21 +128,44 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
     : null;
   const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
   const trackingSelectedTier = maxUnlockedTier;
+  const trackingEnabled = focusMode === 'tracking';
+  const prospectingEnabled = focusMode === 'prospecting';
   const availableTrackingFamilies = trackableMobFamilies.filter((family) =>
     trackingSelectedTier == null || family.minTier <= trackingSelectedTier,
   );
+  const skillLevelByType = new Map(skills.map((skill) => [skill.skillType, skill.level]));
   const activeTrackingFamilyId = trackingEnabled && selectedTrackingFamilyId
     && availableTrackingFamilies.some((family) => family.mobFamilyId === selectedTrackingFamilyId)
       ? selectedTrackingFamilyId
       : null;
+  const activeProspectingResourceNodeId = prospectingEnabled && selectedProspectingResourceNodeId
+    && prospectableResourceNodes.some((node) => node.resourceNodeId === selectedProspectingResourceNodeId)
+      ? selectedProspectingResourceNodeId
+      : null;
+  const focusOptions: Array<{ mode: ExplorationFocusMode; label: string; disabled: boolean }> = [
+    { mode: 'none', label: 'None', disabled: false },
+    { mode: 'tracking', label: 'Track', disabled: availableTrackingFamilies.length === 0 },
+    { mode: 'prospecting', label: 'Prospect', disabled: prospectableResourceNodes.length === 0 },
+  ];
 
   const calculateProbabilities = (turns: number) => {
     const trackedResultRateMultiplier = activeTrackingFamilyId
       ? EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER
       : 1;
+    const prospectingSiteMultiplier = activeProspectingResourceNodeId
+      ? RESOURCE_PROSPECTING_CONSTANTS.ENCOUNTER_SITE_RATE_MULTIPLIER
+      : 1;
+    const prospectingResourceMultiplier = activeProspectingResourceNodeId
+      ? RESOURCE_PROSPECTING_CONSTANTS.RESOURCE_NODE_RATE_MULTIPLIER
+      : 1;
     const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * trackedResultRateMultiplier;
-    const expectedSites = turns * EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * trackedResultRateMultiplier;
-    const expectedResources = turns * EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE;
+    const expectedSites = turns
+      * EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN
+      * trackedResultRateMultiplier
+      * prospectingSiteMultiplier;
+    const expectedResources = turns
+      * EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE
+      * prospectingResourceMultiplier;
     // Cumulative probability of at least one hidden cache: 1 - (1 - p)^n
     const hiddenCacheChance = Math.min(
       Math.round((1 - Math.pow(1 - EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE, turns)) * 100),
@@ -151,7 +185,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
 
   useEffect(() => {
     if (tutorialLocked || trackableMobFamilies.length === 0 || availableTrackingFamilies.length === 0) {
-      setTrackingEnabled(false);
+      if (focusMode === 'tracking') setFocusMode('none');
       setSelectedTrackingFamilyId(null);
       return;
     }
@@ -161,13 +195,28 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
         ? prev
         : availableTrackingFamilies[0]!.mobFamilyId,
     );
-  }, [availableTrackingFamilies, trackableMobFamilies.length, tutorialLocked]);
+  }, [availableTrackingFamilies, focusMode, trackableMobFamilies.length, tutorialLocked]);
+
+  useEffect(() => {
+    if (tutorialLocked || prospectableResourceNodes.length === 0) {
+      if (focusMode === 'prospecting') setFocusMode('none');
+      setSelectedProspectingResourceNodeId(null);
+      return;
+    }
+
+    setSelectedProspectingResourceNodeId((prev) =>
+      prev && prospectableResourceNodes.some((node) => node.resourceNodeId === prev)
+        ? prev
+        : prospectableResourceNodes[0]!.resourceNodeId,
+    );
+  }, [focusMode, prospectableResourceNodes, tutorialLocked]);
 
   const startExplorationRun = () => {
     onStartExploration(
       turnInvestment[0],
       activeTrackingFamilyId ? trackingSelectedTier ?? undefined : effectiveSelectedTier ?? undefined,
       activeTrackingFamilyId ?? undefined,
+      activeProspectingResourceNodeId ?? undefined,
     );
   };
 
@@ -308,7 +357,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
           )}
 
           {/* Tier Selector */}
-          {unlockedTiers.length > 1 && !tutorialLocked && !trackingEnabled && (
+          {unlockedTiers.length > 1 && !tutorialLocked && focusMode !== 'tracking' && (
             <PixelCard>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -342,10 +391,10 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
           {!tutorialLocked && (
             <PixelCard>
               <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="relative">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Tracking</h3>
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Focus</h3>
+                    {focusMode === 'tracking' ? (
                       <button
                         type="button"
                         aria-label="Tracking info"
@@ -358,32 +407,50 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                       >
                         <Info size={14} />
                       </button>
-                    </div>
-                    {trackingInfoOpen ? (
-                      <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3 shadow-lg">
-                        <p className="text-xs text-[var(--rpg-text-secondary)]">
-                          Reduce total yield to bias ambushes and sites toward one discovered mob family.
-                        </p>
-                        <p className="mt-2 text-xs text-[var(--rpg-text-secondary)] opacity-70">
-                          Tracking never bypasses unlocked tiers, and non-family outcomes still remain.
-                        </p>
-                      </div>
                     ) : null}
                   </div>
-                  <ToggleSwitch
-                    checked={trackingEnabled}
-                    disabled={availableTrackingFamilies.length === 0}
-                    ariaLabel={trackingEnabled ? 'Disable tracking' : 'Enable tracking'}
-                    onChange={(checked) => {
-                      setTrackingEnabled(checked);
-                      if (checked) {
-                        setSelectedTrackingFamilyId((prev) => prev ?? availableTrackingFamilies[0]?.mobFamilyId ?? null);
-                      }
-                    }}
-                  />
+                  {focusMode === 'tracking' && trackingInfoOpen ? (
+                    <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3 shadow-lg">
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">
+                        Reduce total yield to bias ambushes and sites toward one discovered mob family.
+                      </p>
+                      <p className="mt-2 text-xs text-[var(--rpg-text-secondary)] opacity-70">
+                        Tracking never bypasses unlocked tiers, and non-family outcomes still remain.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Exploration focus">
+                  {focusOptions.map((option) => {
+                    const isSelected = focusMode === option.mode;
+                    return (
+                      <button
+                        key={option.mode}
+                        type="button"
+                        aria-pressed={isSelected}
+                        disabled={option.disabled}
+                        onClick={() => {
+                          setFocusMode(option.mode);
+                          if (option.mode === 'tracking') {
+                            setSelectedTrackingFamilyId((prev) => prev ?? availableTrackingFamilies[0]?.mobFamilyId ?? null);
+                          }
+                          if (option.mode === 'prospecting') {
+                            setSelectedProspectingResourceNodeId((prev) => prev ?? prospectableResourceNodes[0]?.resourceNodeId ?? null);
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-sm rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isSelected
+                            ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
+                            : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {trackableMobFamilies.length === 0 ? (
+                {!prospectingEnabled && (trackableMobFamilies.length === 0 ? (
                   <p className="text-xs text-[var(--rpg-text-secondary)]">
                     Discover a mob family in this zone before you can track it.
                   </p>
@@ -420,7 +487,45 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                   <p className="text-xs text-[var(--rpg-text-secondary)]">
                     Tracking is off. Exploration keeps its normal family spread.
                   </p>
-                )}
+                ))}
+
+                {prospectingEnabled ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-[var(--rpg-text-secondary)]">Focus resource discoveries toward:</p>
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Prospecting resource">
+                      {prospectableResourceNodes.map((node) => {
+                        const isSelected = selectedProspectingResourceNodeId === node.resourceNodeId;
+                        const skillLevel = skillLevelByType.get(node.skillRequired) ?? 1;
+                        const isGatheringLocked = skillLevel < node.levelRequired;
+                        const resourceName = titleCaseFromSnake(node.resourceType);
+                        return (
+                          <button
+                            key={node.resourceNodeId}
+                            type="button"
+                            aria-label={`Prospect ${resourceName}`}
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedProspectingResourceNodeId(node.resourceNodeId)}
+                            className={`px-3 py-1.5 text-left text-sm rounded border transition-colors ${
+                              isSelected
+                                ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
+                                : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
+                            }`}
+                          >
+                            <span className="block">{resourceName}</span>
+                            <span className="block text-[10px] opacity-80">
+                              {node.skillRequired} {node.levelRequired}
+                            </span>
+                            {isGatheringLocked ? (
+                              <span className="block text-[10px] text-[var(--rpg-red)]">
+                                Gathering locked until {node.skillRequired} {node.levelRequired}
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </PixelCard>
           )}

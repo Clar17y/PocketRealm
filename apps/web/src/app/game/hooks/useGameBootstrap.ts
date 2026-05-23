@@ -24,6 +24,7 @@ import {
   updateTutorialStep,
   type SkillPointState,
   type WorldEventResponse,
+  type ProspectableResourceNodeResponse,
 } from '@/lib/api';
 import { TUTORIAL_COMPLETED, TUTORIAL_STEP_SKILL_POINTS } from '@/lib/tutorial';
 import type {
@@ -53,6 +54,7 @@ type ZoneState = Array<{
   ambientTexts: Record<string, string> | null;
   environmentalTexts: Record<string, string> | null;
   trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
+  prospectableResourceNodes?: ProspectableResourceNodeResponse[];
   exploration: {
     turnsExplored: number;
     turnsToExplore: number | null;

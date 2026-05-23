@@ -38,6 +38,7 @@ import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone } from '../services/staticDataCacheService';
 import { buildTrackableMobFamiliesByZone } from '../services/explorationTrackingService';
+import { buildProspectableResourceNodesByZone } from '../services/resourceProspectingService';
 import { invalidateZoneIdCache } from '../services/zoneService';
 import {
   routeJson,
@@ -77,10 +78,10 @@ export async function listZones(input: AuthenticatedRouteServiceRequest): Promis
   const trackableWildZoneIds = zones
     .filter((z) => discoveredZoneIds.has(z.id) && z.zoneType === 'wild')
     .map((z) => z.id);
-  const trackableFamiliesByZone = await buildTrackableMobFamiliesByZone(
-    playerId,
-    trackableWildZoneIds,
-  );
+  const [trackableFamiliesByZone, prospectableResourcesByZone] = await Promise.all([
+    buildTrackableMobFamiliesByZone(playerId, trackableWildZoneIds),
+    buildProspectableResourceNodesByZone(trackableWildZoneIds),
+  ]);
 
   // Lazy-init currentZoneId if null (existing players from before this feature)
   let currentZoneId = player?.currentZoneId ?? null;
@@ -139,7 +140,10 @@ export async function listZones(input: AuthenticatedRouteServiceRequest): Promis
         ambientTexts: discovered ? z.ambientTexts : null,
         environmentalTexts: discovered ? z.environmentalTexts : null,
         ...(discovered && z.zoneType === 'wild'
-          ? { trackableMobFamilies: trackableFamiliesByZone.get(z.id) ?? [] }
+          ? {
+              trackableMobFamilies: trackableFamiliesByZone.get(z.id) ?? [],
+              prospectableResourceNodes: prospectableResourcesByZone.get(z.id) ?? [],
+            }
           : {}),
         exploration: z.zoneType === 'town' ? null : {
           turnsExplored: explorationByZoneId.get(z.id) ?? 0,

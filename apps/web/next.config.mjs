@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import withSerwistInit from "@serwist/next";
@@ -14,6 +15,20 @@ const revision =
   spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
   crypto.randomUUID();
 
+function getLocalDevOrigins() {
+  const origins = new Set(["localhost", "127.0.0.1"]);
+
+  for (const addresses of Object.values(os.networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === "IPv4" && !address.internal) {
+        origins.add(address.address);
+      }
+    }
+  }
+
+  return Array.from(origins);
+}
+
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
@@ -26,6 +41,7 @@ const withSerwist = withSerwistInit({
 });
 
 const baseConfig = withPlausibleProxy()(withSerwist({
+  allowedDevOrigins: getLocalDevOrigins(),
   reactStrictMode: true,
   transpilePackages: ["@pocketrealm/shared", "@pocketrealm/game-engine"],
   outputFileTracingRoot: OUTPUT_FILE_TRACING_ROOT,

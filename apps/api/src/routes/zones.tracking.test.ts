@@ -52,6 +52,13 @@ vi.mock('../services/explorationTrackingService', async () => {
     buildTrackableMobFamiliesByZone: vi.fn(),
   };
 });
+vi.mock('../services/resourceProspectingService', async () => {
+  const actual = await vi.importActual<typeof import('../services/resourceProspectingService')>('../services/resourceProspectingService');
+  return {
+    ...actual,
+    buildProspectableResourceNodesByZone: vi.fn(),
+  };
+});
 vi.mock('../services/zoneService', () => ({
   invalidateZoneIdCache: vi.fn().mockResolvedValue(undefined),
 }));
@@ -71,8 +78,10 @@ vi.mock('@pocketrealm/database', () => import('../__mocks__/database.js'));
 import { mockPrisma } from '../__test__/setup';
 import { zonesRouter } from './zones';
 import { buildTrackableMobFamiliesByZone } from '../services/explorationTrackingService';
+import { buildProspectableResourceNodesByZone } from '../services/resourceProspectingService';
 
 const mockBuildTrackableMobFamiliesByZone = buildTrackableMobFamiliesByZone as ReturnType<typeof vi.fn>;
+const mockBuildProspectableResourceNodesByZone = buildProspectableResourceNodesByZone as ReturnType<typeof vi.fn>;
 
 function findHandler(method: string, path: string) {
   const layer = (zonesRouter as any).stack.find(
@@ -99,9 +108,15 @@ describe('GET /zones tracking contract', () => {
     mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
       ['zone-forest', [{ mobFamilyId: 'family-spider', name: 'Spiders', minTier: 2 }]],
     ]));
+    mockBuildProspectableResourceNodesByZone.mockResolvedValue(new Map([
+      [
+        'zone-forest',
+        [{ resourceNodeId: 'node-copper', resourceType: 'copper_ore', skillRequired: 'mining', levelRequired: 1 }],
+      ],
+    ]));
   });
 
-  it('includes trackableMobFamilies on discovered wild zones', async () => {
+  it('includes trackableMobFamilies and prospectableResourceNodes on discovered wild zones', async () => {
     const req = { player: { playerId: 'p1' } } as any;
     const res = mockRes();
     const next = vi.fn();
@@ -110,6 +125,7 @@ describe('GET /zones tracking contract', () => {
     await handler(req, res, next);
 
     expect(mockBuildTrackableMobFamiliesByZone).toHaveBeenCalledWith('p1', ['zone-forest']);
+    expect(mockBuildProspectableResourceNodesByZone).toHaveBeenCalledWith(['zone-forest']);
 
     const payload = res.json.mock.calls[0][0];
     expect(payload.zones).toEqual(
@@ -118,9 +134,13 @@ describe('GET /zones tracking contract', () => {
           id: 'zone-forest',
           discovered: true,
           trackableMobFamilies: [{ mobFamilyId: 'family-spider', name: 'Spiders', minTier: 2 }],
+          prospectableResourceNodes: [
+            { resourceNodeId: 'node-copper', resourceType: 'copper_ore', skillRequired: 'mining', levelRequired: 1 },
+          ],
         }),
       ]),
     );
     expect(payload.zones.find((zone: { id: string }) => zone.id === 'zone-town')?.trackableMobFamilies).toBeUndefined();
+    expect(payload.zones.find((zone: { id: string }) => zone.id === 'zone-town')?.prospectableResourceNodes).toBeUndefined();
   });
 });

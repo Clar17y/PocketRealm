@@ -126,13 +126,20 @@ export function useExplorationActions({
     turnSpend: number,
     tier?: number,
     trackingFamilyId?: string,
+    prospectingResourceNodeId?: string,
   ) => {
     if (!currentZone) return;
 
     await runAction('exploration', async () => {
       const hpBefore = hpStateRef.current.currentHp;
       const maxHpBefore = hpStateRef.current.maxHp;
-      const res = await startExploration(currentZone.id, turnSpend, tier, trackingFamilyId);
+      const res = await startExploration(
+        currentZone.id,
+        turnSpend,
+        tier,
+        trackingFamilyId,
+        prospectingResourceNodeId,
+      );
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Exploration failed');
