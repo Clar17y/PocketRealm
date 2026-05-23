@@ -37,13 +37,13 @@ afterEach(() => {
 });
 
 describe('LoginPage', () => {
-  it('renders the submit button inert and omits auth fields before hydration', () => {
+  it('renders auth fields before hydration while keeping submit inert', () => {
     const html = renderToString(React.createElement(LoginPage));
 
     expect(html).toContain('type="button"');
     expect(html).not.toContain('disabled=""');
-    expect(html).not.toContain('id="email"');
-    expect(html).not.toContain('id="password"');
+    expect(html).toContain('id="email"');
+    expect(html).toContain('id="password"');
   });
 
   it('shows and clears the relogin success message after a forced password reset logout', () => {
