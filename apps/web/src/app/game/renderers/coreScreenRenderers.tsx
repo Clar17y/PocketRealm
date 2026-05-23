@@ -144,6 +144,8 @@ export function ExploreScreenRenderer({ gc }: { gc: GameControllerState }) {
         tiers: gc.currentZone.exploration.tiers,
       } : null}
       trackableMobFamilies={gc.currentZone?.trackableMobFamilies ?? []}
+      prospectableResourceNodes={gc.currentZone?.prospectableResourceNodes ?? []}
+      skills={gc.skills}
       availableTurns={gc.turns}
       onStartExploration={gc.handleStartExploration}
       activityLog={gc.activityLog}

@@ -23,6 +23,13 @@ export interface TrackableMobFamilyResponse {
   minTier: number;
 }
 
+export interface ProspectableResourceNodeResponse {
+  resourceNodeId: string;
+  resourceType: string;
+  skillRequired: string;
+  levelRequired: number;
+}
+
 // Zones
 
 export async function getZones(options?: { fresh?: boolean }) {
@@ -46,6 +53,7 @@ export async function getZones(options?: { fresh?: boolean }) {
       ambientTexts: Record<string, string> | null;
       environmentalTexts: Record<string, string> | null;
       trackableMobFamilies?: TrackableMobFamilyResponse[];
+      prospectableResourceNodes?: ProspectableResourceNodeResponse[];
       exploration: {
         turnsExplored: number;
         turnsToExplore: number | null;
@@ -107,6 +115,7 @@ export async function startExploration(
   turns: number,
   tier?: number,
   trackingFamilyId?: string,
+  prospectingResourceNodeId?: string,
 ) {
   return fetchApi<{
     logId: string;
@@ -159,6 +168,7 @@ export async function startExploration(
       turns,
       ...(tier !== undefined && { tier }),
       ...(trackingFamilyId && { trackingFamilyId }),
+      ...(prospectingResourceNodeId && { prospectingResourceNodeId }),
     }),
   });
 }

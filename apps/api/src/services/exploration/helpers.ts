@@ -31,6 +31,15 @@ export const startSchema = z.object({
   turns: z.number().int(),
   tier: z.number().int().min(1).optional(),
   trackingFamilyId: z.string().uuid().optional(),
+  prospectingResourceNodeId: z.string().uuid().optional(),
+}).superRefine((value, ctx) => {
+  if (value.trackingFamilyId && value.prospectingResourceNodeId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['prospectingResourceNodeId'],
+      message: 'Choose either mob tracking or resource prospecting.',
+    });
+  }
 });
 
 // --- Types ---
