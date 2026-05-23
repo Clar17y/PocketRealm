@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { register } from '@/lib/api';
@@ -19,15 +19,23 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const isHydrated = useIsHydrated();
+  const registrationInFlightRef = useRef(false);
+
+  useEffect(() => {
+    router.prefetch('/game');
+  }, [router]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.push('/game');
+      router.replace('/game');
     }
   }, [isLoading, isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (registrationInFlightRef.current) return;
+
+    registrationInFlightRef.current = true;
     setError('');
     setLoading(true);
 
@@ -35,6 +43,7 @@ export default function RegisterPage() {
 
     if (apiError) {
       setError(apiError.message);
+      registrationInFlightRef.current = false;
       setLoading(false);
       return;
     }
@@ -42,9 +51,11 @@ export default function RegisterPage() {
     if (data) {
       setTokens(data.accessToken, data.refreshToken, data.player);
       trackEvent('signup');
-      router.push('/game');
+      router.replace('/game');
+      return;
     }
 
+    registrationInFlightRef.current = false;
     setLoading(false);
   };
 
@@ -120,8 +131,19 @@ export default function RegisterPage() {
             <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
           )}
 
-          <PixelButton type={isHydrated ? 'submit' : 'button'} variant="primary" disabled={loading} className="mt-2">
-            {loading ? 'Creating account...' : 'Begin Journey'}
+          <PixelButton
+            type={isHydrated ? 'submit' : 'button'}
+            variant="primary"
+            disabled={loading}
+            aria-busy={loading}
+            className="mt-2"
+          >
+            {loading ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                <span aria-hidden="true" className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                <span>Creating account...</span>
+              </span>
+            ) : 'Begin Journey'}
           </PixelButton>
         </form>
 

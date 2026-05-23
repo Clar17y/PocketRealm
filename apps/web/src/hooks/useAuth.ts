@@ -20,6 +20,69 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
+export const AUTH_PLAYER_SNAPSHOT_KEY = 'authPlayerSnapshot';
+
+function isStringOrNull(value: unknown): value is string | null {
+  return typeof value === 'string' || value === null;
+}
+
+function parseStoredPlayer(value: unknown): Player | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const player = value as Partial<Player>;
+  if (
+    typeof player.id !== 'string'
+    || typeof player.username !== 'string'
+    || typeof player.email !== 'string'
+    || typeof player.role !== 'string'
+    || typeof player.emailVerified !== 'boolean'
+    || typeof player.isPremium !== 'boolean'
+    || !isStringOrNull(player.premiumExpiresAt)
+    || !isStringOrNull(player.seasonId)
+  ) {
+    return null;
+  }
+
+  return {
+    id: player.id,
+    username: player.username,
+    email: player.email,
+    role: player.role,
+    emailVerified: player.emailVerified,
+    isPremium: player.isPremium,
+    premiumExpiresAt: player.premiumExpiresAt,
+    seasonId: player.seasonId,
+  };
+}
+
+function takeAuthPlayerSnapshot(): Player | null {
+  try {
+    const snapshot = sessionStorage.getItem(AUTH_PLAYER_SNAPSHOT_KEY);
+    if (!snapshot) return null;
+
+    sessionStorage.removeItem(AUTH_PLAYER_SNAPSHOT_KEY);
+    return parseStoredPlayer(JSON.parse(snapshot));
+  } catch {
+    return null;
+  }
+}
+
+function storeAuthPlayerSnapshot(player: Player) {
+  try {
+    sessionStorage.setItem(AUTH_PLAYER_SNAPSHOT_KEY, JSON.stringify(player));
+  } catch {
+    // Session storage is an optimization for immediate navigation only.
+  }
+}
+
+function clearAuthPlayerSnapshot() {
+  try {
+    sessionStorage.removeItem(AUTH_PLAYER_SNAPSHOT_KEY);
+  } catch {
+    // Clearing auth should not depend on optional session storage.
+  }
+}
+
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
     player: null,
@@ -37,6 +100,7 @@ export function useAuth() {
 
   const failRefresh = useCallback((): never => {
     clearStoredTokens();
+    clearAuthPlayerSnapshot();
     setState({ player: null, isLoading: false, isAuthenticated: false });
     throw new Error('Failed to refresh account.');
   }, []);
@@ -106,6 +170,12 @@ export function useAuth() {
       failRefresh();
     }
 
+    const snapshotPlayer = takeAuthPlayerSnapshot();
+    if (snapshotPlayer) {
+      setAuthenticatedState(snapshotPlayer);
+      return;
+    }
+
     const { data, error } = await getPlayer();
     if (data && !error) {
       setAuthenticatedState(data.player);
@@ -143,6 +213,7 @@ export function useAuth() {
   const setTokens = useCallback((accessToken: string, refreshToken: string, player: Player) => {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
+    storeAuthPlayerSnapshot(player);
     setState({ player, isLoading: false, isAuthenticated: true });
   }, []);
 
@@ -154,6 +225,7 @@ export function useAuth() {
   const logout = useCallback(() => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    clearAuthPlayerSnapshot();
     setState({ player: null, isLoading: false, isAuthenticated: false });
   }, []);
 
