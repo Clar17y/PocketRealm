@@ -9,9 +9,9 @@ export const changelog: ChangelogEntry[] = [
   {
     version: '0.60',
     date: '2026-05-23',
-    title: 'Resource Prospecting & Auth Form Reliability',
+    title: 'Resource Prospecting',
     summary:
-      'Exploration now supports resource prospecting, letting you focus searches toward mining, woodcutting, or foraging nodes instead of encounter sites while keeping ambush risk in the mix. Targeting starts modestly and improves as your gathering skill catches up to the node tier, making resource routes more reliable without removing broad exploration. Login and registration forms now render their fields before hydration and submit reliably during local network sessions.',
+      'Exploration now supports resource prospecting, letting you focus searches toward mining, woodcutting, or foraging nodes instead of encounter sites while keeping ambush risk in the mix. Targeting starts modestly and improves as your gathering skill catches up to the node tier, making resource routes more reliable without removing broad exploration.',
   },
   {
     version: '0.59',
