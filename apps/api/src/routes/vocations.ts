@@ -15,7 +15,7 @@ const vocationIdSchema = z.enum(VOCATION_IDS);
 
 const honeSchema = z.object({
   vocationId: vocationIdSchema,
-  turns: z.number().int().positive().max(VOCATION_MASTERY.HONE_ACTION_TURN_LIMIT),
+  turns: z.number().int().min(VOCATION_MASTERY.HONE_ACTION_TURN_MIN).max(VOCATION_MASTERY.HONE_ACTION_TURN_LIMIT),
 });
 
 const learnTechniqueSchema = z.object({

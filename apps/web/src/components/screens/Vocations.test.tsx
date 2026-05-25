@@ -37,9 +37,9 @@ function snapshot(overrides: Partial<VocationSnapshotResponse> = {}): VocationSn
     ],
     dailyCap: {
       dayStart: '2026-05-21T00:00:00.000Z',
-      turnsSpent: 20,
-      turnsLimit: 100,
-      turnsRemaining: 80,
+      turnsSpent: 1200,
+      turnsLimit: 10800,
+      turnsRemaining: 9600,
     },
     ...overrides,
   };
@@ -69,6 +69,28 @@ describe('Vocations screen', () => {
     await waitFor(() => {
       expect(onHone).toHaveBeenCalledWith('weaponsmith', 30);
     });
+  });
+
+  it('shows mechanical technique effects before learning', () => {
+    render(
+      <Vocations
+        snapshot={snapshot()}
+        availableTurns={5000}
+        currentZoneName="Millbrook Market"
+        currentZoneType="town"
+        busyAction={null}
+        onHone={vi.fn()}
+        onLearnTechnique={vi.fn()}
+        onRespec={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bowyer' }));
+
+    expect(screen.getByText(/applies tight string mark/i)).toBeTruthy();
+    expect(screen.getByText(/\+4% ranged power/i)).toBeTruthy();
+    expect(screen.getByText(/-2% accuracy/i)).toBeTruthy();
+    expect(screen.getByText(/light attack, normal attack, skill attack: \+4% damage, \+8% durability wear/i)).toBeTruthy();
   });
 
   it('learns an available technique and shows learned marks', async () => {
@@ -101,17 +123,31 @@ describe('Vocations screen', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /learn blood groove mark/i }));
+    fireEvent.click(screen.getByRole('button', { name: /learn blood groove/i }));
 
     await waitFor(() => {
       expect(onLearnTechnique).toHaveBeenCalledWith('weaponsmith', 'weaponsmith_blood_groove');
     });
   });
 
-  it('blocks mentor actions outside the selected vocation mentor town', () => {
+  it('allows basic mentor actions for every vocation in Millbrook and blocks advanced techniques until Thornwall', () => {
     render(
       <Vocations
-        snapshot={snapshot()}
+        snapshot={snapshot({
+          vocations: [
+            {
+              vocationId: 'weaponsmith',
+              xp: 6038,
+              rank: 5,
+              xpForCurrentRank: 6038,
+              xpForNextRank: 10060,
+              masteryPointsEarned: 4,
+              availableMasteryPoints: 4,
+              spentPoints: 0,
+              learnedTechniqueIds: [],
+            },
+          ],
+        })}
         availableTurns={50}
         currentZoneName="Millbrook"
         currentZoneType="town"
@@ -124,7 +160,9 @@ describe('Vocations screen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Weaponsmith' }));
 
-    expect((screen.getByRole('button', { name: /hone weaponsmith/i }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/mentor: thornwall/i)).toBeTruthy();
+    expect((screen.getByRole('button', { name: /hone weaponsmith/i }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: /learn keen edge/i }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: /learn crushing poll/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByText(/advanced techniques require thornwall/i).length).toBeGreaterThan(0);
   });
 });

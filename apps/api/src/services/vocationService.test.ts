@@ -163,11 +163,11 @@ describe('vocationService', () => {
     const result = await honeVocation({
       playerId: PLAYER_ID,
       vocationId: 'prospector',
-      turns: 3,
+      turns: 300,
       now: NOW,
     });
 
-    expect(spendWithTaxTx).toHaveBeenCalledWith(mockPrisma, PLAYER_ID, 3);
+    expect(spendWithTaxTx).toHaveBeenCalledWith(mockPrisma, PLAYER_ID, 300);
     expect(mockPrisma.playerVocationDailyCap.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { playerId: PLAYER_ID },
       create: { playerId: PLAYER_ID, dayStart: TODAY, turnsSpent: 0 },
@@ -193,19 +193,45 @@ describe('vocationService', () => {
     }));
     expect(mockPrisma.playerVocationDailyCap.update).toHaveBeenCalledWith({
       where: { playerId: PLAYER_ID },
-      data: { dayStart: TODAY, turnsSpent: 13 },
+      data: { dayStart: TODAY, turnsSpent: 310 },
     });
     expect(mockPrisma.playerVocationCounter.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { playerId_statKey: { playerId: PLAYER_ID, statKey: 'vocation_honed_turns_total' } },
-      update: { value: { increment: 3 } },
+      update: { value: { increment: 300 } },
     }));
     expect(mockPrisma.playerVocationCounter.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { playerId_statKey: { playerId: PLAYER_ID, statKey: 'vocation_honed_turns_prospector' } },
-      update: { value: { increment: 3 } },
+      update: { value: { increment: 300 } },
     }));
     expect(result.vocation).toMatchObject({ vocationId: 'prospector', xp: 30 });
     expect(result.turnSpend).toMatchObject({ spent: 12 });
     expect(result.taxInfo).toEqual({ rate: 20, amount: 2, guildId: 'guild-1' });
+  });
+
+  it('allows basic honing for every vocation from any known town mentor', async () => {
+    setTown('Millbrook Market');
+    mockPrisma.playerVocationDailyCap.findUnique.mockResolvedValue({
+      playerId: PLAYER_ID,
+      dayStart: TODAY,
+      turnsSpent: 0,
+      updatedAt: TODAY,
+    });
+    mockPrisma.playerVocation.upsert.mockResolvedValue(
+      vocationRow({ vocationId: 'weaponsmith', xp: 360, rank: 2, masteryPoints: 1 }),
+    );
+    mockPrisma.playerVocation.findMany.mockResolvedValue([
+      vocationRow({ vocationId: 'weaponsmith', xp: 360, rank: 2, masteryPoints: 1 }),
+    ]);
+
+    await expect(honeVocation({
+      playerId: PLAYER_ID,
+      vocationId: 'weaponsmith',
+      turns: 3600,
+      now: NOW,
+    })).resolves.toMatchObject({
+      vocation: expect.objectContaining({ vocationId: 'weaponsmith' }),
+    });
+    expect(spendWithTaxTx).toHaveBeenCalledWith(mockPrisma, PLAYER_ID, 3600);
   });
 
   it('daily cap resets at UTC day start before active honing', async () => {
@@ -216,14 +242,14 @@ describe('vocationService', () => {
       updatedAt: YESTERDAY,
     });
     mockPrisma.playerVocation.upsert.mockResolvedValue(
-      vocationRow({ vocationId: 'prospector', xp: 10, rank: 1, masteryPoints: 0 }),
+      vocationRow({ vocationId: 'prospector', xp: 1, rank: 1, masteryPoints: 0 }),
     );
 
-    await honeVocation({ playerId: PLAYER_ID, vocationId: 'prospector', turns: 1, now: NOW });
+    await honeVocation({ playerId: PLAYER_ID, vocationId: 'prospector', turns: 10, now: NOW });
 
     expect(mockPrisma.playerVocationDailyCap.update).toHaveBeenCalledWith({
       where: { playerId: PLAYER_ID },
-      data: { dayStart: TODAY, turnsSpent: 1 },
+      data: { dayStart: TODAY, turnsSpent: 10 },
     });
   });
 
@@ -231,11 +257,11 @@ describe('vocationService', () => {
     mockPrisma.playerVocationDailyCap.findUnique.mockResolvedValue({
       playerId: PLAYER_ID,
       dayStart: TODAY,
-      turnsSpent: VOCATION_MASTERY.DAILY_HONING_TURN_LIMIT - 1,
+      turnsSpent: VOCATION_MASTERY.DAILY_HONING_TURN_LIMIT - 10,
       updatedAt: TODAY,
     });
 
-    await expect(honeVocation({ playerId: PLAYER_ID, vocationId: 'prospector', turns: 2, now: NOW }))
+    await expect(honeVocation({ playerId: PLAYER_ID, vocationId: 'prospector', turns: 20, now: NOW }))
       .rejects.toMatchObject({ code: 'VOCATION_DAILY_CAP_EXCEEDED' });
     expect(spendWithTaxTx).not.toHaveBeenCalled();
   });
@@ -410,6 +436,46 @@ describe('vocationService', () => {
     })).rejects.toMatchObject({ code: 'TECHNIQUE_ALREADY_LEARNED' });
   });
 
+  it('lets any town teach basic techniques but requires Thornwall for advanced techniques', async () => {
+    setTown('Millbrook Market');
+    mockPrisma.playerVocation.findUnique.mockResolvedValue(
+      vocationRow({ vocationId: 'weaponsmith', xp: getVocationXpForRank(2), rank: 2, masteryPoints: 1, spentPoints: 0 }),
+    );
+    mockPrisma.playerVocationTechnique.findUnique.mockResolvedValue(null);
+    mockPrisma.playerVocation.update.mockResolvedValue(
+      vocationRow({ vocationId: 'weaponsmith', xp: getVocationXpForRank(2), rank: 2, masteryPoints: 1, spentPoints: 1 }),
+    );
+
+    await expect(learnTechnique({
+      playerId: PLAYER_ID,
+      vocationId: 'weaponsmith',
+      techniqueId: 'weaponsmith_keen_edge',
+      now: NOW,
+    })).resolves.toMatchObject({
+      vocation: expect.objectContaining({ vocationId: 'weaponsmith' }),
+    });
+
+    mockPrisma.playerVocation.findUnique.mockResolvedValue(
+      vocationRow({ vocationId: 'weaponsmith', rank: 5, masteryPoints: 5, spentPoints: 0 }),
+    );
+    await expect(learnTechnique({
+      playerId: PLAYER_ID,
+      vocationId: 'weaponsmith',
+      techniqueId: 'weaponsmith_crushing_poll',
+      now: NOW,
+    })).rejects.toMatchObject({ code: 'ADVANCED_MENTOR_REQUIRED' });
+
+    setTown('Thornwall Keep');
+    await expect(learnTechnique({
+      playerId: PLAYER_ID,
+      vocationId: 'weaponsmith',
+      techniqueId: 'weaponsmith_crushing_poll',
+      now: NOW,
+    })).resolves.toMatchObject({
+      vocation: expect.objectContaining({ vocationId: 'weaponsmith' }),
+    });
+  });
+
   it('respec refunds partial points while keeping XP, rank, and mastery points', async () => {
     mockPrisma.playerVocation.findUnique.mockResolvedValue(
       vocationRow({ vocationId: 'prospector', xp: getVocationXpForRank(4), rank: 4, masteryPoints: 3, spentPoints: 3 }),
@@ -452,18 +518,18 @@ describe('vocationService', () => {
       .rejects.toMatchObject({ code: 'NOTHING_TO_RESPEC' });
   });
 
-  it('rejects active, learn, and respec actions outside the required mentor town', async () => {
+  it('rejects active, learn, and respec actions outside known mentor towns', async () => {
     mockPrisma.player.findUnique.mockResolvedValueOnce({
       currentZone: { zoneType: 'wild', name: 'Old Forest' },
     });
-    await honeVocation({ playerId: PLAYER_ID, vocationId: 'prospector', turns: 1, now: NOW })
+    await honeVocation({ playerId: PLAYER_ID, vocationId: 'prospector', turns: 10, now: NOW })
       .then(() => {
         throw new Error('expected hone to fail');
       })
       .catch((error) => expectAppErrorCode(error, 'NOT_IN_TOWN'));
 
     mockPrisma.player.findUnique.mockResolvedValueOnce({
-      currentZone: { zoneType: 'town', name: 'Thornwall Keep' },
+      currentZone: { zoneType: 'town', name: 'Unknown Village' },
     });
     await learnTechnique({
       playerId: PLAYER_ID,
@@ -477,7 +543,7 @@ describe('vocationService', () => {
       .catch((error) => expectAppErrorCode(error, 'WRONG_MENTOR_TOWN'));
 
     mockPrisma.player.findUnique.mockResolvedValueOnce({
-      currentZone: { zoneType: 'town', name: 'Thornwall Keep' },
+      currentZone: { zoneType: 'town', name: 'Unknown Village' },
     });
     await respecVocation({ playerId: PLAYER_ID, vocationId: 'prospector', now: NOW })
       .then(() => {

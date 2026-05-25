@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, CheckCircle, Hammer, MapPin, RotateCcw } from 'lucide-react';
 import {
+  canLearnVocationTechniqueInTown,
+  describeVocationTechnique,
   getPartialRespecRefund,
   getVocationDefinition,
+  isAdvancedVocationTechnique,
   VOCATION_DEFINITIONS,
   VOCATION_MASTERY,
-  type VocationDefinition,
   type VocationId,
+  type VocationMentorTown,
   type VocationSnapshotResponse,
   type VocationStateDto,
   type VocationTechniqueDefinition,
@@ -29,23 +32,32 @@ interface VocationsProps {
   onRespec: (vocationId: VocationId) => void | Promise<void>;
 }
 
-function mentorLabel(mentorTown: VocationDefinition['mentorTown']) {
+function mentorTownLabel(mentorTown: VocationMentorTown) {
   return mentorTown === 'millbrook' ? 'Millbrook' : 'Thornwall';
 }
 
-function inMentorTown(vocation: VocationDefinition, currentZoneName: string | null, currentZoneType: string | null) {
-  if (currentZoneType !== 'town') return false;
-  return (currentZoneName ?? '').toLowerCase().includes(vocation.mentorTown);
+function resolveCurrentMentorTown(currentZoneName: string | null, currentZoneType: string | null): VocationMentorTown | null {
+  if (currentZoneType !== 'town') return null;
+
+  const zoneName = (currentZoneName ?? '').toLowerCase();
+  if (zoneName.includes('millbrook')) return 'millbrook';
+  if (zoneName.includes('thornwall')) return 'thornwall';
+
+  return null;
+}
+
+function formatTag(value: string) {
+  const spaced = value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .toLowerCase();
+
+  return spaced.replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 function progressPct(vocation: VocationStateDto) {
   const span = Math.max(1, vocation.xpForNextRank - vocation.xpForCurrentRank);
   return Math.max(0, Math.min(100, Math.round(((vocation.xp - vocation.xpForCurrentRank) / span) * 100)));
-}
-
-function primaryTechniqueLabel(technique: VocationTechniqueDefinition) {
-  const markEffect = technique.effects.find((effect) => effect.type === 'craft_mark');
-  return markEffect?.type === 'craft_mark' ? markEffect.mark.name : technique.name;
 }
 
 function techniqueTags(technique: VocationTechniqueDefinition) {
@@ -70,23 +82,27 @@ export function Vocations({
   onRespec,
 }: VocationsProps) {
   const [selectedVocationId, setSelectedVocationId] = useState<VocationId>('weaponsmith');
-  const [honingTurns, setHoningTurns] = useState(1);
+  const [honingTurns, setHoningTurns] = useState(VOCATION_MASTERY.HONE_ACTION_TURN_MIN);
   const [confirmRespec, setConfirmRespec] = useState(false);
 
   const vocationRows = snapshot?.vocations ?? [];
   const selectedDefinition = getVocationDefinition(selectedVocationId) ?? VOCATION_DEFINITIONS[0];
   const selectedProgress = vocationRows.find((vocation) => vocation.vocationId === selectedVocationId)
     ?? null;
-  const canUseMentor = inMentorTown(selectedDefinition, currentZoneName, currentZoneType);
+  const currentMentorTown = resolveCurrentMentorTown(currentZoneName, currentZoneType);
+  const canUseMentor = currentMentorTown !== null;
   const maxHoneTurns = Math.max(
     0,
     Math.min(availableTurns, snapshot?.dailyCap.turnsRemaining ?? 0, VOCATION_MASTERY.HONE_ACTION_TURN_LIMIT),
   );
+  const minHoneTurns = VOCATION_MASTERY.HONE_ACTION_TURN_MIN;
+  const inputMaxHoneTurns = Math.max(minHoneTurns, maxHoneTurns);
+  const canHone = canUseMentor && maxHoneTurns >= minHoneTurns;
   const isBusy = busyAction === 'vocations';
 
   useEffect(() => {
-    setHoningTurns((current) => Math.max(1, Math.min(current, Math.max(1, maxHoneTurns))));
-  }, [maxHoneTurns, selectedVocationId]);
+    setHoningTurns((current) => Math.max(minHoneTurns, Math.min(current, inputMaxHoneTurns)));
+  }, [inputMaxHoneTurns, minHoneTurns, selectedVocationId]);
 
   const learnedTechniqueIds = useMemo(
     () => new Set(selectedProgress?.learnedTechniqueIds ?? []),
@@ -149,7 +165,7 @@ export function Vocations({
                         <span className="font-pixel text-[10px] text-[var(--rpg-gold)]">R{progress?.rank ?? 1}</span>
                       </div>
                       <div className="text-[11px] text-[var(--rpg-text-secondary)] truncate">
-                        {mentorLabel(definition.mentorTown)}
+                        {formatTag(definition.primarySkill)}
                       </div>
                     </div>
                   </div>
@@ -195,10 +211,15 @@ export function Vocations({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm text-[var(--rpg-text-primary)]">
                   <MapPin size={14} className={canUseMentor ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'} />
-                  Mentor: {mentorLabel(selectedDefinition.mentorTown)}
+                  Mentor: Millbrook or Thornwall
                 </div>
-                <span className="text-xs text-[var(--rpg-text-secondary)]">{currentZoneName ?? 'No zone'}</span>
+                <span className="text-xs text-[var(--rpg-text-secondary)]">
+                  {currentMentorTown ? mentorTownLabel(currentMentorTown) : (currentZoneName ?? 'No zone')}
+                </span>
               </div>
+              <p className="text-[11px] text-[var(--rpg-text-secondary)]">
+                Any town mentor can teach basic honing and rank 1-4 techniques. Advanced techniques require Thornwall.
+              </p>
 
               <label className="block text-xs font-semibold text-[var(--rpg-text-secondary)]" htmlFor="vocation-honing-turns">
                 Honing turns
@@ -208,19 +229,21 @@ export function Vocations({
                   id="vocation-honing-turns"
                   aria-label="Honing turns"
                   type="number"
-                  min={1}
-                  max={Math.max(1, maxHoneTurns)}
+                  min={minHoneTurns}
+                  max={inputMaxHoneTurns}
                   value={honingTurns}
                   onChange={(event) => {
                     const next = Number(event.target.value);
-                    setHoningTurns(Number.isFinite(next) ? Math.max(1, Math.min(Math.floor(next), Math.max(1, maxHoneTurns))) : 1);
+                    setHoningTurns(Number.isFinite(next)
+                      ? Math.max(minHoneTurns, Math.min(Math.floor(next), inputMaxHoneTurns))
+                      : minHoneTurns);
                   }}
                   className="px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)]"
                 />
                 <PixelButton
                   variant="gold"
                   size="sm"
-                  disabled={!canUseMentor || maxHoneTurns <= 0 || isBusy}
+                  disabled={!canHone || isBusy}
                   onClick={() => onHone(selectedVocationId, Math.min(honingTurns, maxHoneTurns))}
                 >
                   Hone {selectedDefinition.name}
@@ -247,8 +270,10 @@ export function Vocations({
                       const learned = learnedTechniqueIds.has(technique.id);
                       const rankLocked = (selectedProgress?.rank ?? 1) < technique.requiredRank;
                       const pointLocked = (selectedProgress?.availableMasteryPoints ?? 0) < technique.pointCost;
-                      const locked = rankLocked || pointLocked || !canUseMentor;
-                      const label = primaryTechniqueLabel(technique);
+                      const mentorLocked = !canLearnVocationTechniqueInTown(technique, currentMentorTown);
+                      const locked = rankLocked || pointLocked || mentorLocked;
+                      const label = technique.name;
+                      const effectDescription = describeVocationTechnique(technique);
 
                       return (
                         <div key={technique.id} className="rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-background)] p-3">
@@ -265,10 +290,18 @@ export function Vocations({
                                 <span className="text-[10px] text-[var(--rpg-text-secondary)]">{technique.pointCost} pt</span>
                               </div>
                               <p className="text-xs text-[var(--rpg-text-secondary)] mt-1">{technique.description}</p>
+                              <p className="text-xs text-[var(--rpg-text-primary)] mt-1">{effectDescription}</p>
+                              {mentorLocked && (
+                                <p className="text-[11px] text-[var(--rpg-red)] mt-1">
+                                  {isAdvancedVocationTechnique(technique)
+                                    ? 'Advanced techniques require Thornwall.'
+                                    : 'Visit Millbrook or Thornwall to learn this technique.'}
+                                </p>
+                              )}
                               <div className="flex gap-1.5 flex-wrap mt-2">
                                 {techniqueTags(technique).map((tag) => (
                                   <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] border border-[var(--rpg-border)]">
-                                    {tag}
+                                    {formatTag(tag)}
                                   </span>
                                 ))}
                               </div>

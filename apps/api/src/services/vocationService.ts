@@ -5,6 +5,7 @@ import {
   getVocationDefinition,
   getVocationRankForXp,
   getVocationXpForRank,
+  canLearnVocationTechniqueInTown,
   VOCATION_IDS,
   VOCATION_MASTERY,
   type TaxInfo,
@@ -45,11 +46,11 @@ export async function honeVocation(input: {
   now?: Date;
 }): Promise<VocationActionResult> {
   const now = input.now ?? new Date();
-  const vocation = requireVocation(input.vocationId);
+  requireVocation(input.vocationId);
   validateTurns(input.turns);
 
   return prisma.$transaction(async (tx) => {
-    await enforceMentorTownTx(tx, input.playerId, vocation.mentorTown);
+    await enforceKnownMentorTownTx(tx, input.playerId);
 
     const dayStart = getDayStart(now);
     const dailyCap = await loadLockedDailyCapTx(tx, input.playerId, dayStart);
@@ -61,7 +62,8 @@ export async function honeVocation(input: {
     }
 
     const current = await loadLockedVocationTx(tx, input.playerId, input.vocationId);
-    const updated = toProgressUpdate(current.xp + input.turns * VOCATION_MASTERY.ACTIVE_XP_PER_TURN);
+    const xpGained = Math.floor(input.turns * VOCATION_MASTERY.ACTIVE_XP_PER_TURN);
+    const updated = toProgressUpdate(current.xp + xpGained);
 
     const spend = await spendWithTaxTx(tx, input.playerId, input.turns);
     const updatedVocation = await tx.playerVocation.upsert({
@@ -147,7 +149,7 @@ export async function learnTechnique(input: {
   now?: Date;
 }): Promise<VocationActionResult> {
   const now = input.now ?? new Date();
-  const vocation = requireVocation(input.vocationId);
+  requireVocation(input.vocationId);
   const technique = getTechniqueDefinition(input.techniqueId);
 
   if (!technique) {
@@ -158,7 +160,10 @@ export async function learnTechnique(input: {
   }
 
   return prisma.$transaction(async (tx) => {
-    await enforceMentorTownTx(tx, input.playerId, vocation.mentorTown);
+    const mentorTown = await enforceKnownMentorTownTx(tx, input.playerId);
+    if (!canLearnVocationTechniqueInTown(technique, mentorTown)) {
+      throw new AppError(400, 'Advanced vocation techniques require a Thornwall mentor', 'ADVANCED_MENTOR_REQUIRED');
+    }
 
     const current = await loadLockedVocationTx(tx, input.playerId, input.vocationId);
     if (current.rank < technique.requiredRank) {
@@ -204,10 +209,10 @@ export async function respecVocation(input: {
   now?: Date;
 }): Promise<VocationActionResult> {
   const now = input.now ?? new Date();
-  const vocation = requireVocation(input.vocationId);
+  requireVocation(input.vocationId);
 
   return prisma.$transaction(async (tx) => {
-    await enforceMentorTownTx(tx, input.playerId, vocation.mentorTown);
+    await enforceKnownMentorTownTx(tx, input.playerId);
 
     const current = await loadLockedVocationTx(tx, input.playerId, input.vocationId);
     if (current.spentPoints <= 0) {
@@ -248,16 +253,23 @@ function requireVocation(vocationId: VocationId) {
 }
 
 function validateTurns(turns: number): void {
-  if (!Number.isInteger(turns) || turns <= 0) {
-    throw new AppError(400, 'Turns must be a positive integer', 'INVALID_TURNS');
+  if (
+    !Number.isInteger(turns)
+    || turns < VOCATION_MASTERY.HONE_ACTION_TURN_MIN
+    || turns > VOCATION_MASTERY.HONE_ACTION_TURN_LIMIT
+  ) {
+    throw new AppError(
+      400,
+      `Turns must be an integer from ${VOCATION_MASTERY.HONE_ACTION_TURN_MIN} to ${VOCATION_MASTERY.HONE_ACTION_TURN_LIMIT}`,
+      'INVALID_TURNS',
+    );
   }
 }
 
-async function enforceMentorTownTx(
+async function enforceKnownMentorTownTx(
   tx: Prisma.TransactionClient,
   playerId: string,
-  mentorTown: VocationMentorTown,
-): Promise<void> {
+): Promise<VocationMentorTown> {
   const player = await tx.player.findUnique({
     where: { id: playerId },
     select: {
@@ -273,9 +285,11 @@ async function enforceMentorTownTx(
   }
 
   const currentTown = resolveMentorTownFromZoneName(zone.name);
-  if (currentTown !== mentorTown) {
+  if (!currentTown) {
     throw new AppError(400, 'Wrong mentor town for this vocation', 'WRONG_MENTOR_TOWN');
   }
+
+  return currentTown;
 }
 
 function resolveMentorTownFromZoneName(zoneName: string): VocationMentorTown | null {

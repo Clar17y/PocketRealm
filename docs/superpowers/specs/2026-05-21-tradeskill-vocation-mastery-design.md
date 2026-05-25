@@ -143,17 +143,15 @@ Examples:
 
 Honing is taught by NPC mentors and town stations, not by a generic perk screen.
 
-- Millbrook teaches fundamentals and early/mid vocation techniques.
-- Thornwall teaches advanced and prestige techniques.
+- Millbrook and Thornwall both teach basic honing and rank 1-4 techniques for every vocation, so early-zone players are not pushed into whichever vocation happens to have the nearest named mentor.
+- Thornwall teaches rank 5+ advanced and prestige techniques.
 - Core gates are town access, vocation rank, mastery points, and underlying skill/recipe tier.
 - Achievements and titles can add recognition, dialogue, and prestige, but should not block core technique access.
 
 Example mentor ownership:
 
-- Kessa teaches early Weaponsmith, Armorer, and refining-adjacent fundamentals.
-- Rowan teaches Prospector, Forester, and Herbalist field discipline.
-- Vesper teaches Alchemist fundamentals.
-- Orin and Thornwall specialists teach advanced Jeweller, Bowyer, Staffwright, armor, textile, and frontier techniques.
+- Kessa, Rowan, Vesper, and other town mentors can all route players into basic honing and low-rank technique study.
+- Higher-zone specialists such as Orin and Thornwall masters unlock the advanced techniques once the player has the vocation rank and mastery points.
 
 The player-facing UI should feel like visiting a craft mentor or station in town. It should show vocation rank, branches, learned techniques, mentor-locked techniques, and remaining daily active honing cap. Craft and gather screens should expose eligible unlocked techniques at the moment of action.
 
@@ -246,8 +244,9 @@ Launch includes:
 
 Launch tuning constants:
 
-- Active honing cap: 120 turns per UTC day across all vocations.
-- Active honing XP: 10 vocation XP per honing turn.
+- Active honing cap: 10,800 turns per UTC day across all vocations.
+- Active honing action size: 10 to 10,800 turns.
+- Active honing XP: 0.1 vocation XP per honing turn, so spending the full daily cap grants 1,080 vocation XP.
 - Passive craft mastery XP: 20% of the craft's base turn cost.
 - Passive gathering mastery XP: 15% of the gather action's base turn cost.
 - Technique respec refund: 60% of spent mastery points, preserving vocation XP/rank.

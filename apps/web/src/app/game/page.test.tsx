@@ -460,6 +460,7 @@ describe('GamePage realm switching', () => {
     expect(getSubnavText()).toContain('Events');
     expect(getSubnavText()).toContain('Training');
     expect(getSubnavText()).toContain('Casino');
+    expect(getSubnavText()).toContain('Vocations');
 
     useGameControllerMock.mockReturnValue({
       ...createGameControllerState(),
@@ -468,6 +469,7 @@ describe('GamePage realm switching', () => {
     });
     rerender(<GamePage />);
     expect(getSubnavText()).toContain('Skills');
+    expect(getSubnavText()).not.toContain('Vocations');
 
     useGameControllerMock.mockReturnValue({
       ...createGameControllerState(),

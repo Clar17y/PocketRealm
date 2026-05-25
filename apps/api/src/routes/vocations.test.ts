@@ -110,14 +110,14 @@ describe('vocations router', () => {
     const res = await request(buildApp())
       .post('/api/v1/vocations/hone')
       .set(authHeader())
-      .send({ vocationId: 'prospector', turns: 3 });
+      .send({ vocationId: 'prospector', turns: 300 });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual(actionResult);
     expect(honeVocation).toHaveBeenCalledWith({
       playerId: PLAYER_ID,
       vocationId: 'prospector',
-      turns: 3,
+      turns: 300,
     });
     expect(checkAchievements).toHaveBeenCalledWith(PLAYER_ID, {
       statKeys: expect.arrayContaining([
@@ -133,11 +133,11 @@ describe('vocations router', () => {
   it('emits vocation achievement notifications after honing unlocks one', async () => {
     vi.mocked(honeVocation).mockResolvedValue(actionResult);
     const achievement = {
-      id: 'vocation_honing_1200',
+      id: 'vocation_honing_10800',
       category: 'skills',
       title: 'Bench Time',
       description: 'Spend time honing.',
-      threshold: 1200,
+      threshold: 10800,
       tier: 1,
       statKey: 'totalVocationHonedTurns',
     } as const;
@@ -146,13 +146,13 @@ describe('vocations router', () => {
     const res = await request(buildApp())
       .post('/api/v1/vocations/hone')
       .set(authHeader())
-      .send({ vocationId: 'prospector', turns: 3 });
+      .send({ vocationId: 'prospector', turns: 300 });
 
     expect(res.status).toBe(200);
     expect(emitAchievementNotifications).toHaveBeenCalledWith(PLAYER_ID, [achievement]);
   });
 
-  it.each([0, 101])('rejects invalid hone turns %s without delegating', async (turns) => {
+  it.each([0, 10801])('rejects invalid hone turns %s without delegating', async (turns) => {
     const res = await request(buildApp())
       .post('/api/v1/vocations/hone')
       .set(authHeader())
@@ -166,7 +166,7 @@ describe('vocations router', () => {
     const res = await request(buildApp())
       .post('/api/v1/vocations/hone')
       .set(authHeader())
-      .send({ vocationId, turns: 3 });
+      .send({ vocationId, turns: 300 });
 
     expect(res.status).toBe(400);
     expect(honeVocation).not.toHaveBeenCalled();

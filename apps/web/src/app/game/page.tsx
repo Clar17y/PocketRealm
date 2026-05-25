@@ -430,6 +430,7 @@ export default function GamePage() {
               { id: 'gathering', label: 'Gathering' },
               { id: 'crafting', label: 'Crafting' },
               { id: 'forge', label: 'Forge' },
+              { id: 'vocations', label: 'Vocations' },
               { id: 'worldEvents', label: 'Events' },
               ...(currentZone?.zoneType === 'town' ? [
                 { id: 'training', label: 'Training' },
@@ -447,7 +448,6 @@ export default function GamePage() {
               { id: 'inventory', label: 'Items' },
               { id: 'equipment', label: 'Equipment' },
               { id: 'skills', label: 'Skills' },
-              { id: 'vocations', label: 'Vocations' },
             ]}
             activeId={activeScreen}
             onSelect={(id) => setActiveScreen(id as Screen)}

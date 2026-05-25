@@ -36,4 +36,6 @@ export * from './utils/vocationProgress';
 export * from './utils/vocationMapping';
 export * from './utils/vocationTechniqueEffects';
 export * from './utils/vocationCraftMarks';
+export * from './utils/vocationTechniqueDescriptions';
+export * from './utils/vocationMentors';
 export * from './utils/gatheringResourceCategory';

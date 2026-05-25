@@ -120,17 +120,17 @@ describe('achievementDefinitions', () => {
   describe('vocation mastery achievements', () => {
     it('includes named focus title achievements for every launch vocation', () => {
       const expectedTitles = new Map([
-        ['vocation_focus_prospector_1200', 'Stone Reader'],
-        ['vocation_focus_forester_1200', 'Heartwood Hand'],
-        ['vocation_focus_herbalist_1200', 'Leafwarden'],
-        ['vocation_focus_weaponsmith_1200', 'Edgekeeper'],
-        ['vocation_focus_bowyer_1200', 'Stringwright'],
-        ['vocation_focus_staffwright_1200', 'Channel Carver'],
-        ['vocation_focus_armorer_1200', 'Plate-Raiser'],
-        ['vocation_focus_leatherworker_1200', 'Hidewarden'],
-        ['vocation_focus_tailor_1200', 'Wardweaver'],
-        ['vocation_focus_jeweller_1200', 'Facet-Speaker'],
-        ['vocation_focus_alchemist_1200', 'Retort Keeper'],
+        ['vocation_focus_prospector_36000', 'Stone Reader'],
+        ['vocation_focus_forester_36000', 'Heartwood Hand'],
+        ['vocation_focus_herbalist_36000', 'Leafwarden'],
+        ['vocation_focus_weaponsmith_36000', 'Edgekeeper'],
+        ['vocation_focus_bowyer_36000', 'Stringwright'],
+        ['vocation_focus_staffwright_36000', 'Channel Carver'],
+        ['vocation_focus_armorer_36000', 'Plate-Raiser'],
+        ['vocation_focus_leatherworker_36000', 'Hidewarden'],
+        ['vocation_focus_tailor_36000', 'Wardweaver'],
+        ['vocation_focus_jeweller_36000', 'Facet-Speaker'],
+        ['vocation_focus_alchemist_36000', 'Retort Keeper'],
       ]);
 
       for (const [id, titleReward] of expectedTitles) {
@@ -138,14 +138,14 @@ describe('achievementDefinitions', () => {
           id,
           category: 'skills',
           titleReward,
-          threshold: 1200,
+          threshold: 36000,
           statKey: expect.stringMatching(/^vocationHonedTurns_/),
         });
       }
     });
 
     it('tracks active honing, techniques, craft marks, and vocation counters', () => {
-      expect(ACHIEVEMENTS_BY_ID.get('vocation_honing_6000')).toMatchObject({
+      expect(ACHIEVEMENTS_BY_ID.get('vocation_honing_108000')).toMatchObject({
         titleReward: 'Turn-Taught',
         statKey: 'totalVocationHonedTurns',
       });

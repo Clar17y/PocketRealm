@@ -359,7 +359,7 @@ describe('useGameController', () => {
 
   it.each([
     ['skills', 'inventory'],
-    ['vocations', 'inventory'],
+    ['vocations', 'explore'],
     ['bestiary', 'combat'],
     ['worldEvents', 'explore'],
     ['casino', 'explore'],
