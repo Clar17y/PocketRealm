@@ -22,6 +22,7 @@ import {
 import {
   calculateCraftingCrit,
   rollBonusStatsForRarity,
+  type CraftingCritChanceDeltas,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
@@ -89,6 +90,28 @@ function buildCraftMarks(
     itemStatDrawbacks: [...mark.itemStatDrawbacks],
     actionModifiers: [...(mark.actionModifiers ?? [])],
   }));
+}
+
+function buildCraftCritChanceDeltas(
+  rules: ReturnType<typeof applyCraftTechniqueEffects>['critRules'],
+): CraftingCritChanceDeltas | undefined {
+  const deltas: CraftingCritChanceDeltas = {};
+
+  for (const rule of rules) {
+    if (rule.critType !== 'rarity_upgrade') {
+      continue;
+    }
+
+    if (rule.ruleId.startsWith('uncommon_')) {
+      deltas.critChance = (deltas.critChance ?? 0) + rule.critChanceDelta;
+    } else if (rule.ruleId.startsWith('rare_')) {
+      deltas.rareCraftChance = (deltas.rareCraftChance ?? 0) + rule.critChanceDelta;
+    } else if (rule.ruleId.startsWith('epic_')) {
+      deltas.epicCraftChance = (deltas.epicCraftChance ?? 0) + rule.critChanceDelta;
+    }
+  }
+
+  return Object.keys(deltas).length > 0 ? deltas : undefined;
 }
 
 async function findMatchingStack(
@@ -212,6 +235,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
 
     const techniqueEffects = applyCraftTechniqueEffects(selectedTechnique);
     const craftMarks = buildCraftMarks(selectedTechnique, techniqueEffects.craftMarks);
+    const critChanceDeltas = buildCraftCritChanceDeltas(techniqueEffects.critRules);
     const materialCosts = materials.map((mat) => ({
       ...mat,
       totalQuantity: scalePositiveQuantity(mat.quantity * quantity, techniqueEffects.materialCostMultiplier),
@@ -278,6 +302,9 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       const guildMods = await getPlayerGuildModifiers(playerId);
       const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
       const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
+      const craftCritOptions = critChanceDeltas
+        ? { championMultiplier, chanceDeltas: critChanceDeltas }
+        : { championMultiplier };
       const combinedCritBonus = guildMods.craftingCrit + shopCraftingCrit;
       const effectiveLuck = combinedCritBonus > 0
         ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
@@ -295,7 +322,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
           baseStats: templateBaseStats,
           slot: templateSlot,
           championMultiplier,
-        });
+        }, undefined, craftCritOptions);
         const rarity: ItemRarity = critResult.rarity;
         const rolledBonusStats = rollBonusStatsForRarity({
           itemType,

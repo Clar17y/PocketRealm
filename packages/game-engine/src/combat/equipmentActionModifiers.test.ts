@@ -130,6 +130,67 @@ describe('applyEquipmentActionModifiers', () => {
     expect(withModifier.action.id).toBe('expensive_spell');
   });
 
+  it('defence, dodge, and healing modifiers alter defensive and support actions', () => {
+    const reinforcedDefend = applyEquipmentActionModifiers({
+      action: actionDefinition({
+        id: 'defend',
+        actionType: 'defend',
+        category: 'defensive',
+        damageReductionPercent: 0.35,
+      }),
+      modifiers: [
+        modifier({
+          actionTypes: ['defend'],
+          benefits: [
+            { stat: 'defence', value: 0.05, isPercent: true },
+            { stat: 'dodge', value: 0.04, isPercent: true },
+          ],
+          drawbacks: [],
+        }),
+      ],
+    });
+
+    const fortifiedBuff = applyEquipmentActionModifiers({
+      action: actionDefinition({
+        id: 'fortify',
+        actionType: 'buff',
+        category: 'defensive',
+        effect: { name: 'Fortified', stat: 'defence', modifier: 20, duration: 3 },
+      }),
+      modifiers: [
+        modifier({
+          actionTypes: ['buff'],
+          benefits: [{ stat: 'defence', value: 0.05, isPercent: true }],
+          drawbacks: [],
+        }),
+      ],
+    });
+
+    const strongerHeal = applyEquipmentActionModifiers({
+      action: actionDefinition({
+        id: 'minor_heal',
+        actionType: 'heal_self',
+        category: 'supportive',
+        healFlat: 10,
+        healPercent: 0.2,
+      }),
+      modifiers: [
+        modifier({
+          actionTypes: ['heal_self'],
+          benefits: [{ stat: 'healing', value: 0.1, isPercent: true }],
+          drawbacks: [],
+        }),
+      ],
+    });
+
+    expect(reinforcedDefend.damageReductionPercent).toBeCloseTo(0.3675);
+    expect((reinforcedDefend as { avoidanceModifier?: number }).avoidanceModifier).toBe(4);
+    expect(fortifiedBuff.damageReductionPercent).toBeUndefined();
+    expect(fortifiedBuff.effect?.modifier).toBe(21);
+    expect(strongerHeal.healFlat).toBe(11);
+    expect(strongerHeal.healPercent).toBeCloseTo(0.22);
+  });
+
   it('input action is not mutated', () => {
     const action = actionDefinition({
       id: 'heavy_attack',

@@ -132,8 +132,11 @@ describe('vocationDefinitions', () => {
         expect(effect.mark.markId, `${technique.id} mark id`).toContain(`${technique.id}_`);
         expect(effect.mark.name, `${technique.id} mark name`).not.toHaveLength(0);
         expect(effect.mark.description, `${technique.id} mark description`).not.toHaveLength(0);
-        expect(effect.mark.itemStatBenefits.length, `${technique.id} mark benefits`).toBeGreaterThan(0);
-        expect(effect.mark.itemStatDrawbacks.length, `${technique.id} mark drawbacks`).toBeGreaterThan(0);
+        const hasItemTradeoff = effect.mark.itemStatBenefits.length > 0 && effect.mark.itemStatDrawbacks.length > 0;
+        const hasActionTradeoff = (effect.mark.actionModifiers ?? []).some((modifier) =>
+          modifier.benefits.length > 0 && modifier.drawbacks.length > 0,
+        );
+        expect(hasItemTradeoff || hasActionTradeoff, `${technique.id} mark tradeoff`).toBe(true);
       }
     }
   });
@@ -198,12 +201,17 @@ describe('vocationDefinitions', () => {
   it('requires action modifier benefits to carry explicit drawbacks', () => {
     for (const technique of allTechniques()) {
       for (const effect of technique.effects) {
-        if (effect.type !== 'equipment_action_modifier') {
-          continue;
+        if (effect.type === 'equipment_action_modifier') {
+          expect(effect.benefits.length, `${technique.id} action benefits`).toBeGreaterThan(0);
+          expect(effect.drawbacks.length, `${technique.id} action drawbacks`).toBeGreaterThan(0);
         }
 
-        expect(effect.benefits.length, `${technique.id} action benefits`).toBeGreaterThan(0);
-        expect(effect.drawbacks.length, `${technique.id} action drawbacks`).toBeGreaterThan(0);
+        if (effect.type === 'craft_mark') {
+          for (const modifier of effect.mark.actionModifiers ?? []) {
+            expect(modifier.benefits.length, `${technique.id} mark action benefits`).toBeGreaterThan(0);
+            expect(modifier.drawbacks.length, `${technique.id} mark action drawbacks`).toBeGreaterThan(0);
+          }
+        }
       }
     }
   });

@@ -1,4 +1,5 @@
 import { VOCATION_DEFINITIONS } from '../constants/vocationDefinitions';
+import { CRAFTING_CONSTANTS } from '../constants/gameConstants';
 import type {
   CraftMarkDefinition,
   CraftTechniqueEffect,
@@ -115,6 +116,7 @@ export function applyCraftTechniqueEffects(
       application.craftMarks.push(effect.mark);
       application.appliedEffectIds.push(effect.mark.markId);
     } else if (effect.type === 'craft_crit_rule') {
+      application.materialCostMultiplier *= CRAFTING_CONSTANTS.RARITY_TECHNIQUE_MATERIAL_WASTE_MULTIPLIER;
       application.critRules.push(effect);
       application.appliedEffectIds.push(effect.ruleId);
     }

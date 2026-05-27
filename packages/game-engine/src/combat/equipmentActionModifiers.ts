@@ -65,6 +65,21 @@ function applyModifierEntry(action: ActionDefinition, entry: EquipmentActionModi
     };
   }
 
+  if (entry.stat === 'defence') {
+    return applyDefenceModifier(action, entry);
+  }
+
+  if (entry.stat === 'dodge') {
+    return {
+      ...action,
+      avoidanceModifier: (action.avoidanceModifier ?? 0) + accuracyDelta(entry),
+    };
+  }
+
+  if (entry.stat === 'healing') {
+    return applyHealingModifier(action, entry);
+  }
+
   return action;
 }
 
@@ -87,6 +102,68 @@ function applyPercentOrFlat(currentValue: number, entry: EquipmentActionModifier
 
 function accuracyDelta(entry: EquipmentActionModifierEntry): number {
   return entry.isPercent ? entry.value * 100 : entry.value;
+}
+
+function applyDefenceModifier(action: ActionDefinition, entry: EquipmentActionModifierEntry): ActionDefinition {
+  let updated = action;
+
+  if (updated.damageReductionPercent !== undefined || (updated.category === 'defensive' && !updated.effect)) {
+    const currentReduction = updated.damageReductionPercent ?? 0;
+    updated = {
+      ...updated,
+      damageReductionPercent: clampDamageReduction(applyPercentOrFlat(currentReduction, entry)),
+    };
+  }
+
+  if (updated.effect && (updated.effect.stat === 'defence' || updated.effect.stat === 'magicDefence')) {
+    updated = {
+      ...updated,
+      effect: {
+        ...updated.effect,
+        modifier: applyEffectModifier(updated.effect.modifier, entry),
+      },
+    };
+  }
+
+  return updated;
+}
+
+function applyHealingModifier(action: ActionDefinition, entry: EquipmentActionModifierEntry): ActionDefinition {
+  let updated = action;
+
+  if (updated.healFlat !== undefined) {
+    updated = {
+      ...updated,
+      healFlat: Math.max(0, Math.round(applyPercentOrFlat(updated.healFlat, entry))),
+    };
+  }
+
+  if (updated.healPercent !== undefined) {
+    updated = {
+      ...updated,
+      healPercent: Math.max(0, applyPercentOrFlat(updated.healPercent, entry)),
+    };
+  }
+
+  if (updated.effect?.healPerRound !== undefined) {
+    updated = {
+      ...updated,
+      effect: {
+        ...updated.effect,
+        healPerRound: Math.max(0, Math.round(applyPercentOrFlat(updated.effect.healPerRound, entry))),
+      },
+    };
+  }
+
+  return updated;
+}
+
+function applyEffectModifier(currentValue: number, entry: EquipmentActionModifierEntry): number {
+  return Math.round(applyPercentOrFlat(currentValue, entry));
+}
+
+function clampDamageReduction(value: number): number {
+  return Math.max(0, Math.min(0.95, value));
 }
 
 function applyResourceCostDelta(currentCost: number, entry: EquipmentActionModifierEntry): number {

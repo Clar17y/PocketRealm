@@ -51,6 +51,7 @@ export function executeAction(
 ): void {
   const hitOverride = isAttacker ? interaction.attackerHitOverride : interaction.defenderHitOverride;
   const interactionDamageMultiplier = isAttacker ? interaction.attackerDamageMultiplier : interaction.defenderDamageMultiplier;
+  const targetAvoidanceModifier = isAttacker ? interaction.defenderAvoidanceModifier : interaction.attackerAvoidanceModifier;
   // Damage reduction applies when this actor is being attacked (the opponent's reduction on us).
   // `attackerDamageReduction` means "reduction applied to A when A takes damage".
   // So when A is executing their offensive action against B, B's `defenderDamageReduction` applies.
@@ -78,6 +79,7 @@ export function executeAction(
       hitOverride,
       interactionDamageMultiplier,
       damageReduction,
+      targetAvoidanceModifier,
       actorName,
       targetName,
       ctx,

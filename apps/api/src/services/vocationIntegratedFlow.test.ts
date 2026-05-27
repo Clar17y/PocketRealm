@@ -63,6 +63,36 @@ describe('vocation integrated flow contracts', () => {
     expect(unchangedDefend).toEqual(defend);
   });
 
+  it('carries artisan action techniques through craft marks instead of passive unlocks', () => {
+    const eligibleTechniques = getEligibleTechniquesForCraft({
+      vocationId: 'armorer',
+      learnedTechniqueIds: ['armorer_locked_cuirass'],
+      skillType: 'armorsmithing',
+      resultItemType: 'armor',
+      resultSlot: 'chest',
+    });
+
+    expect(eligibleTechniques.map((technique) => technique.id)).toEqual(['armorer_locked_cuirass']);
+
+    const craftApplication = applyCraftTechniqueEffects(eligibleTechniques[0]);
+    expect(craftApplication.craftMarks).toHaveLength(1);
+
+    const persistedMark = persistCraftMark(craftApplication.craftMarks[0]!, 'armorer_locked_cuirass');
+    const actionModifiers = getEquipmentActionModifiers({
+      slot: 'chest',
+      craftMarks: parseCraftMarks([persistedMark]),
+    });
+
+    const defend = BASE_ACTION_DEFINITIONS.defend;
+    const modifiedDefend = applyEquipmentActionModifiers({
+      action: defend,
+      modifiers: actionModifiers,
+    });
+
+    expect(actionModifiers).toHaveLength(1);
+    expect(modifiedDefend.damageReductionPercent ?? 0).toBeGreaterThan(defend.damageReductionPercent ?? 0);
+  });
+
   it('keeps Prospector gem techniques on the existing gem crit path and achievement stat keys', () => {
     const vocationId = resolveGatheringVocation('mining');
     expect(vocationId).toBe('prospector');

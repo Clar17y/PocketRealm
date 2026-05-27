@@ -241,6 +241,43 @@ describe('calculateCraftingCrit', () => {
     expect(result.rarity).toBe('uncommon');
   });
 
+  it('applies flat vocation chance deltas to crit and rarity windows', () => {
+    const uncommonOptions = { chanceDeltas: { critChance: 0.04 } };
+    const uncommonResult = calculateCraftingCrit({
+      skillLevel: 10,
+      requiredLevel: 10,
+      luckStat: 0,
+      itemType: 'weapon',
+      baseStats: { attack: 50 },
+      slot: 'main_hand',
+    }, {
+      critRoll: 0.08,
+      statRoll: 0,
+      bonusPercentRoll: 0.5,
+    }, uncommonOptions);
+
+    const rareOptions = { chanceDeltas: { rareCraftChance: 0.02 } };
+    const rareResult = calculateCraftingCrit({
+      skillLevel: 10,
+      requiredLevel: 10,
+      luckStat: 0,
+      itemType: 'weapon',
+      baseStats: { attack: 50 },
+      slot: 'main_hand',
+    }, {
+      critRoll: 0.02,
+      statRoll: 0,
+      bonusPercentRoll: 0.5,
+    }, rareOptions);
+
+    expect(uncommonResult.critChance).toBeCloseTo(0.09);
+    expect(uncommonResult.isCrit).toBe(true);
+    expect(uncommonResult.rarity).toBe('uncommon');
+    expect(rareResult.rareCraftChance).toBeCloseTo(0.025);
+    expect(rareResult.isCrit).toBe(true);
+    expect(rareResult.rarity).toBe('rare');
+  });
+
   it('returns deterministic crit result when rolls are provided', () => {
     const result = calculateCraftingCrit({
       skillLevel: 25,

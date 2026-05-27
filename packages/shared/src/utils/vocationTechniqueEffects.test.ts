@@ -58,14 +58,14 @@ describe('vocationTechniqueEffects selectors', () => {
     })).toEqual([]);
   });
 
-  it('excludes equipment action techniques from craft and gathering selectors', () => {
+  it('includes artisan action mark techniques in craft selectors but not gathering selectors', () => {
     expect(getEligibleTechniquesForCraft({
       vocationId: 'weaponsmith',
       learnedTechniqueIds: ['weaponsmith_crushing_poll'],
       skillType: 'weaponsmithing',
       resultItemType: 'weapon',
       resultSlot: 'main_hand',
-    })).toEqual([]);
+    }).map((technique) => technique.id)).toEqual(['weaponsmith_crushing_poll']);
 
     expect(getEligibleTechniquesForGathering({
       vocationId: 'weaponsmith',
@@ -127,7 +127,7 @@ describe('vocationTechniqueEffects application', () => {
 
     expect(application).toMatchObject({
       turnCostMultiplier: 0.8,
-      materialCostMultiplier: 1.25,
+      materialCostMultiplier: 1.3125,
       outputQuantityDelta: 1,
       appliedEffectIds: ['fast_batch', 'precise_mark', 'rare_finish'],
     });

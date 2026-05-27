@@ -57,6 +57,8 @@ export interface ActionDefinition {
   accuracyModifier?: number;
   /** Per-action durability wear multiplier from craft marks, applied during combat degradation (1.0 = normal) */
   durabilityWearMultiplier?: number;
+  /** Added to the defender's avoid score while this action is active */
+  avoidanceModifier?: number;
   /** Defence reduction applied to target receiving this action */
   defenceReduction?: number;
   /** Damage reduction percentage when defending (0-1) */

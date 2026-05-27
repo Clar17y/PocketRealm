@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mockPrisma } from '../../__test__/setup';
+import { calculateCraftingCrit } from '@pocketrealm/game-engine';
 import { craftItem } from './craftRouteService';
 import { craftSchema, getSkillLevel, getZoneCraftingLevel } from './helpers';
 import { getTotalQuantityByTemplate, getInventoryState, consumeItemsByTemplateTx } from '../inventoryService';
@@ -426,6 +427,40 @@ describe('craftItem vocation integration', () => {
     expect(mockPrisma.item.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ quantity: 6 }),
     }));
+  });
+
+  it('passes selected rarity technique crit deltas into crafting crit rolls', async () => {
+    mockPrisma.craftingRecipe.findUnique.mockResolvedValue(recipe({
+      vocationId: 'bowyer',
+      resultTemplate: {
+        id: TEMPLATE_ID,
+        name: 'Oak Shortbow',
+        itemType: 'weapon',
+        slot: 'main_hand',
+        stackable: false,
+        maxDurability: 100,
+        baseStats: { rangedPower: 5 },
+      },
+    }));
+    mockPrisma.playerVocationTechnique.findMany.mockResolvedValue([
+      { techniqueId: 'bowyer_horn_nock' },
+    ]);
+
+    await act({ recipeId: RECIPE_ID, quantity: 1, techniqueId: 'bowyer_horn_nock' });
+
+    expect(calculateCraftingCrit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skillLevel: 10,
+        requiredLevel: 1,
+        itemType: 'weapon',
+        baseStats: { rangedPower: 5 },
+        slot: 'main_hand',
+      }),
+      undefined,
+      expect.objectContaining({
+        chanceDeltas: expect.objectContaining({ critChance: 0.04 }),
+      }),
+    );
   });
 
   it('ignores output quantity delta for non-stackable outputs', async () => {

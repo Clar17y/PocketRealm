@@ -36,6 +36,7 @@ export function executeOffensiveAction(
   hitOverride: 'guaranteed_miss' | 'guaranteed_hit' | 'normal',
   interactionDamageMultiplier: number,
   damageReduction: number,
+  targetAvoidanceModifier: number,
   actorName: string,
   targetName: string,
   ctx: RoundContext,
@@ -112,7 +113,7 @@ export function executeOffensiveAction(
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
   const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
   const hitScore = accuracyBonus;
-  const avoidScore = calculateAvoidScore(targetStats);
+  const avoidScore = calculateAvoidScore(targetStats) + targetAvoidanceModifier;
   const hitResolution = hitOverride === 'guaranteed_hit' || action.alwaysHits
     ? guaranteedHitResult(hitScore, avoidScore)
     : attackRoll === 1 || attackRoll === 20
