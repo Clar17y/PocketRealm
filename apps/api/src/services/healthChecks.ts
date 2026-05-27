@@ -27,7 +27,7 @@ export function resetShutdownState(): void {
   shuttingDown = false;
 }
 
-// Single-flight cache of the raw probe promise per dependency. When a probe
+// Single-flight tracking of the raw probe promise per dependency. When a probe
 // times out, the underlying prisma/redis call cannot actually be cancelled,
 // so we keep the same in-flight promise around and race NEW timeouts against
 // IT instead of spawning a fresh probe. Under periodic readiness polling
@@ -81,8 +81,7 @@ function probeDependency(label: string, probe: () => Promise<boolean>): Promise<
   return withTimeout(label, raw);
 }
 
-// Test-only: drop any cached in-flight probe between suites so a hung mock
-// doesn't bleed across tests.
+// Test-only: drop in-flight probe state between suites so mocks do not bleed.
 export function resetProbeInflight(): void {
   for (const key of Object.keys(inflightProbes)) inflightProbes[key] = undefined;
 }
