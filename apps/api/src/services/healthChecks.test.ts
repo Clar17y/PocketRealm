@@ -31,6 +31,15 @@ describe('healthChecks', () => {
       await expect(checkDatabase()).resolves.toBe('ok');
     });
 
+    it('revalidates each successful database check', async () => {
+      (prisma.$queryRaw as any).mockResolvedValue([{ one: 1 }]);
+
+      await expect(checkDatabase()).resolves.toBe('ok');
+      await expect(checkDatabase()).resolves.toBe('ok');
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+
     it('returns "error" when Prisma throws', async () => {
       (prisma.$queryRaw as any).mockRejectedValueOnce(new Error('connection refused'));
       await expect(checkDatabase()).resolves.toBe('error');
@@ -41,6 +50,15 @@ describe('healthChecks', () => {
     it('returns "ok" when ping returns PONG', async () => {
       (redis.ping as any).mockResolvedValueOnce('PONG');
       await expect(checkRedis()).resolves.toBe('ok');
+    });
+
+    it('revalidates each successful Redis check', async () => {
+      (redis.ping as any).mockResolvedValue('PONG');
+
+      await expect(checkRedis()).resolves.toBe('ok');
+      await expect(checkRedis()).resolves.toBe('ok');
+
+      expect(redis.ping).toHaveBeenCalledTimes(2);
     });
 
     it('returns "error" when ping rejects', async () => {
