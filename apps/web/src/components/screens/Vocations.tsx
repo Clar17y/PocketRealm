@@ -82,7 +82,7 @@ export function Vocations({
   onRespec,
 }: VocationsProps) {
   const [selectedVocationId, setSelectedVocationId] = useState<VocationId>('weaponsmith');
-  const [honingTurns, setHoningTurns] = useState(VOCATION_MASTERY.HONE_ACTION_TURN_MIN);
+  const [honingTurns, setHoningTurns] = useState<number>(VOCATION_MASTERY.HONE_ACTION_TURN_MIN);
   const [confirmRespec, setConfirmRespec] = useState(false);
 
   const vocationRows = snapshot?.vocations ?? [];
