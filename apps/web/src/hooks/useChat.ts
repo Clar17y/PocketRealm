@@ -67,6 +67,8 @@ function refreshScopedChatRooms(): void {
   }
 }
 
+const MAX_SEEN_MESSAGE_IDS = CHAT_CONSTANTS.HISTORY_LIMIT * 8;
+
 export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseChatReturn {
   const [worldMessages, setWorldMessages] = useState<ChatMessageEvent[]>([]);
   const [globalActivityMessages, setGlobalActivityMessages] = useState<ChatMessageEvent[]>([]);
@@ -92,6 +94,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
   const activeChannelRef = useRef(activeChannel);
   const guildChatRef = useRef(guildChat);
   const casinoActiveRef = useRef(casinoActive);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
 
   currentZoneIdRef.current = currentZoneId;
   isOpenRef.current = isOpen;
@@ -99,7 +102,29 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
   guildChatRef.current = guildChat;
   casinoActiveRef.current = casinoActive;
 
+  const rememberMessageId = useCallback((id: string) => {
+    const seen = seenMessageIdsRef.current;
+    seen.add(id);
+    while (seen.size > MAX_SEEN_MESSAGE_IDS) {
+      const oldest = seen.values().next().value;
+      if (typeof oldest !== 'string') break;
+      seen.delete(oldest);
+    }
+  }, []);
+
+  const rememberMessages = useCallback((messages: ChatMessageEvent[]) => {
+    for (const message of messages) {
+      rememberMessageId(message.id);
+    }
+    return messages;
+  }, [rememberMessageId]);
+
   const appendMessage = useCallback((msg: ChatMessageEvent) => {
+    if (seenMessageIdsRef.current.has(msg.id)) {
+      return;
+    }
+    rememberMessageId(msg.id);
+
     if (msg.channelType === 'world') {
       if (msg.messageType === 'activity') {
         setGlobalActivityMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
@@ -129,7 +154,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
         setUnreadCasino((n) => n + 1);
       }
     }
-  }, []);
+  }, [rememberMessageId]);
 
   const clearGuildChat = useCallback(() => {
     guildChatRef.current = null;
@@ -175,12 +200,12 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       const history = await getChatHistory('guild', getGuildChannelId(nextGuildChat.id));
       if (guildChatRef.current?.id !== nextGuildChat.id) return;
       if (history.data) {
-        setGuildMessages(history.data.messages);
+        setGuildMessages(rememberMessages(history.data.messages));
       }
     } catch {
       clearGuildChat();
     }
-  }, [clearGuildChat, isAuthenticated]);
+  }, [clearGuildChat, isAuthenticated, rememberMessages]);
 
   // Connect/disconnect based on auth
   useEffect(() => {
@@ -222,10 +247,10 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
         getChatHistory('world', 'world', { messageType: 'activity' }),
       ]).then(([worldRes, activityRes]) => {
         if (worldRes.data) {
-          setWorldMessages(worldRes.data.messages);
+          setWorldMessages(rememberMessages(worldRes.data.messages));
         }
         if (activityRes.data) {
-          setGlobalActivityMessages(activityRes.data.messages);
+          setGlobalActivityMessages(rememberMessages(activityRes.data.messages));
         }
       });
 
@@ -233,7 +258,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       if (currentZoneIdRef.current) {
         getChatHistory('zone', `zone:${currentZoneIdRef.current}`).then((res) => {
           if (res.data) {
-            setZoneMessages(res.data.messages);
+            setZoneMessages(rememberMessages(res.data.messages));
           }
         });
       }
@@ -245,7 +270,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
         socket.emit('chat:join-casino');
         getChatHistory('casino', 'casino').then((res) => {
           if (res.data) {
-            setCasinoMessages(res.data.messages);
+            setCasinoMessages(rememberMessages(res.data.messages));
           }
         });
       }
@@ -262,7 +287,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       socket.off('connect', onConnect);
       disconnectSocket();
     };
-  }, [isAuthenticated, appendMessage, loadGuildChat]);
+  }, [isAuthenticated, appendMessage, loadGuildChat, rememberMessages]);
 
   // Zone change: switch rooms + reload history
   const prevZoneIdRef = useRef(currentZoneId);
@@ -283,11 +308,11 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     getChatHistory('zone', `zone:${currentZoneId}`).then((res) => {
       if (cancelled) return;
       if (res.data) {
-        setZoneMessages(res.data.messages);
+        setZoneMessages(rememberMessages(res.data.messages));
       }
     });
     return () => { cancelled = true; };
-  }, [currentZoneId, isAuthenticated]);
+  }, [currentZoneId, isAuthenticated, rememberMessages]);
 
   const toggleChat = useCallback(() => {
     if (!isOpenRef.current) {
@@ -362,10 +387,10 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     }
     getChatHistory('casino', 'casino').then((res) => {
       if (res.data) {
-        setCasinoMessages(res.data.messages);
+        setCasinoMessages(rememberMessages(res.data.messages));
       }
     });
-  }, []);
+  }, [rememberMessages]);
 
   const injectCasinoSystemMessage = useCallback((texts: string | string[]) => {
     const arr = Array.isArray(texts) ? texts : [texts];

@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireActiveSeason } from '../middleware/seasonGuard';
-import { listZones, travelToZone } from '../services/zoneRoutesService';
+import { runActivityWithWorker } from '../services/activityWorkerClient';
+import { listZones } from '../services/zoneRoutesService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendRouteServiceResponse } from '../utils/routeServiceResponse';
 
@@ -16,5 +17,8 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
 zonesRouter.use(requireActiveSeason);
 
 zonesRouter.post('/travel', asyncHandler(async (req, res) => {
-  sendRouteServiceResponse(res, await travelToZone({ body: req.body, player: req.player! }));
+  sendRouteServiceResponse(res, await runActivityWithWorker({
+    type: 'zones.travel',
+    input: { body: req.body, player: req.player! },
+  }));
 }));

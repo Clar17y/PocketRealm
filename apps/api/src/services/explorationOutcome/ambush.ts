@@ -33,6 +33,10 @@ import type { GrantXpResult } from '../xpService';
 import type { ExplorationOutcomeContext, ExplorationTurnOutcome, AmbushProcessingResult } from './types';
 import { pickWeighted, type NarrativeEvent, type PendingAmbushCombatLog } from '../exploration/helpers';
 
+function hasConsumableCombatBuffUses(uses: ExplorationOutcomeContext['buffUsesLeft']): boolean {
+  return uses.damage > 0 || uses.defence > 0 || uses.durability > 0;
+}
+
 export async function processAmbushOutcome(args: {
   ctx: ExplorationOutcomeContext;
   outcome: ExplorationTurnOutcome;
@@ -225,9 +229,11 @@ export async function processAmbushOutcome(args: {
     allUpdatedItemIds.push(durability.itemId);
   }
 
-  await prisma.$transaction(async (tx) => {
-    await consumeBuffChargesPerMob(tx, playerId, buffUsesLeft);
-  });
+  if (hasConsumableCombatBuffUses(buffUsesLeft)) {
+    await prisma.$transaction(async (tx) => {
+      await consumeBuffChargesPerMob(tx, playerId, buffUsesLeft);
+    });
+  }
 
   const ambushMobFamily = zoneFamilies.find((zoneFamily) =>
     zoneFamily.mobFamily.members.some((member) => member.mobTemplate.id === prefixedMob.id),
@@ -256,7 +262,6 @@ export async function processAmbushOutcome(args: {
     currentHp = combatResult.combatantAHpRemaining;
     currentStamina = combatResult.combatantAStaminaRemaining;
     currentMana = combatResult.combatantAManaRemaining;
-    await setHp(playerId, currentHp);
 
     const rewards = await processCombatVictoryRewards({
       playerId,
@@ -264,6 +269,7 @@ export async function processAmbushOutcome(args: {
       attackSkill,
       damageByScalingStat: combatResult.damageByScalingStat,
       resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
+      guildXpBoost: combatPrep.guildMods.xpBoost,
     });
     loot = rewards.loot;
     const lootWithNames = await enrichLootWithNames(loot);
