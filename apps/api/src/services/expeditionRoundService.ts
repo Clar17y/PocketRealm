@@ -166,7 +166,9 @@ async function buildParticipantFromSnapshot(
   applyGuildCombatModifiers(stats, snapshot.guildMods);
 
   // Fetch template + actions + potions fresh each round (not cached)
-  const fresh = await fetchFreshTemplateData(member.playerId, snapshot.maxHp);
+  const fresh = await fetchFreshTemplateData(member.playerId, snapshot.maxHp, {
+    actionModifiers: snapshot.equipmentStats.actionModifiers ?? [],
+  });
 
   const effects = Array.isArray(member.activeEffects) ? member.activeEffects : [];
 
@@ -183,6 +185,7 @@ async function buildParticipantFromSnapshot(
       sortOrder: s.sortOrder,
     })),
     actionDefinitions: fresh.actionDefinitions,
+    equipmentActionModifiers: snapshot.equipmentStats.actionModifiers ?? [],
     hp: member.currentHp,
     maxHp: snapshot.maxHp,
     stamina: member.currentStamina,

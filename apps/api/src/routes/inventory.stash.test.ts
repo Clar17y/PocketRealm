@@ -11,7 +11,7 @@ vi.mock('../utils/routeHelpers.js', () => ({
 vi.mock('../services/stashService', () => ({
   depositItem: vi.fn().mockResolvedValue(undefined),
   depositBatch: vi.fn(),
-  withdrawItem: vi.fn(),
+  withdrawItem: vi.fn().mockResolvedValue(undefined),
   withdrawBatch: vi.fn(),
   listStash: vi.fn(),
 }));
@@ -26,7 +26,7 @@ vi.mock('../services/stateUpdateHelpers', () => ({
 import { mockPrisma } from '../__test__/setup';
 import { errorHandler } from '../middleware/errorHandler';
 import { generateAccessToken } from '../middleware/auth';
-import { depositItem } from '../services/stashService';
+import { depositItem, depositBatch, withdrawItem, withdrawBatch } from '../services/stashService';
 import { fetchItemDTOs } from '../services/stateUpdateHelpers';
 import { inventoryRouter } from './inventory';
 
@@ -50,9 +50,9 @@ function authToken() {
   });
 }
 
-function makeInventoryItemDTO(quantity: number): InventoryItemDTO {
+function makeInventoryItemDTO(quantity: number, id = itemId): InventoryItemDTO {
   return {
-    id: itemId,
+    id,
     templateId: 'template-1',
     ownerId: 'player-1',
     rarity: 'common',
@@ -121,5 +121,77 @@ describe('inventory stash routes', () => {
     });
     expect(depositItem).toHaveBeenCalledWith('player-1', itemId, 3);
     expect(fetchItemDTOs).toHaveBeenCalledWith([itemId]);
+  });
+
+  it('only reports actually-deposited items as removed when batch deposit skips some', async () => {
+    const skippedId = '33333333-3333-4333-8333-333333333333';
+    vi.mocked(depositBatch).mockResolvedValue({ depositedCount: 1, depositedItemIds: [itemId] });
+
+    const res = await request(buildApp())
+      .post('/api/v1/inventory/stash/deposit/batch')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ itemIds: [itemId, skippedId] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.depositedCount).toBe(1);
+    expect(res.body.stateUpdates.inventoryRemoved).toEqual([itemId]);
+  });
+
+  it('omits inventoryRemoved when a batch deposit deposits nothing', async () => {
+    vi.mocked(depositBatch).mockResolvedValue({ depositedCount: 0, depositedItemIds: [] });
+
+    const res = await request(buildApp())
+      .post('/api/v1/inventory/stash/deposit/batch')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ itemIds: [itemId] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.depositedCount).toBe(0);
+    expect(res.body.stateUpdates).not.toHaveProperty('inventoryRemoved');
+  });
+
+  it('returns the affected marked backpack stack when withdraw merges beside an unmarked same-template stack', async () => {
+    const markedBackpackId = '22222222-2222-4222-8222-222222222222';
+    const markedItem = makeInventoryItemDTO(10, markedBackpackId);
+    vi.mocked(withdrawItem).mockResolvedValue({ itemId: markedBackpackId, merged: true });
+    vi.mocked(fetchItemDTOs).mockResolvedValue([markedItem]);
+
+    const res = await request(buildApp())
+      .post('/api/v1/inventory/stash/withdraw')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ itemId });
+
+    expect(res.status).toBe(200);
+    expect(fetchItemDTOs).toHaveBeenCalledWith([markedBackpackId]);
+    expect(res.body.stateUpdates).toEqual({
+      inventoryUpdated: [markedItem],
+      inventoryUsedSlots: 0,
+      materialTotals: {},
+    });
+  });
+
+  it('returns updated affected stacks for batch withdraw merges into existing marked backpack stacks', async () => {
+    const stashMarkedId = '44444444-4444-4444-8444-444444444444';
+    const markedBackpackId = '55555555-5555-4555-8555-555555555555';
+    const markedItem = makeInventoryItemDTO(12, markedBackpackId);
+    vi.mocked(withdrawBatch).mockResolvedValue({
+      withdrawnCount: 1,
+      addedItemIds: [],
+      updatedItemIds: [markedBackpackId],
+    });
+    vi.mocked(fetchItemDTOs).mockResolvedValue([markedItem]);
+
+    const res = await request(buildApp())
+      .post('/api/v1/inventory/stash/withdraw/batch')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ itemIds: [stashMarkedId] });
+
+    expect(res.status).toBe(200);
+    expect(fetchItemDTOs).toHaveBeenCalledWith([markedBackpackId]);
+    expect(res.body.stateUpdates).toEqual({
+      inventoryUpdated: [markedItem],
+      inventoryUsedSlots: 0,
+      materialTotals: {},
+    });
   });
 });

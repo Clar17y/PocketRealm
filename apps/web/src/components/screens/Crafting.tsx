@@ -25,6 +25,12 @@ interface Material {
   owned: number;
 }
 
+interface CraftTechniqueOption {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface Recipe {
   id: string;
   name: string;
@@ -42,6 +48,7 @@ interface Recipe {
   baseStats: Record<string, unknown>;
   materials: Material[];
   rarity: Rarity;
+  techniques?: CraftTechniqueOption[];
 }
 
 import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
@@ -98,7 +105,7 @@ interface CraftingProps {
   skillLevel: number;
   xpRate: number;
   recipes: Recipe[];
-  onCraft: (recipeId: string, quantity: number) => void;
+  onCraft: (recipeId: string, quantity: number, techniqueId?: string) => void;
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   recoveryCost?: number | null;
@@ -117,6 +124,7 @@ interface CraftingProps {
 
 export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [selectedTechniqueId, setSelectedTechniqueId] = useState('');
   const [quantity, setQuantity] = useState(1);
   const npcKey = skillType ? getCraftingNpc(skillType, zoneName) : undefined;
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(npcKey);
@@ -132,6 +140,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
   }, [recipes, selectedRecipeId]);
 
   const selectedRecipe = selectedRecipeId ? recipes.find((recipe) => recipe.id === selectedRecipeId) ?? null : null;
+  const selectedTechnique = selectedRecipe?.techniques?.find((technique) => technique.id === selectedTechniqueId) ?? null;
   const selectedBaseStats = statEntries(selectedRecipe?.baseStats);
   const selectedRecipeLocked = selectedRecipe?.isAdvanced && selectedRecipe?.isDiscovered === false;
   const selectedLevelLocked = selectedRecipe ? selectedRecipe.requiredLevel > skillLevel : false;
@@ -162,6 +171,17 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
       setQuantity((prev) => Math.max(1, Math.min(prev, selectedMax || 1)));
     }
   }, [selectedRecipeId, selectedMax, defaultMaxQuantity, selectedRecipe?.stackable]);
+
+  useEffect(() => {
+    setSelectedTechniqueId('');
+  }, [selectedRecipeId]);
+
+  useEffect(() => {
+    if (!selectedTechniqueId) return;
+    if (!selectedRecipe?.techniques?.some((technique) => technique.id === selectedTechniqueId)) {
+      setSelectedTechniqueId('');
+    }
+  }, [selectedRecipe, selectedTechniqueId]);
 
   const canCraft = (recipe: Recipe) => {
     if (noFacility) return false;
@@ -346,6 +366,31 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
             })}
           </div>
 
+          {selectedRecipe.techniques && selectedRecipe.techniques.length > 0 && (
+            <div className="space-y-2 mb-4">
+              <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm">Vocation Technique</h4>
+              <select
+                aria-label="Crafting technique"
+                value={selectedTechniqueId}
+                onChange={(event) => setSelectedTechniqueId(event.target.value)}
+                className="w-full px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] text-sm"
+              >
+                <option value="">No technique</option>
+                {selectedRecipe.techniques.map((technique) => (
+                  <option key={technique.id} value={technique.id}>
+                    {technique.name}
+                  </option>
+                ))}
+              </select>
+              {selectedTechnique && (
+                <div className="rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3">
+                  <div className="text-sm font-semibold text-[var(--rpg-gold)]">{selectedTechnique.name}</div>
+                  <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">{selectedTechnique.description}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Cost and Reward */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-[var(--rpg-surface)] rounded-lg p-3">
@@ -431,7 +476,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
             size="lg"
             className="w-full"
             onClick={() => {
-              onCraft(selectedRecipe.id, quantity);
+              onCraft(selectedRecipe.id, quantity, selectedTechniqueId || undefined);
               triggerDialogueEvent('buy');
             }}
             disabled={isOverEncumbered || isRecovering || isActivityLocked || noFacility || selectedMax < 1 || backpackFull}

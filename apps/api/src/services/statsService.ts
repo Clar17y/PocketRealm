@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import { CROWN_CONSTANTS, getAllMobPrefixes } from '@pocketrealm/shared';
+import { CROWN_CONSTANTS, getAllMobPrefixes, VOCATION_IDS, type VocationId } from '@pocketrealm/shared';
 
 // Counter-only keys that remain in the player_stats table
 type CounterKey =
@@ -21,14 +21,40 @@ export type DerivedStatKey =
   | 'totalRecipesLearned' | 'totalBestiaryCompleted'
   | 'totalUniqueMonsterKills'
   | 'highestCharacterLevel' | 'highestSkillLevel'
-  | 'guildLevel' | 'guildContractsCompleted' | 'guildTurnsContributed' | 'guildMemberCount';
+  | 'guildLevel' | 'guildContractsCompleted' | 'guildTurnsContributed' | 'guildMemberCount'
+  | VocationSummaryStatKey | VocationHonedTurnsKey | VocationCraftsKey | VocationGathersKey;
 
 type CrownGroup = keyof typeof CROWN_CONSTANTS.CATEGORY_GROUPS;
 type CrownStatKey = `crowns_${CrownGroup}`;
+type VocationHonedTurnsKey = `vocationHonedTurns_${VocationId}`;
+type VocationCraftsKey = `vocationCrafts_${VocationId}`;
+type VocationGathersKey = `vocationGathers_${VocationId}`;
+type VocationTechniqueUsesKey = `vocationTechniqueUses_${string}`;
+type VocationRespecsKey = `vocationRespecs_${VocationId}`;
+type VocationSummaryStatKey =
+  | 'totalVocationHonedTurns'
+  | 'highestVocationRank'
+  | 'vocationRank5Count'
+  | 'vocationRank10Count'
+  | 'vocationRank20Count'
+  | 'totalVocationTechniquesLearned'
+  | 'vocationTechniqueVocationCount'
+  | 'totalVocationTechniqueUses'
+  | 'distinctVocationTechniquesUsed'
+  | 'totalVocationCrafts'
+  | 'totalVocationGathers'
+  | 'totalVocationCraftMarks'
+  | 'distinctVocationCraftMarks'
+  | 'totalVocationGatherCrits'
+  | 'totalVocationRespecs';
 
 export type StatKey = CounterKey | DerivedStatKey | CrownStatKey;
 
-export type ResolvedStats = Record<StatKey, number>;
+type DynamicVocationStatKey = VocationTechniqueUsesKey | VocationRespecsKey;
+
+export type ResolvedStats =
+  & Record<StatKey, number>
+  & Partial<Record<DynamicVocationStatKey, number>>;
 
 const TOTAL_PREFIX_COUNT = getAllMobPrefixes().length;
 
@@ -82,6 +108,34 @@ interface GuildStatRow {
   guild_member_count: number;
 }
 
+interface VocationProgressStatRow {
+  highest_vocation_rank?: number;
+  vocation_rank_5_count?: number;
+  vocation_rank_10_count?: number;
+  vocation_rank_20_count?: number;
+  total_vocation_techniques_learned?: number;
+  vocation_technique_vocation_count?: number;
+}
+
+interface VocationCounterStatRow {
+  stat_key?: string | null;
+  value?: number | bigint | null;
+}
+
+type StaticVocationStatKey =
+  | VocationSummaryStatKey
+  | VocationHonedTurnsKey
+  | VocationCraftsKey
+  | VocationGathersKey;
+type VocationStats =
+  & Record<StaticVocationStatKey, number>
+  & Partial<Record<DynamicVocationStatKey, number>>;
+
+function toStatNumber(value: unknown): number {
+  const numeric = typeof value === 'bigint' ? Number(value) : Number(value ?? 0);
+  return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : 0;
+}
+
 async function resolveGuildStats(playerId: string): Promise<GuildStatRow> {
   const rows = await prisma.$queryRaw<GuildStatRow[]>(Prisma.sql`
     SELECT
@@ -100,7 +154,138 @@ async function resolveGuildStats(playerId: string): Promise<GuildStatRow> {
     WHERE gm.player_id = ${playerId}
     LIMIT 1
   `);
-  return rows[0] ?? { guild_level: 0, guild_contracts_completed: 0, guild_turns_contributed: 0, guild_member_count: 0 };
+  const row = rows[0];
+  return {
+    guild_level: toStatNumber(row?.guild_level),
+    guild_contracts_completed: toStatNumber(row?.guild_contracts_completed),
+    guild_turns_contributed: toStatNumber(row?.guild_turns_contributed),
+    guild_member_count: toStatNumber(row?.guild_member_count),
+  };
+}
+
+async function resolveVocationStats(playerId: string): Promise<VocationStats> {
+  const [progressRows, counterRows] = await Promise.all([
+    prisma.$queryRaw<VocationProgressStatRow[]>(Prisma.sql`
+      SELECT
+        COALESCE(MAX(rank), 0)::int AS highest_vocation_rank,
+        COUNT(*) FILTER (WHERE rank >= 5)::int AS vocation_rank_5_count,
+        COUNT(*) FILTER (WHERE rank >= 10)::int AS vocation_rank_10_count,
+        COUNT(*) FILTER (WHERE rank >= 20)::int AS vocation_rank_20_count,
+        COALESCE((
+          SELECT COUNT(*)::int
+          FROM player_vocation_techniques pvt
+          WHERE pvt.player_id = ${playerId}
+        ), 0) AS total_vocation_techniques_learned,
+        COALESCE((
+          SELECT COUNT(DISTINCT pvt.vocation_id)::int
+          FROM player_vocation_techniques pvt
+          WHERE pvt.player_id = ${playerId}
+        ), 0) AS vocation_technique_vocation_count
+      FROM player_vocations pv
+      WHERE pv.player_id = ${playerId}
+    `),
+    prisma.$queryRaw<VocationCounterStatRow[]>(Prisma.sql`
+      SELECT stat_key, value
+      FROM player_vocation_counters
+      WHERE player_id = ${playerId}
+    `),
+  ]);
+
+  const stats = buildEmptyVocationStats();
+  const progress = progressRows[0];
+  stats.highestVocationRank = toStatNumber(progress?.highest_vocation_rank);
+  stats.vocationRank5Count = toStatNumber(progress?.vocation_rank_5_count);
+  stats.vocationRank10Count = toStatNumber(progress?.vocation_rank_10_count);
+  stats.vocationRank20Count = toStatNumber(progress?.vocation_rank_20_count);
+  stats.totalVocationTechniquesLearned = toStatNumber(progress?.total_vocation_techniques_learned);
+  stats.vocationTechniqueVocationCount = toStatNumber(progress?.vocation_technique_vocation_count);
+
+  let summedHonedTurns = 0;
+  for (const row of counterRows) {
+    if (typeof row.stat_key !== 'string') continue;
+
+    const value = toStatNumber(row.value);
+    if (row.stat_key === 'vocation_honed_turns_total') {
+      stats.totalVocationHonedTurns = value;
+      continue;
+    }
+    if (row.stat_key.startsWith('vocation_mark_crafted_')) {
+      stats.totalVocationCraftMarks += value;
+      if (value > 0) stats.distinctVocationCraftMarks += 1;
+      continue;
+    }
+    if (row.stat_key.startsWith('vocation_technique_uses_')) {
+      const techniqueId = row.stat_key.slice('vocation_technique_uses_'.length);
+      stats.totalVocationTechniqueUses += value;
+      if (value > 0) stats.distinctVocationTechniquesUsed += 1;
+      stats[`vocationTechniqueUses_${techniqueId}`] = value;
+      continue;
+    }
+    if (row.stat_key.startsWith('vocation_gather_crits_')) {
+      stats.totalVocationGatherCrits += value;
+      continue;
+    }
+    if (row.stat_key === 'vocation_respecs_total') {
+      stats.totalVocationRespecs = value;
+      continue;
+    }
+
+    for (const vocationId of VOCATION_IDS) {
+      if (row.stat_key === `vocation_honed_turns_${vocationId}`) {
+        stats[`vocationHonedTurns_${vocationId}`] = value;
+        summedHonedTurns += value;
+        break;
+      }
+      if (row.stat_key === `vocation_crafts_${vocationId}`) {
+        stats[`vocationCrafts_${vocationId}`] = value;
+        stats.totalVocationCrafts += value;
+        break;
+      }
+      if (row.stat_key === `vocation_gathers_${vocationId}`) {
+        stats[`vocationGathers_${vocationId}`] = value;
+        stats.totalVocationGathers += value;
+        break;
+      }
+      if (row.stat_key === `vocation_respecs_${vocationId}`) {
+        stats[`vocationRespecs_${vocationId}`] = value;
+        break;
+      }
+    }
+  }
+
+  if (stats.totalVocationHonedTurns === 0 && summedHonedTurns > 0) {
+    stats.totalVocationHonedTurns = summedHonedTurns;
+  }
+
+  return stats;
+}
+
+function buildEmptyVocationStats(): VocationStats {
+  const stats = {
+    totalVocationHonedTurns: 0,
+    highestVocationRank: 0,
+    vocationRank5Count: 0,
+    vocationRank10Count: 0,
+    vocationRank20Count: 0,
+    totalVocationTechniquesLearned: 0,
+    vocationTechniqueVocationCount: 0,
+    totalVocationTechniqueUses: 0,
+    distinctVocationTechniquesUsed: 0,
+    totalVocationCrafts: 0,
+    totalVocationGathers: 0,
+    totalVocationCraftMarks: 0,
+    distinctVocationCraftMarks: 0,
+    totalVocationGatherCrits: 0,
+    totalVocationRespecs: 0,
+  } as VocationStats;
+
+  for (const vocationId of VOCATION_IDS) {
+    stats[`vocationHonedTurns_${vocationId}`] = 0;
+    stats[`vocationCrafts_${vocationId}`] = 0;
+    stats[`vocationGathers_${vocationId}`] = 0;
+  }
+
+  return stats;
 }
 
 export async function resolveCrownStats(playerId: string): Promise<Record<CrownStatKey, number>> {
@@ -129,7 +314,7 @@ export async function resolveCrownStats(playerId: string): Promise<Record<CrownS
 
 /** Resolve all stats (derived + counters) for a player in a single call. */
 export async function resolveAllStats(playerId: string): Promise<ResolvedStats> {
-  const [derivedRows, counters, guildStats, crownStats] = await Promise.all([
+  const [derivedRows, counters, guildStats, crownStats, vocationStats] = await Promise.all([
     prisma.$queryRaw<DerivedRow[]>(Prisma.sql`
       SELECT
         COALESCE((SELECT SUM(kills)::int FROM player_bestiary WHERE player_id = ${playerId}), 0) AS total_kills,
@@ -168,6 +353,7 @@ export async function resolveAllStats(playerId: string): Promise<ResolvedStats> 
     prisma.playerStats.findUnique({ where: { playerId } }),
     resolveGuildStats(playerId),
     resolveCrownStats(playerId),
+    resolveVocationStats(playerId),
   ]);
 
   const d = derivedRows[0]!;
@@ -203,6 +389,7 @@ export async function resolveAllStats(playerId: string): Promise<ResolvedStats> 
     guildContractsCompleted: guildStats.guild_contracts_completed,
     guildTurnsContributed: guildStats.guild_turns_contributed,
     guildMemberCount: guildStats.guild_member_count,
+    ...vocationStats,
     ...crownStats,
   };
 }
@@ -213,7 +400,10 @@ export async function resolveStats(playerId: string, statKeys: string[]): Promis
   const result: Record<string, number> = {};
   for (const key of statKeys) {
     if (key in all) {
-      result[key] = all[key as StatKey];
+      const value = all[key as keyof ResolvedStats];
+      if (typeof value === 'number') {
+        result[key] = value;
+      }
     }
   }
   return result;

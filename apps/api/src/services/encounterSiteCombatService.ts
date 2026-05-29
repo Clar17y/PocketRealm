@@ -34,7 +34,7 @@ import {
   countEncounterSiteHits,
   type FleeResult,
 } from './encounterSiteCombatCore';
-import { degradeEquippedDurabilityByHits } from './durabilityService';
+import { degradeEquippedDurabilityByHits, getEquippedDurabilitySnapshot } from './durabilityService';
 import { deleteCombatSession } from './encounterSiteManualCombat';
 
 // Re-export for route handler convenience
@@ -173,6 +173,7 @@ export async function autoResolveEncounterRoom(
     hpState.currentHp,
     hpState.maxHp,
   );
+  const durabilityEquipment = await getEquippedDurabilitySnapshot(playerId);
 
   // Run combat loop in memory
   const combatResult = resolveEncounterRoomCombat(participant, expeditionMobs, undefined, attackSkill);
@@ -325,8 +326,11 @@ export async function autoResolveEncounterRoom(
   );
 
   // Degrade equipment durability from encounter site combat
-  const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(combatResult.rounds.map(r => r.log));
-  const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
+  const { playerHitsLanded, mobHitsLanded, playerWeaponActionIds } = countEncounterSiteHits(combatResult.rounds.map(r => r.log));
+  const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded, 1, {
+    weaponActionIds: playerWeaponActionIds,
+    equipmentSnapshot: durabilityEquipment,
+  });
   const durabilityDamagedItemIds = durabilityLost.map(d => d.itemId);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)

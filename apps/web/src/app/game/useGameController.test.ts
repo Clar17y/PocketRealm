@@ -44,6 +44,10 @@ vi.mock('@/lib/api', () => ({
   getPvpNotificationCount: vi.fn(),
   getSkills: vi.fn(),
   getTurns: vi.fn(),
+  getVocations: vi.fn(),
+  honeVocation: vi.fn(),
+  learnVocationTechnique: vi.fn(),
+  respecVocation: vi.fn(),
   getZones: vi.fn(),
   getZoneEvents: vi.fn(),
   mine: vi.fn(),
@@ -355,6 +359,7 @@ describe('useGameController', () => {
 
   it.each([
     ['skills', 'inventory'],
+    ['vocations', 'explore'],
     ['bestiary', 'combat'],
     ['worldEvents', 'explore'],
     ['casino', 'explore'],

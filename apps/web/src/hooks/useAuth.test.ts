@@ -13,11 +13,12 @@ const apiMock = vi.hoisted(() => ({
 vi.mock('@/lib/api', () => apiMock);
 
 import { getPlayer, refreshToken as refreshTokenApi } from '@/lib/api';
-import { useAuth } from './useAuth';
+import { AUTH_PLAYER_SNAPSHOT_KEY, useAuth } from './useAuth';
 
 describe('useAuth', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -48,18 +49,22 @@ describe('useAuth', () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
+    const player = {
+      id: 'player-1',
+      username: 'Rook',
+      email: 'rook@example.com',
+      role: 'player',
+      emailVerified: false,
+      isPremium: false,
+      premiumExpiresAt: null,
+      seasonId: null,
+    };
+
     await act(async () => {
-      result.current.setTokens('access-token', 'refresh-token', {
-        id: 'player-1',
-        username: 'Rook',
-        email: 'rook@example.com',
-        role: 'player',
-        emailVerified: false,
-        isPremium: false,
-        premiumExpiresAt: null,
-        seasonId: null,
-      });
+      result.current.setTokens('access-token', 'refresh-token', player);
     });
+
+    expect(JSON.parse(sessionStorage.getItem(AUTH_PLAYER_SNAPSHOT_KEY) ?? 'null')).toEqual(player);
 
     vi.mocked(getPlayer).mockResolvedValue({
       data: null,
@@ -105,5 +110,29 @@ describe('useAuth', () => {
     await expect(result.current.checkAuth()).rejects.toThrow('Failed to refresh account.');
     expect(localStorage.getItem('accessToken')).toBe('new-access');
     expect(localStorage.getItem('refreshToken')).toBe('new-refresh');
+  });
+
+  it('uses a one-shot authenticated player snapshot without blocking on a player fetch', async () => {
+    const player = {
+      id: 'player-1',
+      username: 'Rook',
+      email: 'rook@example.com',
+      role: 'player',
+      emailVerified: false,
+      isPremium: false,
+      premiumExpiresAt: null,
+      seasonId: null,
+    };
+
+    localStorage.setItem('accessToken', 'access-token');
+    sessionStorage.setItem(AUTH_PLAYER_SNAPSHOT_KEY, JSON.stringify(player));
+
+    const { result } = renderHook(() => useAuth());
+
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+    expect(result.current.player).toEqual(player);
+    expect(result.current.isLoading).toBe(false);
+    expect(sessionStorage.getItem(AUTH_PLAYER_SNAPSHOT_KEY)).toBeNull();
+    expect(getPlayer).not.toHaveBeenCalled();
   });
 });

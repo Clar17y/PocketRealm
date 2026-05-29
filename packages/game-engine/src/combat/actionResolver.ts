@@ -30,6 +30,8 @@ export interface RoundInteraction {
   defenderHitOverride: 'guaranteed_miss' | 'guaranteed_hit' | 'normal';
   attackerDamageReduction: number;
   defenderDamageReduction: number;
+  attackerAvoidanceModifier: number;
+  defenderAvoidanceModifier: number;
 }
 
 // --- Helpers ---
@@ -141,6 +143,8 @@ export function resolveInteraction(
     defenderHitOverride: 'normal',
     attackerDamageReduction: 0,
     defenderDamageReduction: 0,
+    attackerAvoidanceModifier: 0,
+    defenderAvoidanceModifier: 0,
   };
 
   const a = combatantAAction.action;
@@ -166,6 +170,9 @@ export function resolveInteraction(
   if (b.damageReductionPercent) {
     result.defenderDamageReduction = b.damageReductionPercent;
   }
+  if (b.avoidanceModifier) {
+    result.defenderAvoidanceModifier = b.avoidanceModifier;
+  }
 
   // --- A's defences against B ---
 
@@ -183,6 +190,9 @@ export function resolveInteraction(
 
   if (a.damageReductionPercent) {
     result.attackerDamageReduction = a.damageReductionPercent;
+  }
+  if (a.avoidanceModifier) {
+    result.attackerAvoidanceModifier = a.avoidanceModifier;
   }
 
   // --- Channeling vulnerability ---

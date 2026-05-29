@@ -1,10 +1,26 @@
 import { z } from 'zod';
 import { Prisma, prisma } from '@pocketrealm/database';
-import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, PREMIUM_CONSTANTS, levelToGemTier, type SkillType } from '@pocketrealm/shared';
+import {
+  EXPLORATION_CONSTANTS,
+  GATHERING_CONSTANTS,
+  GATHERING_SKILLS,
+  GEM_CONSTANTS,
+  PREMIUM_CONSTANTS,
+  applyGatheringTechniqueEffects,
+  getGatheringResourceCategory,
+  getEligibleTechniquesForGathering,
+  getResourceTypesForGatheringCategory,
+  levelToGemTier,
+  normalizeGatheringSkillType,
+  normalizeResourceType,
+  resolveGatheringVocation,
+  type SkillType,
+  type VocationTechniqueDefinition,
+} from '@pocketrealm/shared';
 import { createActivityLog, type ActivityType } from '../services/activityLogService';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
-import { addStackableItemTx, getInventoryState, assertNotOverEncumbered } from '../services/inventoryService';
+import { addStackableItemTx, getInventoryState, assertNotOverEncumbered, getStackIdentityKey } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
@@ -19,6 +35,7 @@ import { getHasActivePremiumEntitlement } from '../services/premiumEntitlement';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { buildGatheringResultDetails } from './gatheringResult';
+import { grantPassiveVocationXpTx, getVocationSnapshot } from './vocationService';
 import {
   routeJson,
   type AuthenticatedRouteServiceRequest,
@@ -61,10 +78,22 @@ function getNodeSizeName(remaining: number, maxCapacity: number): string {
   return 'Huge';
 }
 
-function getResourceTypeCategory(resourceType: string): string {
-  const normalized = resourceType.trim().toLowerCase();
-  const parts = normalized.split('_').filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1]! : normalized;
+function buildResourceTypeFilter(resourceType: string): Prisma.ResourceNodeWhereInput {
+  const knownResourceTypes = getResourceTypesForGatheringCategory(resourceType);
+  return {
+    OR: [
+      { resourceType: { equals: resourceType, mode: 'insensitive' } },
+      { resourceType: { endsWith: `_${resourceType}`, mode: 'insensitive' } },
+      { resourceType: { endsWith: ` ${resourceType}`, mode: 'insensitive' } },
+      ...(knownResourceTypes.length > 0 ? [{ resourceType: { in: knownResourceTypes } }] : []),
+    ],
+  };
+}
+
+function matchesResourceTypeFilter(resourceType: string, filter: string | undefined): boolean {
+  if (!filter) return true;
+  return getGatheringResourceCategory(resourceType) === filter
+    || normalizeResourceType(resourceType) === normalizeResourceType(filter);
 }
 export async function listResourceNodes(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
   const playerId = input.player.playerId;
@@ -76,10 +105,7 @@ export async function listResourceNodes(input: AuthenticatedRouteServiceRequest)
     resourceNodeWhere.zoneId = query.zoneId;
   }
   if (query.resourceType) {
-    resourceNodeWhere.OR = [
-      { resourceType: query.resourceType },
-      { resourceType: { endsWith: `_${query.resourceType}` } },
-    ];
+    Object.assign(resourceNodeWhere, buildResourceTypeFilter(query.resourceType));
   }
   if (query.skillRequired) {
     resourceNodeWhere.skillRequired = query.skillRequired;
@@ -102,6 +128,7 @@ export async function listResourceNodes(input: AuthenticatedRouteServiceRequest)
 
   const activeNodes: Array<(typeof playerNodes)[number] & { effectiveCapacity: number }> = [];
   for (const node of playerNodes) {
+    if (!matchesResourceTypeFilter(node.resourceNode.resourceType, query.resourceType)) continue;
     const decay = calculateNodeDecay(node, now);
     if (decay.newlyDecayed > 0) {
       if (decay.effectiveCapacity <= 0) {
@@ -140,7 +167,7 @@ export async function listResourceNodes(input: AuthenticatedRouteServiceRequest)
   for (const node of activeNodes) {
     const template = node.resourceNode;
     zoneById.set(template.zoneId, template.zone.name);
-    resourceTypeSet.add(getResourceTypeCategory(template.resourceType));
+    resourceTypeSet.add(getGatheringResourceCategory(template.resourceType));
   }
 
   const zones = Array.from(zoneById.entries())
@@ -178,7 +205,7 @@ export async function listResourceNodes(input: AuthenticatedRouteServiceRequest)
         zoneId: template.zoneId,
         zoneName: template.zone.name,
         resourceType: template.resourceType,
-        resourceTypeCategory: getResourceTypeCategory(template.resourceType),
+        resourceTypeCategory: getGatheringResourceCategory(template.resourceType),
         skillRequired: template.skillRequired,
         levelRequired: template.levelRequired,
         baseYield: template.baseYield,
@@ -201,7 +228,42 @@ export async function listResourceNodes(input: AuthenticatedRouteServiceRequest)
 const mineSchema = z.object({
   playerNodeId: z.string().uuid(),
   turns: z.number().int().positive(),
+  techniqueId: z.string().trim().min(1).optional(),
 });
+
+function scaleTurnCost(turnCost: number, multiplier: number): number {
+  if (turnCost <= 0) return 0;
+  return Math.max(1, Math.ceil(turnCost * multiplier));
+}
+
+function isInventoryPressureSatisfied(
+  effects: ReturnType<typeof applyGatheringTechniqueEffects>,
+  availableSlots: number | null,
+): boolean {
+  if (effects.inventoryPressureRules.length === 0) return true;
+  if (availableSlots === null) return false;
+  return effects.inventoryPressureRules.every((rule) => availableSlots >= rule.minFreeSlots);
+}
+
+function getGemCritChanceBonus(effects: ReturnType<typeof applyGatheringTechniqueEffects>): number {
+  return effects.critChanceDeltas
+    .filter((delta) => delta.critType === 'gem_crit')
+    .reduce((total, delta) => total + delta.value, 0);
+}
+
+async function incrementVocationCounterTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  statKey: string,
+  increment: number,
+): Promise<void> {
+  if (increment <= 0) return;
+  await tx.playerVocationCounter.upsert({
+    where: { playerId_statKey: { playerId, statKey } },
+    create: { playerId, statKey, value: increment },
+    update: { value: { increment } },
+  });
+}
 
 function toResourceTemplateKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '_');
@@ -266,28 +328,64 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     throw new AppError(400, 'Node is depleted', 'NODE_DEPLETED');
   }
 
-  const skillRequired = template.skillRequired as SkillType;
+  const skillRequired = normalizeGatheringSkillType(template.skillRequired);
+  if (!skillRequired) {
+    throw new AppError(400, 'Resource node has invalid gathering skill', 'INVALID_GATHERING_SKILL');
+  }
   const level = await getSkillLevel(playerId, skillRequired);
   if (level < template.levelRequired) {
     throw new AppError(400, 'Insufficient level to gather this resource', 'INSUFFICIENT_LEVEL');
   }
 
-  if (body.turns < GATHERING_CONSTANTS.BASE_TURN_COST) {
-    throw new AppError(400, `Minimum is ${GATHERING_CONSTANTS.BASE_TURN_COST} turns`, 'INVALID_TURNS');
+  const vocationId = resolveGatheringVocation(skillRequired);
+  if (body.techniqueId && !vocationId) {
+    throw new AppError(400, 'Vocation is not available for this gathering skill', 'VOCATION_NOT_AVAILABLE');
   }
+
+  let selectedTechnique: VocationTechniqueDefinition | null = null;
+  if (body.techniqueId && vocationId) {
+    const learnedTechniques = await prisma.playerVocationTechnique.findMany({
+      where: { playerId, vocationId },
+      select: { techniqueId: true },
+    });
+    const eligibleTechniques = getEligibleTechniquesForGathering({
+      vocationId,
+      learnedTechniqueIds: learnedTechniques.map((technique) => technique.techniqueId),
+      skillType: skillRequired,
+      resourceCategory: getGatheringResourceCategory(template.resourceType),
+    });
+    selectedTechnique = eligibleTechniques.find((technique) => technique.id === body.techniqueId) ?? null;
+    if (!selectedTechnique) {
+      throw new AppError(400, 'Technique is not eligible for this gather', 'TECHNIQUE_NOT_ELIGIBLE');
+    }
+  }
+  const techniqueEffects = applyGatheringTechniqueEffects(selectedTechnique);
 
   const resourceTemplateId = await getResourceTemplateId(template.resourceType);
 
-  // Check backpack capacity — resources stack, so only block if no existing stack
-  const existingStack = await prisma.item.findFirst({
-    where: { ownerId: playerId, templateId: resourceTemplateId, inStash: false },
+  // Check backpack capacity: gathered resources merge only into the normal unmarked stack.
+  const normalResourceStackKey = getStackIdentityKey({
+    templateId: resourceTemplateId,
+    rarity: 'common',
+    bonusStats: null,
+    craftMarks: null,
   });
+  const stackCandidates = await prisma.item.findMany({
+    where: { ownerId: playerId, templateId: resourceTemplateId, inStash: false },
+    select: { templateId: true, rarity: true, bonusStats: true, craftMarks: true },
+  });
+  const existingStack = stackCandidates.find((item) => getStackIdentityKey(item) === normalResourceStackKey) ?? null;
+  let availableSlotsForTechnique: number | null = null;
   if (existingStack) {
     // Resource will stack onto existing item — no new slot needed, skip encumbrance check
+    if (techniqueEffects.inventoryPressureRules.length > 0) {
+      availableSlotsForTechnique = (await getInventoryState(playerId)).availableSlots;
+    }
   } else {
     // Need a new slot: enforce both over-encumbered and full-backpack checks
     await assertNotOverEncumbered(playerId);
     const { availableSlots } = await getInventoryState(playerId);
+    availableSlotsForTechnique = availableSlots;
     if (availableSlots <= 0) {
       throw new AppError(400, 'Backpack is full. Make space before gathering.', 'BACKPACK_FULL');
     }
@@ -322,7 +420,17 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
   // yield_down → increase turn cost (so players still collect the full amount)
   // yield_up  → bonus yield (applied after raw yield calculation)
   const eventMultiplier = zoneModifiers.resourceYieldMultiplier;
-  const turnCostPerAction = computeEventTurnCost(eventMultiplier);
+  const turnCostPerAction = scaleTurnCost(computeEventTurnCost(eventMultiplier), techniqueEffects.turnCostMultiplier);
+  if (body.turns < turnCostPerAction) {
+    throw new AppError(400, `Minimum is ${turnCostPerAction} turns`, 'INVALID_TURNS');
+  }
+  const techniqueOutputDelta = isInventoryPressureSatisfied(techniqueEffects, availableSlotsForTechnique)
+    ? techniqueEffects.outputQuantityDelta
+    : 0;
+  const gemCritChanceBonus = getGemCritChanceBonus(techniqueEffects);
+  // XP per action: scaled by node level requirement
+  const xpPerAction = GATHERING_CONSTANTS.XP_PER_ACTION_BASE
+    + Math.floor(template.levelRequired / GATHERING_CONSTANTS.XP_LEVEL_SCALING_DIVISOR);
 
   const { turnSpend, taxResult, actions, totalYield, rawTotalYield, unclampedRawYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
     // Validate player is actually in the node's zone inside the transaction to prevent TOCTOU race
@@ -339,7 +447,8 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     const effectiveTurns = calculateEffectiveTurns(body.turns, taxRate);
 
     const maxActionsByTurns = Math.floor(effectiveTurns / turnCostPerAction);
-    const maxActionsByCapacity = Math.ceil(effectiveCapacity / effectiveYieldPerAction);
+    const effectiveCapacityPerAction = Math.max(1, effectiveYieldPerAction + Math.max(0, techniqueOutputDelta));
+    const maxActionsByCapacity = Math.ceil(effectiveCapacity / effectiveCapacityPerAction);
     const innerActions = Math.min(maxActionsByTurns, maxActionsByCapacity);
 
     if (innerActions <= 0) {
@@ -350,12 +459,21 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     const actualTurns = calculateInflatedCost(baseTurns, taxRate);
 
     // Batch-level floor: apply multipliers to total, not per-action (fixes fractional dead zone)
-    const innerUnclampedRawYield = Math.max(1, Math.floor(innerActions * effectiveYieldPerAction));
+    const techniqueYieldBonus = innerActions * techniqueOutputDelta;
+    const innerUnclampedRawYield = Math.max(1, Math.floor(innerActions * effectiveYieldPerAction) + techniqueYieldBonus);
     const innerRawYield = Math.min(innerUnclampedRawYield, effectiveCapacity);
+    // yield_up events grant a bonus the player keeps in full, even when it exceeds node capacity.
     const innerTotalYield = eventMultiplier > 1
       ? Math.max(1, Math.floor(innerRawYield * eventMultiplier))
       : innerRawYield;
-    const innerNewCapacity = effectiveCapacity - innerTotalYield;
+    // Node capacity can only ever drop by what the node actually held; clamp separately for capacity tracking.
+    const capacityConsumed = Math.min(innerTotalYield, effectiveCapacity);
+    const capacityAfterYield = effectiveCapacity - capacityConsumed;
+    const capacityPreserved = capacityAfterYield > 0
+      && techniqueEffects.capacityPreserveChance > 0
+      && Math.random() < techniqueEffects.capacityPreserveChance;
+    const preservedCapacity = capacityPreserved ? capacityAfterYield + capacityConsumed : capacityAfterYield;
+    const innerNewCapacity = Math.max(0, Math.min(preservedCapacity, effectiveCapacity, template.maxCapacity));
     const innerNodeDepleted = innerNewCapacity <= 0;
 
     const spent = await spendPlayerTurnsTx(tx, playerId, actualTurns);
@@ -392,6 +510,23 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     }
 
     const minedStack = await addStackableItemTx(tx, playerId, resourceTemplateId, innerTotalYield);
+    if (vocationId) {
+      await grantPassiveVocationXpTx({
+        tx,
+        playerId,
+        vocationId,
+        source: 'gather',
+        baseXp: innerActions * xpPerAction,
+      });
+      await incrementVocationCounterTx(tx, playerId, `vocation_gathers_${vocationId}`, innerActions);
+      if (selectedTechnique) {
+        await incrementVocationCounterTx(tx, playerId, `vocation_technique_uses_${selectedTechnique.id}`, 1);
+        if (capacityPreserved) {
+          await incrementVocationCounterTx(tx, playerId, `vocation_capacity_preserved_${selectedTechnique.id}`, 1);
+        }
+      }
+    }
+
     return {
       turnSpend: spent,
       taxResult: tax,
@@ -419,9 +554,6 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
   // Consume shop gathering yield buff (one use per gather action)
   if (shopGatheringYield > 0) await consumeBuffStandalone(playerId, 'gathering_yield');
 
-  // XP: scaled by node level requirement
-  const xpPerAction = GATHERING_CONSTANTS.XP_PER_ACTION_BASE
-    + Math.floor(template.levelRequired / GATHERING_CONSTANTS.XP_LEVEL_SCALING_DIVISOR);
   const rawXp = actions * xpPerAction;
   const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp, undefined, guildMods.xpBoost || undefined);
 
@@ -437,13 +569,22 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     const luckStat = equipStats.luck;
 
     const critResult = rollGemCritBatch(
-      { skillLevel: level, nodeLevel: template.levelRequired, luckStat, championMultiplier },
+      { skillLevel: level, nodeLevel: template.levelRequired, luckStat, championMultiplier, critChanceBonus: gemCritChanceBonus },
       actions,
     );
 
     if (critResult.gemsFound > 0) {
       const gemStack = await prisma.$transaction(async (tx) => {
-        return addStackableItemTx(tx, playerId, gemTemplateId, critResult.gemsFound);
+        const addedGemStack = await addStackableItemTx(tx, playerId, gemTemplateId, critResult.gemsFound);
+        if (selectedTechnique) {
+          await incrementVocationCounterTx(
+            tx,
+            playerId,
+            `vocation_gather_crits_${selectedTechnique.id}_gem_crit`,
+            critResult.gemsFound,
+          );
+        }
+        return addedGemStack;
       });
       gemExistedBeforeAdd = !gemStack.created;
       const gemTier = levelToGemTier(template.levelRequired);
@@ -461,16 +602,31 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
   const gatherAchKeys = ['totalGatheringActions'];
   if (xpGrant.newLevel) gatherAchKeys.push('highestSkillLevel');
   if (xpGrant.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) gatherAchKeys.push('highestCharacterLevel');
+  if (vocationId) {
+    gatherAchKeys.push(
+      'totalVocationGathers',
+      `vocationGathers_${vocationId}`,
+      'highestVocationRank',
+      'vocationRank5Count',
+      'vocationRank10Count',
+      'vocationRank20Count',
+    );
+    if (gemCrit) {
+      gatherAchKeys.push('totalVocationGatherCrits');
+    }
+    if (selectedTechnique) {
+      gatherAchKeys.push('totalVocationTechniqueUses', 'distinctVocationTechniquesUsed');
+    }
+  }
   await trackAchievements(playerId, {
     totalGatheringActions: actions,
     totalTurnsSpent: turnSpend.spent,
   }, { statKeys: gatherAchKeys });
 
   // --- Build stateUpdates ---
-  // Classify resource item as created or updated based on existingStack check done earlier
   const resourceItemIds = [stack.itemId];
-  const inventoryAdded: string[] = existingStack ? [] : resourceItemIds;
-  const inventoryUpdated: string[] = existingStack ? resourceItemIds : [];
+  const inventoryAdded: string[] = stack.created ? resourceItemIds : [];
+  const inventoryUpdated: string[] = stack.created ? [] : resourceItemIds;
 
   // Include gem item in the appropriate bucket if a gem crit occurred
   if (gemCrit) {
@@ -481,7 +637,7 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     }
   }
 
-  const [inventoryAddedDTOs, inventoryUpdatedDTOs, skills, characterProgression, resources, inventoryMeta, materialTotals] = await Promise.all([
+  const [inventoryAddedDTOs, inventoryUpdatedDTOs, skills, characterProgression, resources, inventoryMeta, materialTotals, vocationSnapshot] = await Promise.all([
     fetchItemDTOs(inventoryAdded),
     fetchItemDTOs(inventoryUpdated),
     fetchSkillDTOs(playerId),
@@ -489,6 +645,7 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     fetchResourceState(playerId),
     fetchInventoryMeta(playerId),
     fetchMaterialTotals(playerId),
+    vocationId ? getVocationSnapshot(playerId) : Promise.resolve(null),
   ]);
 
   const stateUpdates = {
@@ -499,6 +656,7 @@ export async function mineResourceNode(input: AuthenticatedRouteServiceRequest):
     resources,
     inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
     materialTotals,
+    ...(vocationSnapshot ? { vocations: vocationSnapshot } : {}),
   };
 
   const log = await createActivityLog({

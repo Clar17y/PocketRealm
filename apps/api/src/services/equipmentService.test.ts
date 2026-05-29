@@ -41,6 +41,7 @@ describe('getEquipmentStats', () => {
     expect(stats.attack).toBe(0);
     expect(stats.armor).toBe(0);
     expect(stats.health).toBe(0);
+    expect(stats.actionModifiers).toEqual([]);
   });
 
   it('sums base + bonus stats from equipped items', async () => {
@@ -48,6 +49,7 @@ describe('getEquipmentStats', () => {
       {
         item: {
           currentDurability: 10,
+          craftMarks: null,
           template: { baseStats: { attack: 5, accuracy: 2 }, maxDurability: 50 },
           bonusStats: { attack: 1 },
         },
@@ -55,6 +57,7 @@ describe('getEquipmentStats', () => {
       {
         item: {
           currentDurability: 20,
+          craftMarks: null,
           template: { baseStats: { armor: 10 }, maxDurability: 50 },
           bonusStats: null,
         },
@@ -72,6 +75,19 @@ describe('getEquipmentStats', () => {
       {
         item: {
           currentDurability: 0,
+          craftMarks: [{
+            markId: 'keen_edge_mark',
+            name: 'Keen Edge Mark',
+            sourceTechniqueId: 'weaponsmith_keen_edge',
+            description: 'A sharp but broken edge.',
+            actionModifiers: [{
+              modifierId: 'keen_edge_light_attacks',
+              equipmentSlots: ['main_hand'],
+              actionTypes: ['light_attack'],
+              benefits: [{ stat: 'damage', value: 0.1, isPercent: true }],
+              drawbacks: [{ stat: 'resourceCost', value: 0.05, isPercent: true }],
+            }],
+          }],
           template: { baseStats: { attack: 100 }, maxDurability: 50 },
           bonusStats: null,
         },
@@ -80,6 +96,7 @@ describe('getEquipmentStats', () => {
 
     const stats = await getEquipmentStats('p1');
     expect(stats.attack).toBe(0);
+    expect(stats.actionModifiers).toEqual([]);
   });
 
   it('uses template maxDurability when item durability is null', async () => {
@@ -87,6 +104,7 @@ describe('getEquipmentStats', () => {
       {
         item: {
           currentDurability: null,
+          craftMarks: null,
           template: { baseStats: { attack: 5 }, maxDurability: 50 },
           bonusStats: null,
         },
@@ -103,6 +121,7 @@ describe('getEquipmentStats', () => {
       {
         item: {
           currentDurability: 25,
+          craftMarks: null,
           template: {
             baseStats: {
               evasion: 10,
@@ -127,6 +146,65 @@ describe('getEquipmentStats', () => {
     expect(stats.health).toBe(5);
     expect(stats.attack).toBe(0);
     expect(stats.armor).toBe(0);
+  });
+
+  it('extracts action modifiers from valid equipped craft marks', async () => {
+    const actionModifier = {
+      modifierId: 'keen_edge_light_attacks',
+      equipmentSlots: ['main_hand'],
+      actionTypes: ['light_attack'],
+      benefits: [{ stat: 'damage', value: 0.1, isPercent: true }],
+      drawbacks: [{ stat: 'resourceCost', value: 0.05, isPercent: true }],
+    };
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      {
+        slot: 'main_hand',
+        item: {
+          currentDurability: 10,
+          craftMarks: [{
+            markId: 'keen_edge_mark',
+            name: 'Keen Edge Mark',
+            sourceTechniqueId: 'weaponsmith_keen_edge',
+            description: 'A visible edge mark.',
+            actionModifiers: [actionModifier],
+          }],
+          template: { baseStats: { attack: 5 }, maxDurability: 50 },
+          bonusStats: null,
+        },
+      },
+    ]);
+
+    const stats = await getEquipmentStats('p1');
+
+    expect(stats.attack).toBe(5);
+    expect(stats.actionModifiers).toEqual([actionModifier]);
+  });
+
+  it('applies item stat benefits and drawbacks from valid equipped craft marks', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      {
+        slot: 'main_hand',
+        item: {
+          currentDurability: 10,
+          craftMarks: [{
+            markId: 'bowyer_tight_string_tight_string_mark',
+            name: 'Tight String Mark',
+            sourceTechniqueId: 'bowyer_tight_string',
+            description: 'A taut string mark.',
+            itemStatBenefits: [{ stat: 'rangedPower', value: 0.04, isPercent: true }],
+            itemStatDrawbacks: [{ stat: 'accuracy', value: -0.02, isPercent: true }],
+            actionModifiers: [],
+          }],
+          template: { baseStats: { rangedPower: 100, accuracy: 50 }, maxDurability: 50 },
+          bonusStats: { rangedPower: 25 },
+        },
+      },
+    ]);
+
+    const stats = await getEquipmentStats('p1');
+
+    expect(stats.rangedPower).toBe(130);
+    expect(stats.accuracy).toBe(49);
   });
 });
 

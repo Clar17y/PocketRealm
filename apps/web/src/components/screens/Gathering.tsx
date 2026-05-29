@@ -45,6 +45,13 @@ interface ResourceNode {
   sizeName: string;
   weathered?: boolean;
   eventModifiers?: EventModifierBadge[];
+  techniques?: GatheringTechniqueOption[];
+}
+
+interface GatheringTechniqueOption {
+  id: string;
+  name: string;
+  description: string;
 }
 
 interface GatheringProps {
@@ -76,7 +83,7 @@ interface GatheringProps {
   onPageChange: (page: number) => void;
   onZoneFilterChange: (zoneId: string) => void;
   onResourceTypeFilterChange: (resourceType: string) => void;
-  onStartGathering: (nodeId: string, turns: number) => void;
+  onStartGathering: (nodeId: string, turns: number, techniqueId?: string) => void;
   isRecovering?: boolean;
   recoveryCost?: number | null;
   guildTaxRate?: number;
@@ -120,6 +127,7 @@ export function Gathering({
 }: GatheringProps) {
   const { dialogueEvent } = useNpcDialogue();
   const npcKey = skillType ? GATHERING_NPC_MAP[skillType] : undefined;
+  const [selectedTechniqueId, setSelectedTechniqueId] = useState('');
 
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
@@ -163,8 +171,11 @@ export function Gathering({
     if (!updatedNode) {
       // Node was depleted/removed - select first available or null
       setSelectedNode(nodes[0] || null);
-    } else if (updatedNode.remainingCapacity !== selectedNode.remainingCapacity) {
-      // Node still exists but capacity changed - update with fresh data
+    } else if (
+      updatedNode.remainingCapacity !== selectedNode.remainingCapacity
+      || updatedNode.techniques !== selectedNode.techniques
+    ) {
+      // Node still exists but capacity or available techniques changed - update with fresh data
       setSelectedNode(updatedNode);
     }
   }, [nodes, selectedNode]);
@@ -175,8 +186,16 @@ export function Gathering({
     const ttd = getNodeTurnsToDeplete(selectedNode);
     const minTurns = getNodeMinTurns(selectedNode);
     setTurnInvestment([Math.max(minTurns, Math.min(ttd, availableTurns))]);
+    setSelectedTechniqueId('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNode?.id]);
+
+  useEffect(() => {
+    if (!selectedTechniqueId) return;
+    if (!selectedNode?.techniques?.some((technique) => technique.id === selectedTechniqueId)) {
+      setSelectedTechniqueId('');
+    }
+  }, [selectedNode, selectedTechniqueId]);
 
   const calculateYield = (node: ResourceNode, turns: number) => {
     // Match backend formula exactly: linear +10% per level above requirement
@@ -204,6 +223,7 @@ export function Gathering({
   };
 
   const yieldInfo = selectedNode ? calculateYield(selectedNode, turnInvestment[0]) : null;
+  const selectedTechnique = selectedNode?.techniques?.find((technique) => technique.id === selectedTechniqueId) ?? null;
 
   // Percentage-based presets for selected node
   const turnsToDeplete = selectedNode ? getNodeTurnsToDeplete(selectedNode) : 0;
@@ -445,6 +465,33 @@ export function Gathering({
         </PixelCard>
       )}
 
+      {selectedNode?.techniques && selectedNode.techniques.length > 0 && (
+        <PixelCard className="bg-[var(--rpg-background)]">
+          <div className="space-y-2">
+            <h3 className="font-semibold text-[var(--rpg-text-primary)] text-sm">Vocation Technique</h3>
+            <select
+              aria-label="Gathering technique"
+              value={selectedTechniqueId}
+              onChange={(event) => setSelectedTechniqueId(event.target.value)}
+              className="w-full px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] text-sm"
+            >
+              <option value="">No technique</option>
+              {selectedNode.techniques.map((technique) => (
+                <option key={technique.id} value={technique.id}>
+                  {technique.name}
+                </option>
+              ))}
+            </select>
+            {selectedTechnique && (
+              <div className="rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3">
+                <div className="text-sm font-semibold text-[var(--rpg-gold)]">{selectedTechnique.name}</div>
+                <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">{selectedTechnique.description}</div>
+              </div>
+            )}
+          </div>
+        </PixelCard>
+      )}
+
       {/* Start Button */}
       {selectedNode && (() => {
         const selectedWouldStack = ownedResourceNames?.has(selectedNode.name) ?? false;
@@ -454,7 +501,7 @@ export function Gathering({
             variant="gold"
             size="lg"
             className="w-full"
-            onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
+            onClick={() => onStartGathering(selectedNode.id, turnInvestment[0], selectedTechniqueId || undefined)}
             disabled={isOverEncumbered || isRecovering || isActivityLocked || selectedBlockedByFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
           >
             <div className="flex items-center justify-center gap-2">

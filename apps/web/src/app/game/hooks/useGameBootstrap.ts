@@ -17,6 +17,7 @@ import {
   getSkills,
   getTemplates,
   getTurns,
+  getVocations,
   getZoneEvents,
   getZones,
   respecSkillPoints,
@@ -32,6 +33,8 @@ import type {
   PlayerBuffData,
   ResourceState,
   SkillStateDTO,
+  VocationId,
+  VocationSnapshotResponse,
 } from '@pocketrealm/shared';
 import type { CharacterProgression, HpState } from '../gameController.types';
 import type { ServerSettingsPayload } from './usePlayerSettings';
@@ -148,6 +151,7 @@ interface UseGameBootstrapOptions {
   setEquipment: (equipment: EquipmentState) => void;
   setCraftingRecipes: (recipes: Array<{
     id: string;
+    vocationId: VocationId | null;
     skillType: string;
     requiredLevel: number;
     isAdvanced: boolean;
@@ -178,6 +182,7 @@ interface UseGameBootstrapOptions {
   setZoneCraftingName: (name: string | null) => void;
   setTemplates: (templates: CombatTemplateData[]) => void;
   setGuildTaxRate: (rate: number) => void;
+  setVocations: (snapshot: VocationSnapshotResponse) => void;
 }
 
 export function useGameBootstrap({
@@ -218,6 +223,7 @@ export function useGameBootstrap({
   setZoneCraftingName,
   setTemplates,
   setGuildTaxRate,
+  setVocations,
 }: UseGameBootstrapOptions) {
   const refreshCraftingRecipes = useCallback(async () => {
     const response = await getCraftingRecipes();
@@ -312,6 +318,7 @@ export function useGameBootstrap({
       resourcesResponse,
       skillPointResponse,
       buffsResponse,
+      vocationsResponse,
     ] = await Promise.all([
       getTurns(),
       getPlayer(),
@@ -323,6 +330,7 @@ export function useGameBootstrap({
       getResources(),
       getSkillPointState(),
       getPlayerBuffs(),
+      getVocations(),
     ]);
 
     if (turnsResponse.data) {
@@ -375,6 +383,10 @@ export function useGameBootstrap({
 
     if (buffsResponse.data) {
       setActiveBuffs(buffsResponse.data.buffs);
+    }
+
+    if (vocationsResponse.data) {
+      setVocations(vocationsResponse.data);
     }
 
     getExpeditionCooldowns().then((response) => {
@@ -478,6 +490,7 @@ export function useGameBootstrap({
     setTemplates,
     setTutorialStep,
     setTurns,
+    setVocations,
   ]);
 
   return {

@@ -1,7 +1,7 @@
 import { Prisma } from '@pocketrealm/database';
 import type { LootDrop, ItemRarity } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
-import { addStackableItemTx } from './inventoryService';
+import { addStackableItemTx, getStackIdentityKey } from './inventoryService';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import type { PendingLootItem } from './pendingLootService';
 import type { GrantedItemIds } from './stateUpdateHelpers';
@@ -72,15 +72,15 @@ export async function rollAndGrantDropsTx(
   const initialSlots = availableSlots ?? Infinity;
   let remainingSlots = initialSlots;
 
-  // Track existing stacks so merges don't consume a slot
-  const grantedStackableTemplates = new Set<string>();
+  // Track existing normal stacks so merges don't consume a slot.
+  const grantedStackableStackKeys = new Set<string>();
   let existingStacks: Set<string> | null = null;
   if (availableSlots != null) {
     const playerItems = await tx.item.findMany({
       where: { ownerId: playerId, inStash: false },
-      select: { templateId: true },
+      select: { templateId: true, rarity: true, bonusStats: true, craftMarks: true },
     });
-    existingStacks = new Set(playerItems.map((i) => i.templateId));
+    existingStacks = new Set(playerItems.map((item) => getStackIdentityKey(item)));
   }
 
   // Fetch template names for overflow display
@@ -100,7 +100,13 @@ export async function rollAndGrantDropsTx(
     const quantity = Math.max(1, randomIntInclusive(picked.minQuantity, picked.maxQuantity));
 
     if (picked.itemTemplate.stackable) {
-      const hasStack = existingStacks?.has(picked.itemTemplateId) || grantedStackableTemplates.has(picked.itemTemplateId);
+      const normalStackKey = getStackIdentityKey({
+        templateId: picked.itemTemplateId,
+        rarity: 'common',
+        bonusStats: null,
+        craftMarks: null,
+      });
+      const hasStack = existingStacks?.has(normalStackKey) || grantedStackableStackKeys.has(normalStackKey);
       const needsNewSlot = !hasStack;
 
       if (needsNewSlot && remainingSlots <= 0) {
@@ -111,7 +117,7 @@ export async function rollAndGrantDropsTx(
       }
 
       if (needsNewSlot) remainingSlots--;
-      grantedStackableTemplates.add(picked.itemTemplateId);
+      grantedStackableStackKeys.add(normalStackKey);
       const stackResult = await addStackableItemTx(tx, playerId, picked.itemTemplateId, quantity);
       (stackResult.created ? newItemIds : updatedItemIds).push(stackResult.itemId);
       accumulator.add({ itemTemplateId: picked.itemTemplateId, quantity, rarity });

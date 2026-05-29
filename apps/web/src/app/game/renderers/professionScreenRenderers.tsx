@@ -1,7 +1,15 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { SkillType } from '@pocketrealm/shared';
+import {
+  getEligibleTechniquesForCraft,
+  getEligibleTechniquesForGathering,
+  resolveGatheringVocation,
+  resolveRecipeVocation,
+  type SkillType,
+  type VocationId,
+  type VocationTechniqueDefinition,
+} from '@pocketrealm/shared';
 import { calculateEfficiency } from '@pocketrealm/game-engine';
 import { Crafting } from '@/components/screens/Crafting';
 import { Forge } from '@/components/screens/Forge';
@@ -14,12 +22,38 @@ import { CRAFTING_SKILL_TABS, GATHERING_SKILL_TABS, SKILL_META } from '../pageCo
 import { useEquipmentStats } from '../hooks/useEquipmentStats';
 import type { GameControllerState } from './gameScreenRenderer.types';
 
+function techniqueDisplayName(technique: VocationTechniqueDefinition): string {
+  const markEffect = technique.effects.find((effect) => effect.type === 'craft_mark');
+  return markEffect?.type === 'craft_mark' ? markEffect.mark.name : technique.name;
+}
+
+function techniqueOption(technique: VocationTechniqueDefinition) {
+  return {
+    id: technique.id,
+    name: techniqueDisplayName(technique),
+    description: technique.description,
+  };
+}
+
+function buildLearnedTechniqueLookup(vocationState: GameControllerState['vocationState']): Map<VocationId, string[]> {
+  return new Map(
+    (vocationState?.vocations ?? []).map((vocation) => [
+      vocation.vocationId,
+      vocation.learnedTechniqueIds,
+    ]),
+  );
+}
+
 export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
   const activeCraftingSkillMeta = SKILL_META[gc.activeCraftingSkill];
   const activeCraftingSkillData = gc.skills.find((skill) => skill.skillType === gc.activeCraftingSkill);
   const filteredCraftingRecipes = useMemo(
     () => gc.craftingRecipes.filter((recipe) => recipe.skillType === gc.activeCraftingSkill),
     [gc.craftingRecipes, gc.activeCraftingSkill]
+  );
+  const learnedTechniqueLookup = useMemo(
+    () => buildLearnedTechniqueLookup(gc.vocationState),
+    [gc.vocationState],
   );
 
   return (
@@ -70,6 +104,25 @@ export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
             };
           }),
           rarity: rarityFromTier(recipe.resultTemplate.tier),
+          techniques: (() => {
+            const vocationId = resolveRecipeVocation({
+              recipeVocationId: recipe.vocationId,
+              resultSlot: recipe.resultTemplate.slot,
+              resultItemType: recipe.resultTemplate.itemType,
+              recipeSkillType: recipe.skillType,
+            });
+            if (!vocationId) return [];
+
+            return getEligibleTechniquesForCraft({
+              vocationId,
+              learnedTechniqueIds: learnedTechniqueLookup.get(vocationId) ?? [],
+              recipeId: recipe.id,
+              skillType: recipe.skillType,
+              resultItemType: recipe.resultTemplate.itemType,
+              resultSlot: recipe.resultTemplate.slot,
+              resultRarity: null,
+            }).map(techniqueOption);
+          })(),
         }))}
         onCraft={gc.handleCraft}
         activityLog={gc.activityLog}
@@ -149,6 +202,10 @@ export function GatheringScreenRenderer({ gc }: { gc: GameControllerState }) {
     ),
     [gc.inventory]
   );
+  const learnedTechniqueLookup = useMemo(
+    () => buildLearnedTechniqueLookup(gc.vocationState),
+    [gc.vocationState],
+  );
 
   return (
     <div className="space-y-3">
@@ -189,6 +246,17 @@ export function GatheringScreenRenderer({ gc }: { gc: GameControllerState }) {
           sizeName: node.sizeName,
           weathered: node.weathered,
           eventModifiers: node.eventModifiers,
+          techniques: (() => {
+            const vocationId = resolveGatheringVocation(node.skillRequired);
+            if (!vocationId) return [];
+
+            return getEligibleTechniquesForGathering({
+              vocationId,
+              learnedTechniqueIds: learnedTechniqueLookup.get(vocationId) ?? [],
+              skillType: node.skillRequired,
+              resourceCategory: node.resourceTypeCategory,
+            }).map(techniqueOption);
+          })(),
         }))}
         currentZoneId={gc.activeZoneId}
         availableTurns={gc.turns}

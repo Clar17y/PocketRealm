@@ -5,10 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { register } from '@/lib/api';
 
 const push = vi.fn();
+const replace = vi.fn();
+const prefetch = vi.fn();
 const setTokens = vi.fn();
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace, prefetch }),
 }));
 
 vi.mock('next/image', () => ({
@@ -83,6 +85,62 @@ describe('RegisterPage', () => {
       expect(register).toHaveBeenCalledWith('Rook', 'rook@example.com', 'correct-horse-12345');
     });
     expect(setTokens).toHaveBeenCalledWith('access-token', 'refresh-token', player);
-    expect(push).toHaveBeenCalledWith('/game');
+    expect(replace).toHaveBeenCalledWith('/game');
+  });
+
+  it('prefetches the game route so post-registration navigation can start immediately', async () => {
+    render(React.createElement(RegisterPage));
+
+    await waitFor(() => {
+      expect(prefetch).toHaveBeenCalledWith('/game');
+    });
+  });
+
+  it('keeps the submit button disabled with a spinner and ignores duplicate submits until navigation', async () => {
+    const player = {
+      id: 'player-1',
+      username: 'Rook',
+      email: 'rook@example.com',
+      role: 'player',
+      emailVerified: false,
+      seasonId: null,
+      isPremium: false,
+      premiumExpiresAt: null,
+    };
+    let resolveRegistration!: (value: Awaited<ReturnType<typeof register>>) => void;
+    vi.mocked(register).mockReturnValue(new Promise((resolve) => {
+      resolveRegistration = resolve;
+    }));
+
+    render(React.createElement(RegisterPage));
+
+    const submitButton = screen.getByRole('button', { name: 'Begin Journey' }) as HTMLButtonElement;
+    const form = submitButton.closest('form')!;
+    await waitFor(() => expect(submitButton.disabled).toBe(false));
+
+    fireEvent.change(await screen.findByLabelText('Username'), { target: { value: 'Rook' } });
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'rook@example.com' } });
+    fireEvent.change(await screen.findByLabelText('Password'), { target: { value: 'correct-horse-12345' } });
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    expect(register).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(submitButton.disabled).toBe(true));
+    expect(submitButton.getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Creating account...' }).querySelector('.animate-spin')).not.toBeNull();
+
+    resolveRegistration({
+      data: {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        player,
+      },
+    });
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/game');
+    });
+    expect(submitButton.disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Creating account...' }).querySelector('.animate-spin')).not.toBeNull();
   });
 });

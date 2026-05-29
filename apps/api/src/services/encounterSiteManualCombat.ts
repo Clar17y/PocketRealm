@@ -52,7 +52,11 @@ import {
   type EncounterSiteXpContributions,
   type FleeResult,
 } from './encounterSiteCombatCore';
-import { degradeEquippedDurabilityByHits } from './durabilityService';
+import {
+  degradeEquippedDurabilityByHits,
+  getEquippedDurabilitySnapshot,
+  type DurabilityEquipmentSnapshotItem,
+} from './durabilityService';
 import type { GrantXpResult } from './xpService';
 
 // ---------------------------------------------------------------------------
@@ -85,6 +89,7 @@ interface ManualCombatState {
   guildXpBoost: number;
   damageByScalingStat?: CombatSkillContribution;
   resourceCostByScalingStat?: CombatSkillContribution;
+  durabilityEquipment?: DurabilityEquipmentSnapshotItem[];
 }
 
 // Redis key prefix for manual combat sessions
@@ -275,6 +280,7 @@ export async function startManualEncounterRoom(
     hpState.currentHp,
     hpState.maxHp,
   );
+  const durabilityEquipment = await getEquippedDurabilitySnapshot(playerId);
 
   const turnCostCharged = roomMobs.length * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST;
 
@@ -302,6 +308,7 @@ export async function startManualEncounterRoom(
     roomMobSlots: roomMobs,
     attackSkill,
     guildXpBoost,
+    durabilityEquipment,
     ...createEncounterSiteXpContributions(),
   });
 
@@ -362,7 +369,9 @@ export async function resolveManualEncounterRound(
   }
 
   // Refresh template from DB so mid-combat template switches take effect
-  const fresh = await fetchFreshTemplateData(playerId, state.participant.maxHp);
+  const fresh = await fetchFreshTemplateData(playerId, state.participant.maxHp, {
+    actionModifiers: state.participant.equipmentActionModifiers ?? [],
+  });
   state.participant.template = fresh.playerTemplate.map(s => ({
     actionId: s.actionId,
     condition: s.condition,
@@ -590,8 +599,11 @@ export async function resolveManualEncounterRound(
   );
 
   // Degrade equipment durability from all rounds of manual encounter combat
-  const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(state.roundLogs);
-  const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
+  const { playerHitsLanded, mobHitsLanded, playerWeaponActionIds } = countEncounterSiteHits(state.roundLogs);
+  const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded, 1, {
+    weaponActionIds: playerWeaponActionIds,
+    equipmentSnapshot: state.durabilityEquipment,
+  });
   const durabilityDamagedItemIds = durabilityLost.map(d => d.itemId);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)

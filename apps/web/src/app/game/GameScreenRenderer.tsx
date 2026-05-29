@@ -17,6 +17,7 @@ import {
   SkillsScreenRenderer,
   TalentTreeScreenRenderer,
   TrainingScreenRenderer,
+  VocationsScreenRenderer,
 } from './renderers/characterScreenRenderers';
 import {
   CraftingScreenRenderer,
@@ -72,6 +73,8 @@ export function GameScreenRenderer({
       return <EquipmentScreenRenderer gc={gc} />;
     case 'skills':
       return <SkillsScreenRenderer gc={gc} />;
+    case 'vocations':
+      return <VocationsScreenRenderer gc={gc} />;
     case 'zones':
       return <ZonesScreenRenderer gc={gc} />;
     case 'bestiary':

@@ -58,6 +58,7 @@ vi.mock('../socket', () => ({
 }));
 
 vi.mock('@pocketrealm/game-engine', () => ({
+  applyEquipmentActionModifiers: vi.fn(({ action }) => action),
   resolveBossRound: vi.fn().mockReturnValue({
     bossDefeated: false,
     allPlayersDead: false,

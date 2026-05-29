@@ -119,5 +119,6 @@ export async function buildPvpCombatant(
     manaRegenPerRound: calculateManaRegenPerRound(magicLevel),
     unlockedActions: skillPoints.unlockedActions,
     perActionScaling,
+    actionModifiers: equipStats.actionModifiers,
   });
 }

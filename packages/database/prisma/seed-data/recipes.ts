@@ -16,9 +16,23 @@ const trophy = IDS.trophy;
 const bossGear = IDS.bossGear;
 const backpack = IDS.backpack;
 
+type VocationId =
+  | 'prospector'
+  | 'forester'
+  | 'herbalist'
+  | 'weaponsmith'
+  | 'bowyer'
+  | 'staffwright'
+  | 'armorer'
+  | 'leatherworker'
+  | 'tailor'
+  | 'jeweller'
+  | 'alchemist';
+
 type Recipe = {
   id?: string;
   skillType: string;
+  vocationId?: VocationId;
   requiredLevel: number;
   resultTemplateId: string;
   turnCost: number;
@@ -33,6 +47,7 @@ function recipe(r: Recipe) {
   return {
     id: r.id ?? randomUUID(),
     skillType: r.skillType,
+    vocationId: r.vocationId ?? null,
     requiredLevel: r.requiredLevel,
     resultTemplateId: r.resultTemplateId,
     turnCost: r.turnCost,
@@ -45,6 +60,231 @@ function recipe(r: Recipe) {
     soulbound: r.soulbound ?? false,
     mobFamilyId: r.mobFamilyId ?? null,
   };
+}
+
+type SeedRecipe = ReturnType<typeof recipe>;
+type CompleteSeedRecipe = SeedRecipe & { vocationId: VocationId };
+
+const vocationTemplateGroups: Record<VocationId, readonly string[]> = {
+  prospector: [
+    proc.copperIngot,
+    proc.tinIngot,
+    proc.ironIngot,
+    proc.cutStone,
+    proc.darkIronIngot,
+    proc.mithrilIngot,
+    proc.ancientIngot,
+  ],
+  forester: [
+    proc.oakPlank,
+    proc.maplePlank,
+    proc.fungalPlank,
+    proc.elderwoodPlank,
+    proc.willowPlank,
+    proc.bogwoodPlank,
+    proc.crystalPlank,
+    proc.petrifiedPlank,
+  ],
+  herbalist: [],
+  leatherworker: [
+    lth.ratLeather,
+    lth.boarLeather,
+    lth.wolfLeather,
+    lth.batLeather,
+    lth.wargLeather,
+    lth.chitinPlate,
+    lth.crocLeather,
+    lth.scaleMail,
+    lth.nagaLeather,
+    arm.t1_medium_head,
+    arm.t1_medium_chest,
+    arm.t2_medium_head,
+    arm.t2_medium_chest,
+    arm.t2_medium_legs,
+    arm.t3_medium_head,
+    arm.t3_medium_chest,
+    arm.t3_medium_legs,
+    arm.t3_medium_boots,
+    arm.t3_medium_gloves,
+    arm.t4_medium_head,
+    arm.t4_medium_chest,
+    arm.t4_medium_legs,
+    arm.t4_medium_boots,
+    arm.t4_medium_gloves,
+    arm.t4_medium_belt,
+    arm.t5_medium_head,
+    arm.t5_medium_chest,
+    arm.t5_medium_legs,
+    arm.t5_medium_boots,
+    arm.t5_medium_gloves,
+    arm.t5_medium_belt,
+    adv.ratHideGloves,
+    adv.boarHideBoots,
+    adv.chitinGauntlets,
+    adv.wargRiderBelt,
+    adv.goblinKingsCrown,
+    bossGear.alphaPeltChest,
+  ],
+  tailor: [
+    lth.silkCloth,
+    lth.wovenCloth,
+    lth.faeFabric,
+    lth.cursedFabric,
+    lth.etherealCloth,
+    lth.spectralFabric,
+    ...Object.values(backpack),
+    arm.t1_light_head,
+    arm.t1_light_chest,
+    arm.t2_light_head,
+    arm.t2_light_chest,
+    arm.t2_light_legs,
+    arm.t3_light_head,
+    arm.t3_light_chest,
+    arm.t3_light_legs,
+    arm.t3_light_boots,
+    arm.t3_light_gloves,
+    arm.t4_light_head,
+    arm.t4_light_chest,
+    arm.t4_light_legs,
+    arm.t4_light_boots,
+    arm.t4_light_gloves,
+    arm.t4_light_belt,
+    arm.t5_light_head,
+    arm.t5_light_chest,
+    arm.t5_light_legs,
+    arm.t5_light_boots,
+    arm.t5_light_gloves,
+    arm.t5_light_belt,
+    adv.spiderSilkBelt,
+    adv.batWingBoots,
+    bossGear.etherealRobes,
+  ],
+  alchemist: Object.values(pots),
+  jeweller: [
+    gems.cutRuby,
+    gems.cutSapphire,
+    gems.cutEmerald,
+    gems.cutDiamond,
+    gems.cutOpal,
+    gems.cutAmber,
+    gems.cutPearl,
+    gems.cutJade,
+    gems.cutMoonstone,
+    gems.cutStarcrystal,
+    gems.cutResin,
+    gems.cutSap,
+    gems.cutBark,
+    gems.cutHeartwood,
+    gems.cutAncientAmber,
+    ...Object.values(jewel),
+    adv.wolfFangNecklace,
+    adv.banditsLuckyRing,
+    adv.goblinTrinketCharm,
+    adv.spriteDustRing,
+    adv.faeCrown,
+    adv.warlordsSignet,
+    adv.windcallersCharm,
+    adv.deathKnightsRing,
+    adv.covenAmulet,
+    adv.stormCrystalCharm,
+  ],
+  armorer: [
+    arm.t1_heavy_head,
+    arm.t1_heavy_chest,
+    arm.t2_heavy_head,
+    arm.t2_heavy_chest,
+    arm.t2_heavy_legs,
+    arm.t3_heavy_head,
+    arm.t3_heavy_chest,
+    arm.t3_heavy_legs,
+    arm.t3_heavy_boots,
+    arm.t3_heavy_gloves,
+    arm.t4_heavy_head,
+    arm.t4_heavy_chest,
+    arm.t4_heavy_legs,
+    arm.t4_heavy_boots,
+    arm.t4_heavy_gloves,
+    arm.t4_heavy_belt,
+    arm.t5_heavy_head,
+    arm.t5_heavy_chest,
+    arm.t5_heavy_legs,
+    arm.t5_heavy_boots,
+    arm.t5_heavy_gloves,
+    arm.t5_heavy_belt,
+    adv.ironbarkGloves,
+    adv.heartwoodShield,
+    adv.crystalCoreBelt,
+    adv.hydraScaleShield,
+    adv.diamondGolemBelt,
+  ],
+  weaponsmith: [
+    wep.woodenSword,
+    wep.copperDagger,
+    wep.tinSword,
+    wep.boarTuskMace,
+    wep.ironLongsword,
+    wep.crawlerFangBlade,
+    wep.darkIronGreatsword,
+    wep.hydraFangSabre,
+    wep.mithrilBlade,
+    bossGear.wolfsbaneBlade,
+  ],
+  bowyer: [
+    wep.oakShortbow,
+    wep.mapleLongbow,
+    wep.batWingCrossbow,
+    wep.willowWarbow,
+    wep.harpyTalonBow,
+    wep.bogwoodLongbow,
+    wep.wraithBow,
+    wep.ancientBow,
+  ],
+  staffwright: [
+    wep.oakStaff,
+    wep.mapleStaff,
+    wep.goblinHexStaff,
+    wep.elderwoodStaff,
+    wep.faeCrystalStaff,
+    wep.crystalStaffWep,
+    wep.witchsSceptre,
+    wep.lichStaff,
+    bossGear.spiritStaff,
+  ],
+};
+
+function buildVocationMap(groups: Record<VocationId, readonly string[]>): Map<string, VocationId> {
+  const map = new Map<string, VocationId>();
+  for (const [vocationId, templateIds] of Object.entries(groups) as [VocationId, readonly string[]][]) {
+    for (const templateId of templateIds) {
+      const existingVocationId = map.get(templateId);
+      if (existingVocationId) {
+        throw new Error(`Duplicate vocation mapping for ${templateId}: ${existingVocationId}, ${vocationId}`);
+      }
+      map.set(templateId, vocationId);
+    }
+  }
+  return map;
+}
+
+const vocationByResultTemplateId = buildVocationMap(vocationTemplateGroups);
+
+function withResolvedVocation(recipe: SeedRecipe): SeedRecipe {
+  return {
+    ...recipe,
+    vocationId: recipe.vocationId ?? vocationByResultTemplateId.get(recipe.resultTemplateId) ?? null,
+  };
+}
+
+function assertCompleteRecipes(recipes: SeedRecipe[]): asserts recipes is CompleteSeedRecipe[] {
+  const missingVocationRecipe = recipes.find((r) => r.vocationId == null);
+  if (missingVocationRecipe) {
+    throw new Error(`Missing vocationId for crafting recipe result ${missingVocationRecipe.resultTemplateId}`);
+  }
+
+  const unmappedRecipe = recipes.find((r) => !vocationByResultTemplateId.has(r.resultTemplateId));
+  if (unmappedRecipe) {
+    throw new Error(`Missing explicit vocation mapping for crafting recipe result ${unmappedRecipe.resultTemplateId}`);
+  }
 }
 
 // ── Processing Recipes (ore→ingot, log→plank, herb→potion, hide→leather) ──
@@ -319,5 +559,18 @@ function backpackRecipes() {
 // ── Export ─────────────────────────────────────────────────────────────────────
 
 export function getAllRecipes() {
-  return [...processingRecipes(), ...gemRefiningRecipes(), ...weaponRecipes(), ...armorRecipes(), ...jewelcraftingRecipes(), ...advancedRecipes(), ...bossRecipes(), ...backpackRecipes()];
+  const recipes = [
+    ...processingRecipes(),
+    ...gemRefiningRecipes(),
+    ...weaponRecipes(),
+    ...armorRecipes(),
+    ...jewelcraftingRecipes(),
+    ...advancedRecipes(),
+    ...bossRecipes(),
+    ...backpackRecipes(),
+  ].map(withResolvedVocation);
+
+  assertCompleteRecipes(recipes);
+
+  return recipes;
 }

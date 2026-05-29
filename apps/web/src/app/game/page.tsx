@@ -175,6 +175,10 @@ export default function GamePage() {
   }, [activeScreen, gc.loadQuests]);
 
   useEffect(() => {
+    if (activeScreen === 'vocations') void gc.handleLoadVocations();
+  }, [activeScreen, gc.handleLoadVocations]);
+
+  useEffect(() => {
     if (activeScreen === 'casino') {
       chat.joinCasino();
       return () => chat.leaveCasino();
@@ -426,6 +430,7 @@ export default function GamePage() {
               { id: 'gathering', label: 'Gathering' },
               { id: 'crafting', label: 'Crafting' },
               { id: 'forge', label: 'Forge' },
+              { id: 'vocations', label: 'Vocations' },
               { id: 'worldEvents', label: 'Events' },
               ...(currentZone?.zoneType === 'town' ? [
                 { id: 'training', label: 'Training' },

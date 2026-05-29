@@ -1,7 +1,7 @@
 import { Prisma } from '@pocketrealm/database';
 import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, PREMIUM_CONSTANTS, levelToGemTier } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
-import { addStackableItemTx } from './inventoryService';
+import { addStackableItemTx, getStackIdentityKey } from './inventoryService';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
 import type { PendingLootItem } from './pendingLootService';
 import type { GrantedItemIds } from './stateUpdateHelpers';
@@ -162,15 +162,15 @@ export async function grantCacheLootTx(
   const initialSlots = params.availableSlots ?? Infinity;
   let remainingSlots = initialSlots;
 
-  // Track which stackable templates already exist in player's backpack
-  // (merging into an existing stack doesn't consume a new slot)
+  // Track which normal stackable identities already exist in the player's backpack.
+  // Merging into an existing normal stack doesn't consume a new slot.
   const existingStacks = new Set<string>();
   if (params.availableSlots != null) {
     const playerItems = await tx.item.findMany({
       where: { ownerId: params.playerId, inStash: false },
-      select: { templateId: true },
+      select: { templateId: true, rarity: true, bonusStats: true, craftMarks: true },
     });
-    for (const item of playerItems) existingStacks.add(item.templateId);
+    for (const item of playerItems) existingStacks.add(getStackIdentityKey(item));
   }
 
   if (cutGemTemplateIds.length > 0) {
@@ -182,8 +182,14 @@ export async function grantCacheLootTx(
 
     for (let i = 0; i < materialRolls; i++) {
       const picked = cutGemTemplateIds[randomIntInclusive(0, cutGemTemplateIds.length - 1)]!;
+      const normalStackKey = getStackIdentityKey({
+        templateId: picked.templateId,
+        rarity: 'common',
+        bonusStats: null,
+        craftMarks: null,
+      });
       const alreadyGranted = materialMap.has(picked.templateId);
-      const hasExistingStack = existingStacks.has(picked.templateId) || alreadyGranted;
+      const hasExistingStack = existingStacks.has(normalStackKey) || alreadyGranted;
       const needsNewSlot = !hasExistingStack;
 
       if (needsNewSlot && remainingSlots <= 0) {
@@ -204,6 +210,7 @@ export async function grantCacheLootTx(
         }
       } else {
         if (needsNewSlot) remainingSlots--;
+        existingStacks.add(normalStackKey);
         const stackResult = await addStackableItemTx(tx, params.playerId, picked.templateId, 1);
         (stackResult.created ? newItemIds : updatedItemIds).push(stackResult.itemId);
 

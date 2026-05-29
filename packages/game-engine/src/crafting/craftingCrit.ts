@@ -27,6 +27,12 @@ export interface CraftingCritRolls {
   bonusPercentRoll?: number;
 }
 
+export interface CraftingCritChanceDeltas {
+  critChance?: number;
+  rareCraftChance?: number;
+  epicCraftChance?: number;
+}
+
 export interface CraftingCritResult {
   isCrit: boolean;
   rarity: ItemRarity;
@@ -176,24 +182,28 @@ export function rollBonusStat(
 export function calculateCraftingCrit(
   input: CalculateCraftingCritInput,
   rolls?: CraftingCritRolls,
-  options?: { championMultiplier?: number }
+  options?: { championMultiplier?: number; chanceDeltas?: CraftingCritChanceDeltas }
 ): CraftingCritResult {
   const championMultiplierValue = options?.championMultiplier ?? input.championMultiplier ?? 1;
   const championMultiplier = Number.isFinite(championMultiplierValue)
     ? Math.max(1, championMultiplierValue)
     : 1;
+  const chanceDeltas = options?.chanceDeltas;
   const critChance = clamp(
-    calculateCritChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier,
+    calculateCritChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier
+      + sanitizeChanceDelta(chanceDeltas?.critChance),
     CRAFTING_CONSTANTS.MIN_CRIT_CHANCE,
     CRAFTING_CONSTANTS.MAX_CRIT_CHANCE,
   );
   const rareCraftChance = clamp(
-    calculateRareCraftChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier,
+    calculateRareCraftChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier
+      + sanitizeChanceDelta(chanceDeltas?.rareCraftChance),
     0,
     CRAFTING_CONSTANTS.RARE_CRAFT_MAX_CHANCE,
   );
   const epicCraftChance = clamp(
-    calculateEpicCraftChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier,
+    calculateEpicCraftChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier
+      + sanitizeChanceDelta(chanceDeltas?.epicCraftChance),
     0,
     CRAFTING_CONSTANTS.EPIC_CRAFT_MAX_CHANCE,
   );
@@ -236,4 +246,8 @@ export function calculateCraftingCrit(
     bonusStat: rolledBonus.stat,
     bonusValue: rolledBonus.value,
   };
+}
+
+function sanitizeChanceDelta(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }

@@ -117,6 +117,59 @@ describe('achievementDefinitions', () => {
     });
   });
 
+  describe('vocation mastery achievements', () => {
+    it('includes named focus title achievements for every launch vocation', () => {
+      const expectedTitles = new Map([
+        ['vocation_focus_prospector_36000', 'Stone Reader'],
+        ['vocation_focus_forester_36000', 'Heartwood Hand'],
+        ['vocation_focus_herbalist_36000', 'Leafwarden'],
+        ['vocation_focus_weaponsmith_36000', 'Edgekeeper'],
+        ['vocation_focus_bowyer_36000', 'Stringwright'],
+        ['vocation_focus_staffwright_36000', 'Channel Carver'],
+        ['vocation_focus_armorer_36000', 'Plate-Raiser'],
+        ['vocation_focus_leatherworker_36000', 'Hidewarden'],
+        ['vocation_focus_tailor_36000', 'Wardweaver'],
+        ['vocation_focus_jeweller_36000', 'Facet-Speaker'],
+        ['vocation_focus_alchemist_36000', 'Retort Keeper'],
+      ]);
+
+      for (const [id, titleReward] of expectedTitles) {
+        expect(ACHIEVEMENTS_BY_ID.get(id)).toMatchObject({
+          id,
+          category: 'skills',
+          titleReward,
+          threshold: 36000,
+          statKey: expect.stringMatching(/^vocationHonedTurns_/),
+        });
+      }
+    });
+
+    it('tracks active honing, techniques, craft marks, and vocation counters', () => {
+      expect(ACHIEVEMENTS_BY_ID.get('vocation_honing_108000')).toMatchObject({
+        titleReward: 'Turn-Taught',
+        statKey: 'totalVocationHonedTurns',
+      });
+      expect(ACHIEVEMENTS_BY_ID.get('vocation_techniques_10')).toMatchObject({
+        titleReward: 'Technique Keeper',
+        statKey: 'totalVocationTechniquesLearned',
+      });
+      expect(ACHIEVEMENTS_BY_ID.get('vocation_technique_uses_50')).toMatchObject({
+        titleReward: 'Method in Hand',
+        statKey: 'totalVocationTechniqueUses',
+      });
+      expect(ACHIEVEMENTS_BY_ID.get('vocation_marks_100')).toMatchObject({
+        category: 'crafting',
+        titleReward: 'Marked Artisan',
+        statKey: 'totalVocationCraftMarks',
+      });
+      expect(ACHIEVEMENTS_BY_ID.get('vocation_gather_crits_25')).toMatchObject({
+        category: 'gathering',
+        titleReward: 'Gem-Sighted',
+        statKey: 'totalVocationGatherCrits',
+      });
+    });
+  });
+
   describe('family achievements', () => {
     it('every family key in FAMILY_REWARD_ITEMS has achievements', () => {
       for (const key of Object.keys(FAMILY_REWARD_ITEMS)) {

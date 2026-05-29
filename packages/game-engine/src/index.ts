@@ -4,6 +4,7 @@ export * from './combat/mobPrefixes';
 export * from './combat/persistedMobRegen';
 export * from './combat/bossRoundResolver';
 export * from './combat/actionResolver';
+export * from './combat/equipmentActionModifiers';
 export * from './combat/templateCombatEngine';
 export * from './combat/mobTemplateConverter';
 export * from './combat/threatSystem';

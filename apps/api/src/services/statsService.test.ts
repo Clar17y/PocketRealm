@@ -119,6 +119,74 @@ describe('statsService', () => {
       expect(result.crowns_crafting).toBe(1);
       expect(result.crowns_combat).toBe(0);
     });
+
+    it('includes vocation mastery stats from vocation rows and counters', async () => {
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([{
+          total_kills: 0,
+          total_boss_kills: 0,
+          total_boss_damage: 0,
+          total_pvp_wins: 0,
+          best_pvp_win_streak: 0,
+          total_zones_discovered: 0,
+          total_zones_fully_explored: 0,
+          total_recipes_learned: 0,
+          total_bestiary_completed: 0,
+          total_unique_monster_kills: 0,
+          highest_character_level: 1,
+          highest_skill_level: 1,
+        }])
+        .mockResolvedValueOnce([{
+          guild_level: 0,
+          guild_contracts_completed: 0,
+          guild_turns_contributed: 0,
+          guild_member_count: 0,
+        }])
+        .mockResolvedValueOnce([{
+          highest_vocation_rank: 12,
+          vocation_rank_5_count: 3,
+          vocation_rank_10_count: 1,
+          vocation_rank_20_count: 0,
+          total_vocation_techniques_learned: 9,
+          vocation_technique_vocation_count: 4,
+        }])
+        .mockResolvedValueOnce([
+          { stat_key: 'vocation_honed_turns_total', value: 3100 },
+          { stat_key: 'vocation_honed_turns_weaponsmith', value: 1400 },
+          { stat_key: 'vocation_honed_turns_tailor', value: 900 },
+          { stat_key: 'vocation_crafts_weaponsmith', value: 80 },
+          { stat_key: 'vocation_crafts_tailor', value: 20 },
+          { stat_key: 'vocation_gathers_prospector', value: 55 },
+          { stat_key: 'vocation_technique_uses_weaponsmith_blood_groove', value: 18 },
+          { stat_key: 'vocation_technique_uses_prospector_bright_inclusion', value: 9 },
+          { stat_key: 'vocation_mark_crafted_weaponsmith_blood_groove_blood_groove_mark', value: 12 },
+          { stat_key: 'vocation_mark_crafted_tailor_pocket_layout_pocket_layout_mark', value: 4 },
+          { stat_key: 'vocation_gather_crits_prospector_bright_inclusion_gem_crit', value: 7 },
+          { stat_key: 'vocation_respecs_total', value: 2 },
+        ]);
+      mockPrisma.playerStats.findUnique.mockResolvedValue(null);
+
+      const result = await resolveAllStats('p1');
+
+      expect(result.totalVocationHonedTurns).toBe(3100);
+      expect(result.vocationHonedTurns_weaponsmith).toBe(1400);
+      expect(result.vocationHonedTurns_tailor).toBe(900);
+      expect(result.highestVocationRank).toBe(12);
+      expect(result.vocationRank5Count).toBe(3);
+      expect(result.vocationRank10Count).toBe(1);
+      expect(result.totalVocationTechniquesLearned).toBe(9);
+      expect(result.vocationTechniqueVocationCount).toBe(4);
+      expect(result.totalVocationCrafts).toBe(100);
+      expect(result.vocationCrafts_weaponsmith).toBe(80);
+      expect(result.totalVocationGathers).toBe(55);
+      expect(result.vocationGathers_prospector).toBe(55);
+      expect(result.totalVocationTechniqueUses).toBe(27);
+      expect(result.distinctVocationTechniquesUsed).toBe(2);
+      expect(result.totalVocationCraftMarks).toBe(16);
+      expect(result.distinctVocationCraftMarks).toBe(2);
+      expect(result.totalVocationGatherCrits).toBe(7);
+      expect(result.totalVocationRespecs).toBe(2);
+    });
   });
 
   describe('resolveCrownStats', () => {

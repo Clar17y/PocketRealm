@@ -20,6 +20,7 @@ import {
   type EncounterMobSlot,
 } from '@pocketrealm/shared';
 import {
+  applyEquipmentActionModifiers,
   resolveRaidRound,
   buildEncounterRaidMob,
   buildPlayerCombatStats,
@@ -344,16 +345,25 @@ export function resolveEncounterRoomCombat(
 }
 
 /** Count player and mob hits from encounter site round logs for durability degradation. */
-export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): { playerHitsLanded: number; mobHitsLanded: number } {
+export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): {
+  playerHitsLanded: number;
+  mobHitsLanded: number;
+  playerWeaponActionIds: string[];
+} {
   let playerHitsLanded = 0;
   let mobHitsLanded = 0;
+  const playerWeaponActionIds: string[] = [];
   for (const log of roundLogs) {
     for (const action of log.phases.playerAttacks) {
       if ('hit' in action && action.hit) {
         playerHitsLanded++;
+        playerWeaponActionIds.push(action.actionId);
         if ('splashCascade' in action && action.splashCascade) {
           for (const splash of action.splashCascade) {
-            if (splash.hit) playerHitsLanded++;
+            if (splash.hit) {
+              playerHitsLanded++;
+              playerWeaponActionIds.push(action.actionId);
+            }
           }
         }
       }
@@ -364,7 +374,7 @@ export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): { playe
       }
     }
   }
-  return { playerHitsLanded, mobHitsLanded };
+  return { playerHitsLanded, mobHitsLanded, playerWeaponActionIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -557,13 +567,19 @@ export async function buildParticipantForEncounterSite(
   const filteredActions: Record<string, ActionDefinition> = {};
   for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
     if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      filteredActions[id] = def;
+      filteredActions[id] = applyEquipmentActionModifiers({
+        action: def,
+        modifiers: prep.equipmentStats.actionModifiers ?? [],
+      });
     }
   }
   for (const slot of prep.playerTemplate) {
     for (const actionId of [slot.actionId, slot.thenActionId]) {
       if (actionId && !filteredActions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
-        filteredActions[actionId] = BASE_ACTION_DEFINITIONS[actionId]!;
+        filteredActions[actionId] = applyEquipmentActionModifiers({
+          action: BASE_ACTION_DEFINITIONS[actionId]!,
+          modifiers: prep.equipmentStats.actionModifiers ?? [],
+        });
       }
     }
   }
@@ -585,6 +601,7 @@ export async function buildParticipantForEncounterSite(
       sortOrder: s.sortOrder,
     })),
     actionDefinitions: filteredActions,
+    equipmentActionModifiers: prep.equipmentStats.actionModifiers ?? [],
     hp: currentHp,
     maxHp,
     stamina: prep.resources.stamina,

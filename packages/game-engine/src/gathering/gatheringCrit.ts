@@ -5,6 +5,7 @@ export interface GemCritInput {
   nodeLevel: number;
   luckStat: number;
   championMultiplier?: number;
+  critChanceBonus?: number;
 }
 
 export interface GemCritResult {
@@ -17,6 +18,7 @@ export function calculateGemCritChance(
   nodeLevel: number,
   luckStat: number,
   championMultiplier: number = 1,
+  critChanceBonus: number = 0,
 ): number {
   const levelsAbove = Math.max(0, skillLevel - nodeLevel);
   const raw =
@@ -24,7 +26,8 @@ export function calculateGemCritChance(
     levelsAbove * GEM_CRIT_CONSTANTS.LEVEL_BONUS +
     luckStat * GEM_CRIT_CONSTANTS.LUCK_BONUS;
   const multiplier = Number.isFinite(championMultiplier) ? Math.max(1, championMultiplier) : 1;
-  return Math.min(raw * multiplier, GEM_CRIT_CONSTANTS.MAX_CHANCE);
+  const bonus = Number.isFinite(critChanceBonus) ? critChanceBonus : 0;
+  return Math.min(Math.max(0, raw * multiplier + bonus), GEM_CRIT_CONSTANTS.MAX_CHANCE);
 }
 
 export function rollGemCrit(input: GemCritInput, roll?: number, championMultiplier?: number): GemCritResult {
@@ -33,6 +36,7 @@ export function rollGemCrit(input: GemCritInput, roll?: number, championMultipli
     input.nodeLevel,
     input.luckStat,
     championMultiplier ?? input.championMultiplier ?? 1,
+    input.critChanceBonus ?? 0,
   );
   const r = typeof roll === 'number' ? roll : Math.random();
   return { isCrit: r < critChance, critChance };
@@ -53,6 +57,7 @@ export function rollGemCritBatch(
     input.nodeLevel,
     input.luckStat,
     input.championMultiplier ?? 1,
+    input.critChanceBonus ?? 0,
   );
   let gemsFound = 0;
   for (let i = 0; i < actions; i++) {

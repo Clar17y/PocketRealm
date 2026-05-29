@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { parseCraftMarks } from '@pocketrealm/shared';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { PixelCard } from '@/components/PixelCard';
@@ -54,6 +55,8 @@ export function StashPanel({
   batch,
   actions,
 }: StashPanelProps) {
+  const selectedCraftMarks = parseCraftMarks(selectedItem?.craftMarks);
+
   return (
     <div className="space-y-2">
       <StashTutorial />
@@ -231,6 +234,14 @@ export function StashPanel({
                 <X size={20} />
               </button>
             </div>
+            {selectedCraftMarks.length > 0 && (
+              <div className="mb-4 rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-background)] p-3">
+                <div className="text-xs font-semibold text-[var(--rpg-gold)] mb-1">Craft Marks</div>
+                <div className="text-sm text-[var(--rpg-text-primary)]">
+                  {selectedCraftMarks.map((mark) => mark.name).join(', ')}
+                </div>
+              </div>
+            )}
             <PixelButton
               variant="primary"
               size="sm"

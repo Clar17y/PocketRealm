@@ -1,6 +1,6 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import type { EquipmentSlot, SkillType } from '@pocketrealm/shared';
-import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS } from '@pocketrealm/shared';
+import type { CraftMark, EquipmentActionModifier, EquipmentSlot, ItemStatModifier, SkillType } from '@pocketrealm/shared';
+import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS, getEquipmentActionModifiers, parseCraftMarks } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { cachedQuery, invalidateCache } from './cacheService';
 
@@ -24,7 +24,26 @@ export interface EquipmentStats {
   critChance: number;
   critDamage: number;
   inventorySlots: number;
+  actionModifiers?: EquipmentActionModifier[];
 }
+
+type NumericEquipmentStatKey = Exclude<keyof EquipmentStats, 'actionModifiers'>;
+type StatTotals = Record<NumericEquipmentStatKey, number>;
+
+const NUMERIC_EQUIPMENT_STAT_KEYS: readonly NumericEquipmentStatKey[] = [
+  'attack',
+  'rangedPower',
+  'magicPower',
+  'accuracy',
+  'armor',
+  'magicDefence',
+  'health',
+  'dodge',
+  'luck',
+  'critChance',
+  'critDamage',
+  'inventorySlots',
+];
 
 export function isSkillType(value: string): value is SkillType {
   return ALL_SKILLS.includes(value as SkillType);
@@ -72,6 +91,7 @@ async function computeEquipmentStats(playerId: string): Promise<EquipmentStats> 
         select: {
           currentDurability: true,
           bonusStats: true,
+          craftMarks: true,
           template: {
             select: {
               baseStats: true,
@@ -83,46 +103,87 @@ async function computeEquipmentStats(playerId: string): Promise<EquipmentStats> 
     },
   });
 
-  let attack = 0;
-  let rangedPower = 0;
-  let magicPower = 0;
-  let accuracy = 0;
-  let armor = 0;
-  let magicDefence = 0;
-  let health = 0;
-  let dodge = 0;
-  let luck = 0;
-  let critChance = 0;
-  let critDamage = 0;
-  let inventorySlots = 0;
+  const totals = createEmptyStatTotals();
+  const actionModifiers: EquipmentActionModifier[] = [];
 
   for (const slot of equipped) {
     // Broken gear contributes zero stats
     const cur = slot.item?.currentDurability ?? slot.item?.template?.maxDurability ?? 1;
     if (cur <= 0) continue;
 
+    const craftMarks = parseCraftMarks(slot.item?.craftMarks);
+    actionModifiers.push(...getEquipmentActionModifiers({
+      slot: slot.slot,
+      craftMarks,
+    }));
+
     const baseStats = slot.item?.template?.baseStats as Record<string, unknown> | null | undefined;
     const bonusStats = slot.item?.bonusStats as Record<string, unknown> | null | undefined;
-    const statSources = [baseStats, bonusStats];
+    const itemStats = readItemStats([baseStats, bonusStats]);
+    applyCraftMarkStatModifiers(itemStats, craftMarks);
 
-    for (const stats of statSources) {
-      if (!stats) continue;
-      if (typeof stats.attack === 'number') attack += stats.attack;
-      if (typeof stats.rangedPower === 'number') rangedPower += stats.rangedPower;
-      if (typeof stats.magicPower === 'number') magicPower += stats.magicPower;
-      if (typeof stats.accuracy === 'number') accuracy += stats.accuracy;
-      if (typeof stats.armor === 'number') armor += stats.armor;
-      if (typeof stats.magicDefence === 'number') magicDefence += stats.magicDefence;
-      if (typeof stats.health === 'number') health += stats.health;
-      if (typeof stats.dodge === 'number') dodge += stats.dodge;
-      if (typeof stats.luck === 'number') luck += stats.luck;
-      if (typeof stats.critChance === 'number') critChance += stats.critChance;
-      if (typeof stats.critDamage === 'number') critDamage += stats.critDamage;
-      if (typeof stats.inventorySlots === 'number') inventorySlots += stats.inventorySlots;
+    for (const key of NUMERIC_EQUIPMENT_STAT_KEYS) {
+      totals[key] += itemStats[key];
     }
   }
 
-  return { attack, rangedPower, magicPower, accuracy, armor, magicDefence, health, dodge, luck, critChance, critDamage, inventorySlots };
+  return { ...totals, actionModifiers };
+}
+
+function createEmptyStatTotals(): StatTotals {
+  return {
+    attack: 0,
+    rangedPower: 0,
+    magicPower: 0,
+    accuracy: 0,
+    armor: 0,
+    magicDefence: 0,
+    health: 0,
+    dodge: 0,
+    luck: 0,
+    critChance: 0,
+    critDamage: 0,
+    inventorySlots: 0,
+  };
+}
+
+function readItemStats(statSources: ReadonlyArray<Record<string, unknown> | null | undefined>): StatTotals {
+  const itemStats = createEmptyStatTotals();
+  for (const stats of statSources) {
+    if (!stats) continue;
+    for (const key of NUMERIC_EQUIPMENT_STAT_KEYS) {
+      const value = stats[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        itemStats[key] += value;
+      }
+    }
+  }
+  return itemStats;
+}
+
+function applyCraftMarkStatModifiers(
+  itemStats: StatTotals,
+  craftMarks: readonly CraftMark[],
+): void {
+  const baseItemStats = { ...itemStats };
+  for (const mark of craftMarks) {
+    for (const modifier of mark.itemStatBenefits ?? []) {
+      applyCraftMarkStatModifier(itemStats, baseItemStats, modifier);
+    }
+    for (const modifier of mark.itemStatDrawbacks ?? []) {
+      applyCraftMarkStatModifier(itemStats, baseItemStats, modifier);
+    }
+  }
+}
+
+function applyCraftMarkStatModifier(
+  itemStats: StatTotals,
+  baseItemStats: StatTotals,
+  modifier: ItemStatModifier,
+): void {
+  itemStats[modifier.stat] += modifier.isPercent
+    ? baseItemStats[modifier.stat] * modifier.value
+    : modifier.value;
 }
 
 export async function equipItem(

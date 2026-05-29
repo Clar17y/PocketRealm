@@ -3,12 +3,16 @@ import { Prisma } from '@pocketrealm/database';
 import { HIDDEN_CACHE_CONSTANTS } from '@pocketrealm/shared';
 
 let addStackableCallCount = 0;
-vi.mock('./inventoryService', () => ({
-  addStackableItemTx: vi.fn().mockImplementation(() => {
-    addStackableCallCount++;
-    return Promise.resolve({ itemId: `cache-item-${addStackableCallCount}`, quantity: 1, created: true });
-  }),
-}));
+vi.mock('./inventoryService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./inventoryService')>();
+  return {
+    ...actual,
+    addStackableItemTx: vi.fn().mockImplementation(() => {
+      addStackableCallCount++;
+      return Promise.resolve({ itemId: `cache-item-${addStackableCallCount}`, quantity: 1, created: true });
+    }),
+  };
+});
 
 import { rollRarityWithLuck, grantCacheLootTx } from './cacheLootService';
 import { addStackableItemTx } from './inventoryService';
@@ -321,5 +325,30 @@ describe('grantCacheLootTx', () => {
     const boostedQuantity = boosted.materials.reduce((sum, drop) => sum + drop.quantity, 0);
 
     expect(boostedQuantity).toBeGreaterThan(baseQuantity);
+  });
+
+  it('overflows cache materials when only a marked same-template stack exists and no slots remain', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    setupMiningZone();
+    mockTxAny.item.findMany = vi.fn().mockResolvedValue([
+      {
+        templateId: 'cut-sapphire-id',
+        rarity: 'common',
+        bonusStats: null,
+        craftMarks: [{ markId: 'mark-1', sourceTechniqueId: 'tech-1' }],
+      },
+    ]);
+
+    const result = await grantCacheLootTx(mockTx, { ...params, availableSlots: 0 });
+
+    expect(result.materials).toEqual([]);
+    expect(result.overflow).toEqual([
+      expect.objectContaining({
+        templateId: 'cut-sapphire-id',
+        rarity: 'common',
+        quantity: expect.any(Number),
+      }),
+    ]);
+    expect(addStackableItemTx).not.toHaveBeenCalled();
   });
 });

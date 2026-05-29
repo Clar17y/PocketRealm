@@ -7,6 +7,7 @@ import { logger } from '../../logger';
 import {
   GUILD_CONSTANTS, WORLD_EVENT_CONSTANTS, type BossRoundSummary } from '@pocketrealm/shared';
 import {
+  applyEquipmentActionModifiers,
   buildPlayerCombatStats,
   calculateManaRegenPerRound,
   calculateStaminaRegenPerRound,
@@ -188,11 +189,21 @@ async function resolveBossRoundInner(
         equipStats,
       );
 
+      const actionDefinitions = Object.fromEntries(
+        Object.entries(BASE_ACTION_DEFINITIONS).map(([id, action]) => [
+          id,
+          applyEquipmentActionModifiers({
+            action,
+            modifiers: equipStats.actionModifiers ?? [],
+          }),
+        ]),
+      );
+
       return {
         playerId: signup.playerId,
         stats,
         template,
-        actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+        actionDefinitions,
         hp: signup.currentHp,
         maxHp: hpState.maxHp,
         stamina: signup.currentStamina,

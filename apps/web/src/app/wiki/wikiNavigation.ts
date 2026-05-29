@@ -86,6 +86,7 @@ export const wikiNavigation: WikiNavSection[] = [
       { label: 'Crafting Crits', href: '/wiki/crafting/crits' },
       { label: 'Gathering & Gems', href: '/wiki/crafting/gathering' },
       { label: 'Salvage', href: '/wiki/crafting/salvage' },
+      { label: 'Vocation Mastery', href: '/wiki/crafting/vocations' },
     ],
   },
   {

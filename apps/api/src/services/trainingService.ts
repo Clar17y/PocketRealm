@@ -108,6 +108,7 @@ export async function simulateFight(
     manaRegenPerRound: resourceState.mana.regenPerRound,
     unlockedActions: skillPointState.unlockedActions,
     perActionScaling,
+    actionModifiers: equipmentStats.actionModifiers,
   });
 
   // Build mob TemplateCombatant

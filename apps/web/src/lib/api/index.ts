@@ -298,6 +298,14 @@ export { startTrainingFight, getTrainingCooldown } from './training';
 export type { TrainingFightResponse, TrainingCooldownResponse } from './training';
 
 export {
+  getVocations,
+  honeVocation,
+  learnVocationTechnique,
+  respecVocation,
+} from './vocations';
+export type { VocationActionResult, VocationSnapshotResponse } from './vocations';
+
+export {
   getActiveExpedition,
   getExpeditionStatus,
   getExpeditionHistory,

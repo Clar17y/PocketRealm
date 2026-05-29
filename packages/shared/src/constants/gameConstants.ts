@@ -130,6 +130,18 @@ export const SKILL_CONSTANTS = {
   MAX_XP_BOOST: 0.50,
 } as const;
 
+export const VOCATION_MASTERY = {
+  DAILY_HONING_TURN_LIMIT: 10_800,
+  HONE_ACTION_TURN_MIN: 10,
+  HONE_ACTION_TURN_LIMIT: 10_800,
+  ACTIVE_XP_PER_TURN: 0.1,
+  ADVANCED_MENTOR_RANK: 5,
+  ADVANCED_MENTOR_TOWN: 'thornwall',
+  PASSIVE_CRAFT_XP_MULTIPLIER: 0.2,
+  PASSIVE_GATHER_XP_MULTIPLIER: 0.15,
+  RESPEC_REFUND_RATE: 0.6,
+} as const;
+
 export const CHARACTER_CONSTANTS = {
   /** Character XP gained from skill XP after skill-side efficiency is applied. */
   XP_RATIO: 0.3,
@@ -338,6 +350,9 @@ export const CRAFTING_CONSTANTS = {
 
   /** Max items per batch salvage request */
   SALVAGE_BATCH_LIMIT: 50,
+
+  /** Material cost multiplier paid when attempting a vocation rarity finish */
+  RARITY_TECHNIQUE_MATERIAL_WASTE_MULTIPLIER: 1.05,
 
   /** Sanity cap for craft request payload — not a gameplay limit */
   MAX_CRAFT_QUANTITY_SANITY: 99999,

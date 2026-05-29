@@ -13,6 +13,9 @@ const { inventorySpy } = vi.hoisted(() => ({
 const { guildScreenSpy } = vi.hoisted(() => ({
   guildScreenSpy: vi.fn(),
 }));
+const { vocationsSpy } = vi.hoisted(() => ({
+  vocationsSpy: vi.fn(),
+}));
 
 vi.mock('@/components/screens/Dashboard', () => ({
   Dashboard: (props: unknown) => {
@@ -35,6 +38,13 @@ vi.mock('@/components/screens/GuildScreen', () => ({
   },
 }));
 
+vi.mock('@/components/screens/Vocations', () => ({
+  Vocations: (props: unknown) => {
+    vocationsSpy(props);
+    return null;
+  },
+}));
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-04-01T00:00:00.000Z'));
@@ -44,6 +54,7 @@ afterEach(() => {
   vi.useRealTimers();
   dashboardSpy.mockReset();
   inventorySpy.mockReset();
+  vocationsSpy.mockReset();
 });
 
 function createBaseGc() {
@@ -213,6 +224,11 @@ function createBaseGc() {
     starterWeaponType: null,
     loadAll: vi.fn(),
     activeBuffs: [],
+    vocationState: null,
+    handleLoadVocations: vi.fn(),
+    handleHoneVocation: vi.fn(),
+    handleLearnVocationTechnique: vi.fn(),
+    handleRespecVocation: vi.fn(),
     combatLogPrefetch: null,
     inventoryCapacity: 24,
     inventoryUsedSlots: 0,
@@ -352,6 +368,36 @@ describe('GameScreenRenderer', () => {
 
     expect(guildScreenSpy).toHaveBeenCalledWith(expect.objectContaining({
       onGuildMembershipChange,
+    }));
+  });
+
+  it('routes the vocations screen with controller state and actions', () => {
+    const vocationState = {
+      playerId: 'player-1',
+      vocations: [],
+      dailyCap: {
+        dayStart: '2026-05-21T00:00:00.000Z',
+        turnsSpent: 0,
+        turnsLimit: 100,
+        turnsRemaining: 100,
+      },
+    };
+    const handleHoneVocation = vi.fn();
+
+    renderGameScreen(null, {
+      activeScreen: 'vocations',
+      vocationState,
+      handleHoneVocation,
+      turns: 250,
+      currentZone: { name: 'Thornwall Keep', zoneType: 'town' },
+    });
+
+    expect(vocationsSpy).toHaveBeenCalledWith(expect.objectContaining({
+      snapshot: vocationState,
+      availableTurns: 250,
+      currentZoneName: 'Thornwall Keep',
+      currentZoneType: 'town',
+      onHone: handleHoneVocation,
     }));
   });
 });

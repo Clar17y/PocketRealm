@@ -3,7 +3,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
 import { ATTRIBUTE_TYPES, type AttributeType, EXPLORATION_CONSTANTS, TUTORIAL_COMPLETED, TUTORIAL_SKIPPED, STARTER_LOADOUT } from '@pocketrealm/shared';
-import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { ensureEquipmentSlots } from '../services/equipmentService';
@@ -15,6 +14,7 @@ import {
 import { trackAchievements } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getActiveBuffs } from '../services/buffService';
+import { fetchSkillDTOs } from '../services/stateUpdateHelpers.js';
 import { clearStaleEncounterSiteLockout } from '../services/expeditionLockoutService';
 
 export const playerRouter = Router();
@@ -110,32 +110,8 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
  */
 playerRouter.get('/skills', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
-
-  const skills = await prisma.playerSkill.findMany({
-    where: { playerId },
-    select: {
-      id: true,
-      skillType: true,
-      level: true,
-      xp: true,
-      dailyXpGained: true,
-      lastXpResetAt: true,
-    },
-  });
-
-  const now = new Date();
-
-  // Convert BigInt to number and reset stale window XP for display
-  const serializedSkills = skills.map((skill: typeof skills[number]) => {
-    const windowExpired = shouldResetWindowCap(skill.lastXpResetAt, now);
-    return {
-      ...skill,
-      xp: Number(skill.xp),
-      dailyXpGained: windowExpired ? 0 : skill.dailyXpGained,
-    };
-  });
-
-  res.json({ skills: serializedSkills });
+  const skills = await fetchSkillDTOs(playerId);
+  res.json({ skills });
 }));
 
 /**
