@@ -86,6 +86,7 @@ describe('GET /player active encounter site lockout', () => {
   it('clears stale active encounter site ids before returning the player payload', async () => {
     mockPrisma.player.findUnique.mockResolvedValue(buildPlayer());
     mockPrisma.encounterSite.findFirst.mockResolvedValue({ zoneId: 'forest-1' });
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
 
     const req = { player: { playerId: 'p1' } } as any;
     const res = mockRes();
@@ -94,10 +95,11 @@ describe('GET /player active encounter site lockout', () => {
     const handler = findHandler('get', '/');
     await handler(req, res, next);
 
-    expect(mockPrisma.player.update).toHaveBeenCalledWith({
-      where: { id: 'p1' },
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
+      where: { id: 'p1', activeEncounterSiteId: 'site-1' },
       data: { activeEncounterSiteId: null },
     });
+    expect(mockPrisma.player.update).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({
       player: expect.objectContaining({
         activeEncounterSiteId: null,

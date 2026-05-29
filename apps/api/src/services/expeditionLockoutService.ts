@@ -39,11 +39,11 @@ export async function clearStaleEncounterSiteLockout(
     return false;
   }
 
-  await prisma.player.update({
-    where: { id: playerId },
+  const result = await prisma.player.updateMany({
+    where: { id: playerId, activeEncounterSiteId: player.activeEncounterSiteId },
     data: { activeEncounterSiteId: null },
   });
-  return true;
+  return result.count > 0;
 }
 
 export async function checkExpeditionLockout(playerId: string): Promise<void> {

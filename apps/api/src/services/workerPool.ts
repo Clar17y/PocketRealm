@@ -15,6 +15,7 @@ export interface WorkerPoolResult<TResponse> {
     code?: string;
     statusCode?: number;
     stack?: string;
+    expose?: boolean;
   };
 }
 
@@ -23,6 +24,7 @@ export class WorkerPoolError extends Error {
     message: string,
     public code: string,
     public statusCode = 503,
+    public expose = false,
   ) {
     super(message);
     this.name = 'WorkerPoolError';
@@ -138,6 +140,7 @@ export class WorkerPool<TPayload, TResponse> {
           message.error?.message ?? `${this.options.name} worker job failed`,
           message.error?.code ?? 'WORKER_JOB_FAILED',
           message.error?.statusCode ?? 500,
+          message.error?.expose ?? false,
         ));
       }
       this.drain();

@@ -83,12 +83,13 @@ export async function runActivityWithWorker(job: ActivityWorkerJob): Promise<Rou
     if (err && typeof err === 'object') {
       const code = 'code' in err ? (err as { code?: string }).code : undefined;
       const statusCode = 'statusCode' in err ? (err as { statusCode?: number }).statusCode : undefined;
+      const expose = 'expose' in err ? (err as { expose?: boolean }).expose : false;
       const message = err instanceof Error ? err.message : 'Activity worker failed';
 
       if (code === 'WORKER_QUEUE_FULL' || code === 'WORKER_QUEUE_TIMEOUT') {
         throw new AppError(503, 'Activity processing is busy. Try again in a moment.', 'ACTIVITY_BUSY');
       }
-      if (typeof statusCode === 'number') {
+      if (typeof statusCode === 'number' && expose) {
         throw new AppError(statusCode, message, code);
       }
     }

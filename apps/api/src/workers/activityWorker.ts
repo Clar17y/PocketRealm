@@ -12,6 +12,7 @@ function serializeError(err: unknown): WorkerPoolResult<RouteServiceResponse>['e
       code: err.code,
       statusCode: err.statusCode,
       stack: err.stack,
+      expose: true,
     };
   }
 
@@ -21,14 +22,15 @@ function serializeError(err: unknown): WorkerPoolResult<RouteServiceResponse>['e
       code: 'VALIDATION_ERROR',
       statusCode: 400,
       stack: err.stack,
+      expose: true,
     };
   }
 
   if (err instanceof Error) {
-    return { message: err.message, statusCode: 500, stack: err.stack };
+    return { message: err.message, statusCode: 500, stack: err.stack, expose: false };
   }
 
-  return { message: 'Activity worker failed', statusCode: 500 };
+  return { message: 'Activity worker failed', statusCode: 500, expose: false };
 }
 
 if (!parentPort) {

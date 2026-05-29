@@ -101,7 +101,7 @@ describe('runActivityWithWorker', () => {
     _setActivityWorkerPoolForTest({
       run: vi.fn().mockRejectedValue(Object.assign(
         new Error('Cannot travel while recovering'),
-        { code: 'IS_RECOVERING', statusCode: 400 },
+        { code: 'IS_RECOVERING', statusCode: 400, expose: true },
       )),
       close: vi.fn(),
     });
@@ -110,6 +110,38 @@ describe('runActivityWithWorker', () => {
       type: 'zones.travel',
       input: { body: {}, player: { playerId: 'p1', username: 'A' } as never },
     })).rejects.toEqual(new AppError(400, 'Cannot travel while recovering', 'IS_RECOVERING'));
+  });
+
+  it('does not expose unexpected worker failure messages as AppErrors', async () => {
+    vi.mocked(getActivityWorkerConfig).mockReturnValue({
+      enabled: true,
+      mode: 'always',
+      workerCount: 1,
+      queueLimit: 1,
+      queueTimeoutMs: 100,
+    });
+    _setActivityWorkerPoolForTest({
+      run: vi.fn().mockRejectedValue(Object.assign(
+        new Error('database connection string leaked'),
+        { code: 'WORKER_JOB_FAILED', statusCode: 500, expose: false },
+      )),
+      close: vi.fn(),
+    });
+
+    try {
+      await runActivityWithWorker({
+        type: 'zones.travel',
+        input: { body: {}, player: { playerId: 'p1', username: 'A' } as never },
+      });
+      throw new Error('Expected runActivityWithWorker to throw');
+    } catch (err) {
+      expect(err).not.toBeInstanceOf(AppError);
+      expect(err).toMatchObject({
+        message: 'database connection string leaked',
+        code: 'WORKER_JOB_FAILED',
+        statusCode: 500,
+      });
+    }
   });
 });
 

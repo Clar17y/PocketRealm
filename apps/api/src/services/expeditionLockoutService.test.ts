@@ -45,13 +45,15 @@ describe('checkActivityLockout', () => {
       zoneId: 'forest-1',
     });
     mockPrisma.guildExpeditionMember.findFirst.mockResolvedValue(null);
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
 
     await expect(checkActivityLockout('p1')).resolves.toBeUndefined();
 
-    expect(mockPrisma.player.update).toHaveBeenCalledWith({
-      where: { id: 'p1' },
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
+      where: { id: 'p1', activeEncounterSiteId: 'site-1' },
       data: { activeEncounterSiteId: null },
     });
+    expect(mockPrisma.player.update).not.toHaveBeenCalled();
   });
 
   it('keeps blocking activity while the player is still in the active encounter site zone', async () => {
