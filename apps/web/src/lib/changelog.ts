@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.61',
+    date: '2026-05-28',
+    title: 'Faster Exploration and Travel',
+    summary:
+      'Exploration and travel actions now run through a shared activity worker pool, improving responsiveness when multiple players act at the same time. Travel ambush logging and exploration result persistence were also streamlined to reduce action delays.',
+  },
+  {
     version: '0.60',
     date: '2026-05-23',
     title: 'Resource Prospecting',

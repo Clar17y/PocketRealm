@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { Prisma, prisma } from '@pocketrealm/database';
-import { createActivityLog } from '../services/activityLogService';
 import {
   buildPlayerCombatStats,
   applyMobPrefix,
@@ -360,6 +359,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
       } | null = null;
 
       const allTravelOverflow: PendingLootItem[] = [];
+      const pendingTravelCombatLogs: Prisma.ActivityLogCreateManyInput[] = [];
 
       for (const ambush of ambushes) {
         if (tieredMobs.length === 0) break;
@@ -427,13 +427,13 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
             attackSkill,
             damageByScalingStat: combatResult.damageByScalingStat,
             resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
+            guildXpBoost: guildMods.xpBoost,
           });
           const loot = rewards.loot;
           allTravelOverflow.push(...rewards.overflow);
           allTravelNewItemIds.push(...rewards.newItemIds);
           allTravelUpdatedItemIds.push(...rewards.updatedItemIds);
           const xpGain = rewards.xpGrants.reduce((sum, g) => sum + g.boostedXpAfterEfficiency, 0);
-          await setHp(playerId, currentHp);
 
           // Track ambush kill for achievement checks
           ambushKillCount++;
@@ -441,7 +441,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
             ambushMobFamilyIds.push(travelMobFamilyId);
           }
 
-          await createActivityLog({
+          pendingTravelCombatLogs.push({
             playerId,
             activityType: 'combat',
             turnsSpent: 0,
@@ -493,7 +493,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
             await enterRecoveringState(playerId, hpState.maxHp);
             const respawn = await respawnToHomeTown(playerId);
 
-            await createActivityLog({
+            pendingTravelCombatLogs.push({
               playerId,
               activityType: 'combat',
               turnsSpent: 0,
@@ -553,9 +553,8 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
           } else {
             // Fled — abort travel, stay in current zone
             currentHp = fleeResult.remainingHp;
-            await setHp(playerId, currentHp);
 
-            await createActivityLog({
+            pendingTravelCombatLogs.push({
               playerId,
               activityType: 'combat',
               turnsSpent: 0,
@@ -615,6 +614,10 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
 
       // Single deduction point for all exit paths
       await deductConsumedPotions(playerId, allPotionsConsumed);
+
+      if (pendingTravelCombatLogs.length > 0) {
+        await prisma.activityLog.createMany({ data: pendingTravelCombatLogs });
+      }
 
       // Persist stamina/mana after all ambush combats
       await setAllResources(playerId, currentHp, currentStamina, currentMana);

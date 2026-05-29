@@ -209,6 +209,19 @@ describe('useChat', () => {
     expect(result.current.unreadWorld).toBe(0);
   });
 
+  it('ignores duplicate socket messages with the same id', async () => {
+    const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: 'forest' }));
+
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalledWith('world', 'world', { messageType: 'activity' }));
+
+    act(() => {
+      emitSocketEvent('chat:message', worldActivityMessage);
+      emitSocketEvent('chat:message', worldActivityMessage);
+    });
+
+    expect(result.current.globalActivityMessages).toEqual([worldActivityMessage]);
+  });
+
   it('keeps socket world system messages inline and counts them as unread', async () => {
     const { result } = renderHook(() => useChat({ isAuthenticated: true, currentZoneId: null }));
 

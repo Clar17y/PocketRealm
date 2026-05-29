@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';
 import { grantCacheLootTx } from './cacheLootService';
@@ -83,88 +84,60 @@ export async function persistExplorationResults(params: {
   let { availableSlots } = await getInventoryState(playerId);
 
   const persisted = await prisma.$transaction(async (tx) => {
-    const createdResourceDiscoveries: Array<{
-      turnOccurred: number;
-      playerNodeId: string;
-      resourceNodeId: string;
-      resourceType: string;
-      capacity: number;
-      sizeName: string;
-    }> = [];
-
-    for (const discovery of pendingResources) {
-      const playerNode = await tx.playerResourceNode.create({
-        data: {
-          playerId,
-          resourceNodeId: discovery.resourceNodeId,
-          remainingCapacity: discovery.capacity,
-          decayedCapacity: 0,
-        },
-        select: { id: true },
-      });
-
-      createdResourceDiscoveries.push({
-        turnOccurred: discovery.turnOccurred,
-        playerNodeId: playerNode.id,
-        resourceNodeId: discovery.resourceNodeId,
-        resourceType: discovery.resourceType,
-        capacity: discovery.capacity,
-        sizeName: discovery.sizeName,
-      });
+    const resourceRows = pendingResources.map((discovery) => ({
+      id: randomUUID(),
+      playerId,
+      resourceNodeId: discovery.resourceNodeId,
+      remainingCapacity: discovery.capacity,
+      decayedCapacity: 0,
+    }));
+    if (resourceRows.length > 0) {
+      await tx.playerResourceNode.createMany({ data: resourceRows });
     }
+    const createdResourceDiscoveries = pendingResources.map((discovery, index) => ({
+      turnOccurred: discovery.turnOccurred,
+      playerNodeId: resourceRows[index]!.id,
+      resourceNodeId: discovery.resourceNodeId,
+      resourceType: discovery.resourceType,
+      capacity: discovery.capacity,
+      sizeName: discovery.sizeName,
+    }));
 
-    const createdEncounterSites: Array<{
-      turnOccurred: number;
-      encounterSiteId: string;
-      mobFamilyId: string;
-      siteName: string;
-      size: EncounterSiteSize;
-      totalMobs: number;
-      discoveredAt: string;
-    }> = [];
-
-    for (const discovery of pendingSites) {
-      const distinctRooms = new Set(discovery.mobs.map((m) => m.room)).size;
-      const site = await tx.encounterSite.create({
-        data: {
-          playerId,
-          zoneId,
-          mobFamilyId: discovery.mobFamilyId,
-          name: discovery.siteName,
-          size: discovery.size,
-          mobs: { mobs: discovery.mobs } as unknown as Prisma.InputJsonValue,
-          totalRooms: distinctRooms,
-        },
-        select: {
-          id: true,
-          discoveredAt: true,
-        },
-      });
-
-      createdEncounterSites.push({
-        turnOccurred: discovery.turnOccurred,
-        encounterSiteId: site.id,
-        mobFamilyId: discovery.mobFamilyId,
-        siteName: discovery.siteName,
-        size: discovery.size,
-        totalMobs: discovery.mobs.length,
-        discoveredAt: site.discoveredAt.toISOString(),
-      });
+    const siteRows = pendingSites.map((discovery) => ({
+      id: randomUUID(),
+      playerId,
+      zoneId,
+      mobFamilyId: discovery.mobFamilyId,
+      name: discovery.siteName,
+      size: discovery.size,
+      mobs: { mobs: discovery.mobs } as unknown as Prisma.InputJsonValue,
+      totalRooms: new Set(discovery.mobs.map((m) => m.room)).size,
+      discoveredAt: new Date(),
+    }));
+    if (siteRows.length > 0) {
+      await tx.encounterSite.createMany({ data: siteRows });
     }
+    const createdEncounterSites = pendingSites.map((discovery, index) => ({
+      turnOccurred: discovery.turnOccurred,
+      encounterSiteId: siteRows[index]!.id,
+      mobFamilyId: discovery.mobFamilyId,
+      siteName: discovery.siteName,
+      size: discovery.size,
+      totalMobs: discovery.mobs.length,
+      discoveredAt: siteRows[index]!.discoveredAt.toISOString(),
+    }));
 
-    const createdCombatLogIds: string[] = [];
-    for (const combatLog of pendingCombatLogs) {
-      const created = await tx.activityLog.create({
-        data: {
-          playerId,
-          activityType: 'combat',
-          turnsSpent: combatLog.turnsSpent,
-          result: combatLog.result as Prisma.InputJsonValue,
-        },
-        select: { id: true },
-      });
-      createdCombatLogIds.push(created.id);
+    const combatLogRows = pendingCombatLogs.map((combatLog) => ({
+      id: randomUUID(),
+      playerId,
+      activityType: 'combat',
+      turnsSpent: combatLog.turnsSpent,
+      result: combatLog.result as Prisma.InputJsonValue,
+    }));
+    if (combatLogRows.length > 0) {
+      await tx.activityLog.createMany({ data: combatLogRows });
     }
+    const createdCombatLogIds = combatLogRows.map((combatLog) => combatLog.id);
 
     // Grant hidden cache loot (capacity-aware)
     const allCacheOverflow: PendingLootItem[] = [];

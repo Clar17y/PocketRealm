@@ -15,6 +15,7 @@ import {
 import { trackAchievements } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getActiveBuffs } from '../services/buffService';
+import { clearStaleEncounterSiteLockout } from '../services/expeditionLockoutService';
 
 export const playerRouter = Router();
 
@@ -81,11 +82,15 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
     throw new AppError(404, 'Player not found', 'NOT_FOUND');
   }
 
+  const staleEncounterLockCleared = await clearStaleEncounterSiteLockout(playerId, {
+    activeEncounterSiteId: player.activeEncounterSiteId,
+  });
   const titleDisplay = resolveAchievementTitleDisplay(player.activeTitle);
 
   res.json({
     player: {
       ...player,
+      activeEncounterSiteId: staleEncounterLockCleared ? null : player.activeEncounterSiteId,
       email: player.account.email,
       role: player.account.role,
       emailVerified: player.account.emailVerified,
