@@ -14,7 +14,7 @@ PocketRealm is deployed as a split stack: the Next.js web app on Vercel and the 
 - Web Service, Node 20 environment
 - Build: `npm install && npm run build:api`
 - Start: `npm run start:api`
-- Health check path: `/health/ready` (see [Health Check Endpoints](#health-check-endpoints))
+- Health check path: `/health/live` (see [Health Check Endpoints](#health-check-endpoints))
 - Background timers: none fixed-cadence. Boss and expedition rounds resolve via an in-process `setTimeout` registry keyed by `nextRoundAt`, rehydrated from DB on boot. Run exactly one API worker while `ROUND_TIMER_WORKER_MODE=single`. Other maintenance work is activity-triggered or lazy-on-touch. See `docs/superpowers/specs/2026-04-11-event-driven-scheduling-design.md`.
 - Metrics logger (60 s, in-memory only; does not touch Postgres)
 
@@ -56,7 +56,7 @@ All variables are required in production unless marked optional. Set them in Ren
 | `PORT` | no | `4000` | HTTP listen port. Render sets this automatically. |
 | `CORS_ORIGINS` | yes | `http://localhost:3002,http://127.0.0.1:3002` | Comma-separated allowed web origins. Production: the Vercel domain. |
 | `LOG_LEVEL` | no | `info` (prod), `debug` (dev/test) | pino log level — see [Logging](#logging) |
-| `APP_VERSION` | no | (root `package.json#version`) | Override for the version reported by `/health` and Sentry. If unset, the API reads root `package.json#version` at runtime — see [Release Versioning](#release-versioning) |
+| `APP_VERSION` | no | (root `package.json#version`) | Override for the Sentry release tag and API startup log. If unset, the API reads root `package.json#version` at runtime — see [Release Versioning](#release-versioning) |
 | `ROUND_TIMER_WORKER_MODE` | no | `single` | Timer ownership mode. Only `single` is supported today; keep one API worker/instance until distributed leases exist. |
 | `SENTRY_DSN` | yes (prod), no (dev) | — | Server-side Sentry project DSN. Leave unset to disable Sentry. See [Sentry Error Tracking](#sentry-error-tracking). |
 | `SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Overrides `NODE_ENV` for the Sentry environment tag (`production` / `staging`). |
@@ -123,7 +123,7 @@ Running migrations through the pooler causes advisory-lock failures. If `directU
 
 ## Release Versioning
 
-Both the API and web apps read the version from the same root `package.json#version` field so Sentry release tags, the `/health` payload, and the in-game changelog all agree.
+Both the API and web apps read the version from the same root `package.json#version` field so Sentry release tags, startup logs, and the in-game changelog all agree.
 
 ### How it is wired
 
@@ -135,9 +135,8 @@ Both the API and web apps read the version from the same root `package.json#vers
 
 ### Consumers
 
-- `GET /health` returns `{ status, timestamp, version }` — used by uptime monitors and deploy smoke tests.
+- `GET /health/live` returns `{ status: "ok" }` — used by high-frequency uptime monitors and Render health checks.
 - Phase 2.2 (#209) will pass `APP_VERSION` to `Sentry.init({ release })` on both surfaces.
-- Phase 2.3 (#210) will include `version` in `/health/ready`.
 
 To cut a release, bump `version` in root `package.json`, merge to `main`, and Render/Vercel pick it up on the next build.
 
@@ -173,7 +172,7 @@ Follow this every deploy that ships a Prisma schema change.
 
 1. Merge PR to `main`. Render rebuilds API, Vercel rebuilds web.
 2. Render build step runs `npx prisma migrate deploy` (via the `build:api` script chain) against `DIRECT_DATABASE_URL`.
-3. Wait for `/health` on Render to report the new `APP_VERSION` — this confirms the new build is live.
+3. Wait for the Render deploy to pass `/health/live` — this confirms the new process is accepting traffic.
 4. Run the [Smoke Tests](#smoke-tests) against production.
 
 ### Rollback Plan
@@ -195,8 +194,8 @@ Never hand-edit `_prisma_migrations` unless you are recovering from a failed par
 Run against the base URL of the environment you just deployed (staging or prod). Replace `$BASE` below.
 
 ```bash
-# Liveness + version
-curl -fsS "$BASE/health" | tee /dev/stderr | jq -e '.status == "ok" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+"))'
+# Liveness
+curl -fsS "$BASE/health/live" | tee /dev/stderr | jq -e '.status == "ok"'
 ```
 
 **TODO:** wire up an end-to-end auth smoke test (login → player read → inventory read) once a seeded smoke-test account is provisioned in staging and prod. The auth contract is `POST /api/v1/auth/login` with `{email, password}` returning `{accessToken, refreshToken, player}`; current player data is at `GET /api/v1/player/` with `Authorization: Bearer <accessToken>`; inventory is at `GET /api/v1/inventory`.
@@ -263,49 +262,47 @@ The API exposes three health endpoints, all mounted at the root (no `/api/v1` pr
 | Endpoint | Purpose | Status Codes | Touches Dependencies |
 |----------|---------|--------------|----------------------|
 | `GET /health/live` | Liveness probe — "is the process alive?" | Always `200` | No |
-| `GET /health/ready` | Readiness probe — "can it serve traffic?" | `200` healthy, `503` unhealthy | Yes (DB + Redis) |
-| `GET /health` | Full snapshot (version, uptime, dependencies, socket count) | `200` (never 5xx) | Yes (DB + Redis) |
+| `GET /health/ready` | Readiness probe — "can it serve traffic?" | `200` healthy, `503` unhealthy | DB + Redis probe on every request |
+| `GET /health` | Coarse dependency snapshot | `200` (never 5xx) | DB + Redis probe on every request |
 
 ### `/health` response shape
 
 ```json
 {
-  "status": "ok",
-  "timestamp": "2026-04-10T12:34:56.789Z",
-  "version": "0.43.0",
-  "uptime": 12345,
-  "dependencies": {
-    "database": "ok",
-    "redis": "ok",
-    "socketio": { "connected": 42 }
-  }
+  "status": "ok"
 }
 ```
 
-`status` is `"degraded"` if any dependency returns `"error"`. `/health` still returns `200` in that case — use `/health/ready` as the hard gate.
+`status` is `"degraded"` if any dependency returns `"error"`. `/health` still returns `200` in that case — use `/health/ready` as the hard gate for manual checks or low-frequency dependency monitoring.
 
-> **Migrating existing monitors:** Prior to this release `/health` always returned `{"status":"ok"}`. Any uptime monitor using a keyword rule on that literal body MUST be repointed at `/health/ready` (which still returns a clean `200` + `"status":"ok"`). Leaving an existing keyword monitor on `/health` will cause false pages whenever a dependency flaps, because `/health` now reports `"status":"degraded"` without changing the HTTP status. Audit Render's built-in health check too — if it is still configured against `/health`, switch it to `/health/ready` before relying on auto-restart.
+> **Migrating existing monitors:** High-frequency probes must use `/health/live` so they do not wake Neon. If you keep a dependency monitor on `/health/ready`, run it hourly or less often because each request revalidates DB + Redis.
 
 During a SIGTERM graceful shutdown `/health/ready` returns `503` with `{"status":"shutting_down"}` before the process actually closes dependencies, so the load balancer can drain traffic cleanly.
 
 ### APP_VERSION env var
 
-Set `APP_VERSION` at build/deploy time so `/health` and Sentry releases report a real version. Suggested value: the `package.json` version or a git short SHA.
+Set `APP_VERSION` at build/deploy time so Sentry releases report a real version. Suggested value: the `package.json` version or a git short SHA.
 
 On Render, add it under the service's **Environment** tab. Falls back to `"unknown"` when unset.
 
 ### External Uptime Monitoring (launch checklist)
 
-Configure an external ping against `/health/ready` (NOT `/health`, so failures page):
+Configure high-frequency uptime checks against `/health/live`; configure `/health/ready` only as a low-frequency dependency check:
 
-- [ ] Add a monitor in **UptimeRobot** (free tier) or **Render's built-in health check**:
-  - URL: `https://<your-api-host>/health/ready`
+- [ ] Point **Render's built-in health check** at `/health/live`
+- [ ] Add a high-frequency external monitor in **UptimeRobot** (free tier) or similar:
+  - URL: `https://<your-api-host>/health/live`
   - Method: `GET`
   - Interval: 60s
   - Alert threshold: 2 consecutive failures
   - Timeout: 5s
+- [ ] Optional dependency monitor:
+  - URL: `https://<your-api-host>/health/ready`
+  - Method: `GET`
+  - Interval: 60m
+  - Alert threshold: 2 consecutive failures
+  - Timeout: 5s
 - [ ] Wire alerts to a Discord webhook or email distribution list
-- [ ] If using Render's built-in health check, point it at `/health/ready` so Render will restart the instance automatically when the probe fails
 
 ---
 
@@ -321,7 +318,7 @@ development stays noise-free by default.
 |-----|-------|-------|
 | `SENTRY_DSN` | API runtime | Public project DSN. Leave unset to disable Sentry entirely. |
 | `SENTRY_ENVIRONMENT` | API runtime | Overrides `NODE_ENV` for the Sentry environment tag. Set to `production` / `staging`. |
-| `APP_VERSION` | API runtime | Used as the Sentry release tag and surfaced in `/health` response as `version`. Falls back to `"unknown"`. |
+| `APP_VERSION` | API runtime | Used as the Sentry release tag and API startup log version. Falls back to `"unknown"`. |
 
 ### Web environment variables
 

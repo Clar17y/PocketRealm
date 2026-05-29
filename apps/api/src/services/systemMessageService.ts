@@ -1,6 +1,7 @@
 import type { Server as SocketServer } from 'socket.io';
 import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
 import { saveMessage } from './chatService';
+import { publishChatMessageFromWorker } from './realtimeBridge';
 
 const SYSTEM_PLAYER_ID = '00000000-0000-0000-0000-000000000000';
 const SYSTEM_USERNAME = 'System';
@@ -21,8 +22,6 @@ export async function emitSystemMessage(
     messageType,
   });
 
-  if (!io) return row;
-
   const event: ChatMessageEvent = {
     id: row.id,
     channelType,
@@ -33,6 +32,11 @@ export async function emitSystemMessage(
     messageType,
     createdAt: row.createdAt.toISOString(),
   };
+
+  if (!io) {
+    await publishChatMessageFromWorker(event);
+    return row;
+  }
 
   const room = `chat:${channelId}`;
   io.to(room).emit('chat:message', event);

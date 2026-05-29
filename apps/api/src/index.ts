@@ -13,6 +13,8 @@ import { closeSocketAdapter, createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { startMetricsLogger } from './services/metricsLogger';
 import { startApiLatencySnapshotWriter } from './services/apiLatencyMetricsService';
+import { startRealtimeBridge } from './services/realtimeBridge';
+import { closeActivityWorkerPool } from './services/activityWorkerClient';
 import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 import { refreshSeasonCache } from './services/seasonCacheService';
@@ -26,6 +28,7 @@ const server = http.createServer(app);
 
 let stopMetricsLogger: (() => void) | null = null;
 let stopLatencySnapshotWriter: (() => Promise<void>) | null = null;
+let stopRealtimeBridge: (() => Promise<void>) | null = null;
 let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
 let weeklyLeaderboardTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -53,10 +56,11 @@ function scheduleWeeklyLeaderboardJob(skipCurrentWindow = false): void {
 }
 
 async function startServer(): Promise<void> {
-  await createSocketServer(server, isAllowedCorsOrigin);
+  const io = await createSocketServer(server, isAllowedCorsOrigin);
 
   server.listen(PORT, () => {
     logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
+    stopRealtimeBridge = startRealtimeBridge(io);
     void refreshSeasonCache().catch((err) => {
       logger.error({ err }, 'Season cache init failed');
     });
@@ -92,6 +96,10 @@ process.on('SIGTERM', () => {
     Promise.resolve()
       .then(() => stopLatencySnapshotWriter?.())
       .catch((err) => logger.error({ err }, 'API latency snapshot writer shutdown failed'))
+      .then(() => closeActivityWorkerPool())
+      .catch((err) => logger.error({ err }, 'Activity worker pool shutdown failed'))
+      .then(() => stopRealtimeBridge?.())
+      .catch((err) => logger.error({ err }, 'Realtime bridge shutdown failed'))
       .then(() => closeSocketAdapter())
       .catch((err) => logger.error({ err }, 'Socket adapter shutdown failed'))
       .then(() => redis.quit())

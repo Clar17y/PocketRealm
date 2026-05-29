@@ -7,11 +7,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: '0.61',
-    date: '2026-05-23',
+    version: '0.62',
+    date: '2026-05-29',
     title: 'Vocation Mastery',
     summary:
       'Crafting and gathering now have a dedicated mastery path. Visit a mentor in Millbrook or Thornwall to take up one of eleven vocations spanning prospecting, forestry, herbalism, weaponsmithing, bowyery, staffwrighting, armoring, leatherworking, tailoring, jewellery, and alchemy. Spend turns honing a vocation to earn mastery points, then unlock techniques along branching trees that improve crafting output, gathering yield, and combat. Crafting with a technique can stamp a craft mark on the item that adjusts its stats, and marked items stack separately from plain ones. You also earn passive vocation XP just by crafting and gathering, and new vocation achievements track techniques learned and mastery milestones. Not happy with a build? Respec a vocation to refund most of your spent points and try a different path.',
+  },
+  {
+    version: '0.61',
+    date: '2026-05-28',
+    title: 'Faster Exploration and Travel',
+    summary:
+      'Exploration and travel actions now run through a shared activity worker pool, improving responsiveness when multiple players act at the same time. Travel ambush logging and exploration result persistence were also streamlined to reduce action delays.',
   },
   {
     version: '0.60',

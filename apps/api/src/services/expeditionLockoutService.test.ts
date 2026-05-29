@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPrisma } from '../__test__/setup';
-import { checkExpeditionLockout } from './expeditionLockoutService';
+import { checkActivityLockout, checkExpeditionLockout } from './expeditionLockoutService';
 
 describe('checkExpeditionLockout', () => {
   beforeEach(() => {
@@ -28,5 +28,46 @@ describe('checkExpeditionLockout', () => {
     mockPrisma.guildExpeditionMember.findFirst.mockResolvedValue(null);
 
     await expect(checkExpeditionLockout('p1')).resolves.toBeUndefined();
+  });
+});
+
+describe('checkActivityLockout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('clears a stale encounter-site lock when the player was respawned outside the site zone', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      activeEncounterSiteId: 'site-1',
+      currentZoneId: 'town-1',
+    });
+    mockPrisma.encounterSite.findFirst.mockResolvedValue({
+      zoneId: 'forest-1',
+    });
+    mockPrisma.guildExpeditionMember.findFirst.mockResolvedValue(null);
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(checkActivityLockout('p1')).resolves.toBeUndefined();
+
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
+      where: { id: 'p1', activeEncounterSiteId: 'site-1' },
+      data: { activeEncounterSiteId: null },
+    });
+    expect(mockPrisma.player.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps blocking activity while the player is still in the active encounter site zone', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      activeEncounterSiteId: 'site-1',
+      currentZoneId: 'forest-1',
+    });
+    mockPrisma.encounterSite.findFirst.mockResolvedValue({
+      zoneId: 'forest-1',
+    });
+    mockPrisma.guildExpeditionMember.findFirst.mockResolvedValue(null);
+
+    await expect(checkActivityLockout('p1')).rejects.toThrow('Cannot perform this action while in an active encounter site');
+
+    expect(mockPrisma.player.update).not.toHaveBeenCalled();
   });
 });
