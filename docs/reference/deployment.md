@@ -61,6 +61,7 @@ All variables are required in production unless marked optional. Set them in Ren
 | `SENTRY_DSN` | yes (prod), no (dev) | — | Server-side Sentry project DSN. Leave unset to disable Sentry. See [Sentry Error Tracking](#sentry-error-tracking). |
 | `SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Overrides `NODE_ENV` for the Sentry environment tag (`production` / `staging`). |
 | `SENTRY_AUTH_TOKEN` | yes (web build-time) | — | Sentry CLI token used by `next build` to upload web source maps. Not read by the API. |
+| `DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL` | no | — | Discord incoming webhook URL for private support triage notifications. Leave unset to disable Discord mirroring. |
 | `VAPID_PUBLIC_KEY` | yes | — | Web Push VAPID public key |
 | `VAPID_PRIVATE_KEY` | yes | — | Web Push VAPID private key |
 | `VAPID_SUBJECT` | yes | — | `mailto:` contact for Web Push |
@@ -75,10 +76,29 @@ All variables are required in production unless marked optional. Set them in Ren
 | `APP_VERSION` | yes (build-time) | `0.0.0-dev` | Injected from root `package.json#version` via `next.config.mjs` — see [Release Versioning](#release-versioning) |
 | `NEXT_PUBLIC_SENTRY_DSN` | yes (prod), no (dev) | — | Browser Sentry DSN. Leave unset to disable. See [Sentry Error Tracking](#sentry-error-tracking). |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Environment tag for client-side Sentry init. |
+| `NEXT_PUBLIC_DISCORD_INVITE_URL` | no | — | Public Discord invite URL shown in `/game` help links. |
+| `NEXT_PUBLIC_KNOWN_ISSUES_URL` | no | `NEXT_PUBLIC_DISCORD_INVITE_URL` | Public known-issues URL. Defaults to the Discord invite when unset. |
 | `SENTRY_ORG` | yes (web build-time) | — | Sentry org slug for `next build` source map upload. |
 | `SENTRY_PROJECT` | yes (web build-time) | — | Sentry project slug for `next build` source map upload. |
 
 Parallel phases adding new variables should append rows to these tables rather than creating a new section.
+
+### Discord Support Triage
+
+The support workflow stores canonical tickets in Postgres and mirrors redacted summaries to a private Discord triage channel when `DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL` is configured on the API service. The webhook must point to a private staff channel; leave it unset in environments that should not post support notifications.
+
+The in-game Help & Support links are configured at web build time through `NEXT_PUBLIC_DISCORD_INVITE_URL` and `NEXT_PUBLIC_KNOWN_ISSUES_URL`. Because these are `NEXT_PUBLIC_*` variables, changing them in Vercel requires a new web deployment before browser bundles show the new URLs. Changing the API webhook on Render requires restarting or redeploying the API service so the process reads the new runtime environment.
+
+Operators can export new support tickets for manual Codex triage:
+
+```powershell
+npm run support:export-new
+npm run support:export-new -- --limit=50
+npm run support:export-new -- --status=new,needs_info
+npm run support:export-new -- --createdAfter=2026-05-30T00:00:00.000Z
+```
+
+The export writes JSONL to stdout. The records are redacted for emails, bearer tokens, session hints, and UUID-like internal identifiers, and are suitable to paste or attach for manual Codex triage. The command only exports data for review; GitHub issue creation or updating remains a manual operator step after triage.
 
 ---
 
