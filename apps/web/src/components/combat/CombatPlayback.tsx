@@ -8,6 +8,7 @@ import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { PixelButton } from '@/components/PixelButton';
+import { formatCombatEffectDescription } from '@pocketrealm/shared/constants/combatEffectNames';
 
 type Phase = 'playing' | 'finished-auto' | 'finished-manual';
 
@@ -287,7 +288,7 @@ export function CombatPlayback({
             if (lastEntry.effectsApplied && lastEntry.effectsApplied.length > 0) {
               const e = lastEntry.effectsApplied[0];
               return <span className="text-[var(--rpg-blue-light)]">
-                {displayLabel} ({e.stat} {e.modifier > 0 ? '+' : ''}{e.modifier})
+                {displayLabel} ({formatCombatEffectDescription(e)})
               </span>;
             }
             if (lastEntry.roll && !lastEntry.damage) return <span className="text-[var(--rpg-text-secondary)]">Miss!</span>;

@@ -1,4 +1,5 @@
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { formatCombatEffectDescription, formatRounds } from '@pocketrealm/shared/constants/combatEffectNames';
 import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
@@ -79,8 +80,8 @@ function groupActions(): ActionGroup[] {
 
 function formatCost(action: ActionDefinition): string {
   const parts: string[] = [];
-  if (action.cost.stamina > 0) parts.push(`${action.cost.stamina} sta`);
-  if (action.cost.mana > 0) parts.push(`${action.cost.mana} mana`);
+  if (action.cost.stamina > 0) parts.push(`${action.cost.stamina} Stamina`);
+  if (action.cost.mana > 0) parts.push(`${action.cost.mana} Mana`);
   return parts.length > 0 ? parts.join(' + ') : 'Free';
 }
 
@@ -91,22 +92,15 @@ function formatSpecial(action: ActionDefinition): string {
   if (action.resistsMagic) tags.push('Resists magic');
   if (action.alwaysHits) tags.push('Always hits');
   if (action.damageType === 'magic') tags.push('Magic damage');
-  if (action.defenceReduction) tags.push(`-${action.defenceReduction}% def`);
+  if (action.defenceReduction) tags.push(`-${action.defenceReduction}% defence`);
   if (action.lifeLeechPercent) tags.push(`${action.lifeLeechPercent}% leech`);
   if (action.healPercent) tags.push(`Heal ${(action.healPercent * 100).toFixed(0)}% HP`);
   if (action.effect) {
-    const e = action.effect;
-    const parts: string[] = [];
-    if (e.modifier !== 0) parts.push(`${e.modifier > 0 ? '+' : ''}${e.modifier} ${e.stat}`);
-    if ('damagePerRound' in e && e.damagePerRound) parts.push(`${e.damagePerRound} dmg/r`);
-    if ('damagePerRoundPercent' in e && e.damagePerRoundPercent) parts.push(`+${e.damagePerRoundPercent}% dmg/r`);
-    if ('healPerRound' in e && e.healPerRound) parts.push(`${e.healPerRound} heal/r`);
-    parts.push(`${e.duration}r`);
-    tags.push(`${e.name} (${parts.join(', ')})`);
+    tags.push(`${action.effect.name} (${formatCombatEffectDescription(action.effect)})`);
   }
-  if (action.damageReductionPercent) tags.push(`-${(action.damageReductionPercent * 100).toFixed(0)}% dmg taken`);
+  if (action.damageReductionPercent) tags.push(`-${(action.damageReductionPercent * 100).toFixed(0)}% damage taken`);
   if (action.potionType) tags.push(`Potion: ${action.potionType}`);
-  if (action.tauntDuration) tags.push(`Taunt ${action.tauntDuration}r`);
+  if (action.tauntDuration) tags.push(`Taunt ${formatRounds(action.tauntDuration)}`);
   return tags.join(', ') || '-';
 }
 
@@ -116,8 +110,8 @@ function ActionTable({ actions }: { actions: ActionDefinition[] }) {
       <thead>
         <tr>
           <th>Action</th>
-          <th>Dmg Multi</th>
-          <th>Acc Mod</th>
+          <th>Damage</th>
+          <th>Accuracy</th>
           <th>Cost</th>
           <th>Scaling</th>
           <th>Special</th>

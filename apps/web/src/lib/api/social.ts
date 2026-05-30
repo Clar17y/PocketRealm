@@ -5,6 +5,9 @@ import type {
   ChatMessageType,
   ChatNpcActivityReactionResponse,
   StateUpdates,
+  BossActiveEffect,
+  BossEncounterStatus,
+  WorldEventStatus,
   TitleStyleVariant,
 } from '@pocketrealm/shared';
 import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
@@ -216,7 +219,7 @@ export interface WorldEventResponse {
   targetResource: string | null;
   startedAt: string;
   expiresAt: string | null;
-  status: string;
+  status: WorldEventStatus;
 }
 
 export async function getActiveEvents() {
@@ -268,14 +271,14 @@ export interface BossEncounterResponse {
   baseHp: number;
   roundNumber: number;
   nextRoundAt: string | null;
-  status: string;
+  status: BossEncounterStatus;
   killedBy: string | null;
   killedByUsername?: string | null;
   mobName: string;
   mobLevel: number;
   zoneId?: string;
   zoneName?: string;
-  bossEffects?: Array<{ name: string; stat: string; modifier: number; roundsRemaining: number }>;
+  bossEffects?: BossActiveEffect[];
   roundSummaries?: BossRoundSummary[] | null;
 }
 

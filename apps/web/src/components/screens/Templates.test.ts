@@ -40,10 +40,14 @@ const defaultResourceState: ResourceState = {
 
 function renderTemplates(
   unlockedActions: string[] = [],
-  overrides: { staminaState?: ResourceState; manaState?: ResourceState } = {},
+  overrides: {
+    staminaState?: ResourceState;
+    manaState?: ResourceState;
+    templates?: React.ComponentProps<typeof Templates>['templates'];
+  } = {},
 ) {
   return render(React.createElement(Templates, {
-    templates: [],
+    templates: overrides.templates ?? [],
     unlockedActions,
     staminaState: overrides.staminaState ?? defaultResourceState,
     manaState: overrides.manaState ?? defaultResourceState,
@@ -105,5 +109,41 @@ describe('Templates picker', () => {
     expect(screen.getByText('0.33/cycle')).toBeTruthy();
     expect(screen.queryByText(/1\.2345/)).toBeNull();
     expect(screen.queryByText(/0\.333333/)).toBeNull();
+  });
+
+  it('summarizes effect conditions with player-facing copy', () => {
+    renderTemplates([], {
+      templates: [
+        {
+          id: 'template-1',
+          playerId: 'player-1',
+          name: 'Cleanse Rotation',
+          isActive: true,
+          createdAt: '2026-05-29T00:00:00.000Z',
+          updatedAt: '2026-05-29T00:00:00.000Z',
+          slots: [
+            {
+              id: 'slot-1',
+              sortOrder: 0,
+              actionId: 'light_attack',
+              condition: { type: 'has_debuff', effectName: 'Poison' },
+              thenActionId: 'use_cleanse_potion',
+            },
+            {
+              id: 'slot-2',
+              sortOrder: 1,
+              actionId: 'battle_cry',
+              condition: { type: 'no_buff', effectName: 'Battle Cry' },
+              thenActionId: 'battle_cry',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(screen.getByText(/If Poison is affecting you/)).toBeTruthy();
+    expect(screen.getByText(/Battle Cry is not active/)).toBeTruthy();
+    expect(screen.queryByText(/Poison active/)).toBeNull();
+    expect(screen.queryByText(/Battle Cry missing/)).toBeNull();
   });
 });

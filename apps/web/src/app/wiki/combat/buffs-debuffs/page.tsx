@@ -4,6 +4,12 @@ import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import { COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import {
+  formatCombatEffectDescription,
+  formatCombatEffectModifier,
+  formatCombatEffectStatLabel,
+  formatRounds,
+} from '@pocketrealm/shared/constants/combatEffectNames';
 import type { ActionDefinition } from '@pocketrealm/shared';
 
 const { Var, Out, Enemy, Const, Op, Comment } = FormulaBlock;
@@ -43,7 +49,7 @@ export default function BuffsDebuffsPage() {
       <p>Every buff or debuff has these core properties:</p>
       <ul>
         <li><strong>stat:</strong> the stat modified (attack, defence, evasion, accuracy, speed, etc.)</li>
-        <li><strong>modifier:</strong> flat value added/subtracted; percent modifiers use <code>attackPercent</code></li>
+        <li><strong>modifier:</strong> flat value added/subtracted; attack percent effects show as percentages</li>
         <li><strong>duration:</strong> rounds until the effect expires</li>
         <li><strong>isDebuff:</strong> if true, applied to the target; otherwise applied to self</li>
       </ul>
@@ -67,7 +73,7 @@ export default function BuffsDebuffsPage() {
       <p>
         DoT ticks are then reduced by the target&apos;s relevant defence stat.
         Physical DoTs (<code>dotDamageType: physical</code>) check defence;
-        magic DoTs check magicDefence. The same diminishing-returns formula
+        magic DoTs check magic defence. The same diminishing-returns formula
         applies:
       </p>
       <FormulaBlock>
@@ -105,6 +111,7 @@ export default function BuffsDebuffsPage() {
             <th>Stat</th>
             <th>Modifier</th>
             <th>Duration</th>
+            <th>Details</th>
           </tr>
         </thead>
         <tbody>
@@ -112,13 +119,12 @@ export default function BuffsDebuffsPage() {
             <tr key={a.id}>
               <td>{a.name}</td>
               <td>{a.effect!.name}</td>
-              <td>{a.effect!.stat}</td>
+              <td>{formatCombatEffectStatLabel(a.effect!.stat)}</td>
               <td>
-                {a.effect!.stat.includes('Percent')
-                  ? `+${(a.effect!.modifier * 100).toFixed(0)}%`
-                  : `+${a.effect!.modifier}`}
+                {a.effect!.modifier === 0 ? '-' : formatCombatEffectModifier(a.effect!)}
               </td>
-              <td>{a.effect!.duration}r</td>
+              <td>{formatRounds(a.effect!.duration)}</td>
+              <td>{formatCombatEffectDescription(a.effect!)}</td>
             </tr>
           ))}
         </tbody>
@@ -134,6 +140,7 @@ export default function BuffsDebuffsPage() {
             <th>Modifier</th>
             <th>Duration</th>
             <th>DoT</th>
+            <th>Details</th>
           </tr>
         </thead>
         <tbody>
@@ -141,14 +148,15 @@ export default function BuffsDebuffsPage() {
             <tr key={a.id}>
               <td>{a.name}</td>
               <td>{a.effect!.name}</td>
-              <td>{a.effect!.stat}</td>
-              <td>{a.effect!.modifier}</td>
-              <td>{a.effect!.duration}r</td>
+              <td>{formatCombatEffectStatLabel(a.effect!.stat)}</td>
+              <td>{a.effect!.modifier === 0 ? '-' : formatCombatEffectModifier(a.effect!)}</td>
+              <td>{formatRounds(a.effect!.duration)}</td>
               <td>
                 {a.effect!.damagePerRound || a.effect!.damagePerRoundPercent
-                  ? `${a.effect!.damagePerRound ?? 0} + ${a.effect!.damagePerRoundPercent ?? 0}% (${a.effect!.dotDamageType ?? 'physical'})`
+                  ? formatCombatEffectDescription(a.effect!, { includeDuration: false })
                   : '-'}
               </td>
+              <td>{formatCombatEffectDescription(a.effect!)}</td>
             </tr>
           ))}
         </tbody>
@@ -173,10 +181,10 @@ export default function BuffsDebuffsPage() {
                 <tr key={a.id}>
                   <td>{a.name}</td>
                   <td>{a.effect!.name}</td>
-                  <td>{a.effect!.damagePerRound ?? 0}</td>
-                  <td>{a.effect!.damagePerRoundPercent ? `${a.effect!.damagePerRoundPercent}%` : '-'}</td>
-                  <td>{a.effect!.dotDamageType ?? 'physical'}</td>
-                  <td>{a.effect!.duration}r</td>
+                  <td>{a.effect!.damagePerRound ? `${a.effect!.damagePerRound} damage` : '-'}</td>
+                  <td>{a.effect!.damagePerRoundPercent ? `${a.effect!.damagePerRoundPercent}% of hit` : '-'}</td>
+                  <td>{a.effect!.dotDamageType === 'magic' ? 'Magic' : 'Physical'}</td>
+                  <td>{formatRounds(a.effect!.duration)}</td>
                 </tr>
               ))}
             </tbody>
@@ -201,8 +209,8 @@ export default function BuffsDebuffsPage() {
                 <tr key={a.id}>
                   <td>{a.name}</td>
                   <td>{a.effect!.name}</td>
-                  <td>{a.effect!.healPerRound}</td>
-                  <td>{a.effect!.duration}r</td>
+                  <td>{a.effect!.healPerRound} HP</td>
+                  <td>{formatRounds(a.effect!.duration)}</td>
                 </tr>
               ))}
             </tbody>
