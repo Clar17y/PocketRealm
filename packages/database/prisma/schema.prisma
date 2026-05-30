@@ -1368,7 +1368,7 @@ model SupportTicket {
   actualBehavior      String?   @map("actual_behavior") @db.VarChar(2000)
   reproductionSteps   String?   @map("reproduction_steps") @db.VarChar(3000)
   reporterAccountId   String    @map("reporter_account_id")
-  reporterPlayerId    String    @map("reporter_player_id")
+  reporterPlayerId    String?   @map("reporter_player_id")
   reporterDisplayName String    @map("reporter_display_name") @db.VarChar(64)
   realmLabel          String    @map("realm_label") @db.VarChar(80)
   screen              String?   @db.VarChar(80)
@@ -1388,7 +1388,7 @@ model SupportTicket {
   closedAt            DateTime? @map("closed_at")
 
   reporterAccount Account              @relation(fields: [reporterAccountId], references: [id], onDelete: Cascade)
-  reporterPlayer  Player               @relation(fields: [reporterPlayerId], references: [id], onDelete: Cascade)
+  reporterPlayer  Player?              @relation(fields: [reporterPlayerId], references: [id], onDelete: SetNull)
   events          SupportTicketEvent[]
 
   @@index([status, createdAt])

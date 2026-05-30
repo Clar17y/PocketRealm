@@ -14,7 +14,7 @@ CREATE TABLE "support_tickets" (
     "actual_behavior" VARCHAR(2000),
     "reproduction_steps" VARCHAR(3000),
     "reporter_account_id" TEXT NOT NULL,
-    "reporter_player_id" TEXT NOT NULL,
+    "reporter_player_id" TEXT,
     "reporter_display_name" VARCHAR(64) NOT NULL,
     "realm_label" VARCHAR(80) NOT NULL,
     "screen" VARCHAR(80),
@@ -76,7 +76,7 @@ CREATE INDEX "support_ticket_events_actor_account_id_created_at_idx" ON "support
 ALTER TABLE "support_tickets" ADD CONSTRAINT "support_tickets_reporter_account_id_fkey" FOREIGN KEY ("reporter_account_id") REFERENCES "accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "support_tickets" ADD CONSTRAINT "support_tickets_reporter_player_id_fkey" FOREIGN KEY ("reporter_player_id") REFERENCES "players"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "support_tickets" ADD CONSTRAINT "support_tickets_reporter_player_id_fkey" FOREIGN KEY ("reporter_player_id") REFERENCES "players"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "support_ticket_events" ADD CONSTRAINT "support_ticket_events_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "support_tickets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
