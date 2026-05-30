@@ -25,6 +25,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:engine": "npm run build -w @pocketrealm/shared && npm run test -w packages/game-engine",
     "test:api": "npm run test -w apps/api",
+    "support:export-new": "npm run support:export-new -w apps/api --",
     "db:generate": "npm run generate -w packages/database",
     "db:migrate": "npm run migrate -w packages/database",
     "db:migrate:deploy": "npm run migrate:prod -w packages/database",

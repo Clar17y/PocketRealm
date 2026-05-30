@@ -7,7 +7,8 @@
     "dev": "tsx watch --exclude \"../web/**\" --exclude \"../web/.next/**\" --exclude \"../**/node_modules/**\" --exclude \"../packages/**/dist/**\" --exclude \"../**/*.tsbuildinfo\" src/index.ts",
     "build": "npm run clean && node scripts/build.cjs",
     "start": "node dist/index.js",
-    "test": "vitest"
+    "test": "vitest",
+    "support:export-new": "tsx scripts/export-support-tickets.ts --format=jsonl"
   },
   "dependencies": {
     "@pocketrealm/database": "*",
