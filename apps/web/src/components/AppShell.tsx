@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 import { ZoneBackground } from '@/components/ZoneBackground';
+import { HelpSupportMenu } from '@/components/support/HelpSupportMenu';
 
 interface AppShellProps {
   children: ReactNode;
@@ -15,6 +16,9 @@ interface AppShellProps {
   onSettings?: () => void;
   onLogout?: () => void;
   onWhatsNew?: () => void;
+  onReportBug?: () => void;
+  discordUrl?: string;
+  knownIssuesUrl?: string;
   hasUnseenChangelog?: boolean;
   backgroundSrc?: string;
 }
@@ -28,6 +32,9 @@ export function AppShell({
   onSettings,
   onLogout,
   onWhatsNew,
+  onReportBug,
+  discordUrl,
+  knownIssuesUrl,
   hasUnseenChangelog,
   backgroundSrc,
 }: AppShellProps) {
@@ -74,6 +81,13 @@ export function AppShell({
                   </span>
                 )}
               </button>
+            )}
+            {onReportBug && (
+              <HelpSupportMenu
+                discordUrl={discordUrl ?? ''}
+                knownIssuesUrl={knownIssuesUrl ?? ''}
+                onReportBug={onReportBug}
+              />
             )}
             {onSettings && (
               <button

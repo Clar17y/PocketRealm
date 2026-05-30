@@ -58,6 +58,7 @@ export function GameScreenRenderer({
   pushToggle,
   onGuildMembershipChange,
   onLogout,
+  onReportBug,
   onAccountRefresh,
   onForceRelogin,
 }: GameScreenRendererProps) {
@@ -103,6 +104,7 @@ export function GameScreenRenderer({
           pushState={pushState}
           pushToggle={pushToggle}
           onLogout={onLogout}
+          onReportBug={onReportBug}
           onAccountRefresh={onAccountRefresh}
           onForceRelogin={onForceRelogin}
         />

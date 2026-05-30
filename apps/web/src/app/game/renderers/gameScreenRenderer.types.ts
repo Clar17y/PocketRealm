@@ -44,6 +44,7 @@ export interface GameScreenRendererProps {
   pushToggle: ReturnType<typeof usePushNotifications>['toggle'];
   onGuildMembershipChange: () => void;
   onLogout: () => void;
+  onReportBug: () => void;
   onAccountRefresh: () => Promise<void>;
   onForceRelogin: () => void;
 }

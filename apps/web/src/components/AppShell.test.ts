@@ -131,6 +131,34 @@ describe('AppShell', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
+  it('shows help links and opens report bug from the header support menu', () => {
+    const onReportBug = vi.fn();
+
+    render(
+      React.createElement(
+        AppShell,
+        {
+          username: 'Rook',
+          onReportBug,
+          discordUrl: 'https://discord.gg/pocketrealm',
+          knownIssuesUrl: 'https://status.pocketrealm.example/issues',
+        },
+        React.createElement('div', null, 'Child'),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Help and support' }));
+
+    expect(screen.getByRole('menuitem', { name: /wiki/i }).getAttribute('href')).toBe('/wiki');
+    expect(screen.getByRole('menuitem', { name: /discord/i }).getAttribute('href')).toBe('https://discord.gg/pocketrealm');
+    expect(screen.getByRole('menuitem', { name: /known issues/i }).getAttribute('href')).toBe('https://status.pocketrealm.example/issues');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /report bug/i }));
+
+    expect(onReportBug).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
   it('keeps the header stable without the legacy realm switch control', () => {
     const appShellProps: React.ComponentProps<typeof AppShell> & {
       realmLabel: string;
