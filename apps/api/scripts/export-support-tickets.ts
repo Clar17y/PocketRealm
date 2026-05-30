@@ -3,7 +3,7 @@ import { SUPPORT_TICKET_STATUSES, type SupportTicketStatus } from '../src/servic
 
 function argValue(name: string): string | undefined {
   const prefix = `--${name}=`;
-  const match = process.argv.find((arg) => arg.startsWith(prefix));
+  const match = process.argv.findLast((arg) => arg.startsWith(prefix));
   return match?.slice(prefix.length);
 }
 
