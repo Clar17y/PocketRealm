@@ -35,6 +35,8 @@ model Account {
   blocksReceived         PlayerBlock[]            @relation("PlayerBlockBlocked")
   friendMailsSent        FriendMail[]             @relation("FriendMailSender")
   friendMailsReceived    FriendMail[]             @relation("FriendMailRecipient")
+  supportTickets         SupportTicket[]
+  supportTicketEvents    SupportTicketEvent[]
   seasonArchives         SeasonArchive[]
   hallOfFameEntries      HallOfFameEntry[]
 
@@ -150,6 +152,7 @@ model Player {
   shopPurchases        PlayerShopPurchase[]
   buffs                PlayerBuff[]
   pushSubscriptions   PushSubscription[]
+  supportTickets      SupportTicket[]
 
   // Encounter site lockout
   activeEncounterSiteId String? @map("active_encounter_site_id")
@@ -1348,6 +1351,70 @@ model FriendMail {
   @@index([recipientId, isDeletedByRecipient, isRead])
   @@index([senderId, isDeletedBySender])
   @@map("friend_mails")
+}
+
+model SupportTicket {
+  id                  String    @id @default(uuid())
+  publicId            String    @unique @map("public_id") @db.VarChar(24)
+  source              String    @db.VarChar(24)
+  status              String    @default("new") @db.VarChar(24)
+  privacy             String    @db.VarChar(24)
+  category            String    @db.VarChar(24)
+  area                String    @db.VarChar(32)
+  sensitivityFlags    String[]  @default([]) @map("sensitivity_flags")
+  title               String    @db.VarChar(120)
+  description         String    @db.VarChar(4000)
+  expectedBehavior    String?   @map("expected_behavior") @db.VarChar(2000)
+  actualBehavior      String?   @map("actual_behavior") @db.VarChar(2000)
+  reproductionSteps   String?   @map("reproduction_steps") @db.VarChar(3000)
+  reporterAccountId   String    @map("reporter_account_id")
+  reporterPlayerId    String    @map("reporter_player_id")
+  reporterDisplayName String    @map("reporter_display_name") @db.VarChar(64)
+  realmLabel          String    @map("realm_label") @db.VarChar(80)
+  screen              String?   @db.VarChar(80)
+  appVersion          String?   @map("app_version") @db.VarChar(80)
+  apiVersion          String?   @map("api_version") @db.VarChar(80)
+  browser             String?   @db.VarChar(160)
+  device              String?   @db.VarChar(160)
+  requestId           String?   @map("request_id") @db.VarChar(64)
+  sentryEventId       String?   @map("sentry_event_id") @db.VarChar(64)
+  attachmentMetadata  Json?     @map("attachment_metadata")
+  duplicateTicketIds  String[]  @default([]) @map("duplicate_ticket_ids")
+  githubIssueUrl      String?   @map("github_issue_url") @db.VarChar(500)
+  staffNotes          String?   @map("staff_notes") @db.VarChar(4000)
+  discordMessageId    String?   @map("discord_message_id") @db.VarChar(64)
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  closedAt            DateTime? @map("closed_at")
+
+  reporterAccount Account              @relation(fields: [reporterAccountId], references: [id], onDelete: Cascade)
+  reporterPlayer  Player               @relation(fields: [reporterPlayerId], references: [id], onDelete: Cascade)
+  events          SupportTicketEvent[]
+
+  @@index([status, createdAt])
+  @@index([reporterAccountId, createdAt])
+  @@index([reporterPlayerId, createdAt])
+  @@index([category, area])
+  @@map("support_tickets")
+}
+
+model SupportTicketEvent {
+  id             String   @id @default(uuid())
+  ticketId       String   @map("ticket_id")
+  actorAccountId String?  @map("actor_account_id")
+  eventType      String   @map("event_type") @db.VarChar(32)
+  fromStatus     String?  @map("from_status") @db.VarChar(24)
+  toStatus       String?  @map("to_status") @db.VarChar(24)
+  note           String?  @db.VarChar(2000)
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorAccount Account?      @relation(fields: [actorAccountId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([actorAccountId, createdAt])
+  @@map("support_ticket_events")
 }
 
 // =============================================================================
