@@ -1,6 +1,15 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs, checkApiReady, ensureFreshAccessToken } from './core';
 export type { ApiRequestOptions, ApiResponse, TaxInfo } from './core';
 
+export { createSupportTicket } from './support';
+export type {
+  CreateSupportTicketRequest,
+  CreateSupportTicketResponse,
+  SupportTicketArea,
+  SupportTicketCategory,
+  SupportTicketPrivacy,
+} from './support';
+
 export {
   register,
   login,
