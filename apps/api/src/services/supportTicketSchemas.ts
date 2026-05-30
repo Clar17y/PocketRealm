@@ -1,0 +1,82 @@
+import { z } from 'zod';
+
+export const SUPPORT_TICKET_STATUSES = [
+  'new',
+  'needs_info',
+  'duplicate',
+  'accepted',
+  'rejected',
+  'security',
+  'known_issue',
+  'closed',
+] as const;
+
+export const SUPPORT_TICKET_PRIVACY = ['public_candidate', 'private', 'not_sure'] as const;
+export const SUPPORT_TICKET_CATEGORIES = ['bug', 'suggestion', 'balance', 'account', 'security', 'abuse', 'other'] as const;
+export const SUPPORT_TICKET_AREAS = [
+  'combat',
+  'exploration',
+  'crafting',
+  'inventory',
+  'social',
+  'guild',
+  'casino',
+  'payments',
+  'auth',
+  'mobile',
+  'performance',
+  'other',
+] as const;
+export const SUPPORT_SENSITIVITY_FLAGS = [
+  'personal_data',
+  'payment',
+  'account',
+  'security',
+  'exploit',
+  'harassment',
+] as const;
+
+export type SupportTicketStatus = typeof SUPPORT_TICKET_STATUSES[number];
+export type SupportTicketPrivacy = typeof SUPPORT_TICKET_PRIVACY[number];
+export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[number];
+export type SupportTicketArea = typeof SUPPORT_TICKET_AREAS[number];
+export type SupportSensitivityFlag = typeof SUPPORT_SENSITIVITY_FLAGS[number];
+
+export const attachmentMetadataSchema = z.object({
+  name: z.string().max(160),
+  url: z.string().url(),
+  contentType: z.string().max(120).optional(),
+  sizeBytes: z.number().int().nonnegative().max(10_000_000).optional(),
+}).strict();
+
+export const createSupportTicketSchema = z.object({
+  privacy: z.enum(SUPPORT_TICKET_PRIVACY),
+  category: z.enum(SUPPORT_TICKET_CATEGORIES),
+  area: z.enum(SUPPORT_TICKET_AREAS),
+  title: z.string().trim().min(5).max(120),
+  description: z.string().trim().min(10).max(4000),
+  expectedBehavior: z.string().trim().max(2000).optional(),
+  actualBehavior: z.string().trim().max(2000).optional(),
+  reproductionSteps: z.string().trim().max(3000).optional(),
+  screen: z.string().trim().max(80).optional(),
+  appVersion: z.string().trim().max(80).optional(),
+  apiVersion: z.string().trim().max(80).optional(),
+  browser: z.string().trim().max(160).optional(),
+  device: z.string().trim().max(160).optional(),
+  requestId: z.string().trim().max(64).optional(),
+  sentryEventId: z.string().trim().max(64).optional(),
+  attachments: z.array(attachmentMetadataSchema).max(5).optional(),
+}).strict();
+
+export const updateSupportTicketSchema = z.object({
+  status: z.enum(SUPPORT_TICKET_STATUSES).optional(),
+  note: z.string().trim().max(2000).optional(),
+  githubIssueUrl: z.string().url().max(500).nullable().optional(),
+  duplicateTicketIds: z.array(z.string().trim().max(24)).max(20).optional(),
+  sensitivityFlags: z.array(z.enum(SUPPORT_SENSITIVITY_FLAGS)).max(8).optional(),
+}).strict().refine((data) => Object.values(data).some((value) => value !== undefined), {
+  message: 'At least one update field is required',
+});
+
+export type CreateSupportTicketInput = z.infer<typeof createSupportTicketSchema>;
+export type UpdateSupportTicketInput = z.infer<typeof updateSupportTicketSchema>;
