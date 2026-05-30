@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { LastCombatLogEntry } from '@/app/game/gameController.types';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
+import { formatCombatEffectDescription } from '@pocketrealm/shared/constants/combatEffectNames';
 import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
 import { formatHitBreakdown } from './combatLogEntryUtils';
 import { handleKeyActivate } from '@/lib/utils';
@@ -114,10 +115,7 @@ export function CombatLogEntry({
               )}
               {entry.effectsApplied && entry.effectsApplied.length > 0 && !entry.damage && !entry.healAmount && (
                 <span className="text-[var(--rpg-blue-light)] text-xs">
-                  {entry.effectsApplied.map(e =>
-                    `${e.stat} ${e.modifier > 0 ? '+' : ''}${e.modifier}`
-                  ).join(', ')}
-                  {` (${entry.effectsApplied[0].duration} rds)`}
+                  {entry.effectsApplied.map(e => formatCombatEffectDescription(e)).join(', ')}
                 </span>
               )}
               {entry.interactionResult === 'countered' && (
@@ -161,7 +159,7 @@ export function CombatLogEntry({
                 const mitigated = Math.max(0, preMitigation - entry.damage);
 
                 const isMagic = isMagicDamage(entry);
-                const defLabel = isMagic ? 'magic def' : 'defence';
+                const defLabel = isMagic ? 'magic defence' : 'defence';
                 let mitigationLabel = '';
                 if (entry.targetDefence !== undefined || entry.targetMagicDefence !== undefined) {
                   mitigationLabel = showDetailedBreakdown
@@ -191,7 +189,7 @@ export function CombatLogEntry({
               {entry.effectsApplied.map((e, i) => (
                 <span key={i}>
                   {i > 0 && ', '}
-                  {e.target === 'combatantA' ? playerLabel : opponentLabel}: {e.stat} {e.modifier > 0 ? '+' : ''}{e.modifier} ({e.duration} rds)
+                  {e.target === 'combatantA' ? playerLabel : opponentLabel}: {formatCombatEffectDescription(e)}
                 </span>
               ))}
             </div>

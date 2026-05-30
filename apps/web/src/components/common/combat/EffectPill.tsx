@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { BossActiveEffect } from '@pocketrealm/shared';
+import { formatRounds } from '@pocketrealm/shared/constants/combatEffectNames';
 import { isEffectDebuff, effectDetail } from './combatHelpers';
 
 export function EffectPill({ effect, isDebuff }: { effect: BossActiveEffect; isDebuff?: boolean }) {
@@ -22,7 +23,7 @@ export function EffectPill({ effect, isDebuff }: { effect: BossActiveEffect; isD
         }`}
       >
         {effect.name}
-        <span className="opacity-70">{effect.roundsRemaining}r</span>
+        <span className="opacity-70">{formatRounds(effect.roundsRemaining)}</span>
       </span>
       {showDetail && (
         <span className="absolute bottom-full left-0 mb-1 px-2 py-1 rounded bg-[var(--rpg-surface)] border border-[var(--rpg-border)] text-[10px] text-[var(--rpg-text-primary)] whitespace-nowrap z-10 shadow-lg">

@@ -5,6 +5,7 @@ import { useSilentRefresh } from '@/hooks/useSilentRefresh';
 import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import { Shield } from 'lucide-react';
 import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
+import { formatCombatEffectDescription, formatRounds } from '@pocketrealm/shared/constants/combatEffectNames';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
@@ -25,6 +26,19 @@ interface BossEncounterPanelProps {
   playerId?: string;
   onClose?: () => void;
   onNavigate?: (screen: string) => void;
+}
+
+function bossStatusLabel(status: BossEncounterResponse['status']): string {
+  switch (status) {
+    case 'waiting':
+      return 'Waiting';
+    case 'in_progress':
+      return 'In Progress';
+    case 'defeated':
+      return 'Defeated';
+    case 'expired':
+      return 'Expired';
+  }
 }
 
 export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate }: BossEncounterPanelProps) {
@@ -236,7 +250,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
       {/* Status */}
       <div className="flex justify-between text-xs">
         <span>
-          Round {encounter.roundNumber} — {encounter.status}
+          Round {encounter.roundNumber} — {bossStatusLabel(encounter.status)}
         </span>
         {encounter.nextRoundAt && !isOver && (
           <span>
@@ -248,21 +262,24 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
       {/* Boss effect badges */}
       {encounter.bossEffects && encounter.bossEffects.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {encounter.bossEffects.map((effect, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-              style={{
-                background: effect.modifier > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)',
-                color: effect.modifier > 0 ? 'var(--rpg-red)' : 'var(--rpg-blue-light)',
-              }}
-            >
-              {effect.name} ({effect.stat} {effect.modifier > 0 ? '+' : ''}{effect.modifier})
-              {effect.roundsRemaining > 0 && (
-                <span className="ml-1 opacity-70">{effect.roundsRemaining}r</span>
-              )}
-            </span>
-          ))}
+          {encounter.bossEffects.map((effect, i) => {
+            const dangerousEffect = effect.modifier > 0 || (effect.damagePerRound ?? 0) > 0;
+            return (
+              <span
+                key={i}
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                style={{
+                  background: dangerousEffect ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)',
+                  color: dangerousEffect ? 'var(--rpg-red)' : 'var(--rpg-blue-light)',
+                }}
+              >
+                {effect.name} ({formatCombatEffectDescription(effect, { includeDuration: false })})
+                {effect.roundsRemaining > 0 && (
+                  <span className="ml-1 opacity-70">{formatRounds(effect.roundsRemaining)}</span>
+                )}
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -321,7 +338,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
             <div className="flex items-center gap-2 text-xs">
               <span className="text-[var(--rpg-text-secondary)]">
                 Active: <span className="text-[var(--rpg-text-primary)] font-medium">{activeTemplateName}</span>
-                {' '}({activeTemplateActionCount}r)
+                {' '}({activeTemplateActionCount} slot{activeTemplateActionCount === 1 ? '' : 's'})
               </span>
               {onNavigate && (
                 <button

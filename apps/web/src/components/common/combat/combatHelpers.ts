@@ -1,4 +1,5 @@
 import type { BossActiveEffect, ExpeditionRoomType } from '@pocketrealm/shared';
+import { formatCombatEffectDescription, formatRounds } from '@pocketrealm/shared/constants/combatEffectNames';
 
 export function roomTypeBadge(roomType: ExpeditionRoomType | null): { label: string; color: string } {
   switch (roomType) {
@@ -19,13 +20,8 @@ export function isEffectDebuff(effect: BossActiveEffect): boolean {
 }
 
 export function effectDetail(effect: BossActiveEffect): string {
-  const parts: string[] = [];
-  if (effect.modifier && effect.modifier !== 0) {
-    parts.push(`${effect.stat} ${effect.modifier > 0 ? '+' : ''}${effect.modifier}`);
-  }
-  if (effect.damagePerRound && effect.damagePerRound > 0) {
-    parts.push(`${effect.damagePerRound} ${effect.dotDamageType ?? 'magic'} dmg/round`);
-  }
-  parts.push(`${effect.roundsRemaining}r remaining`);
-  return parts.join(' · ');
+  return [
+    formatCombatEffectDescription(effect, { includeDuration: false }),
+    `${formatRounds(effect.roundsRemaining)} remaining`,
+  ].join(' · ');
 }

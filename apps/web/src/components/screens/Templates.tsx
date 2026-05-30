@@ -63,12 +63,12 @@ const CONDITION_OPTIONS: ConditionOption[] = [
   { value: 'stamina_above', label: 'Stamina above' },
   { value: 'mana_below', label: 'Mana below' },
   { value: 'mana_above', label: 'Mana above' },
-  { value: 'has_buff', label: 'Buff active' },
-  { value: 'has_debuff', label: 'Debuff active' },
-  { value: 'no_buff', label: 'Buff missing' },
-  { value: 'no_debuff', label: 'Debuff cleared' },
-  { value: 'any_debuff', label: 'Any debuff active' },
-  { value: 'any_magic_dot', label: 'Any magic DOT active' },
+  { value: 'has_buff', label: 'Buff is active' },
+  { value: 'has_debuff', label: 'Debuff is affecting you' },
+  { value: 'no_buff', label: 'Buff is not active' },
+  { value: 'no_debuff', label: 'Debuff is not affecting you' },
+  { value: 'any_debuff', label: 'Any cleansable debuff' },
+  { value: 'any_magic_dot', label: 'Any magical DoT' },
 ];
 
 function conditionToCombo(c: SlotCondition): string {
@@ -113,14 +113,14 @@ function needsEffectName(c: SlotCondition): boolean {
 // --- Condition summary helper ---
 
 function conditionSummary(c: SlotCondition): string {
-  if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} < ${formatNumber(c.threshold ?? 50)}%`;
-  if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} > ${formatNumber(c.threshold ?? 50)}%`;
-  if (c.type === 'has_buff') return `${c.effectName ?? 'buff'} active`;
-  if (c.type === 'has_debuff') return `${c.effectName ?? 'debuff'} active`;
-  if (c.type === 'no_buff') return `${c.effectName ?? 'buff'} missing`;
-  if (c.type === 'no_debuff') return `${c.effectName ?? 'debuff'} cleared`;
-  if (c.type === 'any_debuff') return 'Any debuff active';
-  if (c.type === 'any_magic_dot') return 'Any magic DOT active';
+  if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} below ${formatNumber(c.threshold ?? 50)}%`;
+  if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} above ${formatNumber(c.threshold ?? 50)}%`;
+  if (c.type === 'has_buff') return `${c.effectName ?? 'Buff'} is active`;
+  if (c.type === 'has_debuff') return `${c.effectName ?? 'Debuff'} is affecting you`;
+  if (c.type === 'no_buff') return `${c.effectName ?? 'Buff'} is not active`;
+  if (c.type === 'no_debuff') return `${c.effectName ?? 'Debuff'} is not affecting you`;
+  if (c.type === 'any_debuff') return 'Any cleansable debuff is affecting you';
+  if (c.type === 'any_magic_dot') return 'Any magical DoT is affecting you';
   return c.type;
 }
 
@@ -132,7 +132,7 @@ function templatePreview(slots: CombatTemplateSlotData[]): string {
     const name = def?.name ?? s.actionId;
     if (s.condition && s.thenActionId) {
       const thenName = BASE_ACTION_DEFINITIONS[s.thenActionId]?.name ?? s.thenActionId;
-      return `IF ${conditionSummary(s.condition)} \u2192 ${thenName}`;
+      return `If ${conditionSummary(s.condition)} \u2192 ${thenName}, otherwise ${name}`;
     }
     return name;
   }).join(' \u2192 ');
