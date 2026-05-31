@@ -168,7 +168,6 @@ describe('supportTicketService', () => {
       device: null,
       requestId: null,
       sentryEventId: null,
-      attachmentMetadata: null,
       duplicateTicketIds: [],
       githubIssueUrl: null,
       sensitivityFlags: ['personal_data'],

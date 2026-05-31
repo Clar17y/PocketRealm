@@ -35,7 +35,6 @@ export interface SupportTicketExportSource {
   device: string | null;
   requestId: string | null;
   sentryEventId: string | null;
-  attachmentMetadata: unknown;
   duplicateTicketIds: string[];
   githubIssueUrl: string | null;
   sensitivityFlags: SupportSensitivityFlag[];

@@ -81,7 +81,6 @@ function toExportSource(ticket: {
   device: string | null;
   requestId: string | null;
   sentryEventId: string | null;
-  attachmentMetadata: unknown;
   duplicateTicketIds: string[];
   githubIssueUrl: string | null;
   sensitivityFlags: string[];
@@ -220,7 +219,6 @@ export async function listSupportTicketsForExport(options: ExportOptions): Promi
       device: true,
       requestId: true,
       sentryEventId: true,
-      attachmentMetadata: true,
       duplicateTicketIds: true,
       githubIssueUrl: true,
       sensitivityFlags: true,

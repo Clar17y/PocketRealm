@@ -1,6 +1,8 @@
 import { logger } from '../logger';
 import { redactSupportText } from './supportTicketRedaction';
 
+const DISCORD_WEBHOOK_TIMEOUT_MS = 5_000;
+
 interface TicketNotification {
   publicId: string;
   title: string;
@@ -42,11 +44,14 @@ export async function notifySupportTicketCreated(ticket: TicketNotification): Pr
   };
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DISCORD_WEBHOOK_TIMEOUT_MS);
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');

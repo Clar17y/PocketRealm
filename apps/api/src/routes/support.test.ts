@@ -156,4 +156,15 @@ describe('supportRouter', () => {
     });
     expect(mocks.supportTicketToJsonl.mock.calls[0]?.[0]).toBe(ticket);
   });
+
+  it('rejects invalid export status filters', async () => {
+    mocks.accountRole = 'admin';
+
+    const res = await request(app())
+      .get('/api/v1/support/tickets/export?status=not-a-status')
+      .expect(400);
+
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mocks.listSupportTicketsForExport).not.toHaveBeenCalled();
+  });
 });

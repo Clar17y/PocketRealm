@@ -78,5 +78,30 @@ export const updateSupportTicketSchema = z.object({
   message: 'At least one update field is required',
 });
 
+export const supportTicketStatusListSchema = z.string().transform((raw, ctx) => {
+  const values = raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (values.length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'At least one support ticket status is required' });
+    return z.NEVER;
+  }
+
+  const allowed = new Set<string>(SUPPORT_TICKET_STATUSES);
+  const unsupported = values.filter((value) => !allowed.has(value));
+  if (unsupported.length > 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Unsupported support ticket status: ${unsupported.join(', ')}` });
+    return z.NEVER;
+  }
+
+  return values as SupportTicketStatus[];
+});
+
+export function parseSupportTicketStatuses(raw: string | undefined): SupportTicketStatus[] | undefined {
+  return raw === undefined ? undefined : supportTicketStatusListSchema.parse(raw);
+}
+
 export type CreateSupportTicketInput = z.infer<typeof createSupportTicketSchema>;
 export type UpdateSupportTicketInput = z.infer<typeof updateSupportTicketSchema>;

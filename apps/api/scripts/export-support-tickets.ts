@@ -1,24 +1,10 @@
 import { listSupportTicketsForExport, supportTicketToJsonl } from '../src/services/supportTicketService';
-import { SUPPORT_TICKET_STATUSES, type SupportTicketStatus } from '../src/services/supportTicketSchemas';
+import { parseSupportTicketStatuses } from '../src/services/supportTicketSchemas';
 
 function argValue(name: string): string | undefined {
   const prefix = `--${name}=`;
   const match = process.argv.findLast((arg) => arg.startsWith(prefix));
   return match?.slice(prefix.length);
-}
-
-function parseStatuses(raw: string | undefined): SupportTicketStatus[] | undefined {
-  if (!raw) return undefined;
-
-  const allowed = new Set<string>(SUPPORT_TICKET_STATUSES);
-  const statuses = raw.split(',').map((value) => value.trim()).filter(Boolean);
-  const unsupported = statuses.filter((value) => !allowed.has(value));
-
-  if (unsupported.length > 0) {
-    throw new Error(`Unsupported --status value: ${unsupported.join(', ')}`);
-  }
-
-  return statuses.filter((value): value is SupportTicketStatus => allowed.has(value));
 }
 
 function parseLimit(raw: string | undefined): number | undefined {
@@ -54,7 +40,7 @@ async function main(): Promise<void> {
   }
 
   const tickets = await listSupportTicketsForExport({
-    statuses: parseStatuses(argValue('status')),
+    statuses: parseSupportTicketStatuses(argValue('status')),
     limit: parseLimit(argValue('limit')),
     createdAfter: parseCreatedAfter(argValue('createdAfter')),
   });

@@ -33,7 +33,6 @@ describe('support ticket redaction', () => {
       device: null,
       requestId: 'req-1',
       sentryEventId: null,
-      attachmentMetadata: null,
       duplicateTicketIds: [],
       githubIssueUrl: null,
       sensitivityFlags: ['personal_data'],
