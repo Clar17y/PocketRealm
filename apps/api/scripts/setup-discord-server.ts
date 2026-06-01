@@ -12,6 +12,7 @@ async function main(): Promise<void> {
   console.log(`Categories: ${result.createdCategories.length} created, ${result.existingCategories.length} existing.`);
   console.log(`Channels: ${result.createdChannels.length} created, ${result.existingChannels.length} existing.`);
   console.log(`Channel placement/permissions updated: ${result.updatedChannels.length}.`);
+  console.log(`Starter messages: ${result.seededStarterMessages.length} posted, ${result.existingStarterMessages.length} existing.`);
   console.log('');
   console.log('Set this on the API service:');
   console.log(`DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL=${result.webhookUrl}`);

@@ -28,11 +28,17 @@ interface ChannelSpec {
   readOnly?: boolean;
   privateToRoleKeys?: RoleKey[];
   createWebhook?: boolean;
+  starterMessage?: StarterMessageSpec;
 }
 
 interface CategorySpec {
   name: string;
   channels: ChannelSpec[];
+}
+
+interface StarterMessageSpec {
+  title: string;
+  lines: string[];
 }
 
 export interface DiscordSetupPlan {
@@ -63,6 +69,14 @@ interface DiscordWebhook {
   url?: string;
 }
 
+export interface DiscordMessage {
+  id: string;
+  content: string;
+  author: {
+    id: string;
+  };
+}
+
 interface PermissionOverwrite {
   id: string;
   type: 0 | 1;
@@ -83,6 +97,8 @@ interface SetupResult {
   createdChannels: string[];
   existingChannels: string[];
   updatedChannels: string[];
+  seededStarterMessages: string[];
+  existingStarterMessages: string[];
   webhookUrl: string;
 }
 
@@ -127,32 +143,145 @@ export function buildDiscordSetupPlan(): DiscordSetupPlan {
       {
         name: 'Info',
         channels: [
-          { name: 'welcome', readOnly: true },
-          { name: 'rules', readOnly: true },
-          { name: 'announcements', readOnly: true },
-          { name: 'known-issues', readOnly: true },
+          {
+            name: 'welcome',
+            readOnly: true,
+            starterMessage: {
+              title: 'Welcome to PocketRealm',
+              lines: [
+                'This is the community hub for PocketRealm players, testers, and launch updates.',
+                'Use the in-game Help links for the current Wiki and Discord invite.',
+                'For bugs, prefer the in-game report flow so account context and privacy choices stay attached.',
+              ],
+            },
+          },
+          {
+            name: 'rules',
+            readOnly: true,
+            starterMessage: {
+              title: 'Server rules',
+              lines: [
+                'Be direct, constructive, and respectful.',
+                'Do not post private account data, email addresses, access tokens, or payment details.',
+                'Keep bug details factual. Staff may move reports into private triage when they include account-specific information.',
+                'No spam, harassment, exploits-for-clout, or impersonation.',
+              ],
+            },
+          },
+          {
+            name: 'announcements',
+            readOnly: true,
+            starterMessage: {
+              title: 'Announcements',
+              lines: [
+                'Patch notes, test windows, downtime notices, and launch updates will land here.',
+                'Discussion can continue in #general or #feedback so this channel stays easy to scan.',
+              ],
+            },
+          },
+          {
+            name: 'known-issues',
+            readOnly: true,
+            starterMessage: {
+              title: 'Known issues',
+              lines: [
+                'Staff will keep broad-impact issues here once they are confirmed.',
+                'If you hit something listed here, avoid duplicate public reports unless you have new reproduction details.',
+                'Account-specific problems should still go through the in-game support report flow.',
+              ],
+            },
+          },
         ],
       },
       {
         name: 'Community',
         channels: [
-          { name: 'general' },
-          { name: 'help' },
-          { name: 'screenshots' },
-          { name: 'feedback' },
+          {
+            name: 'general',
+            starterMessage: {
+              title: 'General chat',
+              lines: [
+                'Talk PocketRealm here: builds, progress, questions, and launch chat.',
+                'Use #help for gameplay questions and #bug-reports for public bug discussion.',
+              ],
+            },
+          },
+          {
+            name: 'help',
+            starterMessage: {
+              title: 'Getting help',
+              lines: [
+                'For gameplay questions, include your character goal and what you already tried.',
+                'For bugs, use the in-game report flow first when possible. It gives staff better context than a chat message.',
+                'The Wiki is the first stop for mechanics, crafting, skills, and realm systems.',
+              ],
+            },
+          },
+          {
+            name: 'screenshots',
+            starterMessage: {
+              title: 'Screenshots',
+              lines: [
+                'Share progress, discoveries, UI oddities, and good moments here.',
+                'Avoid posting private account details or anything that exposes another player without consent.',
+              ],
+            },
+          },
+          {
+            name: 'feedback',
+            starterMessage: {
+              title: 'Feedback',
+              lines: [
+                'Use this for balance, pacing, UX, onboarding, and content feedback.',
+                'The most useful posts explain what happened, what you expected, and why it mattered.',
+              ],
+            },
+          },
         ],
       },
       {
         name: 'Support',
         channels: [
-          { name: 'bug-reports' },
-          { name: 'support-triage', privateToRoleKeys: ['staff', 'moderator', 'triage'], createWebhook: true },
+          {
+            name: 'bug-reports',
+            starterMessage: {
+              title: 'Public bug reports',
+              lines: [
+                'Use this for broad bugs that affect the game publicly and do not expose private account data.',
+                'For account-specific issues, emails, payments, moderation, or anything sensitive, use the in-game report flow.',
+                'Include steps to reproduce, expected behavior, actual behavior, browser/device, and screenshots when useful.',
+              ],
+            },
+          },
+          {
+            name: 'support-triage',
+            privateToRoleKeys: ['staff', 'moderator', 'triage'],
+            createWebhook: true,
+            starterMessage: {
+              title: 'Support triage queue',
+              lines: [
+                'Private intake from in-game reports lands here through the API webhook.',
+                'Codex triage should compare new reports against the backlog, group duplicates, and recommend GitHub issue updates, new issues, or rejection.',
+                'Do not repost sensitive player data into public channels.',
+              ],
+            },
+          },
         ],
       },
       {
         name: 'Staff',
         channels: [
-          { name: 'staff-chat', privateToRoleKeys: ['staff', 'moderator', 'triage'] },
+          {
+            name: 'staff-chat',
+            privateToRoleKeys: ['staff', 'moderator', 'triage'],
+            starterMessage: {
+              title: 'Staff chat',
+              lines: [
+                'Private coordination for moderation, launch operations, and support decisions.',
+                'Keep player-sensitive details here or in the triage queue, not in public channels.',
+              ],
+            },
+          },
         ],
       },
     ],
@@ -202,6 +331,18 @@ function parseWebhook(value: unknown): DiscordWebhook {
     name: typeof record.name === 'string' ? record.name : null,
     token: typeof record.token === 'string' ? record.token : undefined,
     url: typeof record.url === 'string' ? record.url : undefined,
+  };
+}
+
+function parseMessage(value: unknown): DiscordMessage {
+  const record = asRecord(value);
+  const author = asRecord(record.author);
+  return {
+    id: requireString(record.id, 'message.id'),
+    content: typeof record.content === 'string' ? record.content : '',
+    author: {
+      id: requireString(author.id, 'message.author.id'),
+    },
   };
 }
 
@@ -293,6 +434,20 @@ class DiscordRestClient {
     return parseWebhook(data);
   }
 
+  async getRecentMessages(channelId: string): Promise<DiscordMessage[]> {
+    const data = await this.request(`/channels/${channelId}/messages?limit=50`, { method: 'GET' });
+    if (!Array.isArray(data)) throw new Error('Discord API returned invalid messages payload');
+    return data.map(parseMessage);
+  }
+
+  async createMessage(channelId: string, content: string): Promise<DiscordMessage> {
+    const data = await this.request(`/channels/${channelId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+    return parseMessage(data);
+  }
+
   private async request(path: string, init: Omit<RequestInit, 'headers'>): Promise<unknown> {
     const response = await fetch(`${DISCORD_API_BASE}${path}`, {
       ...init,
@@ -315,6 +470,26 @@ class DiscordRestClient {
 
 function bitString(value: bigint): string {
   return value.toString();
+}
+
+export function buildDiscordStarterMessage(starterMessage: StarterMessageSpec): string {
+  return [
+    `**${starterMessage.title}**`,
+    '',
+    ...starterMessage.lines.map((line) => `- ${line}`),
+  ].join('\n');
+}
+
+export function shouldCreateStarterMessage(
+  messages: DiscordMessage[],
+  botUserId: string,
+  starterMessageContent: string,
+): boolean {
+  const [titleLine] = starterMessageContent.split('\n');
+  return !messages.some((message) => (
+    message.author.id === botUserId
+    && message.content.startsWith(titleLine)
+  ));
 }
 
 function publicReadOnlyOverwrites(guildId: string, staffRoleIds: string[]): PermissionOverwrite[] {
@@ -381,6 +556,8 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
     createdChannels: [],
     existingChannels: [],
     updatedChannels: [],
+    seededStarterMessages: [],
+    existingStarterMessages: [],
     webhookUrl: '',
   };
 
@@ -444,6 +621,17 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
         result.createdChannels.push(channelSpec.name);
       }
       channelByKey.set(textKey, channel);
+
+      if (channelSpec.starterMessage) {
+        const starterMessageContent = buildDiscordStarterMessage(channelSpec.starterMessage);
+        const messages = await client.getRecentMessages(channel.id);
+        if (shouldCreateStarterMessage(messages, botUser.id, starterMessageContent)) {
+          await client.createMessage(channel.id, starterMessageContent);
+          result.seededStarterMessages.push(channelSpec.name);
+        } else {
+          result.existingStarterMessages.push(channelSpec.name);
+        }
+      }
 
       if (channelSpec.createWebhook) {
         const existingWebhook = (await client.getWebhooks(channel.id))

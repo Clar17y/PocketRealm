@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDiscordStarterMessage,
   buildPrivateChannelOverwrites,
   buildDiscordSetupPlan,
+  shouldCreateStarterMessage,
   parseLocalEnv,
   PermissionBits,
 } from './discordServerSetup';
@@ -29,6 +31,16 @@ describe('discordServerSetup', () => {
     expect(triage?.createWebhook).toBe(true);
   });
 
+  it('plans starter information for launch channels', () => {
+    const plan = buildDiscordSetupPlan();
+    const channels = plan.categories.flatMap((category) => category.channels);
+
+    expect(channels.find((channel) => channel.name === 'welcome')?.starterMessage?.title)
+      .toBe('Welcome to PocketRealm');
+    expect(channels.find((channel) => channel.name === 'support-triage')?.starterMessage?.title)
+      .toBe('Support triage queue');
+  });
+
   it('uses deny view/send overwrites for private channels', () => {
     const deny = PermissionBits.ViewChannel | PermissionBits.SendMessages;
     expect(deny.toString()).toBe('3072');
@@ -43,5 +55,21 @@ describe('discordServerSetup', () => {
       allow: '68608',
       deny: '0',
     });
+  });
+
+  it('skips starter messages when the bot already posted that channel title', () => {
+    const starter = buildDiscordStarterMessage({
+      title: 'Welcome to PocketRealm',
+      lines: ['Start here.'],
+    });
+
+    expect(shouldCreateStarterMessage([], 'bot-user-id', starter)).toBe(true);
+    expect(shouldCreateStarterMessage([
+      {
+        id: 'message-id',
+        content: starter,
+        author: { id: 'bot-user-id' },
+      },
+    ], 'bot-user-id', starter)).toBe(false);
   });
 });
