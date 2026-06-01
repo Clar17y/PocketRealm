@@ -40,6 +40,34 @@ describe('ReportBugModal', () => {
     expect(await screen.findByText(/report sup-1 created/i)).toBeTruthy();
   });
 
+  it('clears report details after a successful submit to prevent duplicate resubmission', async () => {
+    const onSubmit = vi.fn().mockResolvedValue({ publicId: 'SUP-1' });
+
+    render(<ReportBugModal open currentScreen="forge" onClose={vi.fn()} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: 'Forge result did not update' },
+    });
+    fireEvent.change(screen.getByLabelText(/what happened/i), {
+      target: { value: 'The result modal showed, but inventory stayed stale.' },
+    });
+    fireEvent.change(screen.getByLabelText(/steps/i), {
+      target: { value: 'Open forge, upgrade an item, close result.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /send report/i }));
+
+    expect(await screen.findByText(/report sup-1 created/i)).toBeTruthy();
+    expect(screen.getByLabelText(/title/i)).toHaveProperty('value', '');
+    expect(screen.getByLabelText(/what happened/i)).toHaveProperty('value', '');
+    expect(screen.getByLabelText(/steps/i)).toHaveProperty('value', '');
+
+    const submit = screen.getByRole('button', { name: /send report/i });
+    expect(submit).toHaveProperty('disabled', true);
+    fireEvent.click(submit);
+
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
   it('disables submit until the required title and description are usable', () => {
     render(<ReportBugModal open currentScreen="inventory" onClose={vi.fn()} onSubmit={vi.fn()} />);
 

@@ -79,6 +79,9 @@ export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: Repor
         browser: getBrowserContext(),
       });
       setSuccess(`Report ${response.publicId} created`);
+      setTitle('');
+      setDescription('');
+      setReproductionSteps('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to submit report.');
     } finally {
