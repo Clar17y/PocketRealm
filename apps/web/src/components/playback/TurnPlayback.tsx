@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { ZoneDiscoveryModal } from '@/components/common/ZoneDiscoveryModal';
 import { ExplorationPlayback, type ExplorationPlaybackEvent } from '@/components/exploration/ExplorationPlayback';
@@ -33,6 +33,12 @@ function isZoneDiscoveryEvent(event: ExplorationPlaybackEvent): boolean {
 function getZoneDiscoveryLogMessage(event: ExplorationPlaybackEvent): string {
   const discoveredZoneName = event.details?.discoveredZoneName as string | undefined;
   return discoveredZoneName ? `Discovered ${discoveredZoneName}.` : event.description;
+}
+
+function getZoneDiscoveryId(event: ExplorationPlaybackEvent): string | null {
+  return typeof event.details?.discoveredZoneId === 'string'
+    ? event.details.discoveredZoneId
+    : null;
 }
 
 interface TurnPlaybackProps {
@@ -86,17 +92,21 @@ export function TurnPlayback({
   const [zoneDiscoveryEvent, setZoneDiscoveryEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
   const [resumeFromExternalPause, setResumeFromExternalPause] = useState(0);
+  const [skipPendingDiscoveryDismiss, setSkipPendingDiscoveryDismiss] = useState(false);
   const [playerHpForNextCombat, setPlayerHpForNextCombat] = useState<number | null>(null);
   const [playerStaminaForNextCombat, setPlayerStaminaForNextCombat] = useState<number | null>(null);
   const [playerManaForNextCombat, setPlayerManaForNextCombat] = useState<number | null>(null);
 
   const [loadedCombatLog, setLoadedCombatLog] = useState<CombatLogEntryResponse[] | null>(null);
+  const shownZoneDiscoveryIdsRef = useRef<Set<string>>(new Set());
 
   // Reset tracked HP when playback data changes (new exploration/travel starts)
   useEffect(() => {
     setPlayerHpForNextCombat(null);
     setPlayerStaminaForNextCombat(null);
     setPlayerManaForNextCombat(null);
+    setSkipPendingDiscoveryDismiss(false);
+    shownZoneDiscoveryIdsRef.current.clear();
   }, [totalTurns, events]);
 
   // Pre-fetch the first ambush's combat log on mount
@@ -152,6 +162,9 @@ export function TurnPlayback({
   };
 
   const handleZoneDiscoveryPause = (event: ExplorationPlaybackEvent) => {
+    const discoveredZoneId = getZoneDiscoveryId(event);
+    if (discoveredZoneId) shownZoneDiscoveryIdsRef.current.add(discoveredZoneId);
+
     onPushLog?.({
       timestamp: nowStamp(),
       type: 'success',
@@ -163,6 +176,13 @@ export function TurnPlayback({
 
   const handleZoneDiscoveryDismiss = () => {
     setZoneDiscoveryEvent(null);
+
+    if (skipPendingDiscoveryDismiss) {
+      setSkipPendingDiscoveryDismiss(false);
+      onSkip();
+      return;
+    }
+
     setResumeFromExternalPause((value) => value + 1);
   };
 
@@ -244,6 +264,24 @@ export function TurnPlayback({
     onSkip();
   };
 
+  const handleExplorationSkip = () => {
+    const unshownZoneDiscovery = events.find((event) => {
+      if (!isZoneDiscoveryEvent(event)) return false;
+      const discoveredZoneId = getZoneDiscoveryId(event);
+      return discoveredZoneId !== null && !shownZoneDiscoveryIdsRef.current.has(discoveredZoneId);
+    });
+
+    if (unshownZoneDiscovery) {
+      const discoveredZoneId = getZoneDiscoveryId(unshownZoneDiscovery);
+      if (discoveredZoneId) shownZoneDiscoveryIdsRef.current.add(discoveredZoneId);
+      setZoneDiscoveryEvent(unshownZoneDiscovery);
+      setSkipPendingDiscoveryDismiss(true);
+      return;
+    }
+
+    onSkip();
+  };
+
   const explorationPlaybackContent = (
     <ExplorationPlayback
       totalTurns={totalTurns}
@@ -256,7 +294,7 @@ export function TurnPlayback({
       onEventRevealed={handleEventRevealed}
       onCombatStart={handleCombatStart}
       onComplete={onComplete}
-      onSkip={onSkip}
+      onSkip={handleExplorationSkip}
       strangerLine={strangerLine}
       shouldPauseOnEvent={isZoneDiscoveryEvent}
       onEventPause={handleZoneDiscoveryPause}

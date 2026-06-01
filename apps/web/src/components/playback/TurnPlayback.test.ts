@@ -99,7 +99,7 @@ describe('TurnPlayback zone discovery', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('skips playback without surfacing the discovery modal retroactively', () => {
+  it('surfaces a discovered zone modal before finalizing a skipped playback', () => {
     const onSkip = vi.fn();
 
     render(
@@ -126,12 +126,57 @@ describe('TurnPlayback zone discovery', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
+    expect(screen.getByText('New Zone Discovered')).toBeTruthy();
+    expect(screen.getByText('Ancient Grove')).toBeTruthy();
+    expect(onSkip).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
     expect(onSkip).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a second discovery modal when skipping after the discovery was already shown', () => {
+    const onSkip = vi.fn();
+
+    render(
+      React.createElement(TurnPlayback, {
+        totalTurns: 10,
+        label: 'Exploring Forest Edge',
+        events: [
+          {
+            turn: 4,
+            type: 'zone_exit',
+            description: 'You discovered a path leading to **Ancient Grove**.',
+            details: {
+              discoveredZoneId: 'zone-grove',
+              discoveredZoneName: 'Ancient Grove',
+            },
+          },
+          {
+            turn: 9,
+            type: 'hidden_cache',
+            description: 'You found a hidden cache.',
+          },
+        ],
+        aborted: false,
+        refundedTurns: 0,
+        playerHpBefore: 100,
+        playerMaxHp: 100,
+        onComplete: vi.fn(),
+        onSkip,
+      }),
+    );
 
     act(() => {
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(800);
     });
 
+    expect(screen.getByText('New Zone Discovered')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+
     expect(screen.queryByText('New Zone Discovered')).toBeNull();
+    expect(onSkip).toHaveBeenCalledTimes(1);
   });
 });
