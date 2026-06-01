@@ -26,6 +26,7 @@
     "test:engine": "npm run build -w @pocketrealm/shared && npm run test -w packages/game-engine",
     "test:api": "npm run test -w apps/api",
     "support:export-new": "npm --silent run support:export-new -w apps/api --",
+    "discord:setup-server": "npm --silent run discord:setup-server -w apps/api",
     "db:generate": "npm run generate -w packages/database",
     "db:migrate": "npm run migrate -w packages/database",
     "db:migrate:deploy": "npm run migrate:prod -w packages/database",
