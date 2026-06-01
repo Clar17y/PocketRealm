@@ -45,6 +45,8 @@ describe('ReportBugModal', () => {
 
     const submit = screen.getByRole('button', { name: /send report/i });
     expect(submit).toHaveProperty('disabled', true);
+    expect(screen.getByText('Title needs at least 5 characters.')).toBeTruthy();
+    expect(screen.getByText('Description needs at least 10 characters.')).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: 'Bag bug' },
@@ -54,6 +56,8 @@ describe('ReportBugModal', () => {
     });
 
     expect(submit).toHaveProperty('disabled', false);
+    expect(screen.queryByText('Title needs at least 5 characters.')).toBeNull();
+    expect(screen.queryByText('Description needs at least 10 characters.')).toBeNull();
   });
 
   it('shows an error when submission fails', async () => {

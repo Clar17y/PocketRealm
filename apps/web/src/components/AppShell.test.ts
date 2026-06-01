@@ -159,6 +159,31 @@ describe('AppShell', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
+  it('uses the same fixed header icon box for mail, help, and settings', () => {
+    render(
+      React.createElement(
+        AppShell,
+        {
+          username: 'Rook',
+          mailUnreadCount: 3,
+          onMailClick: vi.fn(),
+          onSettings: vi.fn(),
+          onReportBug: vi.fn(),
+          children: React.createElement('div', null, 'Child'),
+        },
+      ),
+    );
+
+    for (const label of ['Mail (3 unread)', 'Help and support', 'Open settings']) {
+      const className = screen.getByRole('button', { name: label }).className;
+      expect(className).toContain('flex');
+      expect(className).toContain('h-6');
+      expect(className).toContain('w-6');
+      expect(className).toContain('items-center');
+      expect(className).toContain('justify-center');
+    }
+  });
+
   it('keeps the header stable without the legacy realm switch control', () => {
     const appShellProps: React.ComponentProps<typeof AppShell> & {
       realmLabel: string;

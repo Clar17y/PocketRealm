@@ -31,6 +31,8 @@ const PRIVACY_OPTIONS: Array<{ value: SupportTicketPrivacy; label: string }> = [
   { value: 'public_candidate', label: 'Safe to discuss publicly' },
   { value: 'private', label: 'Private or sensitive' },
 ];
+const TITLE_MIN_LENGTH = 5;
+const DESCRIPTION_MIN_LENGTH = 10;
 
 function getBrowserContext(): string | undefined {
   return typeof navigator === 'undefined' ? undefined : navigator.userAgent;
@@ -52,7 +54,9 @@ export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: Repor
   const trimmedTitle = title.trim();
   const trimmedDescription = description.trim();
   const trimmedSteps = reproductionSteps.trim();
-  const canSubmit = !busy && trimmedTitle.length >= 5 && trimmedDescription.length >= 10;
+  const titleNeedsMoreDetail = trimmedTitle.length < TITLE_MIN_LENGTH;
+  const descriptionNeedsMoreDetail = trimmedDescription.length < DESCRIPTION_MIN_LENGTH;
+  const canSubmit = !busy && !titleNeedsMoreDetail && !descriptionNeedsMoreDetail;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,9 +151,15 @@ export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: Repor
             value={title}
             disabled={busy}
             maxLength={120}
+            aria-describedby={titleNeedsMoreDetail ? `${fieldId}-summary-help` : undefined}
             onChange={(event) => setTitle(event.target.value)}
             className="w-full rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 text-sm text-[var(--rpg-text-primary)] disabled:opacity-60"
           />
+          {titleNeedsMoreDetail && (
+            <p id={`${fieldId}-summary-help`} className="text-xs text-[var(--rpg-text-secondary)]">
+              Title needs at least {TITLE_MIN_LENGTH} characters.
+            </p>
+          )}
 
           <label htmlFor={`${fieldId}-description`} className="block text-xs font-semibold text-[var(--rpg-text-secondary)]">
             What happened?
@@ -160,9 +170,15 @@ export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: Repor
             disabled={busy}
             maxLength={4000}
             rows={4}
+            aria-describedby={descriptionNeedsMoreDetail ? `${fieldId}-description-help` : undefined}
             onChange={(event) => setDescription(event.target.value)}
             className="w-full resize-y rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 text-sm text-[var(--rpg-text-primary)] disabled:opacity-60"
           />
+          {descriptionNeedsMoreDetail && (
+            <p id={`${fieldId}-description-help`} className="text-xs text-[var(--rpg-text-secondary)]">
+              Description needs at least {DESCRIPTION_MIN_LENGTH} characters.
+            </p>
+          )}
 
           <label htmlFor={`${fieldId}-steps`} className="block text-xs font-semibold text-[var(--rpg-text-secondary)]">
             Steps
