@@ -259,12 +259,7 @@ export function TurnPlayback({
     }
   };
 
-  const handleCombatSkip = () => {
-    setCombatEvent(null);
-    onSkip();
-  };
-
-  const handleExplorationSkip = () => {
+  const showUnshownZoneDiscoveryBeforeSkip = () => {
     const unshownZoneDiscovery = events.find((event) => {
       if (!isZoneDiscoveryEvent(event)) return false;
       const discoveredZoneId = getZoneDiscoveryId(event);
@@ -276,9 +271,20 @@ export function TurnPlayback({
       if (discoveredZoneId) shownZoneDiscoveryIdsRef.current.add(discoveredZoneId);
       setZoneDiscoveryEvent(unshownZoneDiscovery);
       setSkipPendingDiscoveryDismiss(true);
-      return;
+      return true;
     }
 
+    return false;
+  };
+
+  const handleCombatSkip = () => {
+    setCombatEvent(null);
+    if (showUnshownZoneDiscoveryBeforeSkip()) return;
+    onSkip();
+  };
+
+  const handleExplorationSkip = () => {
+    if (showUnshownZoneDiscoveryBeforeSkip()) return;
     onSkip();
   };
 
