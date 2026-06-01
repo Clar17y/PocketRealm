@@ -35,7 +35,7 @@ import {
   abandonEncounterSite,
 } from '@/lib/api/combat';
 import { makeEncounterMobId } from '@pocketrealm/shared';
-import type { CombatTemplateData, ExpeditionMobInfo, StateUpdates } from '@pocketrealm/shared';
+import type { CombatTemplateData, ExpeditionMobInfo, QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
 
 interface CombatScreenProps {
   hpState: HpState;
@@ -101,6 +101,7 @@ interface CombatScreenProps {
   templates?: CombatTemplateData[];
   onActivateTemplate?: (templateId: string) => void;
   onStateUpdates?: (updates: StateUpdates) => void;
+  updateQuestProgress?: (updates?: QuestProgressUpdate[]) => void;
   refreshPendingEncounters?: (options?: RefreshPendingEncounterOptions) => Promise<PendingEncounter[] | undefined>;
   setError?: (msg: string | null) => void;
   activeEncounterSiteId?: string | null;
@@ -149,6 +150,7 @@ export function CombatScreen({
   templates,
   onActivateTemplate,
   onStateUpdates,
+  updateQuestProgress,
   refreshPendingEncounters,
   setError,
   activeEncounterSiteId: externalActiveEncounterSiteId,
@@ -345,6 +347,7 @@ export function CombatScreen({
             onAutoResolve={async () => {
               const result = await autoResolveEncounterRoom(activeSiteCombat.siteId);
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              updateQuestProgress?.(result.questProgress);
               return result;
             }}
             onStartRoom={async () => {
@@ -356,6 +359,7 @@ export function CombatScreen({
             onResolveRound={async (action) => {
               const result = await resolveEncounterRound(activeSiteCombat.siteId, action);
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              updateQuestProgress?.(result.questProgress);
               return result;
             }}
             onAbandon={async () => {

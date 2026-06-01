@@ -10,6 +10,7 @@ import {
   type ExpeditionRoundLog,
   type BossActiveEffect,
   type PotionConsumed,
+  type QuestProgressUpdate,
   type RoomStrategyEntry,
   type EncounterMobSlot,
 } from '@pocketrealm/shared';
@@ -42,6 +43,7 @@ import {
   loadRoomMobsAsRaidState,
   handleEncounterDefeat,
   computeDefeatedMobXp,
+  markEncounterRoomMobsDefeated,
   buildParticipantForEncounterSite,
   countEncounterSiteHits,
   accumulateEncounterSiteXpContribution,
@@ -54,6 +56,7 @@ import {
 } from './encounterSiteCombatCore';
 import { degradeEquippedDurabilityByHits } from './durabilityService';
 import type { GrantXpResult } from './xpService';
+import { trackEncounterSiteKillProgress } from './encounterSiteProgressService';
 
 // ---------------------------------------------------------------------------
 // Manual combat (Redis-backed state between start-room and round calls)
@@ -342,6 +345,7 @@ export interface ManualRoundResult {
   fleeResult: FleeResult | null;
   respawnedTo: { townId: string; townName: string } | null;
   xpGrants: GrantXpResult[];
+  questProgress: QuestProgressUpdate[];
   durabilityDamagedItemIds: string[];
 }
 
@@ -453,21 +457,13 @@ export async function resolveManualEncounterRound(
       fleeResult: null,
       respawnedTo: null,
       xpGrants: [],
+      questProgress: [],
       durabilityDamagedItemIds: [],
     };
   }
 
   // Room resolved — remove session from Redis and persist to DB
   await deleteCombatSession(playerId, siteId);
-
-  // Pre-compute XP for the activity log (pure function — no DB needed)
-  const totalXpForLog = roomCleared
-    ? computeDefeatedMobXp(
-        new Set(state.roomMobSlots.map(s => makeEncounterMobId(s.slot))),
-        state.roomMobSlots,
-        state.mobXpByTemplateId,
-      )
-    : 0;
 
   const { availableSlots: chestAvailableSlots } = await getInventoryState(playerId);
 
@@ -494,20 +490,29 @@ export async function resolveManualEncounterRound(
     // Spend turns
     const spent = await spendPlayerTurnsTx(tx, playerId, state.turnCostCharged);
 
-    // Mark defeated mobs
-    if (roomCleared) {
-      for (const roomMobSlot of state.roomMobSlots) {
-        const target = mobs.find(m => m.slot === roomMobSlot.slot && (m.room ?? 1) === state.currentRoom);
-        if (target && target.status === 'alive') target.status = 'defeated';
-      }
-    }
+    const newlyDefeatedMobs = roomCleared
+      ? markEncounterRoomMobsDefeated(
+          mobs,
+          state.currentRoom,
+          state.roomMobSlots.map(slot => slot.slot),
+        )
+      : [];
+
+    const roomResolvedWithNewKills = roomCleared && newlyDefeatedMobs.length > 0;
+    const xpAwarded = roomResolvedWithNewKills
+      ? computeDefeatedMobXp(
+          new Set(newlyDefeatedMobs.map(s => makeEncounterMobId(s.slot))),
+          newlyDefeatedMobs,
+          state.mobXpByTemplateId,
+        )
+      : 0;
 
     const overallCounts = countEncounterSiteState(mobs);
     let siteCleared = false;
-    let newCurrentRoom = state.currentRoom;
+    let newCurrentRoom = freshSite.currentRoom ?? state.currentRoom;
     let completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null = null;
 
-    if (roomCleared) {
+    if (roomResolvedWithNewKills) {
       if (overallCounts.alive <= 0) {
         siteCleared = true;
       } else {
@@ -519,7 +524,7 @@ export async function resolveManualEncounterRound(
 
     // Record this room in roomStrategy as manual
     const existingStrategy = (Array.isArray(freshSite.roomStrategy) ? freshSite.roomStrategy : []) as unknown as RoomStrategyEntry[];
-    const updatedStrategy: RoomStrategyEntry[] = roomCleared
+    const updatedStrategy: RoomStrategyEntry[] = roomResolvedWithNewKills
       ? [...existingStrategy, { room: state.currentRoom, mode: 'manual', bonusEligible: false }]
       : existingStrategy;
 
@@ -540,7 +545,7 @@ export async function resolveManualEncounterRound(
         data: {
           mobs: serializeEncounterSiteMobs(mobs),
           currentRoom: newCurrentRoom,
-          ...(roomCleared ? { roomStrategy: updatedStrategy as unknown as Prisma.InputJsonValue } : {}),
+          ...(roomResolvedWithNewKills ? { roomStrategy: updatedStrategy as unknown as Prisma.InputJsonValue } : {}),
         },
       });
     }
@@ -573,12 +578,20 @@ export async function resolveManualEncounterRound(
           initialMobs: state.initialMobs ?? [],
           siteCleared,
           chestReward: completionRewards,
-          rewards: { xp: totalXpForLog },
+          rewards: { xp: xpAwarded },
         } as unknown as Prisma.InputJsonObject,
       },
     });
 
-    return { turnSpend: spent, completionRewards, potionDeductResult, siteCleared, newCurrentRoom };
+    return {
+      turnSpend: spent,
+      completionRewards,
+      potionDeductResult,
+      siteCleared,
+      newCurrentRoom,
+      xpAwarded,
+      newlyDefeatedMobs,
+    };
   });
 
   // Update player HP/resources
@@ -596,8 +609,9 @@ export async function resolveManualEncounterRound(
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];
+  let questProgress: QuestProgressUpdate[] = [];
   if (roomCleared) {
-    const totalXp = totalXpForLog;
+    const totalXp = txResult.xpAwarded;
     if (totalXp > 0) {
       xpGrants = await splitAndGrantXp(
         playerId,
@@ -608,6 +622,7 @@ export async function resolveManualEncounterRound(
         state.guildXpBoost,
       );
     }
+    questProgress = await trackEncounterSiteKillProgress(playerId, txResult.newlyDefeatedMobs);
   }
 
   // Handle defeat
@@ -641,6 +656,7 @@ export async function resolveManualEncounterRound(
     fleeResult,
     respawnedTo,
     xpGrants,
+    questProgress,
     durabilityDamagedItemIds,
   };
 }

@@ -524,6 +524,24 @@ export function computeDefeatedMobXp(
   return totalXp;
 }
 
+export function markEncounterRoomMobsDefeated(
+  mobs: EncounterMobSlot[],
+  currentRoom: number,
+  defeatedSlots: Iterable<number>,
+): EncounterMobSlot[] {
+  const newlyDefeatedMobs: EncounterMobSlot[] = [];
+
+  for (const slot of new Set(defeatedSlots)) {
+    const target = mobs.find(m => m.slot === slot && (m.room ?? 1) === currentRoom);
+    if (!target || target.status !== 'alive') continue;
+
+    newlyDefeatedMobs.push({ ...target });
+    target.status = 'defeated';
+  }
+
+  return newlyDefeatedMobs;
+}
+
 // ---------------------------------------------------------------------------
 // Build RaidParticipant from player data (mirrors buildRaidParticipant in expeditionService)
 // ---------------------------------------------------------------------------
