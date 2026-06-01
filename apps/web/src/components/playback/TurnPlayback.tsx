@@ -178,6 +178,8 @@ export function TurnPlayback({
     setZoneDiscoveryEvent(null);
 
     if (skipPendingDiscoveryDismiss) {
+      if (showUnshownZoneDiscoveryBeforeSkip()) return;
+
       setSkipPendingDiscoveryDismiss(false);
       onSkip();
       return;
@@ -277,15 +279,20 @@ export function TurnPlayback({
     return false;
   };
 
-  const handleCombatSkip = () => {
-    setCombatEvent(null);
+  const finishSkipAfterDiscoveries = () => {
     if (showUnshownZoneDiscoveryBeforeSkip()) return;
+
+    setSkipPendingDiscoveryDismiss(false);
     onSkip();
   };
 
+  const handleCombatSkip = () => {
+    setCombatEvent(null);
+    finishSkipAfterDiscoveries();
+  };
+
   const handleExplorationSkip = () => {
-    if (showUnshownZoneDiscoveryBeforeSkip()) return;
-    onSkip();
+    finishSkipAfterDiscoveries();
   };
 
   const explorationPlaybackContent = (
