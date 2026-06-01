@@ -316,6 +316,7 @@ export function CombatScreenRenderer({ gc, player }: SharedCoreRendererProps) {
       templates={gc.templates}
       onActivateTemplate={gc.handleTemplateSaved}
       onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
+      updateQuestProgress={gc.updateQuestProgress}
       refreshPendingEncounters={gc.refreshPendingEncounters}
       setError={gc.setActionError}
       onPendingEncounterPageChange={gc.handlePendingEncounterPageChange}

@@ -809,6 +809,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimQuestReward,
     handleClaimDailyBonus,
     handleRerollQuest,
+    updateQuestProgress,
 
     // Tutorial
     tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon, starterWeaponType,
