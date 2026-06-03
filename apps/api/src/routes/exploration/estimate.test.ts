@@ -55,7 +55,7 @@ beforeEach(() => {
   mockPrisma.player.findUnique.mockResolvedValue({
     account: {
       isPremium: true,
-      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      premiumExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
     },
   });
 });
