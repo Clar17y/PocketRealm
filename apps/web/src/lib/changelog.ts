@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.64',
+    date: '2026-06-03',
+    title: 'Support Links & Bug Reports',
+    summary:
+      'Pocketrealm now has clearer help paths in-game and on the homepage, including Wiki and Discord links when a Discord invite is configured. Players can submit bug reports from inside the game with screen, browser, realm, and season context attached automatically. Staff now have an Admin Support screen for reviewing reports, applying Codex triage decisions, tracking saved staff notes, and turning real game-wide issues into GitHub follow-up without sending every player directly to the issue tracker.',
+  },
+  {
     version: '0.63',
     date: '2026-06-03',
     title: 'Combat Balance Tuning',
