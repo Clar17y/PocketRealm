@@ -1837,6 +1837,35 @@ describe('resolveRaidRound', () => {
       expect(dmgWithRally).toBe(dmgNoRally + 8);
     });
 
+    it('attackPercent debuffs reduce mob outgoing damage', () => {
+      const player = makeParticipant({
+        playerId: 'p1',
+        hp: 200,
+        maxHp: 200,
+        stats: makeStats({ defence: 0 }),
+      });
+      const mob = makeMob({
+        id: 'boss1',
+        hp: 500,
+        maxHp: 500,
+        stats: makeStats({ damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+        activeEffects: [{
+          name: 'Enfeeble',
+          stat: 'attackPercent',
+          modifier: -0.35,
+          roundsRemaining: 3,
+        }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [player], mobs: [mob], roundNumber: 1 }),
+        alwaysHitRng,
+      );
+
+      expect(result.participantResults[0].damageTaken).toBe(13);
+    });
+
     it('mob defence debuff from player increases player damage', () => {
       // Player applies a debuff that lowers mob defence, then next round deals more damage
       const mob = makeMob({

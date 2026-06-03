@@ -16,6 +16,39 @@ import type { CombatMode } from '@pocketrealm/shared';
 import type { RaidRoundRng } from './raidPlayerPhase';
 import { actionLabel } from './raidPlayerPhase';
 
+function getMobDamageRange(
+  mob: ExpeditionMobState & { activeEffects: BossActiveEffect[] },
+): { damageMin: number; damageMax: number } {
+  let damageMin = mob.stats.damageMin;
+  let damageMax = mob.stats.damageMax;
+  let attackPercentModifier = 0;
+
+  for (const effect of mob.activeEffects) {
+    if (effect.roundsRemaining <= 0) continue;
+
+    if (effect.stat === 'attack') {
+      damageMin += effect.modifier;
+      damageMax += effect.modifier;
+    } else if (effect.stat === 'damageMin') {
+      damageMin += effect.modifier;
+    } else if (effect.stat === 'damageMax') {
+      damageMax += effect.modifier;
+    } else if (effect.stat === 'attackPercent') {
+      attackPercentModifier += effect.modifier;
+    }
+  }
+
+  damageMin = Math.max(1, damageMin);
+  damageMax = Math.max(damageMin, damageMax);
+
+  if (attackPercentModifier !== 0) {
+    damageMin = Math.max(1, Math.floor(damageMin * (1 + attackPercentModifier)));
+    damageMax = Math.max(damageMin, Math.floor(damageMax * (1 + attackPercentModifier)));
+  }
+
+  return { damageMin, damageMax };
+}
+
 export function resolveMobActions(params: {
   mobState: (ExpeditionMobState & { hp: number; activeEffects: BossActiveEffect[] })[];
   pState: (CombatParticipantState & {
@@ -225,10 +258,9 @@ export function resolveMobActions(params: {
           }
         }
 
-        const dmgRaw = roll.rollDamage(mob.stats.damageMin, mob.stats.damageMax);
-        // Apply mob attack buffs (rally/frenzy) as flat bonus damage
-        const mobAttackBonus = getEffectiveStatValue(0, mob.activeEffects, 'attack');
-        let baseDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0)) + mobAttackBonus;
+        const mobDamageRange = getMobDamageRange(mob);
+        const dmgRaw = roll.rollDamage(mobDamageRange.damageMin, mobDamageRange.damageMax);
+        let baseDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0));
         const combinedTargetEffects = [
           ...(targetParticipant.activeEffects ?? []),
           ...(targetIdx >= 0 ? (newPlayerEffects.get(targetIdx) ?? []) : []),

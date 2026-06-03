@@ -1248,6 +1248,28 @@ describe('runTemplateCombat', () => {
   });
 
   describe('DOT/HOT tick system', () => {
+    it('enfeeble reduces outgoing attack damage by 35 percent', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Hero', {
+        stats: makeStats({ hp: 200, maxHp: 200, damageMin: 20, damageMax: 20 }),
+        template: templateOf('light_attack'),
+      });
+      const b = makeCombatant('Mage', {
+        stats: makeStats({ hp: 200, maxHp: 200, damageMin: 20, damageMax: 20 }),
+        template: templateOf('enfeeble'),
+      });
+
+      const result = runTemplateCombat(a, b);
+      const debuffedAttack = result.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+
+      expect(debuffedAttack?.effectsApplied).toBeUndefined();
+      expect(debuffedAttack?.rawDamage).toBe(7);
+      expect(debuffedAttack?.damage).toBe(7);
+    });
+
     it('ships a minimal live anti-evasion counter package', () => {
       expect(BASE_ACTION_DEFINITIONS.snipers_mark.alwaysHits).toBe(true);
       expect(BASE_ACTION_DEFINITIONS.snipers_mark.effect).toEqual(

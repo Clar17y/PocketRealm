@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.63',
+    date: '2026-06-03',
+    title: 'Combat Balance Tuning',
+    summary:
+      'Enfeeble has been retuned from a flat attack penalty to a 35% outgoing damage reduction for 3 rounds. This keeps the spell meaningful as a template choice without collapsing low-damage attacks to minimum damage.',
+  },
+  {
+    version: '0.62',
+    date: '2026-06-01',
+    title: 'Encounter Site Quest Progress',
+    summary:
+      'Slaying monsters in encounter sites now counts toward weekly monster-slaying quests. Auto-resolved and manual room clears both update quest progress immediately, and repeated room-finalization requests no longer double-count kills or rewards.',
+  },
+  {
     version: '0.61',
     date: '2026-05-28',
     title: 'Faster Exploration and Travel',
