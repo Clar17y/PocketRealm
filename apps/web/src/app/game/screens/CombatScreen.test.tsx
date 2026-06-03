@@ -95,13 +95,23 @@ vi.mock('@/components/common/SubNav', () => ({
 vi.mock('@/components/encounter/EncounterSiteCombatView', () => ({
   EncounterSiteCombatView: ({
     currentRoom,
+    onAutoResolve,
+    onResolveRound,
     onAdvanceRoom,
   }: {
     currentRoom: number;
+    onAutoResolve: () => Promise<unknown>;
+    onResolveRound: (action: { action: string; targetMobSlot?: number }) => Promise<unknown>;
     onAdvanceRoom: () => Promise<unknown>;
   }) => (
     <div>
       <div>encounter-room-{currentRoom}</div>
+      <button type="button" onClick={() => void onAutoResolve()}>
+        auto-resolve
+      </button>
+      <button type="button" onClick={() => void onResolveRound({ action: 'template' })}>
+        resolve-round
+      </button>
       <button type="button" onClick={() => void onAdvanceRoom()}>
         advance-room
       </button>
@@ -181,6 +191,7 @@ function buildProps(overrides: Partial<React.ComponentProps<typeof CombatScreen>
     templates: [],
     onActivateTemplate: vi.fn(),
     onStateUpdates: vi.fn(),
+    updateQuestProgress: vi.fn(),
     refreshPendingEncounters: vi.fn().mockResolvedValue([
       {
         encounterSiteId: 'site-1',
@@ -264,5 +275,60 @@ describe('CombatScreen encounter site locking', () => {
 
     expect(props.refreshPendingEncounters).toHaveBeenCalledWith({ includeEncounterSiteId: 'site-1' });
     expect(combatApiMocks.startEncounterRoom).not.toHaveBeenCalled();
+  });
+
+  it('updates quest progress from encounter-site auto-resolve responses', async () => {
+    const questProgress = [
+      { questId: 'weekly-kills', questName: 'Weekly Bounty', current: 1, target: 75, completed: false },
+    ];
+    combatApiMocks.autoResolveEncounterRoom.mockResolvedValue({
+      outcome: 'cleared',
+      rounds: [],
+      initialMobs: [],
+      questProgress,
+      stateUpdates: {},
+      skillXpGrants: [],
+      fleeResult: null,
+      respawnedTo: null,
+    });
+    const props = buildProps();
+
+    render(<CombatScreen {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fight' }));
+    fireEvent.click(screen.getByRole('button', { name: 'auto-resolve' }));
+
+    await waitFor(() => {
+      expect(props.updateQuestProgress).toHaveBeenCalledWith(questProgress);
+    });
+  });
+
+  it('updates quest progress from manual encounter-site round responses', async () => {
+    const questProgress = [
+      { questId: 'weekly-kills', questName: 'Weekly Bounty', current: 1, target: 75, completed: false },
+    ];
+    combatApiMocks.resolveEncounterRound.mockResolvedValue({
+      roundNumber: 1,
+      roundLog: { round: 1, phases: { playerAttacks: [], defences: [], mobActions: [], healing: [], effectTicks: [], outcome: {} }, telegraphs: [] },
+      mobStates: [],
+      playerState: { hp: 90, maxHp: 100, stamina: 80, maxStamina: 100, mana: 40, maxMana: 50, activeEffects: [] },
+      outcome: 'cleared',
+      siteCleared: false,
+      questProgress,
+      stateUpdates: {},
+      skillXpGrants: [],
+      fleeResult: null,
+      respawnedTo: null,
+    });
+    const props = buildProps();
+
+    render(<CombatScreen {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fight' }));
+    fireEvent.click(screen.getByRole('button', { name: 'resolve-round' }));
+
+    await waitFor(() => {
+      expect(props.updateQuestProgress).toHaveBeenCalledWith(questProgress);
+    });
   });
 });

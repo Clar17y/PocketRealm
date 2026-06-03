@@ -588,6 +588,7 @@ export interface EncounterAutoResolveResponse {
   };
   fleeResult?: EncounterFleeResult | null;
   respawnedTo?: { townId: string; townName: string } | null;
+  questProgress?: QuestProgressUpdate[];
   stateUpdates?: StateUpdates;
   skillXpGrants?: Array<{
     skillType: string;
@@ -631,6 +632,7 @@ export interface EncounterManualRoundResponse {
   completionRewards?: Record<string, unknown>;
   fleeResult?: EncounterFleeResult | null;
   respawnedTo?: { townId: string; townName: string } | null;
+  questProgress?: QuestProgressUpdate[];
   stateUpdates?: StateUpdates;
   skillXpGrants?: Array<{
     skillType: string;

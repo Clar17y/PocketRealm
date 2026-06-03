@@ -99,7 +99,7 @@ describe('TurnPlayback zone discovery', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('skips playback without surfacing the discovery modal retroactively', () => {
+  it('surfaces a discovered zone modal before finalizing a skipped playback', () => {
     const onSkip = vi.fn();
 
     render(
@@ -126,12 +126,172 @@ describe('TurnPlayback zone discovery', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
-    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('New Zone Discovered')).toBeTruthy();
+    expect(screen.getByText('Ancient Grove')).toBeTruthy();
+    expect(onSkip).not.toHaveBeenCalled();
 
-    act(() => {
-      vi.advanceTimersByTime(5000);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onSkip).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces every discovered zone modal before finalizing a skipped playback', () => {
+    const onSkip = vi.fn();
+
+    render(
+      React.createElement(TurnPlayback, {
+        totalTurns: 10,
+        label: 'Exploring Forest Edge',
+        events: [
+          {
+            turn: 4,
+            type: 'zone_exit',
+            description: 'You discovered a path leading to **Ancient Grove**.',
+            details: {
+              discoveredZoneId: 'zone-grove',
+              discoveredZoneName: 'Ancient Grove',
+            },
+          },
+          {
+            turn: 10,
+            type: 'zone_exit',
+            description: 'Zone fully explored! You discovered Cave Entrance.',
+            details: {
+              discoveredZoneId: 'zone-cave',
+              discoveredZoneName: 'Cave Entrance',
+            },
+          },
+        ],
+        aborted: false,
+        refundedTurns: 0,
+        playerHpBefore: 100,
+        playerMaxHp: 100,
+        onComplete: vi.fn(),
+        onSkip,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+
+    expect(screen.getByText('Ancient Grove')).toBeTruthy();
+    expect(onSkip).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(screen.getByText('Cave Entrance')).toBeTruthy();
+    expect(onSkip).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onSkip).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a discovered zone modal before finalizing a skipped combat playback', async () => {
+    const onSkip = vi.fn();
+
+    render(
+      React.createElement(TurnPlayback, {
+        totalTurns: 10,
+        label: 'Exploring Forest Edge',
+        events: [
+          {
+            turn: 2,
+            type: 'ambush_victory',
+            description: 'A Forest Rat ambushed you - you defeated it!',
+            details: {
+              mobName: 'Forest Rat',
+              mobDisplayName: 'Forest Rat',
+              outcome: 'victory',
+              mobMaxHp: 8,
+              log: [{
+                round: 1,
+                actor: 'combatantA',
+                action: 'attack',
+                message: 'You hit the Forest Rat.',
+                combatantAHpAfter: 100,
+                combatantBHpAfter: 0,
+              }],
+            },
+          },
+          {
+            turn: 8,
+            type: 'zone_exit',
+            description: 'You discovered a path leading to **Ancient Grove**.',
+            details: {
+              discoveredZoneId: 'zone-grove',
+              discoveredZoneName: 'Ancient Grove',
+            },
+          },
+        ],
+        aborted: false,
+        refundedTurns: 0,
+        playerHpBefore: 100,
+        playerMaxHp: 100,
+        onComplete: vi.fn(),
+        onSkip,
+      }),
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(800);
     });
 
+    expect(screen.getAllByText('Forest Rat').length).toBeGreaterThan(0);
+
+    const skipButtons = screen.getAllByRole('button', { name: 'Skip' });
+    fireEvent.click(skipButtons[skipButtons.length - 1]!);
+
+    expect(screen.getByText('New Zone Discovered')).toBeTruthy();
+    expect(screen.getByText('Ancient Grove')).toBeTruthy();
+    expect(onSkip).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onSkip).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a second discovery modal when skipping after the discovery was already shown', () => {
+    const onSkip = vi.fn();
+
+    render(
+      React.createElement(TurnPlayback, {
+        totalTurns: 10,
+        label: 'Exploring Forest Edge',
+        events: [
+          {
+            turn: 4,
+            type: 'zone_exit',
+            description: 'You discovered a path leading to **Ancient Grove**.',
+            details: {
+              discoveredZoneId: 'zone-grove',
+              discoveredZoneName: 'Ancient Grove',
+            },
+          },
+          {
+            turn: 9,
+            type: 'hidden_cache',
+            description: 'You found a hidden cache.',
+          },
+        ],
+        aborted: false,
+        refundedTurns: 0,
+        playerHpBefore: 100,
+        playerMaxHp: 100,
+        onComplete: vi.fn(),
+        onSkip,
+      }),
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(screen.getByText('New Zone Discovered')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+
     expect(screen.queryByText('New Zone Discovered')).toBeNull();
+    expect(onSkip).toHaveBeenCalledTimes(1);
   });
 });
