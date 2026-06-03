@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { pixelButtonBase, pixelButtonVariants, pixelButtonSizes } from '@/components/PixelButton';
 import { PublicRankings } from '@/components/rankings/PublicRankings';
 import { SUPPORT_CARRY_FORWARD_COPY } from '@/lib/supportCopy';
+import { DISCORD_INVITE_URL } from '@/lib/supportLinks';
 
 const linkPrimary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.primary}`;
 const linkSecondary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.secondary}`;
@@ -35,6 +36,9 @@ export default function Home() {
             <a href="/register" className={linkPrimary}>Play Free</a>
             <a href="/wiki" className={linkSecondary}>Game Wiki</a>
             <a href="#rankings" className={linkSecondary}>Rankings</a>
+            {DISCORD_INVITE_URL && (
+              <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer" className={linkSecondary}>Discord</a>
+            )}
           </div>
         </div>
       </section>

@@ -52,8 +52,9 @@ describe('supportTicketService', () => {
     const ticket = await createSupportTicket({
       accountId: 'account-1',
       playerId: 'player-1',
+      seasonId: 'season-1',
       reporterDisplayName: 'Mira',
-      realmLabel: 'Preseason',
+      realmLabel: 'Season One',
       input: {
         privacy: 'private',
         category: 'bug',
@@ -72,6 +73,7 @@ describe('supportTicketService', () => {
         status: 'new',
         reporterAccountId: 'account-1',
         reporterPlayerId: 'player-1',
+        seasonId: 'season-1',
         title: 'Forge broke',
       }),
     }));
@@ -94,6 +96,7 @@ describe('supportTicketService', () => {
     await createSupportTicket({
       accountId: 'account-1',
       playerId: null,
+      seasonId: null,
       reporterDisplayName: 'Mira',
       realmLabel: 'Preseason',
       input: {
@@ -161,6 +164,7 @@ describe('supportTicketService', () => {
       reproductionSteps: null,
       reporterDisplayName: 'Mira',
       realmLabel: 'Preseason',
+      seasonId: null,
       screen: 'inventory',
       appVersion: null,
       apiVersion: null,

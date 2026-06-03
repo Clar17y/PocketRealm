@@ -12,6 +12,8 @@ const {
   adminEvaluateSeasonRewardsMock,
   adminMergeSeasonMock,
   adminGetBalanceReportMock,
+  adminListSupportTicketsMock,
+  adminUpdateSupportTicketMock,
 } = vi.hoisted(() => ({
   adminGetSeasonsMock: vi.fn(),
   adminCreateSeasonMock: vi.fn(),
@@ -21,6 +23,8 @@ const {
   adminEvaluateSeasonRewardsMock: vi.fn(),
   adminMergeSeasonMock: vi.fn(),
   adminGetBalanceReportMock: vi.fn(),
+  adminListSupportTicketsMock: vi.fn(),
+  adminUpdateSupportTicketMock: vi.fn(),
 }));
 
 vi.mock('@/lib/api', async () => {
@@ -35,6 +39,8 @@ vi.mock('@/lib/api', async () => {
     adminEvaluateSeasonRewards: adminEvaluateSeasonRewardsMock,
     adminMergeSeason: adminMergeSeasonMock,
     adminGetBalanceReport: adminGetBalanceReportMock,
+    adminListSupportTickets: adminListSupportTicketsMock,
+    adminUpdateSupportTicket: adminUpdateSupportTicketMock,
     adminGetLatencyActions: vi.fn().mockResolvedValue({ data: { actions: [] } }),
     adminGetLatencyReport: vi.fn().mockResolvedValue({
       data: {
@@ -71,6 +77,41 @@ const seasons: AdminSeason[] = [
   },
 ];
 
+const supportTickets = [
+  {
+    id: 'SUP-B0414A95',
+    status: 'new',
+    privacy: 'private',
+    category: 'bug',
+    area: 'combat',
+    title: 'Testd',
+    body: 'Testing 123e\n\nSteps: Test',
+    reporter: { displayName: 'ZuKii', realm: 'Preseason', seasonId: null },
+    context: { screen: 'explore', appVersion: '0.1.0' },
+    sensitivityFlags: [],
+    duplicateTicketIds: [],
+    githubIssueUrl: null,
+    createdAt: '2026-06-01T20:37:10.643Z',
+    updatedAt: '2026-06-01T20:37:10.643Z',
+  },
+  {
+    id: 'SUP-1B10429D',
+    status: 'new',
+    privacy: 'private',
+    category: 'bug',
+    area: 'combat',
+    title: 'Testd',
+    body: 'Testing 123e\n\nSteps: Test',
+    reporter: { displayName: 'ZuKii', realm: 'Season One', seasonId: 'season-1' },
+    context: { screen: 'explore', appVersion: '0.1.0' },
+    sensitivityFlags: [],
+    duplicateTicketIds: [],
+    githubIssueUrl: null,
+    createdAt: '2026-06-01T20:37:15.271Z',
+    updatedAt: '2026-06-01T20:37:15.271Z',
+  },
+];
+
 function renderAdminScreen() {
   return render(
     <AdminScreen
@@ -96,6 +137,12 @@ async function openSeasonsTab() {
   await screen.findByRole('heading', { name: 'Create Season' });
 }
 
+async function openSupportTab() {
+  renderAdminScreen();
+  fireEvent.click(screen.getByRole('button', { name: 'Support' }));
+  await screen.findByRole('heading', { name: 'Support Triage' });
+}
+
 beforeEach(() => {
   adminGetSeasonsMock.mockResolvedValue({ data: { seasons }, error: null });
   adminCreateSeasonMock.mockResolvedValue({ data: { season: seasons[0] }, error: null });
@@ -104,6 +151,8 @@ beforeEach(() => {
   adminEndSeasonMock.mockResolvedValue({ data: { message: 'Ended' }, error: null });
   adminEvaluateSeasonRewardsMock.mockResolvedValue({ data: { message: 'Evaluated', hallOfFameEntries: 12 }, error: null });
   adminMergeSeasonMock.mockResolvedValue({ data: { message: 'Merged', merged: 20, errors: [] }, error: null });
+  adminListSupportTicketsMock.mockResolvedValue({ data: { tickets: supportTickets }, error: null });
+  adminUpdateSupportTicketMock.mockResolvedValue({ data: { ticket: { publicId: 'SUP-1B10429D', status: 'duplicate' } }, error: null });
   adminGetBalanceReportMock.mockResolvedValue({
     data: {
       period: '7d',
@@ -158,6 +207,78 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+describe('AdminScreen support tab', () => {
+  it('loads support tickets and applies a duplicate decision', async () => {
+    await openSupportTab();
+
+    await waitFor(() => expect(adminListSupportTicketsMock).toHaveBeenCalledWith({
+      status: 'new,needs_info',
+      limit: 50,
+    }));
+    expect(screen.getByText('SUP-B0414A95')).toBeTruthy();
+    expect(screen.getAllByText(/Testing 123e/)).toHaveLength(2);
+
+    const row = screen.getByTestId('support-ticket-SUP-1B10429D');
+    fireEvent.change(within(row).getByLabelText('Status'), { target: { value: 'duplicate' } });
+    fireEvent.change(within(row).getByLabelText('Duplicate ticket IDs'), { target: { value: 'SUP-B0414A95' } });
+    fireEvent.change(within(row).getByLabelText('Staff note'), {
+      target: { value: 'Duplicate test submission from repeated Send Report clicks.' },
+    });
+    fireEvent.click(within(row).getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => expect(adminUpdateSupportTicketMock).toHaveBeenCalledWith('SUP-1B10429D', {
+      status: 'duplicate',
+      duplicateTicketIds: ['SUP-B0414A95'],
+      githubIssueUrl: null,
+      sensitivityFlags: [],
+      note: 'Duplicate test submission from repeated Send Report clicks.',
+    }));
+    await waitFor(() => expect(adminListSupportTicketsMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('applies pasted Codex JSONL decisions in bulk', async () => {
+    await openSupportTab();
+
+    fireEvent.change(screen.getByLabelText('Codex decisions JSONL'), {
+      target: {
+        value: [
+          JSON.stringify({
+            id: 'SUP-1B10429D',
+            status: 'duplicate',
+            duplicateTicketIds: ['SUP-B0414A95'],
+            note: 'Duplicate test submission.',
+          }),
+          JSON.stringify({
+            id: 'SUP-B0414A95',
+            status: 'rejected',
+            note: 'Test submission.',
+          }),
+        ].join('\n'),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Codex Decisions' }));
+
+    await waitFor(() => expect(adminUpdateSupportTicketMock).toHaveBeenCalledWith('SUP-1B10429D', {
+      status: 'duplicate',
+      duplicateTicketIds: ['SUP-B0414A95'],
+      note: 'Duplicate test submission.',
+    }));
+    expect(adminUpdateSupportTicketMock).toHaveBeenCalledWith('SUP-B0414A95', {
+      status: 'rejected',
+      note: 'Test submission.',
+    });
+    await waitFor(() => expect(adminListSupportTicketsMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows the Codex triage runbook and export command', async () => {
+    await openSupportTab();
+
+    expect(screen.getByText('Run support export')).toBeTruthy();
+    expect(screen.getByText('npm --silent run support:export-new -w apps/api -- --limit 20')).toBeTruthy();
+    expect(screen.getByText(/Paste Codex decision JSONL here, then apply it to update tickets/)).toBeTruthy();
+  });
 });
 
 describe('AdminScreen seasons tab', () => {

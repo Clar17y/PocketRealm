@@ -77,6 +77,53 @@ export interface AdminSeason {
   isBootstrapped: boolean;
 }
 
+export type AdminSupportTicketStatus =
+  | 'new'
+  | 'needs_info'
+  | 'duplicate'
+  | 'accepted'
+  | 'rejected'
+  | 'security'
+  | 'known_issue'
+  | 'closed';
+
+export type AdminSupportSensitivityFlag =
+  | 'personal_data'
+  | 'payment'
+  | 'account'
+  | 'security'
+  | 'exploit'
+  | 'harassment';
+
+export interface AdminSupportTicket {
+  id: string;
+  status: AdminSupportTicketStatus;
+  privacy: string;
+  category: string;
+  area: string;
+  title: string;
+  body: string;
+  reporter: {
+    displayName: string;
+    realm: string;
+    seasonId: string | null;
+  };
+  context: Record<string, string>;
+  sensitivityFlags: AdminSupportSensitivityFlag[];
+  duplicateTicketIds: string[];
+  githubIssueUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminSupportTicketUpdateInput {
+  status?: AdminSupportTicketStatus;
+  note?: string;
+  duplicateTicketIds?: string[];
+  githubIssueUrl?: string | null;
+  sensitivityFlags?: AdminSupportSensitivityFlag[];
+}
+
 type AdminSeasonCreateInput = {
   name: string;
   startsAt: string;
@@ -208,6 +255,21 @@ export async function adminGetResourceNodes(zoneId?: string) {
 
 export async function adminGetSeasons() {
   return fetchApi<{ seasons: AdminSeason[] }>('/api/v1/admin/seasons');
+}
+
+export async function adminListSupportTickets(options: { status?: string; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (options.status) params.set('status', options.status);
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  const qs = params.toString();
+  return fetchApi<{ tickets: AdminSupportTicket[] }>(`/api/v1/support/tickets${qs ? `?${qs}` : ''}`);
+}
+
+export async function adminUpdateSupportTicket(publicId: string, input: AdminSupportTicketUpdateInput) {
+  return fetchApi<{ ticket: { publicId: string; status: AdminSupportTicketStatus } }>(`/api/v1/support/tickets/${publicId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function adminCreateSeason(data: AdminSeasonCreateInput) {

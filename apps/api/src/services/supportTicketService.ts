@@ -15,6 +15,7 @@ import { toSupportTicketJsonlRecord, type SupportTicketExportSource } from './su
 interface CreateSupportTicketParams {
   accountId: string;
   playerId: string | null;
+  seasonId: string | null;
   reporterDisplayName: string;
   realmLabel: string;
   input: CreateSupportTicketInput;
@@ -74,6 +75,7 @@ function toExportSource(ticket: {
   reproductionSteps: string | null;
   reporterDisplayName: string;
   realmLabel: string;
+  seasonId: string | null;
   screen: string | null;
   appVersion: string | null;
   apiVersion: string | null;
@@ -118,6 +120,7 @@ export async function createSupportTicket(params: CreateSupportTicketParams) {
         reproductionSteps: input.reproductionSteps,
         reporterAccountId: params.accountId,
         reporterPlayerId: params.playerId,
+        seasonId: params.seasonId,
         reporterDisplayName: params.reporterDisplayName,
         realmLabel: params.realmLabel,
         screen: input.screen,
@@ -212,6 +215,7 @@ export async function listSupportTicketsForExport(options: ExportOptions): Promi
       reproductionSteps: true,
       reporterDisplayName: true,
       realmLabel: true,
+      seasonId: true,
       screen: true,
       appVersion: true,
       apiVersion: true,
@@ -232,4 +236,8 @@ export async function listSupportTicketsForExport(options: ExportOptions): Promi
 
 export function supportTicketToJsonl(ticket: SupportTicketExportSource): string {
   return `${JSON.stringify(toSupportTicketJsonlRecord(ticket))}\n`;
+}
+
+export function supportTicketToAdminRecord(ticket: SupportTicketExportSource) {
+  return toSupportTicketJsonlRecord(ticket);
 }

@@ -6,6 +6,7 @@ import { createSupportTicketSchema, supportTicketStatusListSchema, updateSupport
 import {
   createSupportTicket,
   listSupportTicketsForExport,
+  supportTicketToAdminRecord,
   supportTicketToJsonl,
   updateSupportTicket,
 } from '../services/supportTicketService';
@@ -20,8 +21,9 @@ const exportQuerySchema = z.object({
   createdAfter: z.string().datetime().optional(),
 });
 
-function realmLabelFor(seasonId: string | null): string {
-  return seasonId ? 'Seasonal Realm' : 'Preseason';
+function realmLabelFor(seasonId: string | null, seasonName?: string): string {
+  if (!seasonId) return 'Preseason';
+  return seasonName ?? 'Seasonal Realm';
 }
 
 supportRouter.use(authenticate);
@@ -31,8 +33,9 @@ supportRouter.post('/tickets', asyncHandler(async (req, res) => {
   const ticket = await createSupportTicket({
     accountId: req.player!.accountId,
     playerId: req.player!.playerId,
+    seasonId: req.player!.seasonId,
     reporterDisplayName: req.player!.username,
-    realmLabel: realmLabelFor(req.player!.seasonId),
+    realmLabel: realmLabelFor(req.player!.seasonId, req.season?.name),
     input,
   });
 
@@ -55,6 +58,19 @@ supportRouter.patch('/tickets/:publicId', requireAdmin, asyncHandler(async (req,
       publicId: ticket.publicId,
       status: ticket.status,
     },
+  });
+}));
+
+supportRouter.get('/tickets', requireAdmin, asyncHandler(async (req, res) => {
+  const query = exportQuerySchema.parse(req.query);
+  const tickets = await listSupportTicketsForExport({
+    statuses: query.status,
+    limit: query.limit,
+    createdAfter: query.createdAfter ? new Date(query.createdAfter) : undefined,
+  });
+
+  res.json({
+    tickets: tickets.map(supportTicketToAdminRecord),
   });
 }));
 

@@ -252,6 +252,7 @@ model Season {
   seasonArchives    SeasonArchive[]
   hallOfFameEntries HallOfFameEntry[]
   rewardTiers       SeasonRewardTier[]
+  supportTickets    SupportTicket[]
 
   @@index([status])
   @@map("seasons")
@@ -1369,6 +1370,7 @@ model SupportTicket {
   reproductionSteps   String?   @map("reproduction_steps") @db.VarChar(3000)
   reporterAccountId   String    @map("reporter_account_id")
   reporterPlayerId    String?   @map("reporter_player_id")
+  seasonId            String?   @map("season_id")
   reporterDisplayName String    @map("reporter_display_name") @db.VarChar(64)
   realmLabel          String    @map("realm_label") @db.VarChar(80)
   screen              String?   @db.VarChar(80)
@@ -1389,11 +1391,13 @@ model SupportTicket {
 
   reporterAccount Account              @relation(fields: [reporterAccountId], references: [id], onDelete: Cascade)
   reporterPlayer  Player?              @relation(fields: [reporterPlayerId], references: [id], onDelete: SetNull)
+  season           Season?              @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   events          SupportTicketEvent[]
 
   @@index([status, createdAt])
   @@index([reporterAccountId, createdAt])
   @@index([reporterPlayerId, createdAt])
+  @@index([seasonId, createdAt])
   @@index([category, area])
   @@map("support_tickets")
 }

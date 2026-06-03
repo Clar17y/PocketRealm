@@ -28,6 +28,7 @@ export interface SupportTicketExportSource {
   reproductionSteps: string | null;
   reporterDisplayName: string;
   realmLabel: string;
+  seasonId: string | null;
   screen: string | null;
   appVersion: string | null;
   apiVersion: string | null;
@@ -76,6 +77,7 @@ export function toSupportTicketJsonlRecord(ticket: SupportTicketExportSource) {
     reporter: {
       displayName: ticket.reporterDisplayName,
       realm: ticket.realmLabel,
+      seasonId: ticket.seasonId,
     },
     context: compactContext(ticket),
     sensitivityFlags: ticket.sensitivityFlags,
