@@ -15,6 +15,10 @@ const ChannelType = {
   Category: 4,
 } as const;
 
+const AutoModEventType = { MessageSend: 1 } as const;
+const AutoModTriggerType = { Keyword: 1, Spam: 3, KeywordPreset: 4, MentionSpam: 5 } as const;
+const AutoModActionType = { BlockMessage: 1, SendAlertMessage: 2 } as const;
+
 type RoleKey =
   | 'staff'
   | 'moderator'
@@ -88,6 +92,32 @@ export interface DiscordMessage {
   };
 }
 
+interface AutoModAction {
+  type: typeof AutoModActionType[keyof typeof AutoModActionType];
+  metadata?: {
+    channel_id?: string;
+  };
+}
+
+interface AutoModRulePayload {
+  name: string;
+  event_type: typeof AutoModEventType[keyof typeof AutoModEventType];
+  trigger_type: typeof AutoModTriggerType[keyof typeof AutoModTriggerType];
+  trigger_metadata?: {
+    keyword_filter?: string[];
+    presets?: number[];
+    mention_total_limit?: number;
+    mention_raid_protection_enabled?: boolean;
+  };
+  actions: AutoModAction[];
+  enabled: boolean;
+}
+
+interface DiscordAutoModRule {
+  id: string;
+  name: string;
+}
+
 interface PermissionOverwrite {
   id: string;
   type: 0 | 1;
@@ -110,6 +140,10 @@ interface SetupResult {
   updatedChannels: string[];
   seededStarterMessages: string[];
   existingStarterMessages: string[];
+  createdAutoModRules: string[];
+  updatedAutoModRules: string[];
+  channelIdsByName: Record<string, string>;
+  roleIdsByKey: Record<string, string>;
   webhookUrl: string;
 }
 
@@ -153,6 +187,60 @@ export function buildRequiredBotPermissionBits(): string[] {
     'CreatePrivateThreads',
     'SendMessagesInThreads',
     'ManageGuild',
+  ];
+}
+
+function buildAutoModActions(alertChannelId: string): AutoModAction[] {
+  return [
+    { type: AutoModActionType.BlockMessage },
+    { type: AutoModActionType.SendAlertMessage, metadata: { channel_id: alertChannelId } },
+  ];
+}
+
+export function buildAutoModRules(options: { alertChannelId: string; extraKeywords: string[] }): AutoModRulePayload[] {
+  return [
+    {
+      name: 'PocketRealm: spam protection',
+      event_type: AutoModEventType.MessageSend,
+      trigger_type: AutoModTriggerType.Spam,
+      actions: buildAutoModActions(options.alertChannelId),
+      enabled: true,
+    },
+    {
+      name: 'PocketRealm: mention protection',
+      event_type: AutoModEventType.MessageSend,
+      trigger_type: AutoModTriggerType.MentionSpam,
+      trigger_metadata: {
+        mention_total_limit: 8,
+        mention_raid_protection_enabled: true,
+      },
+      actions: buildAutoModActions(options.alertChannelId),
+      enabled: true,
+    },
+    {
+      name: 'PocketRealm: preset safety',
+      event_type: AutoModEventType.MessageSend,
+      trigger_type: AutoModTriggerType.KeywordPreset,
+      trigger_metadata: { presets: [1, 2, 3] },
+      actions: buildAutoModActions(options.alertChannelId),
+      enabled: true,
+    },
+    {
+      name: 'PocketRealm: private data guard',
+      event_type: AutoModEventType.MessageSend,
+      trigger_type: AutoModTriggerType.Keyword,
+      trigger_metadata: {
+        keyword_filter: [
+          'Bearer *',
+          'access_token=*',
+          'refreshToken=*',
+          'password=*',
+          ...options.extraKeywords,
+        ],
+      },
+      actions: buildAutoModActions(options.alertChannelId),
+      enabled: true,
+    },
   ];
 }
 
@@ -409,6 +497,14 @@ function parseMessage(value: unknown): DiscordMessage {
   };
 }
 
+function parseAutoModRule(value: unknown): DiscordAutoModRule {
+  const record = asRecord(value);
+  return {
+    id: requireString(record.id, 'autoModRule.id'),
+    name: requireString(record.name, 'autoModRule.name'),
+  };
+}
+
 class DiscordRestClient {
   constructor(private readonly botToken: string) {}
 
@@ -511,6 +607,28 @@ class DiscordRestClient {
     return parseMessage(data);
   }
 
+  async getAutoModRules(guildId: string): Promise<DiscordAutoModRule[]> {
+    const data = await this.request(`/guilds/${guildId}/auto-moderation/rules`, { method: 'GET' });
+    if (!Array.isArray(data)) throw new Error('Discord API returned invalid AutoMod rules payload');
+    return data.map(parseAutoModRule);
+  }
+
+  async createAutoModRule(guildId: string, rule: AutoModRulePayload): Promise<DiscordAutoModRule> {
+    const data = await this.request(`/guilds/${guildId}/auto-moderation/rules`, {
+      method: 'POST',
+      body: JSON.stringify(rule),
+    });
+    return parseAutoModRule(data);
+  }
+
+  async updateAutoModRule(guildId: string, ruleId: string, rule: AutoModRulePayload): Promise<DiscordAutoModRule> {
+    const data = await this.request(`/guilds/${guildId}/auto-moderation/rules/${ruleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(rule),
+    });
+    return parseAutoModRule(data);
+  }
+
   private async request(path: string, init: Omit<RequestInit, 'headers'>): Promise<unknown> {
     const response = await fetch(`${DISCORD_API_BASE}${path}`, {
       ...init,
@@ -607,6 +725,13 @@ function webhookUrl(webhook: DiscordWebhook): string | null {
   return null;
 }
 
+function readAutoModExtraKeywords(): string[] {
+  return (process.env.DISCORD_AUTOMOD_EXTRA_KEYWORDS ?? '')
+    .split(',')
+    .map((keyword) => keyword.trim())
+    .filter((keyword) => keyword.length > 0);
+}
+
 export async function setupDiscordServer(options: SetupOptions): Promise<SetupResult> {
   const client = new DiscordRestClient(options.botToken);
   const plan = buildDiscordSetupPlan();
@@ -621,6 +746,10 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
     updatedChannels: [],
     seededStarterMessages: [],
     existingStarterMessages: [],
+    createdAutoModRules: [],
+    updatedAutoModRules: [],
+    channelIdsByName: {},
+    roleIdsByKey: {},
     webhookUrl: '',
   };
 
@@ -632,12 +761,14 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
     if (existing) {
       result.existingRoles.push(roleSpec.name);
       roleIdsByKey.set(roleSpec.key, existing.id);
+      result.roleIdsByKey[roleSpec.key] = existing.id;
       continue;
     }
 
     const created = await client.createRole(options.guildId, roleSpec);
     result.createdRoles.push(roleSpec.name);
     roleIdsByKey.set(roleSpec.key, created.id);
+    result.roleIdsByKey[roleSpec.key] = created.id;
   }
 
   const triageRoleId = roleIdsByKey.get('triage');
@@ -684,6 +815,7 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
         result.createdChannels.push(channelSpec.name);
       }
       channelByKey.set(textKey, channel);
+      result.channelIdsByName[channelSpec.name] = channel.id;
 
       if (channelSpec.starterMessage) {
         const starterMessageContent = buildDiscordStarterMessage(channelSpec.starterMessage);
@@ -704,6 +836,28 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
         if (!url) throw new Error('Discord webhook did not include a token or URL');
         result.webhookUrl = url;
       }
+    }
+  }
+
+  const modLogChannelId = result.channelIdsByName['mod-log'];
+  if (!modLogChannelId) throw new Error('Discord setup plan did not create or find mod-log channel');
+
+  const existingAutoModRulesByName = new Map(
+    (await client.getAutoModRules(options.guildId)).map((rule) => [rule.name, rule]),
+  );
+  const plannedAutoModRules = buildAutoModRules({
+    alertChannelId: modLogChannelId,
+    extraKeywords: readAutoModExtraKeywords(),
+  });
+
+  for (const rule of plannedAutoModRules) {
+    const existing = existingAutoModRulesByName.get(rule.name);
+    if (existing) {
+      await client.updateAutoModRule(options.guildId, existing.id, rule);
+      result.updatedAutoModRules.push(rule.name);
+    } else {
+      await client.createAutoModRule(options.guildId, rule);
+      result.createdAutoModRules.push(rule.name);
     }
   }
 
