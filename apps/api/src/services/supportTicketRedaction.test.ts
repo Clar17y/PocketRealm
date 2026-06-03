@@ -50,7 +50,7 @@ describe('support ticket redaction', () => {
       area: 'crafting',
       title: 'Forge broke',
       body: 'My email is [redacted-email]',
-      reporter: { displayName: 'Mira', realm: 'Preseason', seasonId: null },
+      reporter: { displayName: 'Reporter SUP-1', realm: 'Preseason', seasonId: null },
       context: { screen: 'forge', appVersion: '0.1.0', browser: 'Chrome', requestId: 'req-1' },
       sensitivityFlags: ['personal_data'],
       duplicateTicketIds: [],
@@ -58,6 +58,40 @@ describe('support ticket redaction', () => {
       createdAt: '2026-05-30T12:00:00.000Z',
       updatedAt: '2026-05-30T12:01:00.000Z',
     });
+    expect(JSON.stringify(record)).not.toContain('player@example.com');
+  });
+
+  it('pseudonymizes reporter display names in JSONL export records', () => {
+    const record = toSupportTicketJsonlRecord({
+      publicId: 'SUP-2',
+      status: 'new',
+      privacy: 'private',
+      category: 'bug',
+      area: 'inventory',
+      title: 'Inventory bug',
+      description: 'Potions did not stack.',
+      expectedBehavior: null,
+      actualBehavior: null,
+      reproductionSteps: null,
+      reporterDisplayName: 'player@example.com',
+      realmLabel: 'Preseason',
+      seasonId: null,
+      screen: null,
+      appVersion: null,
+      apiVersion: null,
+      browser: null,
+      device: null,
+      requestId: null,
+      sentryEventId: null,
+      duplicateTicketIds: [],
+      githubIssueUrl: null,
+      sensitivityFlags: [],
+      staffNotes: null,
+      createdAt: new Date('2026-05-30T12:00:00.000Z'),
+      updatedAt: new Date('2026-05-30T12:01:00.000Z'),
+    });
+
+    expect(record.reporter.displayName).toBe('Reporter SUP-2');
     expect(JSON.stringify(record)).not.toContain('player@example.com');
   });
 });

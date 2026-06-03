@@ -12,6 +12,9 @@ describe('ReportBugModal', () => {
 
     render(<ReportBugModal open currentScreen="forge" onClose={vi.fn()} onSubmit={onSubmit} />);
 
+    fireEvent.change(screen.getByLabelText(/category/i), {
+      target: { value: 'account' },
+    });
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: 'Forge result did not update' },
     });
@@ -30,7 +33,7 @@ describe('ReportBugModal', () => {
           description: 'The result modal showed, but inventory stayed stale.',
           reproductionSteps: 'Open forge, upgrade an item, close result.',
           privacy: 'not_sure',
-          category: 'bug',
+          category: 'account',
           area: 'other',
           screen: 'forge',
           browser: expect.any(String),

@@ -1,7 +1,12 @@
 'use client';
 
 import { useId, useState, type FormEvent } from 'react';
-import type { CreateSupportTicketRequest, SupportTicketArea, SupportTicketPrivacy } from '@/lib/api';
+import type {
+  CreateSupportTicketRequest,
+  SupportTicketArea,
+  SupportTicketCategory,
+  SupportTicketPrivacy,
+} from '@/lib/api';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 
 interface ReportBugModalProps {
@@ -31,6 +36,17 @@ const PRIVACY_OPTIONS: Array<{ value: SupportTicketPrivacy; label: string }> = [
   { value: 'public_candidate', label: 'Safe to discuss publicly' },
   { value: 'private', label: 'Private or sensitive' },
 ];
+
+const CATEGORY_OPTIONS: Array<{ value: SupportTicketCategory; label: string }> = [
+  { value: 'bug', label: 'Bug' },
+  { value: 'balance', label: 'Balance' },
+  { value: 'account', label: 'Account' },
+  { value: 'security', label: 'Security' },
+  { value: 'abuse', label: 'Abuse or harassment' },
+  { value: 'suggestion', label: 'Suggestion' },
+  { value: 'other', label: 'Other' },
+];
+
 const TITLE_MIN_LENGTH = 5;
 const DESCRIPTION_MIN_LENGTH = 10;
 
@@ -41,6 +57,7 @@ function getBrowserContext(): string | undefined {
 export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: ReportBugModalProps) {
   const fieldId = useId();
   const [privacy, setPrivacy] = useState<SupportTicketPrivacy>('not_sure');
+  const [category, setCategory] = useState<SupportTicketCategory>('bug');
   const [area, setArea] = useState<SupportTicketArea>('other');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -69,7 +86,7 @@ export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: Repor
     try {
       const response = await onSubmit({
         privacy,
-        category: 'bug',
+        category,
         area,
         title: trimmedTitle,
         description: trimmedDescription,
@@ -123,6 +140,23 @@ export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: Repor
             className="w-full rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 text-sm text-[var(--rpg-text-primary)] disabled:opacity-60"
           >
             {PRIVACY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor={`${fieldId}-category`} className="block text-xs font-semibold text-[var(--rpg-text-secondary)]">
+            Category
+          </label>
+          <select
+            id={`${fieldId}-category`}
+            value={category}
+            disabled={busy}
+            onChange={(event) => setCategory(event.target.value as SupportTicketCategory)}
+            className="w-full rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 text-sm text-[var(--rpg-text-primary)] disabled:opacity-60"
+          >
+            {CATEGORY_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

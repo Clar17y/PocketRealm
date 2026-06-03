@@ -56,17 +56,21 @@ function compactContext(ticket: SupportTicketExportSource): Record<string, strin
   return context;
 }
 
-export function toSupportTicketJsonlRecord(ticket: SupportTicketExportSource) {
-  const expected = redactSupportText(ticket.expectedBehavior);
-  const actual = redactSupportText(ticket.actualBehavior);
-  const repro = redactSupportText(ticket.reproductionSteps);
+function buildBody(ticket: SupportTicketExportSource, transform: (value: string | null | undefined) => string | null) {
+  const expected = transform(ticket.expectedBehavior);
+  const actual = transform(ticket.actualBehavior);
+  const repro = transform(ticket.reproductionSteps);
   const bodyParts = [
-    redactSupportText(ticket.description),
+    transform(ticket.description),
     expected ? `Expected: ${expected}` : null,
     actual ? `Actual: ${actual}` : null,
     repro ? `Steps: ${repro}` : null,
   ].filter((part): part is string => Boolean(part));
 
+  return bodyParts.join('\n\n');
+}
+
+export function toSupportTicketJsonlRecord(ticket: SupportTicketExportSource) {
   return {
     id: ticket.publicId,
     status: ticket.status,
@@ -74,9 +78,9 @@ export function toSupportTicketJsonlRecord(ticket: SupportTicketExportSource) {
     category: ticket.category,
     area: ticket.area,
     title: redactSupportText(ticket.title) ?? '',
-    body: bodyParts.join('\n\n'),
+    body: buildBody(ticket, redactSupportText),
     reporter: {
-      displayName: ticket.reporterDisplayName,
+      displayName: `Reporter ${ticket.publicId}`,
       realm: ticket.realmLabel,
       seasonId: ticket.seasonId,
     },
@@ -91,7 +95,24 @@ export function toSupportTicketJsonlRecord(ticket: SupportTicketExportSource) {
 
 export function toSupportTicketAdminRecord(ticket: SupportTicketExportSource) {
   return {
-    ...toSupportTicketJsonlRecord(ticket),
+    id: ticket.publicId,
+    status: ticket.status,
+    privacy: ticket.privacy,
+    category: ticket.category,
+    area: ticket.area,
+    title: ticket.title,
+    body: buildBody(ticket, (value) => value ?? null),
+    reporter: {
+      displayName: ticket.reporterDisplayName,
+      realm: ticket.realmLabel,
+      seasonId: ticket.seasonId,
+    },
+    context: compactContext(ticket),
+    sensitivityFlags: ticket.sensitivityFlags,
+    duplicateTicketIds: ticket.duplicateTicketIds,
+    githubIssueUrl: ticket.githubIssueUrl,
     staffNotes: ticket.staffNotes,
+    createdAt: ticket.createdAt.toISOString(),
+    updatedAt: ticket.updatedAt.toISOString(),
   };
 }

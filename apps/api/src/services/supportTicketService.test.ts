@@ -137,7 +137,10 @@ describe('supportTicketService', () => {
     expect(result.status).toBe('accepted');
     expect(tx.supportTicket.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { publicId: 'SUP-1' },
-      data: expect.objectContaining({ status: 'accepted' }),
+      data: expect.objectContaining({
+        status: 'accepted',
+        closedAt: null,
+      }),
     }));
     expect(tx.supportTicketEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
@@ -220,6 +223,7 @@ describe('supportTicketService', () => {
       id: 'SUP-1',
       status: 'needs_info',
       staffNotes: 'Ask reporter which potion and acquisition path.',
+      reporter: { displayName: 'Mira', realm: 'Preseason', seasonId: null },
     });
   });
 

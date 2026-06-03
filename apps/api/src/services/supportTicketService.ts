@@ -48,8 +48,9 @@ function nextPublicId(): string {
   return `SUP-${slug}`;
 }
 
-function closeTimestampFor(status: SupportTicketStatus | undefined): Date | undefined {
-  return status && CLOSED_STATUSES.includes(status) ? new Date() : undefined;
+function closeTimestampFor(status: SupportTicketStatus | undefined): Date | null | undefined {
+  if (!status) return undefined;
+  return CLOSED_STATUSES.includes(status) ? new Date() : null;
 }
 
 function isPrismaKnownError(error: unknown): error is PrismaKnownError {

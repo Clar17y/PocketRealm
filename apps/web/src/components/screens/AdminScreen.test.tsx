@@ -280,7 +280,7 @@ describe('AdminScreen support tab', () => {
     await openSupportTab();
 
     expect(screen.getByText('Run support export')).toBeTruthy();
-    expect(screen.getByText('npm --silent run support:export-new -w apps/api -- --limit 20')).toBeTruthy();
+    expect(screen.getByText('npm --silent run support:export-new -w apps/api -- --limit=20')).toBeTruthy();
     expect(screen.getByText(/Paste Codex decision JSONL here, then apply it to update tickets/)).toBeTruthy();
   });
 });

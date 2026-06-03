@@ -260,7 +260,7 @@ export function SupportTab() {
         <div className="mb-3 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] p-3 text-xs text-[var(--rpg-text-secondary)]">
           <div className="font-semibold text-[var(--rpg-text-primary)]">Run support export</div>
           <code className="mt-2 block overflow-x-auto whitespace-pre rounded bg-[var(--rpg-surface)] px-2 py-1 font-mono text-[var(--rpg-gold)]">
-            npm --silent run support:export-new -w apps/api -- --limit 20
+            npm --silent run support:export-new -w apps/api -- --limit=20
           </code>
           <ol className="mt-2 list-decimal space-y-1 pl-4">
             <li>Send the exported JSONL to Codex and ask it to triage against the current GitHub backlog.</li>
