@@ -3,6 +3,7 @@ import {
   buildDiscordStarterMessage,
   buildPrivateChannelOverwrites,
   buildDiscordSetupPlan,
+  buildRequiredBotPermissionBits,
   shouldCreateStarterMessage,
   parseLocalEnv,
   PermissionBits,
@@ -39,6 +40,53 @@ describe('discordServerSetup', () => {
       .toBe('Welcome to PocketRealm');
     expect(channels.find((channel) => channel.name === 'support-triage')?.starterMessage?.title)
       .toBe('Support triage queue');
+  });
+
+  it('plans launch role keys for linked players and level milestones', () => {
+    const plan = buildDiscordSetupPlan();
+    const roleKeys = plan.roles.map((role) => role.key);
+
+    expect(roleKeys).toEqual(expect.arrayContaining([
+      'linked',
+      'level5',
+      'level10',
+      'level20',
+      'level30',
+      'level50',
+    ]));
+  });
+
+  it('plans launch channels for duels, bot health, support triage, and moderation logs', () => {
+    const plan = buildDiscordSetupPlan();
+    const channelNames = plan.categories.flatMap((category) => (
+      category.channels.map((channel) => channel.name)
+    ));
+
+    expect(channelNames).toEqual(expect.arrayContaining([
+      'duels',
+      'bot-health',
+      'support-triage',
+      'mod-log',
+    ]));
+  });
+
+  it('documents required bot permissions without kick or ban access', () => {
+    const permissionBits = buildRequiredBotPermissionBits();
+
+    expect(permissionBits).toEqual([
+      'ViewChannel',
+      'SendMessages',
+      'ReadMessageHistory',
+      'UseApplicationCommands',
+      'ManageChannels',
+      'ManageRoles',
+      'CreatePublicThreads',
+      'CreatePrivateThreads',
+      'SendMessagesInThreads',
+      'ManageGuild',
+    ]);
+    expect(permissionBits).not.toContain('KickMembers');
+    expect(permissionBits).not.toContain('BanMembers');
   });
 
   it('uses deny view/send overwrites for private channels', () => {

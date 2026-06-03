@@ -15,7 +15,18 @@ const ChannelType = {
   Category: 4,
 } as const;
 
-type RoleKey = 'staff' | 'moderator' | 'triage' | 'tester' | 'founder';
+type RoleKey =
+  | 'staff'
+  | 'moderator'
+  | 'triage'
+  | 'tester'
+  | 'founder'
+  | 'linked'
+  | 'level5'
+  | 'level10'
+  | 'level20'
+  | 'level30'
+  | 'level50';
 
 interface RoleSpec {
   key: RoleKey;
@@ -130,6 +141,21 @@ export function loadLocalEnvFile(cwd: string, filename = '.discord-setup.env'): 
   }
 }
 
+export function buildRequiredBotPermissionBits(): string[] {
+  return [
+    'ViewChannel',
+    'SendMessages',
+    'ReadMessageHistory',
+    'UseApplicationCommands',
+    'ManageChannels',
+    'ManageRoles',
+    'CreatePublicThreads',
+    'CreatePrivateThreads',
+    'SendMessagesInThreads',
+    'ManageGuild',
+  ];
+}
+
 export function buildDiscordSetupPlan(): DiscordSetupPlan {
   return {
     roles: [
@@ -138,6 +164,12 @@ export function buildDiscordSetupPlan(): DiscordSetupPlan {
       { key: 'triage', name: 'Support Triage', color: 0x9b59b6 },
       { key: 'tester', name: 'Tester', color: 0x2ecc71 },
       { key: 'founder', name: 'Founder', color: 0xf1c40f },
+      { key: 'linked', name: 'Linked Account', color: 0x2ecc71 },
+      { key: 'level5', name: 'Realm Level 5', color: 0x95a5a6 },
+      { key: 'level10', name: 'Realm Level 10', color: 0x3498db },
+      { key: 'level20', name: 'Realm Level 20', color: 0x9b59b6 },
+      { key: 'level30', name: 'Realm Level 30', color: 0xe67e22 },
+      { key: 'level50', name: 'Realm Level 50', color: 0xf1c40f },
     ],
     categories: [
       {
@@ -218,6 +250,17 @@ export function buildDiscordSetupPlan(): DiscordSetupPlan {
             },
           },
           {
+            name: 'duels',
+            starterMessage: {
+              title: 'Friendly duels',
+              lines: [
+                'Use /duel here for no-stakes simulations against linked players.',
+                'Duels do not spend turns, change ratings, damage gear, grant rewards, or alter character state.',
+                'Use the site to adjust equipment, skills, and combat templates before rematching.',
+              ],
+            },
+          },
+          {
             name: 'screenshots',
             starterMessage: {
               title: 'Screenshots',
@@ -279,6 +322,26 @@ export function buildDiscordSetupPlan(): DiscordSetupPlan {
               lines: [
                 'Private coordination for moderation, launch operations, and support decisions.',
                 'Keep player-sensitive details here or in the triage queue, not in public channels.',
+              ],
+            },
+          },
+          {
+            name: 'bot-health',
+            privateToRoleKeys: ['staff', 'moderator', 'triage'],
+            starterMessage: {
+              title: 'Bot health',
+              lines: [
+                'PocketRealmBot startup, repair, and role-sync notices land here.',
+              ],
+            },
+          },
+          {
+            name: 'mod-log',
+            privateToRoleKeys: ['staff', 'moderator'],
+            starterMessage: {
+              title: 'Moderation log',
+              lines: [
+                'Discord AutoMod alerts and staff moderation notes land here.',
               ],
             },
           },
