@@ -39,6 +39,7 @@ export interface SupportTicketExportSource {
   duplicateTicketIds: string[];
   githubIssueUrl: string | null;
   sensitivityFlags: SupportSensitivityFlag[];
+  staffNotes: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,5 +86,12 @@ export function toSupportTicketJsonlRecord(ticket: SupportTicketExportSource) {
     githubIssueUrl: ticket.githubIssueUrl,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
+  };
+}
+
+export function toSupportTicketAdminRecord(ticket: SupportTicketExportSource) {
+  return {
+    ...toSupportTicketJsonlRecord(ticket),
+    staffNotes: ticket.staffNotes,
   };
 }

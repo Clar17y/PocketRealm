@@ -37,6 +37,7 @@ describe('support ticket redaction', () => {
       duplicateTicketIds: [],
       githubIssueUrl: null,
       sensitivityFlags: ['personal_data'],
+      staffNotes: null,
       createdAt: new Date('2026-05-30T12:00:00.000Z'),
       updatedAt: new Date('2026-05-30T12:01:00.000Z'),
     });

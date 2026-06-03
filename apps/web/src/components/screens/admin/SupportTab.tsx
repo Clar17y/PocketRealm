@@ -318,6 +318,14 @@ export function SupportTab() {
                     <pre className="mt-2 whitespace-pre-wrap rounded bg-[var(--rpg-background)] p-2 text-xs text-[var(--rpg-text-primary)]">
                       {ticket.body}
                     </pre>
+                    {ticket.staffNotes?.trim() ? (
+                      <div className="mt-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] p-2">
+                        <div className="text-xs font-semibold text-[var(--rpg-gold)]">Saved staff notes</div>
+                        <div className="mt-1 whitespace-pre-wrap text-xs text-[var(--rpg-text-primary)]">
+                          {ticket.staffNotes}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="mt-2 text-xs text-[var(--rpg-text-secondary)]">
                       {ticket.reporter.displayName} / {ticket.reporter.realm}
                       {ticket.reporter.seasonId ? ` (${ticket.reporter.seasonId})` : ''}

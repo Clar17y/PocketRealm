@@ -112,6 +112,7 @@ export interface AdminSupportTicket {
   sensitivityFlags: AdminSupportSensitivityFlag[];
   duplicateTicketIds: string[];
   githubIssueUrl: string | null;
+  staffNotes: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -3,6 +3,7 @@ import { prisma } from '@pocketrealm/database';
 import {
   createSupportTicket,
   listSupportTicketsForExport,
+  supportTicketToAdminRecord,
   supportTicketToJsonl,
   updateSupportTicket,
 } from './supportTicketService';
@@ -175,6 +176,7 @@ describe('supportTicketService', () => {
       duplicateTicketIds: [],
       githubIssueUrl: null,
       sensitivityFlags: ['personal_data'],
+      staffNotes: null,
       createdAt: new Date('2026-05-30T12:00:00.000Z'),
       updatedAt: new Date('2026-05-30T12:01:00.000Z'),
     });
@@ -182,6 +184,43 @@ describe('supportTicketService', () => {
     expect(line.endsWith('\n')).toBe(true);
     expect(JSON.parse(line)).toMatchObject({ id: 'SUP-1', area: 'inventory' });
     expect(line).not.toContain('player@example.com');
+  });
+
+  it('includes staff notes in admin records', () => {
+    const record = supportTicketToAdminRecord({
+      publicId: 'SUP-1',
+      status: 'needs_info',
+      privacy: 'private',
+      category: 'bug',
+      area: 'inventory',
+      title: 'Inventory bug',
+      description: 'Potions did not stack.',
+      expectedBehavior: null,
+      actualBehavior: null,
+      reproductionSteps: null,
+      reporterDisplayName: 'Mira',
+      realmLabel: 'Preseason',
+      seasonId: null,
+      screen: 'inventory',
+      appVersion: null,
+      apiVersion: null,
+      browser: null,
+      device: null,
+      requestId: null,
+      sentryEventId: null,
+      duplicateTicketIds: [],
+      githubIssueUrl: null,
+      sensitivityFlags: [],
+      staffNotes: 'Ask reporter which potion and acquisition path.',
+      createdAt: new Date('2026-05-30T12:00:00.000Z'),
+      updatedAt: new Date('2026-05-30T12:01:00.000Z'),
+    });
+
+    expect(record).toMatchObject({
+      id: 'SUP-1',
+      status: 'needs_info',
+      staffNotes: 'Ask reporter which potion and acquisition path.',
+    });
   });
 
   it('lists new and needs_info tickets for export by default', async () => {

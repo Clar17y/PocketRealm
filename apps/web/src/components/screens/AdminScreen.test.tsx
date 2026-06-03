@@ -91,6 +91,7 @@ const supportTickets = [
     sensitivityFlags: [],
     duplicateTicketIds: [],
     githubIssueUrl: null,
+    staffNotes: 'Ask reporter which potion and acquisition path.',
     createdAt: '2026-06-01T20:37:10.643Z',
     updatedAt: '2026-06-01T20:37:10.643Z',
   },
@@ -107,6 +108,7 @@ const supportTickets = [
     sensitivityFlags: [],
     duplicateTicketIds: [],
     githubIssueUrl: null,
+    staffNotes: null,
     createdAt: '2026-06-01T20:37:15.271Z',
     updatedAt: '2026-06-01T20:37:15.271Z',
   },
@@ -219,6 +221,8 @@ describe('AdminScreen support tab', () => {
     }));
     expect(screen.getByText('SUP-B0414A95')).toBeTruthy();
     expect(screen.getAllByText(/Testing 123e/)).toHaveLength(2);
+    expect(screen.getByText('Saved staff notes')).toBeTruthy();
+    expect(screen.getByText('Ask reporter which potion and acquisition path.')).toBeTruthy();
 
     const row = screen.getByTestId('support-ticket-SUP-1B10429D');
     fireEvent.change(within(row).getByLabelText('Status'), { target: { value: 'duplicate' } });

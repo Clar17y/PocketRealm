@@ -10,7 +10,11 @@ import type {
   SupportTicketStatus,
   UpdateSupportTicketInput,
 } from './supportTicketSchemas';
-import { toSupportTicketJsonlRecord, type SupportTicketExportSource } from './supportTicketRedaction';
+import {
+  toSupportTicketAdminRecord,
+  toSupportTicketJsonlRecord,
+  type SupportTicketExportSource,
+} from './supportTicketRedaction';
 
 interface CreateSupportTicketParams {
   accountId: string;
@@ -86,6 +90,7 @@ function toExportSource(ticket: {
   duplicateTicketIds: string[];
   githubIssueUrl: string | null;
   sensitivityFlags: string[];
+  staffNotes: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): SupportTicketExportSource {
@@ -226,6 +231,7 @@ export async function listSupportTicketsForExport(options: ExportOptions): Promi
       duplicateTicketIds: true,
       githubIssueUrl: true,
       sensitivityFlags: true,
+      staffNotes: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -239,5 +245,5 @@ export function supportTicketToJsonl(ticket: SupportTicketExportSource): string 
 }
 
 export function supportTicketToAdminRecord(ticket: SupportTicketExportSource) {
-  return toSupportTicketJsonlRecord(ticket);
+  return toSupportTicketAdminRecord(ticket);
 }
