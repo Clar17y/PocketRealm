@@ -623,8 +623,8 @@ const enfeeble: ActionDefinition = {
   damageType: 'magic',
   effect: {
     name: 'Enfeeble',
-    stat: 'attack',
-    modifier: -20,
+    stat: 'attackPercent',
+    modifier: -0.35,
     duration: 3,
     isDebuff: true,
   },
