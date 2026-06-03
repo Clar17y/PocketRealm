@@ -95,9 +95,10 @@ function isStringArray(value: unknown): value is string[] {
 
 function parseSensitivityFlags(value: string): AdminSupportSensitivityFlag[] {
   const flags = splitList(value);
+  const sensitivityFlags = flags.filter(isSensitivityFlag);
   const invalid = flags.filter((flag) => !isSensitivityFlag(flag));
   if (invalid.length > 0) throw new Error(`Unsupported sensitivity flag: ${invalid.join(', ')}`);
-  return flags;
+  return sensitivityFlags;
 }
 
 function parseDecision(value: unknown, index: number): CodexDecision {
