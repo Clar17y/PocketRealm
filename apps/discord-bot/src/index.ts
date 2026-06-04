@@ -3,7 +3,10 @@ import 'dotenv/config';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import pino from 'pino';
 
+import { PocketRealmApiClient } from './api/pocketRealmApi.js';
 import { loadBotConfig } from './config.js';
+import { syncLinkedRoles } from './discord/roleSync.js';
+import { routeInteraction } from './interactions/interactionRouter.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
@@ -11,6 +14,10 @@ const logger = pino({
 
 async function main(): Promise<void> {
   const config = loadBotConfig();
+  const api = new PocketRealmApiClient({
+    baseUrl: config.apiBaseUrl,
+    internalApiKey: config.internalApiKey,
+  });
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -18,6 +25,15 @@ async function main(): Promise<void> {
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildMembers,
     ],
+  });
+  let roleSyncInterval: NodeJS.Timeout | undefined;
+
+  client.on(Events.InteractionCreate, async (interaction) => {
+    try {
+      await routeInteraction(interaction, { api });
+    } catch (error) {
+      logger.warn({ error }, 'Failed to handle Discord interaction');
+    }
   });
 
   client.once(Events.ClientReady, async (readyClient) => {
@@ -33,10 +49,28 @@ async function main(): Promise<void> {
     } catch (error) {
       logger.warn({ error }, 'Failed to post Discord bot health message');
     }
+
+    const runRoleSync = async (): Promise<void> => {
+      try {
+        const guild = await readyClient.guilds.fetch(config.guildId);
+        const summary = await syncLinkedRoles({ api, guild, config });
+        logger.info({ summary }, 'Discord linked role sync completed');
+      } catch (error) {
+        logger.warn({ error }, 'Discord linked role sync failed');
+      }
+    };
+
+    void runRoleSync();
+    roleSyncInterval = setInterval(() => {
+      void runRoleSync();
+    }, 60_000);
   });
 
   const shutdown = (signal: NodeJS.Signals): void => {
     logger.info({ signal }, 'Shutting down Discord bot');
+    if (roleSyncInterval) {
+      clearInterval(roleSyncInterval);
+    }
     client.destroy();
     process.exit(0);
   };
