@@ -6,11 +6,13 @@ import { PixelCard } from '@/components/PixelCard';
 import {
   claimDiscordLinkCode,
   getDiscordLinkStatus,
+  normalizeDiscordLinkStatus,
   type ApiResponse,
+  type DiscordLinkApiResponse,
   type DiscordLinkStatusResponse,
 } from '@/lib/api';
 
-type DiscordLinkApi = Promise<ApiResponse<DiscordLinkStatusResponse>>;
+type DiscordLinkApi = Promise<ApiResponse<DiscordLinkApiResponse>>;
 
 interface DiscordLinkCardProps {
   loadStatus?: () => DiscordLinkApi;
@@ -49,7 +51,7 @@ export function DiscordLinkCard({
 
       setIsLoading(false);
       if (response.data) {
-        setStatus(response.data);
+        setStatus(normalizeDiscordLinkStatus(response.data));
         setError(null);
         return;
       }
@@ -76,7 +78,7 @@ export function DiscordLinkCard({
 
     setIsClaiming(false);
     if (response.data) {
-      setStatus(response.data);
+      setStatus(normalizeDiscordLinkStatus(response.data));
       setCode('');
       return;
     }
@@ -85,6 +87,7 @@ export function DiscordLinkCard({
   };
 
   const isLinked = Boolean(status?.linked);
+  const discordUserId = status?.discordUserId;
   const titleReward = status?.titleReward ?? (isLinked ? 'Linked Adventurer' : null);
 
   return (
@@ -111,9 +114,9 @@ export function DiscordLinkCard({
         </span>
       </div>
 
-      {status?.discordUserId && (
+      {discordUserId && (
         <p className="mb-3 text-xs text-[var(--rpg-text-secondary)]">
-          Discord user ID <span className="font-bold text-[var(--rpg-text-primary)]">{status.discordUserId}</span>
+          Discord user ID <span className="font-bold text-[var(--rpg-text-primary)]">{discordUserId}</span>
         </p>
       )}
 

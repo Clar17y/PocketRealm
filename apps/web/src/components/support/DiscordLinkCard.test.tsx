@@ -10,16 +10,20 @@ describe('DiscordLinkCard', () => {
   it('claims a Discord link code and shows the title reward proof', async () => {
     const onClaimCode = vi.fn().mockResolvedValue({
       data: {
-        linked: true,
-        discordUserId: '123456789',
-        linkedAt: '2026-06-04T12:00:00.000Z',
-        titleReward: 'Linked Adventurer',
+        link: {
+          id: 'discord-link-1',
+          discordUserId: '123456789',
+          discordGuildId: 'guild-1',
+          linkedAt: '2026-06-04T12:00:00.000Z',
+          roleSyncedAt: null,
+        },
+        titleAchievementId: 'discord_linked',
       },
     });
 
     render(
       <DiscordLinkCard
-        loadStatus={vi.fn().mockResolvedValue({ data: { linked: false } })}
+        loadStatus={vi.fn().mockResolvedValue({ data: { linked: false, link: null } })}
         claimCode={onClaimCode}
       />,
     );
@@ -37,9 +41,13 @@ describe('DiscordLinkCard', () => {
         loadStatus={vi.fn().mockResolvedValue({
           data: {
             linked: true,
-            discordUserId: '987654321',
-            discordGuildId: 'guild-1',
-            titleReward: 'Linked Adventurer',
+            link: {
+              id: 'discord-link-2',
+              discordUserId: '987654321',
+              discordGuildId: 'guild-1',
+              linkedAt: '2026-06-04T12:00:00.000Z',
+              roleSyncedAt: '2026-06-04T12:05:00.000Z',
+            },
           },
         })}
         claimCode={vi.fn()}
@@ -54,7 +62,7 @@ describe('DiscordLinkCard', () => {
   it('shows API errors when claiming fails', async () => {
     render(
       <DiscordLinkCard
-        loadStatus={vi.fn().mockResolvedValue({ data: { linked: false } })}
+        loadStatus={vi.fn().mockResolvedValue({ data: { linked: false, link: null } })}
         claimCode={vi.fn().mockResolvedValue({
           error: { message: 'That Discord link code is invalid.', code: 'INVALID_DISCORD_LINK_CODE' },
         })}
