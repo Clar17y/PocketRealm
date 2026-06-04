@@ -72,7 +72,7 @@ describe('handleProfileCommand', () => {
 
   it('makes selected-user unlinked copy clear', async () => {
     const get = vi.fn(async (): Promise<never> => {
-      throw new PocketRealmApiError('Not found', 404, 'POCKETREALM_API_ERROR', {});
+      throw new PocketRealmApiError('Link required', 404, 'DISCORD_LINK_REQUIRED', {});
     });
     const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
     const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
@@ -90,6 +90,56 @@ describe('handleProfileCommand', () => {
     expect(editReply).toHaveBeenCalledWith({
       content: 'That Discord user needs to link their PocketRealm account with /link first.',
     });
+  });
+
+  it('reports a linked account with no active player without telling the user to run /link', async () => {
+    const get = vi.fn(async (): Promise<never> => {
+      throw new PocketRealmApiError('Player not found', 404, 'DISCORD_PLAYER_NOT_FOUND', {});
+    });
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      user: { id: 'invoker-1' },
+      options: {
+        getUser: vi.fn(() => null),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleProfileCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Linked PocketRealm account has no active player.',
+    });
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).not.toContain('/link');
+  });
+
+  it('uses generic data failure copy for other 404 errors', async () => {
+    const get = vi.fn(async (): Promise<never> => {
+      throw new PocketRealmApiError('Not found', 404, 'POCKETREALM_API_ERROR', {});
+    });
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      user: { id: 'invoker-1' },
+      options: {
+        getUser: vi.fn(() => null),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleProfileCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Unable to load PocketRealm player data right now. Please try again later.',
+    });
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).not.toContain('/link');
   });
 });
 
@@ -220,6 +270,37 @@ describe('handleRankCommand', () => {
         }),
       ],
     });
+  });
+
+  it('formats null rank and score as unranked', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      rank: {
+        category: 'level',
+        rank: null,
+        score: null,
+        totalPlayers: 250,
+      },
+    }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      user: { id: 'invoker-1' },
+      options: {
+        getString: vi.fn(() => 'level'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    const reply = editReply.mock.calls[0]?.[0];
+    const embed = typeof reply === 'object' && 'embeds' in reply ? reply.embeds?.[0] : undefined;
+    expect(embed).toEqual(expect.objectContaining({
+      data: expect.objectContaining({
+        description: 'Rank: Unranked',
+      }),
+    }));
   });
 
   it('tells unlinked users to run /link ephemerally', async () => {

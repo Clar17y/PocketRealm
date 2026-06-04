@@ -33,8 +33,8 @@ interface SkillsResponse {
 interface RankResponse {
   rank: {
     category: string;
-    rank: number;
-    score: number;
+    rank: number | null;
+    score: number | null;
     totalPlayers?: number;
     lastRefreshedAt?: string;
   };
@@ -45,6 +45,7 @@ type PlayerCommandConfig = Pick<BotConfig, 'guildId'>;
 
 const LINK_SELF_COPY = 'Link your PocketRealm account first with /link.';
 const LINK_OTHER_COPY = 'That Discord user needs to link their PocketRealm account with /link first.';
+const PLAYER_NOT_FOUND_COPY = 'Linked PocketRealm account has no active player.';
 
 export async function handleProfileCommand(
   interaction: ChatInputCommandInteraction,
@@ -150,6 +151,13 @@ async function editPlayerErrorReply(
     return;
   }
 
+  if (isPlayerNotFoundError(error)) {
+    await interaction.editReply({
+      content: PLAYER_NOT_FOUND_COPY,
+    });
+    return;
+  }
+
   await interaction.editReply({
     content: 'Unable to load PocketRealm player data right now. Please try again later.',
   });
@@ -157,7 +165,12 @@ async function editPlayerErrorReply(
 
 function isUnlinkedError(error: unknown): boolean {
   return error instanceof PocketRealmApiError
-    && (error.code === 'DISCORD_LINK_REQUIRED' || error.status === 404);
+    && error.code === 'DISCORD_LINK_REQUIRED';
+}
+
+function isPlayerNotFoundError(error: unknown): boolean {
+  return error instanceof PocketRealmApiError
+    && error.code === 'DISCORD_PLAYER_NOT_FOUND';
 }
 
 function buildProfileEmbed(profile: ProfileResponse['profile']): EmbedBuilder {
@@ -197,10 +210,17 @@ function formatSkills(skills: SkillsResponse['skills']): string {
 }
 
 function buildRankEmbed(rank: RankResponse['rank']): EmbedBuilder {
-  const lines = [
-    `Rank: #${rank.rank}${rank.totalPlayers ? ` of ${rank.totalPlayers}` : ''}`,
-    `Score: ${rank.score}`,
-  ];
+  const lines: string[] = [];
+
+  if (rank.rank === null) {
+    lines.push('Rank: Unranked');
+  } else {
+    lines.push(`Rank: #${rank.rank}${rank.totalPlayers ? ` of ${rank.totalPlayers}` : ''}`);
+  }
+
+  if (rank.score !== null) {
+    lines.push(`Score: ${rank.score}`);
+  }
 
   if (rank.lastRefreshedAt) {
     lines.push(`Updated: ${formatDiscordTimestamp(rank.lastRefreshedAt)}`);

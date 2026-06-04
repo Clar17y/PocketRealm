@@ -38,7 +38,11 @@ export async function handleWikiCommand(
     return;
   }
 
-  const results = response.results.slice(0, MAX_WIKI_RESULTS);
+  const results = response.results
+    .map(formatWikiResult)
+    .filter((result): result is string => Boolean(result))
+    .slice(0, MAX_WIKI_RESULTS);
+
   if (results.length === 0) {
     await interaction.editReply({
       content: `No wiki results found for "${query}".`,
@@ -49,18 +53,38 @@ export async function handleWikiCommand(
   await interaction.editReply({
     content: [
       `Wiki results for "${query}":`,
-      ...results.map(formatWikiResult),
+      ...results,
     ].join('\n'),
   });
 }
 
-function formatWikiResult(result: WikiResult): string {
+function formatWikiResult(result: WikiResult): string | null {
+  const url = toAbsoluteWikiUrl(result.url);
+  if (!url) {
+    return null;
+  }
+
   const title = result.section ? `${result.title} - ${result.section}` : result.title;
   const snippet = result.snippet ? ` - ${result.snippet}` : '';
 
-  return `- ${title}: ${toAbsoluteWikiUrl(result.url)}${snippet}`;
+  return `- ${title}: ${url}${snippet}`;
 }
 
-function toAbsoluteWikiUrl(url: string): string {
-  return new URL(url, WIKI_BASE_URL).toString();
+function toAbsoluteWikiUrl(url: string): string | null {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url, WIKI_BASE_URL);
+  } catch {
+    return null;
+  }
+
+  if (parsedUrl.protocol !== 'https:' || parsedUrl.origin !== WIKI_BASE_URL) {
+    return null;
+  }
+
+  if (parsedUrl.pathname !== '/wiki' && !parsedUrl.pathname.startsWith('/wiki/')) {
+    return null;
+  }
+
+  return parsedUrl.toString();
 }
