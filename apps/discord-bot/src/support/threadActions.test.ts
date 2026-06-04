@@ -38,6 +38,14 @@ describe('isStaffMember', () => {
 
     expect(isStaffMember(member, new Set([STAFF_ROLE_ID]))).toBe(true);
   });
+
+  it('checks raw guild member role arrays against configured staff role ids', () => {
+    expect(isStaffMember({ roles: [USER_ROLE_ID, STAFF_ROLE_ID] }, new Set([STAFF_ROLE_ID]))).toBe(true);
+  });
+
+  it('denies malformed member shapes safely', () => {
+    expect(isStaffMember({ roles: { cache: null } }, new Set([STAFF_ROLE_ID]))).toBe(false);
+  });
 });
 
 describe('handleSupportThreadAction', () => {
@@ -73,9 +81,52 @@ describe('handleSupportThreadAction', () => {
       threadId: THREAD_ID,
       createdByDiscordUserId: ACTOR_ID,
     });
-    expect(interaction.reply).toHaveBeenCalledWith({
-      ephemeral: true,
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith({
       content: expect.stringContaining(THREAD_ID),
+    });
+  });
+
+  it('records a follow-up thread when adding the reporter fails', async () => {
+    const api = createApi(ticketContext);
+    const thread = createThread();
+    vi.mocked(thread.members.add).mockRejectedValue(new Error('Missing Access') as never);
+    const interaction = createButtonInteraction({
+      customId: 'support:ask_reporter:SUP-ABC12345',
+      channel: createTriageChannel(thread),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('SUP-ABC12345'),
+    }));
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/support/tickets/SUP-ABC12345/thread', {
+      threadId: THREAD_ID,
+      createdByDiscordUserId: ACTOR_ID,
+    });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('could not be added'),
+    });
+  });
+
+  it('cleans up a duplicate follow-up thread when recording hits a mapping conflict', async () => {
+    const conflict = Object.assign(new Error('Conflict'), { statusCode: 409, code: 'SUPPORT_DISCORD_THREAD_CONFLICT' });
+    const api = createApi(ticketContext);
+    vi.mocked(api.post).mockRejectedValue(conflict as never);
+    const thread = createThread();
+    const interaction = createButtonInteraction({
+      customId: 'support:ask_reporter:SUP-ABC12345',
+      channel: createTriageChannel(thread),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(thread.setArchived).toHaveBeenCalledWith(true, 'Duplicate support follow-up for SUP-ABC12345');
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('already exists'),
     });
   });
 
@@ -101,8 +152,7 @@ describe('handleSupportThreadAction', () => {
       '/api/v1/discord/support/tickets/SUP-ABC12345/thread',
       expect.anything(),
     );
-    expect(interaction.reply).toHaveBeenCalledWith({
-      ephemeral: true,
+    expect(interaction.editReply).toHaveBeenCalledWith({
       content: expect.stringContaining(THREAD_ID),
     });
   });
@@ -127,8 +177,7 @@ describe('handleSupportThreadAction', () => {
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/support/tickets/SUP-ABC12345/archive-thread', {
       actorDiscordUserId: ACTOR_ID,
     });
-    expect(interaction.reply).toHaveBeenCalledWith({
-      ephemeral: true,
+    expect(interaction.editReply).toHaveBeenCalledWith({
       content: 'Archived support thread for `SUP-ABC12345`.',
     });
   });
@@ -158,9 +207,27 @@ describe('handleSupportThreadAction', () => {
     expect(vi.mocked(thread.setArchived).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(api.post).mock.invocationCallOrder[0],
     );
-    expect(interaction.reply).toHaveBeenCalledWith({
-      ephemeral: true,
+    expect(interaction.editReply).toHaveBeenCalledWith({
       content: 'Archived support thread for `SUP-ABC12345`.',
+    });
+  });
+
+  it('does not call the archive API when no follow-up thread exists', async () => {
+    const api = createApi(ticketContext);
+    const interaction = createButtonInteraction({
+      customId: 'support:archive_thread:SUP-ABC12345',
+      channel: createTriageChannel(createThread()),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(api.post).not.toHaveBeenCalledWith(
+      '/api/v1/discord/support/tickets/SUP-ABC12345/archive-thread',
+      expect.anything(),
+    );
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'No follow-up thread exists for `SUP-ABC12345`.',
     });
   });
 
@@ -178,9 +245,29 @@ describe('handleSupportThreadAction', () => {
       status: 'accepted',
       actorDiscordUserId: ACTOR_ID,
     });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Updated `SUP-ABC12345` status to `accepted`.',
+    });
+  });
+
+  it('returns a clear configuration response when staff roles are empty', async () => {
+    const api = createApi(ticketContext);
+    const interaction = createButtonInteraction({
+      customId: 'support:accepted:SUP-ABC12345',
+      channel: createTriageChannel(createThread()),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, {
+      api,
+      config: { supportStaffRoleIds: [] },
+    });
+
+    expect(api.post).not.toHaveBeenCalled();
     expect(interaction.reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Updated `SUP-ABC12345` status to `accepted`.',
+      content: 'Support actions are not configured. Ask an administrator to set support staff roles.',
     });
   });
 
@@ -243,7 +330,7 @@ function createTriageChannel(thread: PrivateThreadChannel): TextChannel {
 function createButtonInteraction(input: {
   customId: string;
   channel: ButtonInteraction['channel'];
-  member: GuildMember;
+  member: unknown;
 }): ButtonInteraction {
   return {
     customId: input.customId,
@@ -251,5 +338,7 @@ function createButtonInteraction(input: {
     member: input.member,
     user: { id: ACTOR_ID },
     reply: vi.fn(),
+    deferReply: vi.fn(),
+    editReply: vi.fn(),
   } as unknown as ButtonInteraction;
 }

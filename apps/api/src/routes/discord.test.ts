@@ -500,6 +500,16 @@ describe('discordRouter', () => {
     });
   });
 
+  it('rejects Discord support status values that buttons do not emit', async () => {
+    await request(app())
+      .post('/api/v1/discord/support/tickets/SUP-ABC12345/status')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ status: 'duplicate', actorDiscordUserId: '5678901234567890' })
+      .expect(400);
+
+    expect(mocks.updateSupportTicketStatusFromDiscord).not.toHaveBeenCalled();
+  });
+
   it('creates a pending Discord duel with internal bot auth', async () => {
     mocks.createPendingDiscordDuel.mockResolvedValue({
       id: DUEL_ID,

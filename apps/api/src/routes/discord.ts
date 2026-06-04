@@ -41,7 +41,7 @@ import {
   resolveDiscordDuel,
 } from '../services/discordDuelService';
 import { createDiscordSupportTicket } from '../services/supportTicketService';
-import { createSupportTicketSchema, SUPPORT_TICKET_STATUSES } from '../services/supportTicketSchemas';
+import { createSupportTicketSchema } from '../services/supportTicketSchemas';
 import { searchWikiForDiscord } from '../services/wikiSearchService';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -107,8 +107,10 @@ const archiveThreadSchema = z.object({
   actorDiscordUserId: discordSnowflakeSchema,
 }).strict();
 
+const DISCORD_SUPPORT_BUTTON_STATUSES = ['needs_info', 'accepted', 'rejected', 'security', 'closed'] as const;
+
 const supportTicketStatusSchema = z.object({
-  status: z.enum(SUPPORT_TICKET_STATUSES),
+  status: z.enum(DISCORD_SUPPORT_BUTTON_STATUSES),
   actorDiscordUserId: discordSnowflakeSchema,
 }).strict();
 

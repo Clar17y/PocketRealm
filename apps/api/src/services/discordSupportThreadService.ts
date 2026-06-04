@@ -60,8 +60,12 @@ function supportTicketSummary(ticket: {
   return safeText(ticket.description, MAX_DISCORD_SUMMARY_LENGTH);
 }
 
-function closeTimestampFor(status: SupportTicketStatus): Date | null {
-  return CLOSED_TICKET_STATUSES.includes(status) ? new Date() : null;
+function closeTimestampFor(status: SupportTicketStatus, existingClosedAt?: Date | null): Date | null {
+  if (!CLOSED_TICKET_STATUSES.includes(status)) {
+    return null;
+  }
+
+  return existingClosedAt ?? new Date();
 }
 
 function firstActiveDiscordUserId(ticket: {
@@ -320,18 +324,25 @@ export async function updateSupportTicketStatusFromDiscord(input: UpdateSupportT
   return prisma.$transaction(async (tx) => {
     const existing = await tx.supportTicket.findUnique({
       where: { publicId: input.publicId },
-      select: { id: true, status: true },
+      select: { id: true, publicId: true, status: true, closedAt: true },
     });
 
     if (!existing) {
       throw new AppError(404, 'Support ticket not found', 'SUPPORT_TICKET_NOT_FOUND');
     }
 
+    if (existing.status === input.status) {
+      return {
+        publicId: existing.publicId,
+        status: existing.status,
+      };
+    }
+
     const ticket = await tx.supportTicket.update({
       where: { publicId: input.publicId },
       data: {
         status: input.status,
-        closedAt: closeTimestampFor(input.status),
+        closedAt: closeTimestampFor(input.status, existing.closedAt),
       },
       select: {
         publicId: true,

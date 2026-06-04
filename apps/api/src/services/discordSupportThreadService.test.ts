@@ -360,6 +360,55 @@ describe('discordSupportThreadService', () => {
     });
   });
 
+  it('returns the current ticket without updating or recording an event when status is unchanged', async () => {
+    const closedAt = new Date('2026-06-04T10:00:00.000Z');
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({
+      id: 'ticket-1',
+      publicId: 'SUP-ABC12345',
+      status: 'closed',
+      closedAt,
+    } as never);
+
+    const result = await updateSupportTicketStatusFromDiscord({
+      publicId: 'SUP-ABC12345',
+      status: 'closed',
+      actorDiscordUserId: '5678901234567890',
+    });
+
+    expect(result).toEqual({
+      publicId: 'SUP-ABC12345',
+      status: 'closed',
+    });
+    expect(prisma.supportTicket.update).not.toHaveBeenCalled();
+    expect(prisma.supportTicketEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('preserves an existing closedAt when moving between closed statuses', async () => {
+    const closedAt = new Date('2026-06-04T10:00:00.000Z');
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({
+      id: 'ticket-1',
+      status: 'rejected',
+      closedAt,
+    } as never);
+    vi.mocked(prisma.supportTicket.update).mockResolvedValue({
+      publicId: 'SUP-ABC12345',
+      status: 'closed',
+    } as never);
+
+    await updateSupportTicketStatusFromDiscord({
+      publicId: 'SUP-ABC12345',
+      status: 'closed',
+      actorDiscordUserId: '5678901234567890',
+    });
+
+    expect(prisma.supportTicket.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        status: 'closed',
+        closedAt,
+      },
+    }));
+  });
+
   it('returns not found when creating a thread without a triage mapping', async () => {
     vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({ id: 'ticket-1' } as never);
     vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue(null as never);
