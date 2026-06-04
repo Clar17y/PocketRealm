@@ -82,6 +82,8 @@ export async function handleReportModalSubmit(
     return;
   }
 
+  await interaction.deferReply({ ephemeral: true });
+
   try {
     const response = await api.post<CreateDiscordReportResponse>('/api/v1/discord/reports', {
       discordGuildId: interaction.guildId,
@@ -94,13 +96,11 @@ export async function handleReportModalSubmit(
       ...optionalSteps(interaction.fields.getTextInputValue(REPORT_STEPS_FIELD)),
     });
 
-    await interaction.reply({
-      ephemeral: true,
+    await interaction.editReply({
       content: `Report ${response.ticket.publicId} created with status ${response.ticket.status}.`,
     });
   } catch (error) {
-    await interaction.reply({
-      ephemeral: true,
+    await interaction.editReply({
       content: reportErrorCopy(error),
     });
   }

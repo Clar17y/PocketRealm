@@ -45,7 +45,8 @@ describe('handleReportModalSubmit', () => {
         status: 'open',
       },
     });
-    const reply = vi.fn();
+    const deferReply = vi.fn();
+    const editReply = vi.fn();
     const interaction = createModalInteraction({
       guildId: 'guild-123',
       userId: 'user-123',
@@ -56,11 +57,13 @@ describe('handleReportModalSubmit', () => {
         area: 'combat',
         privacy: 'private',
       },
-      reply,
+      deferReply,
+      editReply,
     });
 
     await handleReportModalSubmit(interaction, api);
 
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/reports', {
       discordGuildId: 'guild-123',
       discordUserId: 'user-123',
@@ -71,10 +74,44 @@ describe('handleReportModalSubmit', () => {
       description: 'The fight stopped after I stunned a spider.',
       reproductionSteps: 'Stun a spider during its turn.',
     });
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
+    expect(editReply).toHaveBeenCalledWith({
       content: 'Report SUP-ABC12345 created with status open.',
     });
+  });
+
+  it('normalizes blank or unknown optional fields before posting', async () => {
+    const api = createApi({
+      ticket: {
+        publicId: 'SUP-ABC12345',
+        status: 'open',
+      },
+    });
+    const interaction = createModalInteraction({
+      guildId: 'guild-123',
+      userId: 'user-123',
+      values: {
+        title: '  Inventory soft lock  ',
+        description: '  Inventory stopped accepting item moves.  ',
+        steps: '   ',
+        area: 'Not A Real Area',
+        privacy: 'not-sure',
+      },
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    });
+
+    await handleReportModalSubmit(interaction, api);
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/reports', expect.objectContaining({
+      area: 'other',
+      privacy: 'not_sure',
+      title: 'Inventory soft lock',
+      description: 'Inventory stopped accepting item moves.',
+    }));
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/discord/reports',
+      expect.not.objectContaining({ reproductionSteps: expect.any(String) }),
+    );
   });
 
   it('tells an unlinked user to link first', async () => {
@@ -82,7 +119,7 @@ describe('handleReportModalSubmit', () => {
     vi.mocked(api.post).mockRejectedValue(
       new PocketRealmApiError('Link required', 404, 'DISCORD_LINK_REQUIRED', {}),
     );
-    const reply = vi.fn();
+    const editReply = vi.fn();
     const interaction = createModalInteraction({
       guildId: 'guild-123',
       userId: 'user-123',
@@ -93,14 +130,60 @@ describe('handleReportModalSubmit', () => {
         area: 'inventory',
         privacy: 'not sure',
       },
-      reply,
+      deferReply: vi.fn(),
+      editReply,
     });
 
     await handleReportModalSubmit(interaction, api);
 
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Link your PocketRealm account first, or use the in-game report flow.',
+    });
+  });
+
+  it('uses safe retry copy for generic API failures', async () => {
+    const api = createApi(null);
+    vi.mocked(api.post).mockRejectedValue(new Error('API down'));
+    const editReply = vi.fn();
+    const interaction = createModalInteraction({
+      guildId: 'guild-123',
+      userId: 'user-123',
+      values: {
+        title: 'Inventory disappeared',
+        description: 'My backpack emptied after login.',
+        steps: '',
+        area: 'inventory',
+        privacy: 'not_sure',
+      },
+      deferReply: vi.fn(),
+      editReply,
+    });
+
+    await handleReportModalSubmit(interaction, api);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Unable to create a report right now. Please try again later.',
+    });
+  });
+
+  it('does not call the API outside a guild', async () => {
+    const api = createApi(null);
+    const reply = vi.fn();
+    const interaction = createModalInteraction({
+      guildId: null,
+      userId: 'user-123',
+      values: {},
+      reply,
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    });
+
+    await handleReportModalSubmit(interaction, api);
+
+    expect(api.post).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Link your PocketRealm account first, or use the in-game report flow.',
+      content: 'Reports only work in the PocketRealm Discord server.',
     });
   });
 });
@@ -115,7 +198,9 @@ function createModalInteraction(options: {
   guildId: string | null;
   userId: string;
   values: Record<string, string>;
-  reply: ReturnType<typeof vi.fn>;
+  reply?: ReturnType<typeof vi.fn>;
+  deferReply: ReturnType<typeof vi.fn>;
+  editReply: ReturnType<typeof vi.fn>;
 }): ModalSubmitInteraction {
   return {
     guildId: options.guildId,
@@ -123,6 +208,8 @@ function createModalInteraction(options: {
     fields: {
       getTextInputValue: vi.fn((fieldId: string) => options.values[fieldId] ?? ''),
     },
-    reply: options.reply,
+    reply: options.reply ?? vi.fn(),
+    deferReply: options.deferReply,
+    editReply: options.editReply,
   } as unknown as ModalSubmitInteraction;
 }
