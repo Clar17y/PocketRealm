@@ -1,6 +1,8 @@
 import 'dotenv/config';
 
+import { prisma } from '@pocketrealm/database';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
+import { Redis } from 'ioredis';
 import pino from 'pino';
 
 import { PocketRealmApiClient } from './api/pocketRealmApi.js';
@@ -8,6 +10,7 @@ import { loadBotConfig } from './config.js';
 import { syncLinkedRoles } from './discord/roleSync.js';
 import { routeInteraction } from './interactions/interactionRouter.js';
 import { buildTriageCard, type UnpostedTicketsResponse } from './support/triageCards.js';
+import { createMessageXpService } from './xp/messageXp.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
@@ -15,9 +18,16 @@ const logger = pino({
 
 async function main(): Promise<void> {
   const config = loadBotConfig();
+  const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
   const api = new PocketRealmApiClient({
     baseUrl: config.apiBaseUrl,
     internalApiKey: config.internalApiKey,
+  });
+  const messageXp = createMessageXpService({
+    prisma,
+    redis,
+    config,
+    logger,
   });
   const client = new Client({
     intents: [
@@ -32,11 +42,55 @@ async function main(): Promise<void> {
   let isRoleSyncRunning = false;
   let isSupportTriageRunning = false;
 
+  redis.on('error', (error: unknown) => {
+    logger.warn({ error }, 'Discord XP Redis connection error');
+  });
+
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
       await routeInteraction(interaction, { api, config });
     } catch (error) {
       logger.warn({ error }, 'Failed to handle Discord interaction');
+    }
+  });
+
+  client.on(Events.MessageCreate, async (message) => {
+    try {
+      const result = await messageXp.grantXpForMessage(message);
+      if (!result.eligible) {
+        logger.debug(
+          {
+            guildId: message.guildId,
+            channelId: message.channelId,
+            discordUserId: message.author.id,
+            reason: result.reason,
+          },
+          'Discord message XP skipped',
+        );
+        return;
+      }
+
+      logger.debug(
+        {
+          guildId: message.guildId,
+          channelId: message.channelId,
+          discordUserId: message.author.id,
+          xpGranted: result.xpGranted,
+          previousLevel: result.previousLevel,
+          newLevel: result.newLevel,
+        },
+        'Discord message XP granted',
+      );
+    } catch (error) {
+      logger.warn(
+        {
+          error,
+          guildId: message.guildId,
+          channelId: message.channelId,
+          messageId: message.id,
+        },
+        'Failed to process Discord message XP',
+      );
     }
   });
 
@@ -131,6 +185,7 @@ async function main(): Promise<void> {
     if (supportTriageInterval) {
       clearInterval(supportTriageInterval);
     }
+    redis.disconnect();
     client.destroy();
     process.exit(0);
   };
