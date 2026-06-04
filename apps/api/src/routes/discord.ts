@@ -33,6 +33,7 @@ import {
 } from '../services/discordSchemas';
 import {
   createPendingDiscordDuel,
+  DISCORD_DUEL_REPLAY_MAX_PAGE,
   getDiscordDuelReplay,
   recordDiscordDuelMessage,
   resolveDiscordDuel,
@@ -78,7 +79,7 @@ const discordDuelResolveSchema = z.object({
 }).strict();
 
 const discordDuelReplayQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).optional(),
+  page: z.coerce.number().int().min(1).max(DISCORD_DUEL_REPLAY_MAX_PAGE).optional(),
 }).strict();
 
 const publicIdParamsSchema = z.object({

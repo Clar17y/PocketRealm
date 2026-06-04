@@ -185,6 +185,7 @@ describe('discordDuelService', () => {
       .mockResolvedValueOnce(linkedPlayer('player-1', 'Mira'))
       .mockResolvedValueOnce(linkedPlayer('player-2', 'Theo'));
     mockPrisma.discordDuel.create.mockResolvedValue(pendingDuel());
+    mockPrisma.discordDuel.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.discordDuel.update.mockResolvedValue(pendingDuel({
       status: 'completed',
       winnerPlayerId: 'player-1',
@@ -299,7 +300,20 @@ describe('discordDuelService', () => {
   });
 
   it('resolves a Discord duel without mutating gameplay state', async () => {
-    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel());
+    mockPrisma.discordDuel.findUnique
+      .mockResolvedValueOnce(pendingDuel())
+      .mockResolvedValueOnce(pendingDuel({
+        status: 'completed',
+        winnerPlayerId: 'player-1',
+        isDraw: false,
+        summary: { outcome: 'victory', totalRounds: 3 },
+        combatLog: [{ round: 1, message: 'Mira hits Theo.' }],
+        completedAt: NOW,
+        acceptedAt: NOW,
+      }));
+    mockPrisma.discordDuel.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
 
     const result = await resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID);
 
@@ -311,8 +325,25 @@ describe('discordDuelService', () => {
       { combatMode: 'pvp' },
     );
     expectNoGameplayWrites();
-    expect(mockPrisma.discordDuel.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: DUEL_ID },
+    expect(mockPrisma.discordDuel.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: DUEL_ID,
+        status: 'pending',
+        expiresAt: { gt: NOW },
+        targetDiscordUserId: TARGET_DISCORD_ID,
+      },
+      data: {
+        status: 'resolving',
+        acceptedAt: NOW,
+      },
+    });
+    expect(mockPrisma.discordDuel.updateMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: {
+        id: DUEL_ID,
+        status: 'resolving',
+        acceptedAt: NOW,
+        targetDiscordUserId: TARGET_DISCORD_ID,
+      },
       data: expect.objectContaining({
         status: 'completed',
         winnerPlayerId: 'player-1',
@@ -320,6 +351,7 @@ describe('discordDuelService', () => {
         combatLog: [{ round: 1, message: 'Mira hits Theo.' }],
       }),
     }));
+    expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
     expect(result).toEqual(expect.objectContaining({
       id: DUEL_ID,
       status: 'completed',
@@ -330,17 +362,61 @@ describe('discordDuelService', () => {
     }));
   });
 
+  it('does not simulate combat when the atomic duel claim fails', async () => {
+    mockPrisma.discordDuel.findUnique
+      .mockResolvedValueOnce(pendingDuel())
+      .mockResolvedValueOnce(pendingDuel({ status: 'completed' }));
+    mockPrisma.discordDuel.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID))
+      .rejects.toMatchObject({ code: 'DISCORD_DUEL_NOT_PENDING' });
+
+    expect(buildPvpCombatant).not.toHaveBeenCalled();
+    expect(runTemplateCombat).not.toHaveBeenCalled();
+    expect(mockPrisma.discordDuel.updateMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
+  });
+
   it('records the Discord message id for a duel', async () => {
-    mockPrisma.discordDuel.update.mockResolvedValue(pendingDuel({ messageId: MESSAGE_ID }));
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ messageId: MESSAGE_ID }));
+    mockPrisma.discordDuel.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await recordDiscordDuelMessage(DUEL_ID, MESSAGE_ID);
 
-    expect(mockPrisma.discordDuel.update).toHaveBeenCalledWith({
-      where: { id: DUEL_ID },
+    expect(mockPrisma.discordDuel.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: DUEL_ID,
+        OR: [
+          { messageId: null },
+          { messageId: MESSAGE_ID },
+        ],
+      },
       data: { messageId: MESSAGE_ID },
+    });
+    expect(mockPrisma.discordDuel.findUnique).toHaveBeenCalledWith({
+      where: { id: DUEL_ID },
       select: { id: true, messageId: true },
     });
+    expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
     expect(result).toEqual({ id: DUEL_ID, messageId: MESSAGE_ID });
+  });
+
+  it('allows retrying the same Discord message id for a duel', async () => {
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ messageId: MESSAGE_ID }));
+    mockPrisma.discordDuel.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(recordDiscordDuelMessage(DUEL_ID, MESSAGE_ID))
+      .resolves.toEqual({ id: DUEL_ID, messageId: MESSAGE_ID });
+  });
+
+  it('rejects recording a different Discord message id for a duel', async () => {
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ messageId: '6789012345678901' }));
+    mockPrisma.discordDuel.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(recordDiscordDuelMessage(DUEL_ID, MESSAGE_ID))
+      .rejects.toMatchObject({ code: 'DISCORD_DUEL_MESSAGE_CONFLICT' });
+
+    expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
   });
 
   it('returns bounded replay pages with hasMore', async () => {

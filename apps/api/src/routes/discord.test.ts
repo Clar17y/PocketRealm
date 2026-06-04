@@ -83,6 +83,7 @@ vi.mock('../services/discordSupportThreadService', () => ({
 }));
 
 vi.mock('../services/discordDuelService', () => ({
+  DISCORD_DUEL_REPLAY_MAX_PAGE: 100,
   createPendingDiscordDuel: mocks.createPendingDiscordDuel,
   recordDiscordDuelMessage: mocks.recordDiscordDuelMessage,
   resolveDiscordDuel: mocks.resolveDiscordDuel,
@@ -592,6 +593,15 @@ describe('discordRouter', () => {
       entries: [{ round: 11 }],
     });
     expect(mocks.getDiscordDuelReplay).toHaveBeenCalledWith(DUEL_ID, 2);
+  });
+
+  it('rejects Discord duel replay pages beyond the route cap', async () => {
+    await request(app())
+      .get(`/api/v1/discord/duels/${DUEL_ID}/replay?page=101`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(400);
+
+    expect(mocks.getDiscordDuelReplay).not.toHaveBeenCalled();
   });
 
   it('requires internal bot auth for Discord duel routes', async () => {

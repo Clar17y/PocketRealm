@@ -6,6 +6,8 @@ import { buildPvpCombatant } from './pvpCombatantBuilder';
 
 const DISCORD_DUEL_TTL_MS = 2 * 60 * 1000;
 const DISCORD_DUEL_REPLAY_PAGE_SIZE = 10;
+export const DISCORD_DUEL_REPLAY_MAX_PAGE = 100;
+const DISCORD_DUEL_RESOLVING_STATUS = 'resolving';
 
 export interface CreateDiscordDuelInput {
   guildId: string;
@@ -192,6 +194,36 @@ async function getDuelOrThrow(duelId: string): Promise<DiscordDuelRecord> {
   return duel;
 }
 
+async function throwDiscordDuelClaimError(
+  duelId: string,
+  acceptedByDiscordUserId: string,
+  now: Date,
+): Promise<never> {
+  const duel = await prisma.discordDuel.findUnique({
+    where: { id: duelId },
+    select: {
+      status: true,
+      expiresAt: true,
+      targetDiscordUserId: true,
+    },
+  });
+
+  if (!duel) {
+    throw new AppError(404, 'Discord duel not found', 'DISCORD_DUEL_NOT_FOUND');
+  }
+  if (duel.status !== 'pending') {
+    throw new AppError(409, 'Discord duel is no longer pending', 'DISCORD_DUEL_NOT_PENDING');
+  }
+  if (duel.expiresAt <= now) {
+    throw new AppError(410, 'Discord duel challenge has expired', 'DISCORD_DUEL_EXPIRED');
+  }
+  if (acceptedByDiscordUserId !== duel.targetDiscordUserId) {
+    throw new AppError(403, 'Only the challenged Discord user can accept this duel', 'DISCORD_DUEL_NOT_TARGET');
+  }
+
+  throw new AppError(409, 'Discord duel could not be claimed', 'DISCORD_DUEL_CLAIM_CONFLICT');
+}
+
 export async function createPendingDiscordDuel(input: CreateDiscordDuelInput): Promise<PendingDiscordDuelDto> {
   if (input.challengerDiscordUserId === input.targetDiscordUserId) {
     throw new AppError(400, 'Cannot challenge yourself to a Discord duel', 'DISCORD_DUEL_SELF_CHALLENGE');
@@ -223,11 +255,28 @@ export async function recordDiscordDuelMessage(
   duelId: string,
   messageId: string,
 ): Promise<{ id: string; messageId: string | null }> {
-  const duel = await prisma.discordDuel.update({
-    where: { id: duelId },
+  await prisma.discordDuel.updateMany({
+    where: {
+      id: duelId,
+      OR: [
+        { messageId: null },
+        { messageId },
+      ],
+    },
     data: { messageId },
+  });
+
+  const duel = await prisma.discordDuel.findUnique({
+    where: { id: duelId },
     select: { id: true, messageId: true },
   });
+
+  if (!duel) {
+    throw new AppError(404, 'Discord duel not found', 'DISCORD_DUEL_NOT_FOUND');
+  }
+  if (duel.messageId !== messageId) {
+    throw new AppError(409, 'Discord duel message id has already been recorded', 'DISCORD_DUEL_MESSAGE_CONFLICT');
+  }
 
   return { id: duel.id, messageId: duel.messageId };
 }
@@ -247,6 +296,23 @@ export async function resolveDiscordDuel(
   }
   if (acceptedByDiscordUserId !== duel.targetDiscordUserId) {
     throw new AppError(403, 'Only the challenged Discord user can accept this duel', 'DISCORD_DUEL_NOT_TARGET');
+  }
+
+  const claim = await prisma.discordDuel.updateMany({
+    where: {
+      id: duelId,
+      status: 'pending',
+      expiresAt: { gt: now },
+      targetDiscordUserId: acceptedByDiscordUserId,
+    },
+    data: {
+      status: DISCORD_DUEL_RESOLVING_STATUS,
+      acceptedAt: now,
+    },
+  });
+
+  if (claim.count !== 1) {
+    await throwDiscordDuelClaimError(duelId, acceptedByDiscordUserId, now);
   }
 
   const [challengerCombatant, targetCombatant] = await Promise.all([
@@ -271,19 +337,28 @@ export async function resolveDiscordDuel(
     targetHpRemaining: combatResult.combatantBHpRemaining,
   };
 
-  const updated = await prisma.discordDuel.update({
-    where: { id: duelId },
+  const completion = await prisma.discordDuel.updateMany({
+    where: {
+      id: duelId,
+      status: DISCORD_DUEL_RESOLVING_STATUS,
+      acceptedAt: now,
+      targetDiscordUserId: acceptedByDiscordUserId,
+    },
     data: {
       status: 'completed',
-      acceptedAt: now,
       completedAt: now,
       winnerPlayerId,
       isDraw,
       combatLog: combatLog as unknown as Prisma.InputJsonValue,
       summary: summary as unknown as Prisma.InputJsonValue,
     },
-    include: discordDuelInclude(),
   });
+
+  if (completion.count !== 1) {
+    throw new AppError(409, 'Discord duel completion could not be applied', 'DISCORD_DUEL_COMPLETION_CONFLICT');
+  }
+
+  const updated = await getDuelOrThrow(duelId);
 
   return completedDto(updated);
 }
