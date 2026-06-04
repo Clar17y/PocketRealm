@@ -11,6 +11,11 @@ import {
   handleSkillsCommand,
   handleTurnsCommand,
 } from './playerCommands.js';
+import {
+  handleReportCommand,
+  handleReportModalSubmit,
+  isReportModalCustomId,
+} from './reportCommand.js';
 import { handleWikiCommand } from './wikiCommand.js';
 
 export interface InteractionRouterOptions {
@@ -20,7 +25,6 @@ export interface InteractionRouterOptions {
 
 const UNIMPLEMENTED_REGISTERED_CHAT_COMMANDS = new Set([
   'duel',
-  'report',
   'staff',
 ]);
 
@@ -32,6 +36,15 @@ export async function routeInteraction(
     if (parseSupportButtonId(interaction.customId)) {
       await handleSupportThreadAction(interaction, options);
     }
+    return;
+  }
+
+  if (
+    typeof interaction.isModalSubmit === 'function'
+    && interaction.isModalSubmit()
+    && isReportModalCustomId(interaction.customId)
+  ) {
+    await handleReportModalSubmit(interaction, options.api);
     return;
   }
 
@@ -64,6 +77,11 @@ export async function routeInteraction(
 
   if (interaction.commandName === 'rank') {
     await handleRankCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'report') {
+    await handleReportCommand(interaction);
     return;
   }
 

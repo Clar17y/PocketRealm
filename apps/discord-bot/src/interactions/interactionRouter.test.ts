@@ -1,12 +1,19 @@
-import type { ChatInputCommandInteraction, Interaction } from 'discord.js';
+import type { ChatInputCommandInteraction, Interaction, ModalSubmitInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { routeInteraction } from './interactionRouter.js';
+import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
 
 vi.mock('../support/threadActions.js', () => ({
   handleSupportThreadAction: vi.fn(),
+}));
+
+vi.mock('./reportCommand.js', () => ({
+  handleReportCommand: vi.fn(),
+  handleReportModalSubmit: vi.fn(),
+  isReportModalCustomId: vi.fn((customId: string) => customId.startsWith('report:')),
 }));
 
 const routerConfig = {
@@ -78,6 +85,32 @@ describe('routeInteraction', () => {
       ephemeral: true,
       content: 'The /duel command is not available yet.',
     });
+  });
+
+  it('routes report commands to the report modal handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'report',
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleReportCommand).toHaveBeenCalledWith(interaction);
+  });
+
+  it('routes report modal submissions to the report submit handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => false,
+      isButton: () => false,
+      isModalSubmit: () => true,
+      customId: 'report:invoker-1',
+    } as unknown as ModalSubmitInteraction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleReportModalSubmit).toHaveBeenCalledWith(interaction, api);
   });
 
   it('ignores unknown chat input commands', async () => {
