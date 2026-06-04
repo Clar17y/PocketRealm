@@ -14,6 +14,8 @@ export default defineConfig({
       '@pocketrealm/shared/constants/talentTreeDefinitions': resolve(__dirname, '../../packages/shared/src/constants/talentTreeDefinitions.ts'),
       '@pocketrealm/shared/constants/bossTemplateDefinitions': resolve(__dirname, '../../packages/shared/src/constants/bossTemplateDefinitions.ts'),
       '@pocketrealm/shared/utils/titleDisplay': resolve(__dirname, '../../packages/shared/src/utils/titleDisplay.ts'),
+      '@pocketrealm/shared/wiki/wikiNavigation': resolve(__dirname, '../../packages/shared/src/wiki/wikiNavigation.ts'),
+      '@pocketrealm/shared/wiki/wikiSearch': resolve(__dirname, '../../packages/shared/src/wiki/wikiSearch.ts'),
       '@pocketrealm/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
       '@pocketrealm/game-engine': resolve(__dirname, '../../packages/game-engine/src/index.ts'),
       '@pocketrealm/database': resolve(__dirname, '../../packages/database/src/index.ts'),

@@ -12,7 +12,13 @@ describe('wikiSearch', () => {
 
   it('finds pages by alias keywords', () => {
     const results = searchWiki('elo rating');
-    expect(results.some((result) => result.href === '/wiki/pvp/elo')).toBe(true);
+    expect(results[0]?.href).toBe('/wiki/pvp/elo');
+  });
+
+  it('prioritizes exact high-value aliases over incidental matches', () => {
+    expect(searchWiki('pvp')[0]?.href).toBe('/wiki/pvp/combat');
+    expect(searchWiki('duel')[0]?.href).toBe('/wiki/pvp/combat');
+    expect(searchWiki('ranked pvp')[0]?.href).toBe('/wiki/pvp/elo');
   });
 
   it('returns deterministic limited results', () => {
