@@ -1,6 +1,5 @@
-import { createHash } from 'crypto';
+import { createHmac } from 'crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppError } from '../middleware/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   prisma: {
@@ -12,6 +11,7 @@ const mocks = vi.hoisted(() => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -43,14 +43,17 @@ const NOW = new Date('2026-06-04T12:00:00.000Z');
 const FUTURE = new Date('2026-06-04T12:15:00.000Z');
 const DISCORD_USER_ID = '1234567890123456';
 const DISCORD_GUILD_ID = '2345678901234567';
+const VALID_HMAC_SECRET = '12345678901234567890123456789012';
+const ORIGINAL_DISCORD_INTERNAL_API_KEY = process.env.DISCORD_INTERNAL_API_KEY;
 
 const tx = {
   discordLinkCode: {
     findUnique: vi.fn(),
-    update: vi.fn(),
+    updateMany: vi.fn(),
   },
   discordAccountLink: {
     findFirst: vi.fn(),
+    findUnique: vi.fn(),
     create: vi.fn(),
   },
   playerAchievement: {
@@ -73,19 +76,36 @@ function linkRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function hmacLinkCode(code: string): string {
+  return createHmac('sha256', VALID_HMAC_SECRET).update(code.trim().toUpperCase()).digest('hex');
+}
+
+function prismaP2002(target: string[] | string) {
+  return Object.assign(new Error('Unique constraint failed'), {
+    code: 'P2002',
+    meta: { target },
+  });
+}
+
 describe('discordAccountLinkService', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
+    process.env.DISCORD_INTERNAL_API_KEY = VALID_HMAC_SECRET;
     mocks.prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    if (ORIGINAL_DISCORD_INTERNAL_API_KEY === undefined) {
+      delete process.env.DISCORD_INTERNAL_API_KEY;
+    } else {
+      process.env.DISCORD_INTERNAL_API_KEY = ORIGINAL_DISCORD_INTERNAL_API_KEY;
+    }
   });
 
-  it('creates an uppercase 8-character link code and stores only its sha256 hash', async () => {
+  it('creates an uppercase 8-character link code and stores only its HMAC hash', async () => {
     mocks.prisma.discordLinkCode.create.mockResolvedValue({});
 
     const result = await createDiscordLinkCode({
@@ -102,10 +122,66 @@ describe('discordAccountLinkService', () => {
       data: {
         discordUserId: DISCORD_USER_ID,
         discordGuildId: DISCORD_GUILD_ID,
-        codeHash: createHash('sha256').update(result.code).digest('hex'),
+        codeHash: hmacLinkCode(result.code),
         expiresAt: FUTURE,
       },
     });
+  });
+
+  it('fails clearly when the link-code HMAC secret is not configured', async () => {
+    delete process.env.DISCORD_INTERNAL_API_KEY;
+
+    await expect(createDiscordLinkCode({
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+    })).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DISCORD_LINK_CODE_HMAC_NOT_CONFIGURED',
+      message: 'Discord link code HMAC secret is not configured',
+    });
+    expect(mocks.prisma.discordLinkCode.create).not.toHaveBeenCalled();
+
+    process.env.DISCORD_INTERNAL_API_KEY = 'too-short';
+
+    await expect(claimDiscordLinkCode({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      code: 'ABC12345',
+    })).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DISCORD_LINK_CODE_HMAC_NOT_CONFIGURED',
+    });
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('retries bounded link-code generation when the code hash collides', async () => {
+    mocks.randomBytes
+      .mockReturnValueOnce(Buffer.from([0, 1, 2, 3, 4, 5, 6, 7]))
+      .mockReturnValueOnce(Buffer.from([8, 9, 10, 11, 12, 13, 14, 15]));
+    mocks.prisma.discordLinkCode.create
+      .mockRejectedValueOnce(prismaP2002(['codeHash']))
+      .mockResolvedValueOnce({});
+
+    const result = await createDiscordLinkCode({
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+    });
+
+    expect(result.code).toBe('IJKLMNOP');
+    expect(mocks.prisma.discordLinkCode.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops retrying link-code generation after bounded hash collisions', async () => {
+    mocks.prisma.discordLinkCode.create.mockRejectedValue(prismaP2002(['codeHash']));
+
+    await expect(createDiscordLinkCode({
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+    })).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DISCORD_LINK_CODE_GENERATION_FAILED',
+    });
+    expect(mocks.prisma.discordLinkCode.create).toHaveBeenCalledTimes(5);
   });
 
   it('claims a valid code, links the account, and grants the linked title achievement', async () => {
@@ -117,8 +193,8 @@ describe('discordAccountLinkService', () => {
       usedAt: null,
     });
     tx.discordAccountLink.findFirst.mockResolvedValue(null);
+    tx.discordLinkCode.updateMany.mockResolvedValue({ count: 1 });
     tx.discordAccountLink.create.mockResolvedValue(linkRecord());
-    tx.discordLinkCode.update.mockResolvedValue({});
     tx.playerAchievement.upsert.mockResolvedValue({});
 
     const result = await claimDiscordLinkCode({
@@ -128,7 +204,7 @@ describe('discordAccountLinkService', () => {
     });
 
     expect(tx.discordLinkCode.findUnique).toHaveBeenCalledWith({
-      where: { codeHash: createHash('sha256').update('ABC12345').digest('hex') },
+      where: { codeHash: hmacLinkCode('ABC12345') },
     });
     expect(tx.discordAccountLink.findFirst).toHaveBeenNthCalledWith(1, {
       where: {
@@ -142,16 +218,20 @@ describe('discordAccountLinkService', () => {
       where: { accountId: 'account-1', unlinkedAt: null },
       select: { id: true },
     });
+    expect(tx.discordLinkCode.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'code-1',
+        usedAt: null,
+        expiresAt: { gt: NOW },
+      },
+      data: { usedAt: NOW },
+    });
     expect(tx.discordAccountLink.create).toHaveBeenCalledWith({
       data: {
         discordGuildId: DISCORD_GUILD_ID,
         discordUserId: DISCORD_USER_ID,
         accountId: 'account-1',
       },
-    });
-    expect(tx.discordLinkCode.update).toHaveBeenCalledWith({
-      where: { id: 'code-1' },
-      data: { usedAt: NOW },
     });
     expect(tx.playerAchievement.upsert).toHaveBeenCalledWith({
       where: { playerId_achievementId: { playerId: 'player-1', achievementId: 'discord_linked' } },
@@ -186,6 +266,76 @@ describe('discordAccountLinkService', () => {
     });
 
     expect(tx.discordAccountLink.create).not.toHaveBeenCalled();
+    expect(tx.discordLinkCode.updateMany).not.toHaveBeenCalled();
+    expect(tx.playerAchievement.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a claim when conditional code consumption loses a race', async () => {
+    tx.discordLinkCode.findUnique.mockResolvedValue({
+      id: 'code-1',
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+      expiresAt: FUTURE,
+      usedAt: null,
+    });
+    tx.discordAccountLink.findFirst.mockResolvedValue(null);
+    tx.discordLinkCode.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(claimDiscordLinkCode({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      code: 'ABC12345',
+    })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'DISCORD_LINK_CODE_INVALID',
+    });
+    expect(tx.discordAccountLink.create).not.toHaveBeenCalled();
+    expect(tx.playerAchievement.upsert).not.toHaveBeenCalled();
+  });
+
+  it('maps active Discord user unique races to the existing conflict error', async () => {
+    tx.discordLinkCode.findUnique.mockResolvedValue({
+      id: 'code-1',
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+      expiresAt: FUTURE,
+      usedAt: null,
+    });
+    tx.discordAccountLink.findFirst.mockResolvedValue(null);
+    tx.discordLinkCode.updateMany.mockResolvedValue({ count: 1 });
+    tx.discordAccountLink.create.mockRejectedValue(prismaP2002(['discordGuildId', 'discordUserId']));
+
+    await expect(claimDiscordLinkCode({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      code: 'ABC12345',
+    })).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'DISCORD_USER_ALREADY_LINKED',
+    });
+    expect(tx.playerAchievement.upsert).not.toHaveBeenCalled();
+  });
+
+  it('maps active account unique races to the existing conflict error', async () => {
+    tx.discordLinkCode.findUnique.mockResolvedValue({
+      id: 'code-1',
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+      expiresAt: FUTURE,
+      usedAt: null,
+    });
+    tx.discordAccountLink.findFirst.mockResolvedValue(null);
+    tx.discordLinkCode.updateMany.mockResolvedValue({ count: 1 });
+    tx.discordAccountLink.create.mockRejectedValue(prismaP2002('discord_account_links_active_account_unique'));
+
+    await expect(claimDiscordLinkCode({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      code: 'ABC12345',
+    })).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'DISCORD_ACCOUNT_ALREADY_LINKED',
+    });
     expect(tx.playerAchievement.upsert).not.toHaveBeenCalled();
   });
 
@@ -293,8 +443,8 @@ describe('discordAccountLinkService', () => {
   });
 
   it('marks an active Discord link as role-synced', async () => {
-    mocks.prisma.discordAccountLink.findUnique.mockResolvedValue({ id: 'link-1', unlinkedAt: null });
-    mocks.prisma.discordAccountLink.update.mockResolvedValue(linkRecord({ roleSyncedAt: NOW }));
+    mocks.prisma.discordAccountLink.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.discordAccountLink.findUnique.mockResolvedValue(linkRecord({ roleSyncedAt: NOW }));
 
     await expect(markDiscordLinkSynced('link-1')).resolves.toEqual({
       id: 'link-1',
@@ -303,13 +453,17 @@ describe('discordAccountLinkService', () => {
       linkedAt: NOW,
       roleSyncedAt: NOW,
     });
-    expect(mocks.prisma.discordAccountLink.update).toHaveBeenCalledWith({
-      where: { id: 'link-1' },
+    expect(mocks.prisma.discordAccountLink.updateMany).toHaveBeenCalledWith({
+      where: { id: 'link-1', unlinkedAt: null },
       data: { roleSyncedAt: NOW },
+    });
+    expect(mocks.prisma.discordAccountLink.findUnique).toHaveBeenCalledWith({
+      where: { id: 'link-1' },
     });
   });
 
   it('rejects missing or inactive links when marking role sync complete', async () => {
+    mocks.prisma.discordAccountLink.updateMany.mockResolvedValueOnce({ count: 0 });
     mocks.prisma.discordAccountLink.findUnique.mockResolvedValueOnce(null);
 
     await expect(markDiscordLinkSynced('missing-link')).rejects.toMatchObject({
@@ -317,6 +471,7 @@ describe('discordAccountLinkService', () => {
       code: 'DISCORD_LINK_NOT_FOUND',
     });
 
+    mocks.prisma.discordAccountLink.updateMany.mockResolvedValueOnce({ count: 0 });
     mocks.prisma.discordAccountLink.findUnique.mockResolvedValueOnce({
       id: 'link-1',
       unlinkedAt: NOW,
@@ -326,5 +481,6 @@ describe('discordAccountLinkService', () => {
       statusCode: 409,
       code: 'DISCORD_LINK_INACTIVE',
     });
+    expect(mocks.prisma.discordAccountLink.update).not.toHaveBeenCalled();
   });
 });

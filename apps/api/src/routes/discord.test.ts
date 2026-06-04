@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../middleware/auth', () => ({
   authenticate: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    if (!req.header('authorization')) {
+      return next(new AppError(401, 'Missing or invalid authorization header', 'UNAUTHORIZED'));
+    }
     req.player = {
       accountId: 'account-1',
       playerId: 'player-1',
@@ -102,6 +105,7 @@ describe('discordRouter', () => {
 
     const res = await request(app())
       .post('/api/v1/discord/link')
+      .set('authorization', 'Bearer test-token')
       .send({ code: ' abc12345 ' })
       .expect(201);
 
@@ -136,6 +140,7 @@ describe('discordRouter', () => {
 
     const res = await request(app())
       .get('/api/v1/discord/link')
+      .set('authorization', 'Bearer test-token')
       .expect(200);
 
     expect(res.body).toEqual({
@@ -165,10 +170,29 @@ describe('discordRouter', () => {
 
     const res = await request(app())
       .delete('/api/v1/discord/link')
+      .set('authorization', 'Bearer test-token')
       .expect(200);
 
     expect(res.body.unlinked).toBe(true);
     expect(mocks.unlinkDiscordAccount).toHaveBeenCalledWith('account-1');
+  });
+
+  it('requires player auth for player Discord link routes', async () => {
+    await request(app())
+      .get('/api/v1/discord/link')
+      .expect(401);
+
+    expect(mocks.getDiscordLinkStatus).not.toHaveBeenCalled();
+  });
+
+  it('rejects extra fields on the claim body', async () => {
+    await request(app())
+      .post('/api/v1/discord/link')
+      .set('authorization', 'Bearer test-token')
+      .send({ code: 'ABC12345', extra: 'nope' })
+      .expect(400);
+
+    expect(mocks.claimDiscordLinkCode).not.toHaveBeenCalled();
   });
 
   it('lists unsynced links for a Discord guild with internal bot auth', async () => {
@@ -201,6 +225,16 @@ describe('discordRouter', () => {
     expect(mocks.listUnsyncedDiscordLinks).toHaveBeenCalledWith(DISCORD_GUILD_ID);
   });
 
+  it('rejects malformed snowflakes on internal routes', async () => {
+    await request(app())
+      .post('/api/v1/discord/link-codes')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ discordUserId: 'not-a-snowflake', discordGuildId: DISCORD_GUILD_ID })
+      .expect(400);
+
+    expect(mocks.createDiscordLinkCode).not.toHaveBeenCalled();
+  });
+
   it('marks a Discord link as role synced with internal bot auth', async () => {
     mocks.markDiscordLinkSynced.mockResolvedValue({
       id: LINK_ID,
@@ -223,5 +257,14 @@ describe('discordRouter', () => {
       roleSyncedAt: LINKED_AT,
     });
     expect(mocks.markDiscordLinkSynced).toHaveBeenCalledWith(LINK_ID);
+  });
+
+  it('rejects a bad Discord link id param', async () => {
+    await request(app())
+      .post('/api/v1/discord/links/not-a-uuid/synced')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(400);
+
+    expect(mocks.markDiscordLinkSynced).not.toHaveBeenCalled();
   });
 });
