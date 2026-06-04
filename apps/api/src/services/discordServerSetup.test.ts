@@ -225,6 +225,7 @@ describe('discordServerSetup', () => {
       'PocketRealm: private data guard',
     ]);
     expect(result.channelIdsByName['mod-log']).toBe('mod-log-id');
+    expect(result.categoryIdsByName.Support).toBe('support-category-id');
     expect(result.roleIdsByKey.linked).toBe('linked-role-id');
 
     const autoModRequests = requests.filter((request) => asName(request.body).startsWith('PocketRealm:'));

@@ -18,12 +18,13 @@ async function main(): Promise<void> {
   console.log(`Starter messages: ${result.seededStarterMessages.length} posted, ${result.existingStarterMessages.length} existing.`);
   console.log(`AutoMod rules: ${result.createdAutoModRules.length} created, ${result.updatedAutoModRules.length} updated.`);
   console.log('');
-  console.log('Set this on the API service:');
+  console.log('Set these Discord integration values in API or bot worker env as applicable:');
   console.log(`DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL=${result.webhookUrl}`);
+  console.log(`DISCORD_SUPPORT_CATEGORY_ID=${result.categoryIdsByName.Support ?? ''}`);
   console.log(`DISCORD_DUELS_CHANNEL_ID=${result.channelIdsByName.duels ?? ''}`);
   console.log(`DISCORD_SUPPORT_TRIAGE_CHANNEL_ID=${result.channelIdsByName['support-triage'] ?? ''}`);
   console.log(`DISCORD_BOT_HEALTH_CHANNEL_ID=${result.channelIdsByName['bot-health'] ?? ''}`);
-  console.log(`DISCORD_LINKED_ROLE_ID=${result.roleIdsByKey.linked ?? ''}`);
+  console.log(`DISCORD_VERIFIED_ROLE_ID=${result.roleIdsByKey.linked ?? ''}`);
   console.log(`DISCORD_LEVEL_ROLE_MAP=${levelRoleMap}`);
 }
 

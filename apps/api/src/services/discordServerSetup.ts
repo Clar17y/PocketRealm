@@ -147,6 +147,7 @@ interface SetupResult {
   existingStarterMessages: string[];
   createdAutoModRules: string[];
   updatedAutoModRules: string[];
+  categoryIdsByName: Record<string, string>;
   channelIdsByName: Record<string, string>;
   roleIdsByKey: Record<string, string>;
   webhookUrl: string;
@@ -805,6 +806,7 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
     existingStarterMessages: [],
     createdAutoModRules: [],
     updatedAutoModRules: [],
+    categoryIdsByName: {},
     channelIdsByName: {},
     roleIdsByKey: {},
     webhookUrl: '',
@@ -849,6 +851,7 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
       result.createdCategories.push(categorySpec.name);
       channelByKey.set(categoryKey, category);
     }
+    result.categoryIdsByName[categorySpec.name] = category.id;
 
     for (const channelSpec of categorySpec.channels) {
       const textKey = channelKey(channelSpec.name, ChannelType.Text);

@@ -144,7 +144,7 @@ npm run discord:setup-server
 npm run discord:register-commands
 ```
 
-`npm run discord:setup-server` is idempotent and prints the channel and role IDs needed for the bot worker env. It also applies AutoMod setup, including `DISCORD_AUTOMOD_EXTRA_KEYWORDS` when set. If a local setup token was used outside a secure deployment context, rotate it before public launch.
+`npm run discord:setup-server` reads setup-only Discord credentials from `.discord-setup.env` in the repo root or `apps/api`. The file must provide `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID`; it may also provide `DISCORD_AUTOMOD_EXTRA_KEYWORDS`. The command is idempotent and prints the channel, category, webhook, and role IDs needed for the API and bot worker env. If a local setup token was used outside a secure deployment context, rotate it before public launch.
 
 Before public launch:
 - Confirm Server Members Intent and Message Content Intent are enabled in the Discord Developer Portal.
