@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link2 } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import {
@@ -38,14 +38,18 @@ export function DiscordLinkCard({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isClaiming, setIsClaiming] = useState(false);
+  const statusRequestVersion = useRef(0);
 
   useEffect(() => {
     let active = true;
+    const requestVersion = statusRequestVersion.current + 1;
+    statusRequestVersion.current = requestVersion;
+    setIsLoading(true);
 
     void (async () => {
       const response = await loadStatus();
 
-      if (!active) {
+      if (!active || requestVersion !== statusRequestVersion.current) {
         return;
       }
 
@@ -78,6 +82,8 @@ export function DiscordLinkCard({
 
     setIsClaiming(false);
     if (response.data) {
+      statusRequestVersion.current += 1;
+      setIsLoading(false);
       setStatus(normalizeDiscordLinkStatus(response.data));
       setCode('');
       return;
@@ -89,6 +95,7 @@ export function DiscordLinkCard({
   const isLinked = Boolean(status?.linked);
   const discordUserId = status?.discordUserId;
   const titleReward = status?.titleReward ?? (isLinked ? 'Linked Adventurer' : null);
+  const areClaimControlsDisabled = isLoading || isClaiming || isLinked;
 
   return (
     <PixelCard>
@@ -134,7 +141,8 @@ export function DiscordLinkCard({
           value={code}
           maxLength={8}
           autoComplete="off"
-          disabled={isClaiming}
+          disabled={areClaimControlsDisabled}
+          aria-invalid={Boolean(error)}
           aria-describedby={error ? 'settings-discord-link-error' : undefined}
           onChange={(event) => setCode(normalizeCode(event.target.value))}
           className={inputClassName}
@@ -143,7 +151,7 @@ export function DiscordLinkCard({
         <button
           type="button"
           onClick={() => void handleClaim()}
-          disabled={isClaiming || code.length !== 8}
+          disabled={areClaimControlsDisabled || code.length !== 8}
           className={primaryButtonClassName}
         >
           <Link2 className="h-4 w-4" aria-hidden="true" />
