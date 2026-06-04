@@ -251,6 +251,24 @@ describe('handleSupportThreadAction', () => {
     });
   });
 
+  it('answers unsupported support actions after deferring', async () => {
+    const api = createApi(ticketContext);
+    const interaction = createButtonInteraction({
+      customId: 'support:unknown_action:SUP-ABC12345',
+      channel: createTriageChannel(createThread()),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(api.get).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Unsupported support action for `SUP-ABC12345`.',
+    });
+  });
+
   it('returns a clear configuration response when staff roles are empty', async () => {
     const api = createApi(ticketContext);
     const interaction = createButtonInteraction({

@@ -103,7 +103,12 @@ export async function handleSupportThreadAction(
       await interaction.editReply({
         content: `Updated \`${parsed.publicId}\` status to \`${status}\`.`,
       });
+      return;
     }
+
+    await interaction.editReply({
+      content: `Unsupported support action for \`${parsed.publicId}\`.`,
+    });
   } catch {
     await interaction.editReply({
       content: `Could not complete the support action for \`${parsed.publicId}\`. Try again or use staff tools.`,
