@@ -27,6 +27,7 @@ async function main(): Promise<void> {
     ],
   });
   let roleSyncInterval: NodeJS.Timeout | undefined;
+  let isRoleSyncRunning = false;
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
@@ -51,12 +52,20 @@ async function main(): Promise<void> {
     }
 
     const runRoleSync = async (): Promise<void> => {
+      if (isRoleSyncRunning) {
+        logger.debug('Discord linked role sync skipped because a previous run is still active');
+        return;
+      }
+
+      isRoleSyncRunning = true;
       try {
         const guild = await readyClient.guilds.fetch(config.guildId);
         const summary = await syncLinkedRoles({ api, guild, config });
         logger.info({ summary }, 'Discord linked role sync completed');
       } catch (error) {
         logger.warn({ error }, 'Discord linked role sync failed');
+      } finally {
+        isRoleSyncRunning = false;
       }
     };
 

@@ -21,6 +21,8 @@ export async function handleLinkCommand(
     return;
   }
 
+  await interaction.deferReply({ ephemeral: true });
+
   let response: LinkCodeResponse;
   try {
     response = await api.post<LinkCodeResponse>('/api/v1/discord/link-codes', {
@@ -28,19 +30,22 @@ export async function handleLinkCommand(
       discordGuildId: interaction.guildId,
     });
   } catch {
-    await interaction.reply({
-      ephemeral: true,
+    await interaction.editReply({
       content: 'Unable to create a PocketRealm link code right now. Please try again later.',
     });
     return;
   }
 
-  await interaction.reply({
-    ephemeral: true,
+  await interaction.editReply({
     content: `Enter this code in PocketRealm Settings: ${response.code}\nIt expires at ${formatDiscordTimestamp(response.expiresAt)}.`,
   });
 }
 
 export function formatDiscordTimestamp(value: string): string {
-  return `<t:${Math.floor(new Date(value).getTime() / 1000)}:F>`;
+  const timestamp = Math.floor(new Date(value).getTime() / 1000);
+  if (!Number.isFinite(timestamp)) {
+    return 'the listed expiry time';
+  }
+
+  return `<t:${timestamp}:F>`;
 }
