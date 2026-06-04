@@ -18,8 +18,10 @@ async function main(): Promise<void> {
   console.log(`Starter messages: ${result.seededStarterMessages.length} posted, ${result.existingStarterMessages.length} existing.`);
   console.log(`AutoMod rules: ${result.createdAutoModRules.length} created, ${result.updatedAutoModRules.length} updated.`);
   console.log('');
-  console.log('Set these Discord integration values in API or bot worker env as applicable:');
+  console.log('Set this on the API service if webhook mirroring is enabled:');
   console.log(`DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL=${result.webhookUrl}`);
+  console.log('');
+  console.log('Set these on the Discord bot worker:');
   console.log(`DISCORD_SUPPORT_CATEGORY_ID=${result.categoryIdsByName.Support ?? ''}`);
   console.log(`DISCORD_DUELS_CHANNEL_ID=${result.channelIdsByName.duels ?? ''}`);
   console.log(`DISCORD_SUPPORT_TRIAGE_CHANNEL_ID=${result.channelIdsByName['support-triage'] ?? ''}`);

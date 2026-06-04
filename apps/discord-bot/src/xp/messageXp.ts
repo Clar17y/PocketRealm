@@ -616,7 +616,7 @@ async function syncHighestLevelRole(
   }
 }
 
-function highestRoleIdForLevel(level: number, levelRoleMap: Map<number, string>): string | null {
+export function highestRoleIdForLevel(level: number, levelRoleMap: Map<number, string>): string | null {
   let selectedLevel = 0;
   let selectedRoleId: string | null = null;
 

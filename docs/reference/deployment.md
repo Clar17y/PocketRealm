@@ -70,7 +70,6 @@ All variables are required in production unless marked optional. Set them in Ren
 | `SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Overrides `NODE_ENV` for the Sentry environment tag (`production` / `staging`). |
 | `SENTRY_AUTH_TOKEN` | yes (web build-time) | — | Sentry CLI token used by `next build` to upload web source maps. Not read by the API. |
 | `DISCORD_INTERNAL_API_KEY` | yes | - | Shared internal auth key for Discord bot API requests and link-code signing. Must match the bot worker value. Use 32+ random bytes. |
-| `DISCORD_AUTOMOD_EXTRA_KEYWORDS` | no | - | Comma-separated extra keywords added by `npm run discord:setup-server` when configuring Discord AutoMod. |
 | `DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL` | no | - | Optional Discord incoming webhook fallback for private support triage notifications. Leave unset to disable webhook mirroring. |
 | `VAPID_PUBLIC_KEY` | yes | — | Web Push VAPID public key |
 | `VAPID_PRIVATE_KEY` | yes | — | Web Push VAPID private key |
@@ -144,7 +143,7 @@ npm run discord:setup-server
 npm run discord:register-commands
 ```
 
-`npm run discord:setup-server` reads setup-only Discord credentials from `.discord-setup.env` in the repo root or `apps/api`. The file must provide `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID`; it may also provide `DISCORD_AUTOMOD_EXTRA_KEYWORDS`. The command is idempotent and prints the channel, category, webhook, and role IDs needed for the API and bot worker env. If a local setup token was used outside a secure deployment context, rotate it before public launch.
+`npm run discord:setup-server` reads setup-only Discord credentials from `.discord-setup.env` in the repo root or `apps/api`; start from `apps/api/.discord-setup.env.example`. The file must provide `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID`; it may also provide setup-only `DISCORD_AUTOMOD_EXTRA_KEYWORDS` for comma-separated keyword additions. The command is idempotent and prints the channel, category, webhook, and role IDs needed for the API and bot worker env. If a local setup token was used outside a secure deployment context, rotate it before public launch.
 
 Before public launch:
 - Confirm Server Members Intent and Message Content Intent are enabled in the Discord Developer Portal.

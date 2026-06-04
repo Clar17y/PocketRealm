@@ -6,7 +6,7 @@ import type { BotConfig } from '../config.js';
 import { syncLinkedRoles as defaultSyncLinkedRoles } from '../discord/roleSync.js';
 import type { RoleSyncSummary, SyncLinkedRolesOptions } from '../discord/roleSync.js';
 import { isStaffMember } from '../support/threadActions.js';
-import { levelForDiscordXp } from '../xp/messageXp.js';
+import { highestRoleIdForLevel, levelForDiscordXp } from '../xp/messageXp.js';
 
 const MAX_XP_DECREMENT_ATTEMPTS = 5;
 
@@ -399,20 +399,6 @@ async function syncAdjustedLevelRole(
       data: { lastRoleSyncAt: now },
     }).catch(() => undefined);
   }
-}
-
-function highestRoleIdForLevel(level: number, levelRoleMap: Map<number, string>): string | null {
-  let selectedLevel = 0;
-  let selectedRoleId: string | null = null;
-
-  for (const [roleLevel, roleId] of levelRoleMap.entries()) {
-    if (level >= roleLevel && roleLevel > selectedLevel) {
-      selectedLevel = roleLevel;
-      selectedRoleId = roleId;
-    }
-  }
-
-  return selectedRoleId;
 }
 
 async function recordStaffFailure(
