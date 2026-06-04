@@ -48,6 +48,14 @@
     "./utils/titleDisplay": {
       "types": "./dist/utils/titleDisplay.d.ts",
       "default": "./dist/utils/titleDisplay.js"
+    },
+    "./wiki/wikiNavigation": {
+      "types": "./dist/wiki/wikiNavigation.d.ts",
+      "default": "./dist/wiki/wikiNavigation.js"
+    },
+    "./wiki/wikiSearch": {
+      "types": "./dist/wiki/wikiSearch.d.ts",
+      "default": "./dist/wiki/wikiSearch.js"
     }
   },
   "scripts": {
