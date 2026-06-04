@@ -266,6 +266,24 @@ describe('discordServerSetup', () => {
     expect(autoModMutations).toEqual([]);
   });
 
+  it('rejects managed AutoMod rules with stale immutable trigger types before mutation', async () => {
+    const requests = stubDiscordSetupFetch([
+      { id: 'stale-rule-id', name: 'PocketRealm: spam protection', trigger_type: 1 },
+    ]);
+
+    await expect(setupDiscordServer({ botToken: 'token', guildId: 'guild-id' }))
+      .rejects.toThrow(
+        'Discord AutoMod rule "PocketRealm: spam protection" has trigger type 1, expected 3. '
+        + 'Delete the stale rule before running PocketRealm setup.',
+      );
+
+    const autoModMutations = requests.filter((request) => (
+      request.path.includes('/auto-moderation/rules')
+      && ['POST', 'PATCH'].includes(request.method)
+    ));
+    expect(autoModMutations).toEqual([]);
+  });
+
   it('uses deny view/send overwrites for private channels', () => {
     const deny = PermissionBits.ViewChannel | PermissionBits.SendMessages;
     expect(deny.toString()).toBe('3072');

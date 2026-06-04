@@ -268,11 +268,11 @@ function isSingletonAutoModTriggerType(triggerType: number): boolean {
     || triggerType === AutoModTriggerType.MentionSpam;
 }
 
-function assertNoUnmanagedAutoModConflicts(
+function assertAutoModPreflight(
   existingRules: DiscordAutoModRule[],
   plannedRules: AutoModRulePayload[],
 ): void {
-  const plannedNames = new Set(plannedRules.map((rule) => rule.name));
+  const plannedRulesByName = new Map(plannedRules.map((rule) => [rule.name, rule]));
   const plannedSingletonTriggerTypes = new Set<number>(
     plannedRules
       .map((rule) => rule.trigger_type)
@@ -280,7 +280,17 @@ function assertNoUnmanagedAutoModConflicts(
   );
 
   for (const existingRule of existingRules) {
-    if (plannedNames.has(existingRule.name)) continue;
+    const plannedRule = plannedRulesByName.get(existingRule.name);
+    if (plannedRule) {
+      if (existingRule.trigger_type !== plannedRule.trigger_type) {
+        throw new Error(
+          `Discord AutoMod rule "${existingRule.name}" has trigger type ${existingRule.trigger_type}, `
+          + `expected ${plannedRule.trigger_type}. Delete the stale rule before running PocketRealm setup.`,
+        );
+      }
+      continue;
+    }
+
     if (!plannedSingletonTriggerTypes.has(existingRule.trigger_type)) continue;
 
     throw new Error(
@@ -894,7 +904,7 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
     alertChannelId: modLogChannelId,
     extraKeywords: readAutoModExtraKeywords(),
   });
-  assertNoUnmanagedAutoModConflicts(existingAutoModRules, plannedAutoModRules);
+  assertAutoModPreflight(existingAutoModRules, plannedAutoModRules);
 
   const existingAutoModRulesByName = new Map(existingAutoModRules.map((rule) => [rule.name, rule]));
 
