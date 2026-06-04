@@ -10,6 +10,16 @@ const mocks = vi.hoisted(() => ({
   unlinkDiscordAccount: vi.fn(),
   listUnsyncedDiscordLinks: vi.fn(),
   markDiscordLinkSynced: vi.fn(),
+  getLinkedDiscordProfile: vi.fn(),
+  getLinkedDiscordTurns: vi.fn(),
+  getLinkedDiscordSkills: vi.fn(),
+  getLinkedDiscordRank: vi.fn(),
+  searchWikiForDiscord: vi.fn(),
+  createDiscordSupportTicket: vi.fn(),
+  listUnpostedSupportTicketsForDiscord: vi.fn(),
+  markSupportTriageMessage: vi.fn(),
+  markSupportThreadCreated: vi.fn(),
+  archiveSupportThread: vi.fn(),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -44,6 +54,28 @@ vi.mock('../services/discordAccountLinkService', () => ({
   unlinkDiscordAccount: mocks.unlinkDiscordAccount,
   listUnsyncedDiscordLinks: mocks.listUnsyncedDiscordLinks,
   markDiscordLinkSynced: mocks.markDiscordLinkSynced,
+}));
+
+vi.mock('../services/discordProfileService', () => ({
+  getLinkedDiscordProfile: mocks.getLinkedDiscordProfile,
+  getLinkedDiscordTurns: mocks.getLinkedDiscordTurns,
+  getLinkedDiscordSkills: mocks.getLinkedDiscordSkills,
+  getLinkedDiscordRank: mocks.getLinkedDiscordRank,
+}));
+
+vi.mock('../services/wikiSearchService', () => ({
+  searchWikiForDiscord: mocks.searchWikiForDiscord,
+}));
+
+vi.mock('../services/supportTicketService', () => ({
+  createDiscordSupportTicket: mocks.createDiscordSupportTicket,
+}));
+
+vi.mock('../services/discordSupportThreadService', () => ({
+  listUnpostedSupportTicketsForDiscord: mocks.listUnpostedSupportTicketsForDiscord,
+  markSupportTriageMessage: mocks.markSupportTriageMessage,
+  markSupportThreadCreated: mocks.markSupportThreadCreated,
+  archiveSupportThread: mocks.archiveSupportThread,
 }));
 
 import { discordRouter } from './discord';
@@ -266,5 +298,168 @@ describe('discordRouter', () => {
       .expect(400);
 
     expect(mocks.markDiscordLinkSynced).not.toHaveBeenCalled();
+  });
+
+  it('requires internal bot auth for Discord profile helper routes', async () => {
+    await request(app())
+      .get(`/api/v1/discord/users/${DISCORD_USER_ID}/profile?guildId=${DISCORD_GUILD_ID}`)
+      .expect(401);
+
+    expect(mocks.getLinkedDiscordProfile).not.toHaveBeenCalled();
+  });
+
+  it('returns a linked Discord player profile with internal bot auth', async () => {
+    mocks.getLinkedDiscordProfile.mockResolvedValue({
+      username: 'Mira',
+      characterLevel: 12,
+      activeTitle: 'Linked Adventurer',
+    });
+
+    const res = await request(app())
+      .get(`/api/v1/discord/users/${DISCORD_USER_ID}/profile?guildId=${DISCORD_GUILD_ID}`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body.profile).toEqual({
+      username: 'Mira',
+      characterLevel: 12,
+      activeTitle: 'Linked Adventurer',
+    });
+    expect(mocks.getLinkedDiscordProfile).toHaveBeenCalledWith({
+      guildId: DISCORD_GUILD_ID,
+      discordUserId: DISCORD_USER_ID,
+    });
+  });
+
+  it('delegates Discord turns, skills, and rank routes after validation', async () => {
+    mocks.getLinkedDiscordTurns.mockResolvedValue({ currentTurns: 42 });
+    mocks.getLinkedDiscordSkills.mockResolvedValue({ skills: [{ skillType: 'mining', level: 18, xp: 1200 }] });
+    mocks.getLinkedDiscordRank.mockResolvedValue({ category: 'character_level', rank: 3, score: 12 });
+
+    await request(app())
+      .get(`/api/v1/discord/users/${DISCORD_USER_ID}/turns?guildId=${DISCORD_GUILD_ID}`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+    await request(app())
+      .get(`/api/v1/discord/users/${DISCORD_USER_ID}/skills?guildId=${DISCORD_GUILD_ID}`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+    await request(app())
+      .get(`/api/v1/discord/users/${DISCORD_USER_ID}/rank/character_level?guildId=${DISCORD_GUILD_ID}`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(mocks.getLinkedDiscordTurns).toHaveBeenCalledWith({ guildId: DISCORD_GUILD_ID, discordUserId: DISCORD_USER_ID });
+    expect(mocks.getLinkedDiscordSkills).toHaveBeenCalledWith({ guildId: DISCORD_GUILD_ID, discordUserId: DISCORD_USER_ID });
+    expect(mocks.getLinkedDiscordRank).toHaveBeenCalledWith({
+      guildId: DISCORD_GUILD_ID,
+      discordUserId: DISCORD_USER_ID,
+      category: 'character_level',
+    });
+  });
+
+  it('searches the wiki with the configured public web URL', async () => {
+    const originalPublicWebUrl = process.env.PUBLIC_WEB_URL;
+    process.env.PUBLIC_WEB_URL = 'https://pocketrealm.example';
+    mocks.searchWikiForDiscord.mockReturnValue([{ title: 'Forge', url: 'https://pocketrealm.example/wiki/items/forge' }]);
+
+    const res = await request(app())
+      .get('/api/v1/discord/wiki/search?q=forge')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body.results).toEqual([{ title: 'Forge', url: 'https://pocketrealm.example/wiki/items/forge' }]);
+    expect(mocks.searchWikiForDiscord).toHaveBeenCalledWith('forge', 'https://pocketrealm.example');
+
+    if (originalPublicWebUrl === undefined) {
+      delete process.env.PUBLIC_WEB_URL;
+    } else {
+      process.env.PUBLIC_WEB_URL = originalPublicWebUrl;
+    }
+  });
+
+  it('creates a Discord support report for a linked user', async () => {
+    mocks.createDiscordSupportTicket.mockResolvedValue({
+      publicId: 'SUP-ABC12345',
+      status: 'new',
+    });
+
+    const res = await request(app())
+      .post('/api/v1/discord/reports')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        discordGuildId: DISCORD_GUILD_ID,
+        discordUserId: DISCORD_USER_ID,
+        privacy: 'private',
+        category: 'bug',
+        area: 'crafting',
+        title: 'Forge broke',
+        description: 'The forge did not refresh after upgrade.',
+      })
+      .expect(201);
+
+    expect(res.body.ticket).toEqual({ publicId: 'SUP-ABC12345', status: 'new' });
+    expect(mocks.createDiscordSupportTicket).toHaveBeenCalledWith({
+      discordGuildId: DISCORD_GUILD_ID,
+      discordUserId: DISCORD_USER_ID,
+      input: {
+        privacy: 'private',
+        category: 'bug',
+        area: 'crafting',
+        title: 'Forge broke',
+        description: 'The forge did not refresh after upgrade.',
+      },
+    });
+  });
+
+  it('delegates Discord support triage thread routes', async () => {
+    mocks.listUnpostedSupportTicketsForDiscord.mockResolvedValue([{ publicId: 'SUP-ABC12345' }]);
+    mocks.markSupportTriageMessage.mockResolvedValue({ publicId: 'SUP-ABC12345', discordMessageId: '3456789012345678' });
+    mocks.markSupportThreadCreated.mockResolvedValue({ publicId: 'SUP-ABC12345', threadId: '4567890123456789' });
+    mocks.archiveSupportThread.mockResolvedValue({ publicId: 'SUP-ABC12345', status: 'archived' });
+
+    await request(app())
+      .get('/api/v1/discord/support/tickets/unposted?limit=5')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+    await request(app())
+      .post('/api/v1/discord/support/tickets/SUP-ABC12345/triage-message')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        guildId: DISCORD_GUILD_ID,
+        triageChannelId: '2345678901234567',
+        triageMessageId: '3456789012345678',
+      })
+      .expect(200);
+    await request(app())
+      .post('/api/v1/discord/support/tickets/SUP-ABC12345/thread')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        threadId: '4567890123456789',
+        createdByDiscordUserId: '5678901234567890',
+      })
+      .expect(200);
+    await request(app())
+      .post('/api/v1/discord/support/tickets/SUP-ABC12345/archive-thread')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ actorDiscordUserId: '5678901234567890' })
+      .expect(200);
+
+    expect(mocks.listUnpostedSupportTicketsForDiscord).toHaveBeenCalledWith(5);
+    expect(mocks.markSupportTriageMessage).toHaveBeenCalledWith({
+      publicId: 'SUP-ABC12345',
+      guildId: DISCORD_GUILD_ID,
+      triageChannelId: '2345678901234567',
+      triageMessageId: '3456789012345678',
+    });
+    expect(mocks.markSupportThreadCreated).toHaveBeenCalledWith({
+      publicId: 'SUP-ABC12345',
+      threadId: '4567890123456789',
+      createdByDiscordUserId: '5678901234567890',
+    });
+    expect(mocks.archiveSupportThread).toHaveBeenCalledWith({
+      publicId: 'SUP-ABC12345',
+      actorDiscordUserId: '5678901234567890',
+    });
   });
 });

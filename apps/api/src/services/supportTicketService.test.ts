@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@pocketrealm/database';
 import {
+  createDiscordSupportTicket,
   createSupportTicket,
   listSupportTicketsForExport,
   supportTicketToAdminRecord,
@@ -18,6 +19,9 @@ vi.mock('@pocketrealm/database', () => ({
     $transaction: vi.fn(),
     supportTicket: {
       findMany: vi.fn(),
+    },
+    discordAccountLink: {
+      findFirst: vi.fn(),
     },
   },
 }));
@@ -37,6 +41,7 @@ describe('supportTicketService', () => {
   beforeEach(() => {
     vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
     vi.mocked(prisma.supportTicket.findMany).mockReset();
+    vi.mocked(prisma.discordAccountLink.findFirst).mockReset();
     tx.supportTicket.create.mockReset();
     tx.supportTicket.findUniqueOrThrow.mockReset();
     tx.supportTicket.update.mockReset();
@@ -115,6 +120,70 @@ describe('supportTicketService', () => {
         reporterPlayerId: null,
       }),
     }));
+  });
+
+  it('creates Discord-sourced support tickets for a linked active player', async () => {
+    vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue({
+      account: {
+        id: 'account-1',
+        activePlayer: {
+          id: 'player-1',
+          username: 'Mira',
+          seasonId: 'season-1',
+          season: { name: 'Spring Realm' },
+        },
+      },
+    } as never);
+    tx.supportTicket.create.mockResolvedValue({
+      id: 'internal-id',
+      publicId: 'SUP-42',
+      source: 'discord',
+    });
+
+    const ticket = await createDiscordSupportTicket({
+      discordGuildId: '2345678901234567',
+      discordUserId: '1234567890123456',
+      input: {
+        privacy: 'private',
+        category: 'bug',
+        area: 'crafting',
+        title: 'Forge broke',
+        description: 'The forge did not refresh after upgrade.',
+      },
+    });
+
+    expect(ticket.publicId).toBe('SUP-42');
+    expect(tx.supportTicket.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        source: 'discord',
+        reporterAccountId: 'account-1',
+        reporterPlayerId: 'player-1',
+        seasonId: 'season-1',
+        reporterDisplayName: 'Mira',
+        realmLabel: 'Spring Realm',
+      }),
+    }));
+  });
+
+  it('requires a Discord link before creating a Discord support ticket', async () => {
+    vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue(null);
+
+    await expect(createDiscordSupportTicket({
+      discordGuildId: '2345678901234567',
+      discordUserId: '1234567890123456',
+      input: {
+        privacy: 'private',
+        category: 'bug',
+        area: 'crafting',
+        title: 'Forge broke',
+        description: 'The forge did not refresh after upgrade.',
+      },
+    })).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'DISCORD_LINK_REQUIRED',
+    });
+
+    expect(tx.supportTicket.create).not.toHaveBeenCalled();
   });
 
   it('updates status and writes an audit event with the previous status', async () => {

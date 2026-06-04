@@ -23,6 +23,7 @@ interface CreateSupportTicketParams {
   reporterDisplayName: string;
   realmLabel: string;
   input: CreateSupportTicketInput;
+  source?: 'in_game' | 'discord';
 }
 
 interface ExportOptions {
@@ -105,6 +106,11 @@ function toExportSource(ticket: {
   };
 }
 
+function realmLabelFor(seasonId: string | null, seasonName?: string): string {
+  if (!seasonId) return 'Preseason';
+  return seasonName ?? 'Seasonal Realm';
+}
+
 export async function createSupportTicket(params: CreateSupportTicketParams) {
   const publicId = nextPublicId();
   const { input } = params;
@@ -113,7 +119,7 @@ export async function createSupportTicket(params: CreateSupportTicketParams) {
     const ticket = await tx.supportTicket.create({
       data: {
         publicId,
-        source: 'in_game',
+        source: params.source ?? 'in_game',
         status: 'new',
         privacy: input.privacy,
         category: input.category,
@@ -150,6 +156,51 @@ export async function createSupportTicket(params: CreateSupportTicketParams) {
     });
 
     return ticket;
+  });
+}
+
+export async function createDiscordSupportTicket(params: {
+  discordGuildId: string;
+  discordUserId: string;
+  input: CreateSupportTicketInput;
+}) {
+  const link = await prisma.discordAccountLink.findFirst({
+    where: {
+      discordGuildId: params.discordGuildId,
+      discordUserId: params.discordUserId,
+      unlinkedAt: null,
+    },
+    orderBy: { linkedAt: 'desc' },
+    select: {
+      account: {
+        select: {
+          id: true,
+          activePlayer: {
+            select: {
+              id: true,
+              username: true,
+              seasonId: true,
+              season: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!link) {
+    throw new AppError(404, 'Discord account is not linked to a PocketRealm account', 'DISCORD_LINK_REQUIRED');
+  }
+
+  const player = link.account.activePlayer;
+  return createSupportTicket({
+    accountId: link.account.id,
+    playerId: player?.id ?? null,
+    seasonId: player?.seasonId ?? null,
+    reporterDisplayName: player?.username ?? 'Discord Adventurer',
+    realmLabel: realmLabelFor(player?.seasonId ?? null, player?.season?.name),
+    input: params.input,
+    source: 'discord',
   });
 }
 
