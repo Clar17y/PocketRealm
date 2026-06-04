@@ -137,6 +137,44 @@ describe('handleStaffCommand', () => {
     }));
   });
 
+  it('uses a guarded decrement for negative XP adjustments', async () => {
+    const prisma = createPrisma({
+      profile: createProfile({
+        xp: 90,
+        level: 1,
+      }),
+    });
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'xp-adjust',
+      targetUserId,
+      amount: -200,
+      reason: 'remove mistaken credit',
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+      prisma,
+    });
+
+    expect(prisma.discordCommunityProfile.updateMany).toHaveBeenCalledWith({
+      where: { id: 'profile-1', xp: 90 },
+      data: { xp: { decrement: 90 } },
+    });
+    expect(prisma.discordBotAuditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: 'success',
+        metadata: expect.objectContaining({
+          amount: -200,
+          appliedAmount: -90,
+          previousXp: 90,
+          newXp: 0,
+        }),
+      }),
+    });
+  });
+
   it('calls syncLinkedRoles for staff sync-roles commands', async () => {
     const api = createApi();
     const syncLinkedRoles = vi.fn(async () => ({
@@ -231,6 +269,25 @@ function createPrisma(options: { profile?: MockProfile | null } = {}): StaffPris
         xp: nextXp,
       };
       return storedProfile;
+    }),
+    updateMany: vi.fn(async ({ where, data }: {
+      where: { id: string; xp?: number };
+      data: { xp: { decrement: number } };
+    }) => {
+      if (!storedProfile || storedProfile.id !== where.id) {
+        return { count: 0 };
+      }
+
+      if (where.xp !== undefined && storedProfile.xp !== where.xp) {
+        return { count: 0 };
+      }
+
+      storedProfile = {
+        ...storedProfile,
+        xp: storedProfile.xp - data.xp.decrement,
+      };
+
+      return { count: 1 };
     }),
     create: vi.fn(async ({ data }: { data: Omit<MockProfile, 'id' | 'lastRoleSyncAt' | 'excludedFromXp'> }) => {
       storedProfile = {

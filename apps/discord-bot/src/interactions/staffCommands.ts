@@ -8,6 +8,8 @@ import type { RoleSyncSummary, SyncLinkedRolesOptions } from '../discord/roleSyn
 import { isStaffMember } from '../support/threadActions.js';
 import { levelForDiscordXp } from '../xp/messageXp.js';
 
+const MAX_XP_DECREMENT_ATTEMPTS = 5;
+
 type StaffConfig = Pick<
   BotConfig,
   'guildId' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'
@@ -21,14 +23,18 @@ interface DiscordCommunityProfileRecord {
   level: number;
 }
 
-interface StaffCommunityProfileDelegate {
-  findUnique(args: {
-    where: {
+type StaffCommunityProfileWhere =
+  | {
       discordGuildId_discordUserId: {
         discordGuildId: string;
         discordUserId: string;
       };
-    };
+    }
+  | { id: string };
+
+interface StaffCommunityProfileDelegate {
+  findUnique(args: {
+    where: StaffCommunityProfileWhere;
   }): Promise<DiscordCommunityProfileRecord | null>;
   update(args: {
     where: { id: string };
@@ -38,6 +44,15 @@ interface StaffCommunityProfileDelegate {
       lastRoleSyncAt?: Date;
     };
   }): Promise<DiscordCommunityProfileRecord>;
+  updateMany(args: {
+    where: {
+      id: string;
+      xp?: number;
+    };
+    data: {
+      xp: { decrement: number };
+    };
+  }): Promise<{ count: number }>;
   create(args: {
     data: {
       discordGuildId: string;
@@ -311,20 +326,52 @@ async function applyXpAdjustment(
     };
   }
 
-  const decrement = Math.min(Math.abs(input.amount), input.previousXp);
-  if (decrement === 0) {
-    return { updatedProfile: input.profile, appliedAmount: 0 };
-  }
+  return applyGuardedXpDecrement(tx, input.profile, Math.abs(input.amount));
+}
 
-  return {
-    updatedProfile: await tx.discordCommunityProfile.update({
-      where: { id: input.profile.id },
+async function applyGuardedXpDecrement(
+  tx: StaffTransactionClient,
+  profile: DiscordCommunityProfileRecord,
+  requestedDecrement: number,
+): Promise<{ updatedProfile: DiscordCommunityProfileRecord | null; appliedAmount: number }> {
+  let currentProfile: DiscordCommunityProfileRecord | null = profile;
+
+  for (let attempt = 0; attempt < MAX_XP_DECREMENT_ATTEMPTS; attempt += 1) {
+    if (!currentProfile || currentProfile.xp <= 0) {
+      return { updatedProfile: currentProfile, appliedAmount: 0 };
+    }
+
+    const decrement = Math.min(requestedDecrement, currentProfile.xp);
+    const update = await tx.discordCommunityProfile.updateMany({
+      where: {
+        id: currentProfile.id,
+        xp: currentProfile.xp,
+      },
       data: {
         xp: { decrement },
       },
-    }),
-    appliedAmount: -decrement,
-  };
+    });
+
+    if (update.count === 1) {
+      const updatedProfile = await tx.discordCommunityProfile.findUnique({
+        where: { id: currentProfile.id },
+      });
+      if (!updatedProfile) {
+        throw new Error('Discord community profile disappeared after XP decrement');
+      }
+
+      return {
+        updatedProfile,
+        appliedAmount: -decrement,
+      };
+    }
+
+    currentProfile = await tx.discordCommunityProfile.findUnique({
+      where: { id: currentProfile.id },
+    });
+  }
+
+  throw new Error('Could not apply Discord staff XP decrement safely');
 }
 
 async function syncAdjustedLevelRole(
