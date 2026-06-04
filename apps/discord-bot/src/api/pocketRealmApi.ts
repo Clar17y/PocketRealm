@@ -65,7 +65,11 @@ export class PocketRealmApiClient {
   }
 
   private buildUrl(path: string): URL {
-    return new URL(path.replace(/^\//, ''), this.baseUrl);
+    if (!path.startsWith('/') || path.startsWith('//')) {
+      throw new Error('PocketRealm API path must be a relative API path beginning with /');
+    }
+
+    return new URL(path.slice(1), this.baseUrl);
   }
 }
 

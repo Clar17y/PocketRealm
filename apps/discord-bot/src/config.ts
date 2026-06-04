@@ -53,11 +53,20 @@ export function parseLevelRoleMap(raw: string | undefined): Map<number, string> 
   if (!raw?.trim()) return levelRoleMap;
 
   for (const entry of raw.split(',')) {
-    const [rawLevel, rawRoleId] = entry.split(':');
-    const level = Number.parseInt(rawLevel?.trim() ?? '', 10);
+    const parts = entry.split(':');
+    if (parts.length !== 2) {
+      throw new Error(`Invalid Discord level role mapping: ${entry}`);
+    }
 
+    const [rawLevel, rawRoleId] = parts;
+    const trimmedLevel = rawLevel.trim();
+    if (!/^\d+$/.test(trimmedLevel)) {
+      throw new Error(`Invalid Discord level role level: ${rawLevel}`);
+    }
+
+    const level = Number.parseInt(trimmedLevel, 10);
     if (!Number.isInteger(level) || level < 1) {
-      throw new Error(`Invalid Discord level role level: ${rawLevel ?? ''}`);
+      throw new Error(`Invalid Discord level role level: ${rawLevel}`);
     }
 
     levelRoleMap.set(level, snowflakeSchema.parse(rawRoleId));

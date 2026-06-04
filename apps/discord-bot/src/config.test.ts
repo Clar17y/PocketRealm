@@ -47,4 +47,10 @@ describe('parseBotConfig', () => {
     expect(() => parseBotConfig({ ...validEnv, DISCORD_CLIENT_ID: 'not-a-snowflake' })).toThrow();
     expect(() => parseBotConfig({ ...validEnv, DISCORD_INTERNAL_API_KEY: 'too-short' })).toThrow();
   });
+
+  it('rejects malformed level role mappings', () => {
+    expect(() => parseBotConfig({ ...validEnv, DISCORD_LEVEL_ROLE_MAP: '1abc:556677889900112233' })).toThrow();
+    expect(() => parseBotConfig({ ...validEnv, DISCORD_LEVEL_ROLE_MAP: '1.5:556677889900112233' })).toThrow();
+    expect(() => parseBotConfig({ ...validEnv, DISCORD_LEVEL_ROLE_MAP: '1:556677889900112233:extra' })).toThrow();
+  });
 });

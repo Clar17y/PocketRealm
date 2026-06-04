@@ -18,7 +18,7 @@
     "build:api": "npm run build -w packages/shared && npm run build -w packages/game-engine && npm run build -w packages/database && npm run build -w apps/api",
     "build:web": "npm run build -w packages/shared && npm run build -w packages/game-engine && npm run build -w apps/web",
     "build:discord-bot": "npm run build -w packages/shared && npm run build -w packages/database && npm run build -w apps/discord-bot",
-    "verify:ci": "npm run typecheck && npm run build:api && npm run build:web && npm run test:engine && npm run test:api && npm run test -w packages/shared && npm run test -w apps/web",
+    "verify:ci": "npm run typecheck && npm run build:api && npm run build:web && npm run build:discord-bot && npm run test:engine && npm run test:api && npm run test -w packages/shared && npm run test -w apps/web && npm run test -w apps/discord-bot",
     "start:api": "npm run start -w apps/api",
     "start:web": "npm run start -w apps/web",
     "start:discord-bot": "npm run start -w apps/discord-bot",
