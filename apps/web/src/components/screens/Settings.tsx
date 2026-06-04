@@ -11,6 +11,7 @@ import { DISCORD_INVITE_URL, KNOWN_ISSUES_URL } from '@/lib/supportLinks';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import { RaritySelector } from '../common/RaritySelector';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { DiscordLinkCard } from '@/components/support/DiscordLinkCard';
 import { HelpSupportCard } from '@/components/support/HelpSupportCard';
 import { SupportPocketrealmCard } from './SupportPocketrealmCard';
 
@@ -411,6 +412,7 @@ export function Settings({
               onReportBug={onReportBug}
             />
           )}
+          <DiscordLinkCard />
 
           <PixelCard>
             <h3 className="mb-3 text-sm font-bold text-[var(--rpg-text-primary)]">Account</h3>

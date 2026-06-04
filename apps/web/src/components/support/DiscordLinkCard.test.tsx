@@ -1,0 +1,69 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DiscordLinkCard } from './DiscordLinkCard';
+
+describe('DiscordLinkCard', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('claims a Discord link code and shows the title reward proof', async () => {
+    const onClaimCode = vi.fn().mockResolvedValue({
+      data: {
+        linked: true,
+        discordUserId: '123456789',
+        linkedAt: '2026-06-04T12:00:00.000Z',
+        titleReward: 'Linked Adventurer',
+      },
+    });
+
+    render(
+      <DiscordLinkCard
+        loadStatus={vi.fn().mockResolvedValue({ data: { linked: false } })}
+        claimCode={onClaimCode}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/discord link code/i), { target: { value: 'ABC12345' } });
+    fireEvent.click(screen.getByRole('button', { name: /link discord/i }));
+
+    await waitFor(() => expect(onClaimCode).toHaveBeenCalledWith('ABC12345'));
+    expect(await screen.findByText(/linked adventurer/i)).toBeTruthy();
+  });
+
+  it('shows current linked state loaded from the API', async () => {
+    render(
+      <DiscordLinkCard
+        loadStatus={vi.fn().mockResolvedValue({
+          data: {
+            linked: true,
+            discordUserId: '987654321',
+            discordGuildId: 'guild-1',
+            titleReward: 'Linked Adventurer',
+          },
+        })}
+        claimCode={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText(/discord account linked/i)).toBeTruthy();
+    expect(screen.getByText(/987654321/i)).toBeTruthy();
+    expect(screen.getByText(/linked adventurer/i)).toBeTruthy();
+  });
+
+  it('shows API errors when claiming fails', async () => {
+    render(
+      <DiscordLinkCard
+        loadStatus={vi.fn().mockResolvedValue({ data: { linked: false } })}
+        claimCode={vi.fn().mockResolvedValue({
+          error: { message: 'That Discord link code is invalid.', code: 'INVALID_DISCORD_LINK_CODE' },
+        })}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/discord link code/i), { target: { value: 'BADCODE1' } });
+    fireEvent.click(screen.getByRole('button', { name: /link discord/i }));
+
+    expect((await screen.findByRole('alert')).textContent).toBe('That Discord link code is invalid.');
+  });
+});

@@ -1,6 +1,9 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs, checkApiReady, ensureFreshAccessToken } from './core';
 export type { ApiRequestOptions, ApiResponse, TaxInfo } from './core';
 
+export { getDiscordLinkStatus, claimDiscordLinkCode } from './discord';
+export type { DiscordLinkStatusResponse } from './discord';
+
 export { createSupportTicket } from './support';
 export type {
   CreateSupportTicketRequest,
