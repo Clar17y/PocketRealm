@@ -5,6 +5,7 @@ import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { routeInteraction } from './interactionRouter.js';
 import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
+import { handleStaffCommand } from './staffCommands.js';
 
 vi.mock('../support/threadActions.js', () => ({
   handleSupportThreadAction: vi.fn(),
@@ -16,10 +17,16 @@ vi.mock('./reportCommand.js', () => ({
   isReportModalCustomId: vi.fn((customId: string) => customId.startsWith('report:')),
 }));
 
+vi.mock('./staffCommands.js', () => ({
+  handleStaffCommand: vi.fn(),
+}));
+
 const routerConfig = {
   guildId: 'guild-123',
   webBaseUrl: 'https://pocketrealm.app',
+  verifiedRoleId: 'verified-role-1',
   supportStaffRoleIds: ['staff-role-1'],
+  levelRoleMap: new Map<number, string>(),
 };
 
 describe('routeInteraction', () => {
@@ -97,6 +104,21 @@ describe('routeInteraction', () => {
     await routeInteraction(interaction, { api, config: routerConfig });
 
     expect(handleReportCommand).toHaveBeenCalledWith(interaction);
+  });
+
+  it('routes staff commands to the staff handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'staff',
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleStaffCommand).toHaveBeenCalledWith(interaction, {
+      api,
+      config: routerConfig,
+    });
   });
 
   it('routes report modal submissions to the report submit handler', async () => {

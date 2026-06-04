@@ -16,16 +16,19 @@ import {
   handleReportModalSubmit,
   isReportModalCustomId,
 } from './reportCommand.js';
+import { handleStaffCommand } from './staffCommands.js';
 import { handleWikiCommand } from './wikiCommand.js';
 
 export interface InteractionRouterOptions {
   api: Pick<PocketRealmApiClient, 'get' | 'post'>;
-  config: Pick<BotConfig, 'guildId' | 'webBaseUrl' | 'supportStaffRoleIds'>;
+  config: Pick<
+    BotConfig,
+    'guildId' | 'webBaseUrl' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'
+  >;
 }
 
 const UNIMPLEMENTED_REGISTERED_CHAT_COMMANDS = new Set([
   'duel',
-  'staff',
 ]);
 
 export async function routeInteraction(
@@ -82,6 +85,11 @@ export async function routeInteraction(
 
   if (interaction.commandName === 'report') {
     await handleReportCommand(interaction);
+    return;
+  }
+
+  if (interaction.commandName === 'staff') {
+    await handleStaffCommand(interaction, options);
     return;
   }
 
