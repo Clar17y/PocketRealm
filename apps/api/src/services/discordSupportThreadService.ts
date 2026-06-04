@@ -189,25 +189,25 @@ export async function markSupportTriageMessage(input: MarkSupportTriageMessageIn
       throwTriageMessageConflict();
     }
 
-    const mappingData = {
+    const triageMessageData = {
       guildId: input.guildId,
       triageChannelId: input.triageChannelId,
       triageMessageId: input.triageMessageId,
-      reporterDiscordUserId: firstActiveDiscordUserId(existing),
-      status: 'triage_posted',
-      archivedAt: null,
     };
 
     if (mapping) {
       await tx.supportTicketDiscordThread.update({
         where: { ticketId: existing.id },
-        data: mappingData,
+        data: triageMessageData,
       });
     } else {
       await tx.supportTicketDiscordThread.create({
         data: {
           ticketId: existing.id,
-          ...mappingData,
+          ...triageMessageData,
+          reporterDiscordUserId: firstActiveDiscordUserId(existing),
+          status: 'triage_posted',
+          archivedAt: null,
         },
       });
     }

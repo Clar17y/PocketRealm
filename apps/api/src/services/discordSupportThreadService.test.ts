@@ -183,6 +183,38 @@ describe('discordSupportThreadService', () => {
     }));
   });
 
+  it('preserves existing triage mapping state when retrying the same Discord message id', async () => {
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue(ticket({
+      discordMessageId: '3456789012345678',
+      reporterAccount: { discordAccountLinks: [] },
+    }) as never);
+    vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue({
+      ticketId: 'ticket-1',
+      triageMessageId: '3456789012345678',
+      reporterDiscordUserId: '1234567890123456',
+      status: 'archived',
+      threadId: '4567890123456789',
+      archivedAt: CREATED_AT,
+    } as never);
+    vi.mocked(prisma.supportTicketDiscordThread.update).mockResolvedValue({} as never);
+
+    await markSupportTriageMessage({
+      publicId: 'SUP-ABC12345',
+      guildId: '1234567890123456',
+      triageChannelId: '2345678901234567',
+      triageMessageId: '3456789012345678',
+    });
+
+    expect(prisma.supportTicketDiscordThread.update).toHaveBeenCalledWith({
+      where: { ticketId: 'ticket-1' },
+      data: {
+        guildId: '1234567890123456',
+        triageChannelId: '2345678901234567',
+        triageMessageId: '3456789012345678',
+      },
+    });
+  });
+
   it('returns a conflict when a different triage message is already recorded', async () => {
     vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue(ticket({ discordMessageId: '9999999999999999' }) as never);
 
