@@ -7,6 +7,7 @@ const DISCORD_SUPPORT_TRIAGE_STATUSES = ['new', 'needs_info'] as const;
 const PRIVATE_SUPPORT_SUMMARY = 'Private report body withheld. Review in staff support tools.';
 const MAX_DISCORD_TITLE_LENGTH = 80;
 const MAX_DISCORD_SUMMARY_LENGTH = 240;
+const CLOSED_TICKET_STATUSES: SupportTicketStatus[] = ['closed', 'rejected', 'duplicate'];
 
 export interface MarkSupportTriageMessageInput {
   publicId: string;
@@ -23,6 +24,12 @@ export interface MarkSupportThreadCreatedInput {
 
 export interface ArchiveSupportThreadInput {
   publicId: string;
+  actorDiscordUserId: string;
+}
+
+export interface UpdateSupportTicketStatusFromDiscordInput {
+  publicId: string;
+  status: SupportTicketStatus;
   actorDiscordUserId: string;
 }
 
@@ -51,6 +58,10 @@ function supportTicketSummary(ticket: {
   }
 
   return safeText(ticket.description, MAX_DISCORD_SUMMARY_LENGTH);
+}
+
+function closeTimestampFor(status: SupportTicketStatus): Date | null {
+  return CLOSED_TICKET_STATUSES.includes(status) ? new Date() : null;
 }
 
 function firstActiveDiscordUserId(ticket: {
@@ -268,6 +279,84 @@ export async function markSupportThreadCreated(input: MarkSupportThreadCreatedIn
     threadId: input.threadId,
     status: 'thread_created',
   };
+}
+
+export async function getSupportTicketActionContextForDiscord(publicId: string) {
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { publicId },
+    select: {
+      publicId: true,
+      title: true,
+      discordThread: {
+        select: {
+          reporterDiscordUserId: true,
+          threadId: true,
+          triageChannelId: true,
+          triageMessageId: true,
+        },
+      },
+    },
+  });
+
+  if (!ticket) {
+    throw new AppError(404, 'Support ticket not found', 'SUPPORT_TICKET_NOT_FOUND');
+  }
+
+  if (!ticket.discordThread) {
+    throwDiscordThreadNotFound();
+  }
+
+  return {
+    publicId: ticket.publicId,
+    title: safeText(ticket.title, MAX_DISCORD_TITLE_LENGTH),
+    reporterDiscordUserId: ticket.discordThread.reporterDiscordUserId,
+    threadId: ticket.discordThread.threadId,
+    triageChannelId: ticket.discordThread.triageChannelId,
+    triageMessageId: ticket.discordThread.triageMessageId,
+  };
+}
+
+export async function updateSupportTicketStatusFromDiscord(input: UpdateSupportTicketStatusFromDiscordInput) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.supportTicket.findUnique({
+      where: { publicId: input.publicId },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      throw new AppError(404, 'Support ticket not found', 'SUPPORT_TICKET_NOT_FOUND');
+    }
+
+    const ticket = await tx.supportTicket.update({
+      where: { publicId: input.publicId },
+      data: {
+        status: input.status,
+        closedAt: closeTimestampFor(input.status),
+      },
+      select: {
+        publicId: true,
+        status: true,
+      },
+    });
+
+    await tx.supportTicketEvent.create({
+      data: {
+        ticketId: existing.id,
+        eventType: 'status_changed',
+        fromStatus: existing.status,
+        toStatus: input.status,
+        metadata: {
+          actorDiscordUserId: input.actorDiscordUserId,
+          source: 'discord_support_button',
+        },
+      },
+    });
+
+    return {
+      publicId: ticket.publicId,
+      status: ticket.status,
+    };
+  });
 }
 
 export async function archiveSupportThread(input: ArchiveSupportThreadInput) {

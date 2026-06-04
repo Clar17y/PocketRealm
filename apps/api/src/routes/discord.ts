@@ -13,9 +13,11 @@ import {
 } from '../services/discordAccountLinkService';
 import {
   archiveSupportThread,
+  getSupportTicketActionContextForDiscord,
   listUnpostedSupportTicketsForDiscord,
   markSupportThreadCreated,
   markSupportTriageMessage,
+  updateSupportTicketStatusFromDiscord,
 } from '../services/discordSupportThreadService';
 import {
   getLinkedDiscordProfile,
@@ -39,7 +41,7 @@ import {
   resolveDiscordDuel,
 } from '../services/discordDuelService';
 import { createDiscordSupportTicket } from '../services/supportTicketService';
-import { createSupportTicketSchema } from '../services/supportTicketSchemas';
+import { createSupportTicketSchema, SUPPORT_TICKET_STATUSES } from '../services/supportTicketSchemas';
 import { searchWikiForDiscord } from '../services/wikiSearchService';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -102,6 +104,11 @@ const threadCreatedSchema = z.object({
 }).strict();
 
 const archiveThreadSchema = z.object({
+  actorDiscordUserId: discordSnowflakeSchema,
+}).strict();
+
+const supportTicketStatusSchema = z.object({
+  status: z.enum(SUPPORT_TICKET_STATUSES),
   actorDiscordUserId: discordSnowflakeSchema,
 }).strict();
 
@@ -279,6 +286,24 @@ discordRouter.post('/support/tickets/:publicId/thread', requireInternalBotAuth, 
   const params = publicIdParamsSchema.parse(req.params);
   const input = threadCreatedSchema.parse(req.body);
   const result = await markSupportThreadCreated({
+    publicId: params.publicId,
+    ...input,
+  });
+
+  res.json({ ticket: result });
+}));
+
+discordRouter.get('/support/tickets/:publicId/action-context', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const params = publicIdParamsSchema.parse(req.params);
+  const result = await getSupportTicketActionContextForDiscord(params.publicId);
+
+  res.json({ ticket: result });
+}));
+
+discordRouter.post('/support/tickets/:publicId/status', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const params = publicIdParamsSchema.parse(req.params);
+  const input = supportTicketStatusSchema.parse(req.body);
+  const result = await updateSupportTicketStatusFromDiscord({
     publicId: params.publicId,
     ...input,
   });

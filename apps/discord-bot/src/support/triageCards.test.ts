@@ -50,7 +50,10 @@ describe('buildTriageCard', () => {
       'support:ask_reporter:SUP-1',
       'support:needs_info:SUP-1',
       'support:accepted:SUP-1',
+      'support:rejected:SUP-1',
+      'support:security:SUP-1',
       'support:closed:SUP-1',
+      'support:archive_thread:SUP-1',
     ]));
   });
 });

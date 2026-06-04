@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   markSupportTriageMessage: vi.fn(),
   markSupportThreadCreated: vi.fn(),
   archiveSupportThread: vi.fn(),
+  getSupportTicketActionContextForDiscord: vi.fn(),
+  updateSupportTicketStatusFromDiscord: vi.fn(),
   createPendingDiscordDuel: vi.fn(),
   recordDiscordDuelMessage: vi.fn(),
   resolveDiscordDuel: vi.fn(),
@@ -80,6 +82,8 @@ vi.mock('../services/discordSupportThreadService', () => ({
   markSupportTriageMessage: mocks.markSupportTriageMessage,
   markSupportThreadCreated: mocks.markSupportThreadCreated,
   archiveSupportThread: mocks.archiveSupportThread,
+  getSupportTicketActionContextForDiscord: mocks.getSupportTicketActionContextForDiscord,
+  updateSupportTicketStatusFromDiscord: mocks.updateSupportTicketStatusFromDiscord,
 }));
 
 vi.mock('../services/discordDuelService', () => ({
@@ -433,6 +437,8 @@ describe('discordRouter', () => {
     mocks.markSupportTriageMessage.mockResolvedValue({ publicId: 'SUP-ABC12345', discordMessageId: '3456789012345678' });
     mocks.markSupportThreadCreated.mockResolvedValue({ publicId: 'SUP-ABC12345', threadId: '4567890123456789' });
     mocks.archiveSupportThread.mockResolvedValue({ publicId: 'SUP-ABC12345', status: 'archived' });
+    mocks.getSupportTicketActionContextForDiscord.mockResolvedValue({ publicId: 'SUP-ABC12345' });
+    mocks.updateSupportTicketStatusFromDiscord.mockResolvedValue({ publicId: 'SUP-ABC12345', status: 'accepted' });
 
     await request(app())
       .get('/api/v1/discord/support/tickets/unposted?limit=5')
@@ -460,6 +466,15 @@ describe('discordRouter', () => {
       .set('x-pocketrealm-bot-key', 'bot-key')
       .send({ actorDiscordUserId: '5678901234567890' })
       .expect(200);
+    await request(app())
+      .get('/api/v1/discord/support/tickets/SUP-ABC12345/action-context')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+    await request(app())
+      .post('/api/v1/discord/support/tickets/SUP-ABC12345/status')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ status: 'accepted', actorDiscordUserId: '5678901234567890' })
+      .expect(200);
 
     expect(mocks.listUnpostedSupportTicketsForDiscord).toHaveBeenCalledWith(5);
     expect(mocks.markSupportTriageMessage).toHaveBeenCalledWith({
@@ -475,6 +490,12 @@ describe('discordRouter', () => {
     });
     expect(mocks.archiveSupportThread).toHaveBeenCalledWith({
       publicId: 'SUP-ABC12345',
+      actorDiscordUserId: '5678901234567890',
+    });
+    expect(mocks.getSupportTicketActionContextForDiscord).toHaveBeenCalledWith('SUP-ABC12345');
+    expect(mocks.updateSupportTicketStatusFromDiscord).toHaveBeenCalledWith({
+      publicId: 'SUP-ABC12345',
+      status: 'accepted',
       actorDiscordUserId: '5678901234567890',
     });
   });

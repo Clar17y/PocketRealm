@@ -2,11 +2,17 @@ import type { ChatInputCommandInteraction, Interaction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { handleSupportThreadAction } from '../support/threadActions.js';
 import { routeInteraction } from './interactionRouter.js';
+
+vi.mock('../support/threadActions.js', () => ({
+  handleSupportThreadAction: vi.fn(),
+}));
 
 const routerConfig = {
   guildId: 'guild-123',
   webBaseUrl: 'https://pocketrealm.app',
+  supportStaffRoleIds: ['staff-role-1'],
 };
 
 describe('routeInteraction', () => {
@@ -86,6 +92,22 @@ describe('routeInteraction', () => {
     await routeInteraction(interaction, { api, config: routerConfig });
 
     expect(reply).not.toHaveBeenCalled();
+  });
+
+  it('routes support button interactions to the support thread action handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => false,
+      isButton: () => true,
+      customId: 'support:ask_reporter:SUP-ABC12345',
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleSupportThreadAction).toHaveBeenCalledWith(interaction, {
+      api,
+      config: routerConfig,
+    });
   });
 });
 

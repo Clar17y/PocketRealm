@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
       updateMany: vi.fn(),
       update: vi.fn(),
     },
+    supportTicketEvent: {
+      create: vi.fn(),
+    },
     supportTicketDiscordThread: {
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -26,9 +29,11 @@ vi.mock('@pocketrealm/database', () => ({
 
 import {
   archiveSupportThread,
+  getSupportTicketActionContextForDiscord,
   listUnpostedSupportTicketsForDiscord,
   markSupportThreadCreated,
   markSupportTriageMessage,
+  updateSupportTicketStatusFromDiscord,
 } from './discordSupportThreadService';
 
 const CREATED_AT = new Date('2026-06-04T12:00:00.000Z');
@@ -274,6 +279,83 @@ describe('discordSupportThreadService', () => {
         threadId: '4567890123456789',
         createdByDiscordUserId: '5678901234567890',
         status: 'thread_created',
+      },
+    });
+  });
+
+  it('returns sanitized action context for Discord support buttons', async () => {
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({
+      ...ticket({
+        title: 'Forge broke for player@example.com',
+      }),
+      discordThread: {
+        reporterDiscordUserId: '1234567890123456',
+        threadId: '4567890123456789',
+        triageChannelId: '2345678901234567',
+        triageMessageId: '3456789012345678',
+      },
+    } as never);
+
+    const result = await getSupportTicketActionContextForDiscord('SUP-ABC12345');
+
+    expect(result).toEqual({
+      publicId: 'SUP-ABC12345',
+      title: 'Forge broke for [redacted-email]',
+      reporterDiscordUserId: '1234567890123456',
+      threadId: '4567890123456789',
+      triageChannelId: '2345678901234567',
+      triageMessageId: '3456789012345678',
+    });
+    expect(JSON.stringify(result)).not.toContain('player@example.com');
+    expect(JSON.stringify(result)).not.toContain('The forge did not refresh');
+    expect(prisma.supportTicket.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { publicId: 'SUP-ABC12345' },
+      select: expect.objectContaining({
+        title: true,
+        discordThread: expect.any(Object),
+      }),
+    }));
+  });
+
+  it('updates support ticket status from a Discord support button and records an audit event', async () => {
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({ id: 'ticket-1', status: 'new' } as never);
+    vi.mocked(prisma.supportTicket.update).mockResolvedValue({
+      publicId: 'SUP-ABC12345',
+      status: 'accepted',
+      closedAt: null,
+    } as never);
+
+    const result = await updateSupportTicketStatusFromDiscord({
+      publicId: 'SUP-ABC12345',
+      status: 'accepted',
+      actorDiscordUserId: '5678901234567890',
+    });
+
+    expect(result).toEqual({
+      publicId: 'SUP-ABC12345',
+      status: 'accepted',
+    });
+    expect(prisma.supportTicket.update).toHaveBeenCalledWith({
+      where: { publicId: 'SUP-ABC12345' },
+      data: {
+        status: 'accepted',
+        closedAt: null,
+      },
+      select: {
+        publicId: true,
+        status: true,
+      },
+    });
+    expect(prisma.supportTicketEvent.create).toHaveBeenCalledWith({
+      data: {
+        ticketId: 'ticket-1',
+        eventType: 'status_changed',
+        fromStatus: 'new',
+        toStatus: 'accepted',
+        metadata: {
+          actorDiscordUserId: '5678901234567890',
+          source: 'discord_support_button',
+        },
       },
     });
   });

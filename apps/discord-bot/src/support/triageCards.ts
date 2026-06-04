@@ -54,13 +54,18 @@ export function buildTriageCard(ticket: SupportTriageTicketDto): TriageCardPaylo
     supportButton('Ask Reporter', 'ask_reporter', ticket.publicId, ButtonStyle.Secondary),
     supportButton('Needs Info', 'needs_info', ticket.publicId, ButtonStyle.Secondary),
     supportButton('Accepted', 'accepted', ticket.publicId, ButtonStyle.Success),
+    supportButton('Rejected', 'rejected', ticket.publicId, ButtonStyle.Danger),
+    supportButton('Security', 'security', ticket.publicId, ButtonStyle.Primary),
+  );
+  const archiveRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     supportButton('Closed', 'closed', ticket.publicId, ButtonStyle.Danger),
+    supportButton('Archive Thread', 'archive_thread', ticket.publicId, ButtonStyle.Secondary),
   );
 
   return {
     content: `New support ticket \`${ticket.publicId}\``,
     embeds: [embed],
-    components: [row],
+    components: [row, archiveRow],
   };
 }
 
