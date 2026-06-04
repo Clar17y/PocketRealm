@@ -1,6 +1,7 @@
 import type { ButtonInteraction, ChatInputCommandInteraction, User } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
+import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 
@@ -77,26 +78,53 @@ describe('handleDuelCommand', () => {
         },
       } as T;
     });
-    const reply = vi.fn(async () => ({ id: 'discord-message-1' }));
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const followUp = vi.fn(async () => ({ id: 'discord-message-1' }));
     const interaction = createCommandInteraction({
       opponent: createUser('333333333333333333'),
-      reply,
+      deferReply,
+      editReply,
+      followUp,
     });
 
     await handleDuelCommand(interaction, api, config);
 
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/duels', {
       guildId: 'guild-123',
       channelId: '111111111111111111',
       challengerDiscordUserId: '123456789012345678',
       targetDiscordUserId: '333333333333333333',
     });
-    expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+    expect(followUp).toHaveBeenCalledWith(expect.objectContaining({
       content: '<@333333333333333333>, <@123456789012345678> challenged you to a friendly simulation.',
       components: expect.any(Array),
     }));
+    expect(editReply).toHaveBeenCalledWith({ content: 'Friendly simulation challenge posted.' });
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/message', {
       messageId: 'discord-message-1',
+    });
+  });
+
+  it('edits the deferred command response for duel-specific create errors', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockRejectedValue(
+      new PocketRealmApiError('Target link required', 404, 'DISCORD_DUEL_TARGET_LINK_REQUIRED', {}),
+    );
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = createCommandInteraction({
+      opponent: createUser('333333333333333333'),
+      deferReply,
+      editReply,
+    });
+
+    await handleDuelCommand(interaction, api, config);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Both players need linked PocketRealm accounts before dueling.',
     });
   });
 });
@@ -128,19 +156,22 @@ describe('handleDuelButton', () => {
         },
       },
     });
-    const update = vi.fn<ButtonInteraction['update']>();
+    const deferUpdate = vi.fn<ButtonInteraction['deferUpdate']>();
+    const editReply = vi.fn<ButtonInteraction['editReply']>();
     const interaction = createButtonInteraction({
       customId: 'duel:accept:duel-123:333333333333333333',
       userId: '333333333333333333',
-      update,
+      deferUpdate,
+      editReply,
     });
 
     await handleDuelButton(interaction, api);
 
+    expect(deferUpdate).toHaveBeenCalled();
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/resolve', {
       acceptedByDiscordUserId: '333333333333333333',
     });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('Friendly simulation'),
     }));
   });
@@ -163,6 +194,29 @@ describe('handleDuelButton', () => {
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
       content: 'Only the challenged player can use this duel button.',
+    });
+  });
+
+  it('sends an ephemeral follow-up for expired accepted duels after deferring update', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockRejectedValue(
+      new PocketRealmApiError('Expired', 410, 'DISCORD_DUEL_EXPIRED', {}),
+    );
+    const deferUpdate = vi.fn<ButtonInteraction['deferUpdate']>();
+    const followUp = vi.fn<ButtonInteraction['followUp']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:accept:duel-123:333333333333333333',
+      userId: '333333333333333333',
+      deferUpdate,
+      followUp,
+    });
+
+    await handleDuelButton(interaction, api);
+
+    expect(deferUpdate).toHaveBeenCalled();
+    expect(followUp).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'That friendly duel is no longer available. Start a new /duel.',
     });
   });
 
@@ -232,6 +286,35 @@ describe('handleDuelButton', () => {
       components: [],
     }));
   });
+
+  it('bounds long replay entries for Discord message limits', async () => {
+    const api = createApi();
+    vi.mocked(api.get).mockResolvedValue({
+      replay: {
+        id: 'duel-123',
+        status: 'resolved',
+        page: 1,
+        pageSize: 10,
+        hasMore: false,
+        entries: [
+          { round: 1, message: 'A'.repeat(2_500) },
+          { internalState: 'B'.repeat(2_500) },
+        ],
+      },
+    });
+    const editReply = vi.fn<ButtonInteraction['editReply']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:replay:duel-123:1',
+      editReply,
+    });
+
+    await handleDuelButton(interaction, api);
+
+    const payload = editReply.mock.calls[0]?.[0] as { content: string };
+    expect(payload.content.length).toBeLessThanOrEqual(1_800);
+    expect(payload.content).toContain('Replay event details unavailable.');
+    expect(payload.content).not.toContain('internalState');
+  });
 });
 
 function createApi(): Pick<PocketRealmApiClient, 'get' | 'post'> {
@@ -254,7 +337,10 @@ function createCommandInteraction(input: {
   guildId?: string | null;
   opponent: User;
   userId?: string;
-  reply: ReturnType<typeof vi.fn>;
+  reply?: ReturnType<typeof vi.fn>;
+  deferReply?: ReturnType<typeof vi.fn>;
+  editReply?: ReturnType<typeof vi.fn>;
+  followUp?: ReturnType<typeof vi.fn>;
 }): ChatInputCommandInteraction {
   const userId = input.userId ?? '123456789012345678';
 
@@ -265,7 +351,10 @@ function createCommandInteraction(input: {
     options: {
       getUser: vi.fn(() => input.opponent),
     },
-    reply: input.reply,
+    reply: input.reply ?? vi.fn(),
+    deferReply: input.deferReply ?? vi.fn(),
+    editReply: input.editReply ?? vi.fn(),
+    followUp: input.followUp ?? vi.fn(),
   } as unknown as ChatInputCommandInteraction;
 }
 
@@ -274,15 +363,19 @@ function createButtonInteraction(input: {
   userId?: string;
   reply?: ReturnType<typeof vi.fn>;
   update?: ReturnType<typeof vi.fn>;
+  deferUpdate?: ReturnType<typeof vi.fn>;
   deferReply?: ReturnType<typeof vi.fn>;
   editReply?: ReturnType<typeof vi.fn>;
+  followUp?: ReturnType<typeof vi.fn>;
 }): ButtonInteraction {
   return {
     customId: input.customId,
     user: { id: input.userId ?? '333333333333333333' },
     reply: input.reply ?? vi.fn(),
     update: input.update ?? vi.fn(),
+    deferUpdate: input.deferUpdate ?? vi.fn(),
     deferReply: input.deferReply ?? vi.fn(),
     editReply: input.editReply ?? vi.fn(),
+    followUp: input.followUp ?? vi.fn(),
   } as unknown as ButtonInteraction;
 }

@@ -24,6 +24,9 @@ import {
 type DuelApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
 type DuelCommandConfig = Pick<BotConfig, 'duelsChannelId'>;
 
+const MAX_REPLAY_CONTENT_LENGTH = 1_800;
+const MAX_REPLAY_ENTRY_LENGTH = 240;
+
 interface CreateDuelResponse {
   duel: {
     id: string;
@@ -97,6 +100,8 @@ export async function handleDuelCommand(
     return;
   }
 
+  await interaction.deferReply({ ephemeral: true });
+
   let response: CreateDuelResponse;
   try {
     response = await api.post<CreateDuelResponse>('/api/v1/discord/duels', {
@@ -106,17 +111,17 @@ export async function handleDuelCommand(
       targetDiscordUserId: opponent.id,
     });
   } catch (error) {
-    await interaction.reply({
-      ephemeral: true,
+    await interaction.editReply({
       content: createDuelErrorCopy(error),
     });
     return;
   }
 
-  const replyResult = await interaction.reply({
+  const replyResult = await interaction.followUp({
     content: `<@${opponent.id}>, ${interaction.user} challenged you to a friendly simulation.`,
     components: [buildChallengeRow(response.duel.id, opponent.id)],
   });
+  await interaction.editReply({ content: 'Friendly simulation challenge posted.' });
   await recordDuelMessage(api, interaction, response.duel.id, replyResult);
 }
 
@@ -202,20 +207,22 @@ async function acceptDuel(
   api: Pick<PocketRealmApiClient, 'post'>,
   duelId: string,
 ): Promise<void> {
+  await interaction.deferUpdate();
+
   let response: DuelResultResponse;
   try {
     response = await api.post<DuelResultResponse>(`/api/v1/discord/duels/${encodeURIComponent(duelId)}/resolve`, {
       acceptedByDiscordUserId: interaction.user.id,
     });
   } catch (error) {
-    await interaction.reply({
+    await interaction.followUp({
       ephemeral: true,
       content: resolveDuelErrorCopy(error),
     });
     return;
   }
 
-  await interaction.update(buildDuelResultMessage(response));
+  await interaction.editReply(buildDuelResultMessage(response));
 }
 
 function buildDuelResultMessage(response: DuelResultResponse): InteractionUpdateOptions {
@@ -263,7 +270,16 @@ function formatReplay(replay: DuelReplayResponse['replay']): string {
     return `Friendly simulation replay page ${replay.page}: no replay entries are available.`;
   }
 
-  const lines = entries.map((entry, index) => `${index + 1}. ${formatReplayEntry(entry)}`);
+  const lines: string[] = [];
+  for (const [index, entry] of entries.entries()) {
+    const line = `${index + 1}. ${formatReplayEntry(entry)}`;
+    if (`Friendly simulation replay page ${replay.page}\n${[...lines, line].join('\n')}`.length > MAX_REPLAY_CONTENT_LENGTH) {
+      lines.push('Replay page truncated for Discord.');
+      break;
+    }
+
+    lines.push(line);
+  }
   if (replay.hasMore) {
     lines.push('More replay pages are available.');
   }
@@ -306,16 +322,16 @@ function formatSummary(summary: unknown): string | null {
 
 function formatReplayEntry(entry: unknown): string {
   if (typeof entry === 'string') {
-    return entry;
+    return truncateText(entry, MAX_REPLAY_ENTRY_LENGTH);
   }
 
   if (!isRecord(entry)) {
-    return JSON.stringify(entry);
+    return truncateText(JSON.stringify(entry), MAX_REPLAY_ENTRY_LENGTH);
   }
 
   const message = typeof entry.message === 'string' ? entry.message : null;
   if (message) {
-    return message;
+    return truncateText(message, MAX_REPLAY_ENTRY_LENGTH);
   }
 
   const round = typeof entry.round === 'number' ? `Round ${entry.round}` : null;
@@ -323,7 +339,7 @@ function formatReplayEntry(entry: unknown): string {
   const damage = typeof entry.damageDealt === 'number' ? `${entry.damageDealt} damage` : null;
   const parts = [round, actionName, damage].filter((part): part is string => Boolean(part));
 
-  return parts.length > 0 ? parts.join(' · ') : JSON.stringify(entry);
+  return parts.length > 0 ? parts.join(' · ') : 'Replay event details unavailable.';
 }
 
 async function recordDuelMessage(
@@ -373,15 +389,23 @@ function readMessageId(value: unknown): string | null {
 
 function createDuelErrorCopy(error: unknown): string {
   if (error instanceof PocketRealmApiError) {
-    if (error.code === 'DISCORD_LINK_REQUIRED') {
+    if (
+      error.code === 'DISCORD_LINK_REQUIRED'
+      || error.code === 'DISCORD_DUEL_CHALLENGER_LINK_REQUIRED'
+      || error.code === 'DISCORD_DUEL_TARGET_LINK_REQUIRED'
+    ) {
       return 'Both players need linked PocketRealm accounts before dueling.';
     }
 
-    if (error.code === 'DISCORD_PLAYER_NOT_FOUND') {
+    if (
+      error.code === 'DISCORD_PLAYER_NOT_FOUND'
+      || error.code === 'DISCORD_DUEL_CHALLENGER_PLAYER_NOT_FOUND'
+      || error.code === 'DISCORD_DUEL_TARGET_PLAYER_NOT_FOUND'
+    ) {
       return 'Both players need active PocketRealm characters before dueling.';
     }
 
-    if (error.code === 'DISCORD_SELF_CHALLENGE') {
+    if (error.code === 'DISCORD_SELF_CHALLENGE' || error.code === 'DISCORD_DUEL_SELF_CHALLENGE') {
       return 'Challenge another player, not yourself.';
     }
   }
@@ -391,11 +415,22 @@ function createDuelErrorCopy(error: unknown): string {
 
 function resolveDuelErrorCopy(error: unknown): string {
   if (error instanceof PocketRealmApiError) {
-    if (error.code === 'DISCORD_LINK_REQUIRED') {
+    if (
+      error.code === 'DISCORD_LINK_REQUIRED'
+      || error.code === 'DISCORD_DUEL_CHALLENGER_LINK_REQUIRED'
+      || error.code === 'DISCORD_DUEL_TARGET_LINK_REQUIRED'
+    ) {
       return 'Link your PocketRealm account first with /link.';
     }
 
-    if (error.status === 404 || error.status === 409) {
+    if (
+      error.status === 404
+      || error.status === 409
+      || error.status === 410
+      || error.code === 'DISCORD_DUEL_EXPIRED'
+      || error.code === 'DISCORD_DUEL_NOT_PENDING'
+      || error.code === 'DISCORD_DUEL_NOT_FOUND'
+    ) {
       return 'That friendly duel is no longer available. Start a new /duel.';
     }
   }
@@ -405,4 +440,8 @@ function resolveDuelErrorCopy(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function truncateText(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
 }
