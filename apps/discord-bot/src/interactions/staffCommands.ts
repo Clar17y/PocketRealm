@@ -33,7 +33,7 @@ interface StaffCommunityProfileDelegate {
   update(args: {
     where: { id: string };
     data: {
-      xp?: number;
+      xp?: number | { increment: number } | { decrement: number };
       level?: number;
       lastRoleSyncAt?: Date;
     };
@@ -220,28 +220,23 @@ async function adjustDiscordXp(input: {
       },
     });
     const previousXp = profile?.xp ?? 0;
-    const previousLevel = profile?.level ?? levelForDiscordXp(previousXp);
-    const newXp = Math.max(0, previousXp + input.amount);
+    const { updatedProfile, appliedAmount } = await applyXpAdjustment(tx, {
+      profile,
+      guildId: input.guildId,
+      targetDiscordUserId: input.target.id,
+      amount: input.amount,
+      previousXp,
+    });
+    const newXp = updatedProfile?.xp ?? 0;
+    const effectivePreviousXp = Math.max(0, newXp - appliedAmount);
+    const previousLevel = levelForDiscordXp(effectivePreviousXp);
     const newLevel = levelForDiscordXp(newXp);
-    const updatedProfile = profile
+    const normalizedProfile = updatedProfile && updatedProfile.level !== newLevel
       ? await tx.discordCommunityProfile.update({
-          where: { id: profile.id },
-          data: {
-            xp: newXp,
-            level: newLevel,
-          },
+          where: { id: updatedProfile.id },
+          data: { level: newLevel },
         })
-      : newXp > 0
-        ? await tx.discordCommunityProfile.create({
-            data: {
-              discordGuildId: input.guildId,
-              discordUserId: input.target.id,
-              xp: newXp,
-              level: newLevel,
-              dailyXp: 0,
-            },
-          })
-        : null;
+      : updatedProfile;
 
     await tx.discordBotAuditEvent.create({
       data: {
@@ -252,7 +247,8 @@ async function adjustDiscordXp(input: {
         status: 'success',
         metadata: {
           amount: input.amount,
-          previousXp,
+          appliedAmount,
+          previousXp: effectivePreviousXp,
           newXp,
           previousLevel,
           newLevel,
@@ -262,16 +258,73 @@ async function adjustDiscordXp(input: {
     });
 
     return {
-      profileId: updatedProfile?.id ?? null,
+      profileId: normalizedProfile?.id ?? null,
       targetUserId: input.target.id,
       amount: input.amount,
-      previousXp,
+      previousXp: effectivePreviousXp,
       newXp,
       previousLevel,
       newLevel,
       reason: input.reason,
     };
   });
+}
+
+async function applyXpAdjustment(
+  tx: StaffTransactionClient,
+  input: {
+    profile: DiscordCommunityProfileRecord | null;
+    guildId: string;
+    targetDiscordUserId: string;
+    amount: number;
+    previousXp: number;
+  },
+): Promise<{ updatedProfile: DiscordCommunityProfileRecord | null; appliedAmount: number }> {
+  if (!input.profile) {
+    if (input.amount <= 0) {
+      return { updatedProfile: null, appliedAmount: 0 };
+    }
+
+    return {
+      updatedProfile: await tx.discordCommunityProfile.create({
+        data: {
+          discordGuildId: input.guildId,
+          discordUserId: input.targetDiscordUserId,
+          xp: input.amount,
+          level: levelForDiscordXp(input.amount),
+          dailyXp: 0,
+        },
+      }),
+      appliedAmount: input.amount,
+    };
+  }
+
+  if (input.amount >= 0) {
+    return {
+      updatedProfile: await tx.discordCommunityProfile.update({
+        where: { id: input.profile.id },
+        data: {
+          xp: { increment: input.amount },
+        },
+      }),
+      appliedAmount: input.amount,
+    };
+  }
+
+  const decrement = Math.min(Math.abs(input.amount), input.previousXp);
+  if (decrement === 0) {
+    return { updatedProfile: input.profile, appliedAmount: 0 };
+  }
+
+  return {
+    updatedProfile: await tx.discordCommunityProfile.update({
+      where: { id: input.profile.id },
+      data: {
+        xp: { decrement },
+      },
+    }),
+    appliedAmount: -decrement,
+  };
 }
 
 async function syncAdjustedLevelRole(

@@ -65,7 +65,12 @@ describe('handleStaffCommand', () => {
     expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'profile-1' },
       data: expect.objectContaining({
-        xp: 110,
+        xp: { increment: 20 },
+      }),
+    }));
+    expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'profile-1' },
+      data: expect.objectContaining({
         level: 2,
       }),
     }));
@@ -78,6 +83,7 @@ describe('handleStaffCommand', () => {
         status: 'success',
         metadata: expect.objectContaining({
           amount: 20,
+          appliedAmount: 20,
           previousXp: 90,
           newXp: 110,
           previousLevel: 1,
@@ -183,6 +189,12 @@ interface MockProfile {
   excludedFromXp: boolean;
 }
 
+interface MockProfileUpdateData {
+  xp?: number | { increment: number } | { decrement: number };
+  level?: number;
+  lastRoleSyncAt?: Date;
+}
+
 function createProfile(overrides: Partial<MockProfile> = {}): MockProfile {
   return {
     id: 'profile-1',
@@ -202,10 +214,21 @@ function createPrisma(options: { profile?: MockProfile | null } = {}): StaffPris
   let storedProfile = options.profile === undefined ? createProfile() : options.profile;
   const discordCommunityProfile = {
     findUnique: vi.fn(async () => storedProfile),
-    update: vi.fn(async ({ data }: { data: Partial<MockProfile> }) => {
+    update: vi.fn(async ({ data }: { where: { id: string }; data: MockProfileUpdateData }) => {
+      const currentProfile = storedProfile ?? createProfile();
+      const xpChange = data.xp;
+      const nextXp = typeof xpChange === 'number'
+        ? xpChange
+        : xpChange && 'increment' in xpChange
+          ? currentProfile.xp + xpChange.increment
+          : xpChange && 'decrement' in xpChange
+            ? currentProfile.xp - xpChange.decrement
+            : currentProfile.xp;
+      const { xp: _xp, ...restData } = data;
       storedProfile = {
-        ...(storedProfile ?? createProfile()),
-        ...data,
+        ...currentProfile,
+        ...restData,
+        xp: nextXp,
       };
       return storedProfile;
     }),
