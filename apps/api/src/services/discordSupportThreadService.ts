@@ -1,7 +1,12 @@
 import { prisma } from '@pocketrealm/database';
 import { AppError } from '../middleware/errorHandler';
+import { redactSupportText } from './supportTicketRedaction';
+import type { SupportSensitivityFlag, SupportTicketArea, SupportTicketCategory, SupportTicketPrivacy, SupportTicketStatus } from './supportTicketSchemas';
 
 const DISCORD_SUPPORT_TRIAGE_STATUSES = ['new', 'needs_info'] as const;
+const PRIVATE_SUPPORT_SUMMARY = 'Private report body withheld. Review in staff support tools.';
+const MAX_DISCORD_TITLE_LENGTH = 80;
+const MAX_DISCORD_SUMMARY_LENGTH = 240;
 
 export interface MarkSupportTriageMessageInput {
   publicId: string;
@@ -25,6 +30,29 @@ function boundedLimit(limit: number): number {
   return Math.min(Math.max(limit, 1), 50);
 }
 
+function truncateText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
+function safeText(value: string, maxLength: number): string {
+  return truncateText(redactSupportText(value) ?? '', maxLength);
+}
+
+function supportTicketSummary(ticket: {
+  privacy: SupportTicketPrivacy;
+  description: string;
+}): string {
+  if (ticket.privacy === 'private' || ticket.privacy === 'not_sure') {
+    return PRIVATE_SUPPORT_SUMMARY;
+  }
+
+  return safeText(ticket.description, MAX_DISCORD_SUMMARY_LENGTH);
+}
+
 function firstActiveDiscordUserId(ticket: {
   reporterAccount: {
     discordAccountLinks: Array<{ discordUserId: string }>;
@@ -46,6 +74,26 @@ async function findTicketId(publicId: string): Promise<string> {
   return ticket.id;
 }
 
+function throwTriageMessageConflict(): never {
+  throw new AppError(
+    409,
+    'Support ticket already has a different Discord triage message',
+    'SUPPORT_TRIAGE_MESSAGE_CONFLICT'
+  );
+}
+
+function throwDiscordThreadNotFound(): never {
+  throw new AppError(404, 'Discord support thread mapping not found', 'SUPPORT_DISCORD_THREAD_NOT_FOUND');
+}
+
+function throwDiscordThreadConflict(): never {
+  throw new AppError(
+    409,
+    'Support ticket already has a different Discord support thread',
+    'SUPPORT_DISCORD_THREAD_CONFLICT'
+  );
+}
+
 export async function listUnpostedSupportTicketsForDiscord(limit = 10) {
   const tickets = await prisma.supportTicket.findMany({
     where: {
@@ -60,72 +108,134 @@ export async function listUnpostedSupportTicketsForDiscord(limit = 10) {
       privacy: true,
       category: true,
       area: true,
+      sensitivityFlags: true,
       title: true,
       description: true,
-      reporterDisplayName: true,
       realmLabel: true,
       createdAt: true,
-      reporterAccount: {
-        select: {
-          discordAccountLinks: {
-            where: { unlinkedAt: null },
-            orderBy: { linkedAt: 'desc' },
-            take: 1,
-            select: { discordUserId: true },
-          },
-        },
-      },
     },
   });
 
   return tickets.map((ticket) => ({
     publicId: ticket.publicId,
-    status: ticket.status,
-    privacy: ticket.privacy,
-    category: ticket.category,
-    area: ticket.area,
-    title: ticket.title,
-    description: ticket.description,
-    reporterDisplayName: ticket.reporterDisplayName,
-    reporterDiscordUserId: firstActiveDiscordUserId(ticket),
+    status: ticket.status as SupportTicketStatus,
+    privacy: ticket.privacy as SupportTicketPrivacy,
+    category: ticket.category as SupportTicketCategory,
+    area: ticket.area as SupportTicketArea,
+    sensitivityFlags: ticket.sensitivityFlags as SupportSensitivityFlag[],
+    title: safeText(ticket.title, MAX_DISCORD_TITLE_LENGTH),
+    summary: supportTicketSummary({
+      privacy: ticket.privacy as SupportTicketPrivacy,
+      description: ticket.description,
+    }),
     realmLabel: ticket.realmLabel,
     createdAt: ticket.createdAt,
   }));
 }
 
 export async function markSupportTriageMessage(input: MarkSupportTriageMessageInput) {
-  const ticket = await prisma.supportTicket.update({
-    where: { publicId: input.publicId },
-    data: { discordMessageId: input.triageMessageId },
-    select: { id: true, publicId: true, discordMessageId: true },
-  });
+  const ticket = await prisma.$transaction(async (tx) => {
+    const existing = await tx.supportTicket.findUnique({
+      where: { publicId: input.publicId },
+      select: {
+        id: true,
+        publicId: true,
+        discordMessageId: true,
+        reporterAccount: {
+          select: {
+            discordAccountLinks: {
+              where: { unlinkedAt: null },
+              orderBy: { linkedAt: 'desc' },
+              take: 1,
+              select: { discordUserId: true },
+            },
+          },
+        },
+      },
+    });
 
-  await prisma.supportTicketDiscordThread.upsert({
-    where: { ticketId: ticket.id },
-    create: {
-      ticketId: ticket.id,
+    if (!existing) {
+      throw new AppError(404, 'Support ticket not found', 'SUPPORT_TICKET_NOT_FOUND');
+    }
+
+    if (existing.discordMessageId && existing.discordMessageId !== input.triageMessageId) {
+      throwTriageMessageConflict();
+    }
+
+    if (!existing.discordMessageId) {
+      const claim = await tx.supportTicket.updateMany({
+        where: { id: existing.id, discordMessageId: null },
+        data: { discordMessageId: input.triageMessageId },
+      });
+
+      if (claim.count === 0) {
+        const current = await tx.supportTicket.findUnique({
+          where: { id: existing.id },
+          select: { discordMessageId: true },
+        });
+
+        if (current?.discordMessageId !== input.triageMessageId) {
+          throwTriageMessageConflict();
+        }
+      }
+    }
+
+    const mapping = await tx.supportTicketDiscordThread.findUnique({
+      where: { ticketId: existing.id },
+      select: { triageMessageId: true },
+    });
+
+    if (mapping?.triageMessageId && mapping.triageMessageId !== input.triageMessageId) {
+      throwTriageMessageConflict();
+    }
+
+    const mappingData = {
       guildId: input.guildId,
       triageChannelId: input.triageChannelId,
       triageMessageId: input.triageMessageId,
-      status: 'triage_posted',
-    },
-    update: {
-      guildId: input.guildId,
-      triageChannelId: input.triageChannelId,
-      triageMessageId: input.triageMessageId,
+      reporterDiscordUserId: firstActiveDiscordUserId(existing),
       status: 'triage_posted',
       archivedAt: null,
-    },
+    };
+
+    if (mapping) {
+      await tx.supportTicketDiscordThread.update({
+        where: { ticketId: existing.id },
+        data: mappingData,
+      });
+    } else {
+      await tx.supportTicketDiscordThread.create({
+        data: {
+          ticketId: existing.id,
+          ...mappingData,
+        },
+      });
+    }
+
+    return existing;
   });
 
   return {
     publicId: ticket.publicId,
-    discordMessageId: ticket.discordMessageId,
+    discordMessageId: input.triageMessageId,
   };
 }
 
 export async function markSupportThreadCreated(input: MarkSupportThreadCreatedInput) {
   const ticketId = await findTicketId(input.publicId);
+  const mapping = await prisma.supportTicketDiscordThread.findUnique({
+    where: { ticketId },
+    select: { threadId: true },
+  });
+
+  if (!mapping) {
+    throwDiscordThreadNotFound();
+  }
+
+  if (mapping.threadId && mapping.threadId !== input.threadId) {
+    throwDiscordThreadConflict();
+  }
+
   await prisma.supportTicketDiscordThread.update({
     where: { ticketId },
     data: {
@@ -144,6 +254,23 @@ export async function markSupportThreadCreated(input: MarkSupportThreadCreatedIn
 
 export async function archiveSupportThread(input: ArchiveSupportThreadInput) {
   const ticketId = await findTicketId(input.publicId);
+  const mapping = await prisma.supportTicketDiscordThread.findUnique({
+    where: { ticketId },
+    select: { archivedAt: true },
+  });
+
+  if (!mapping) {
+    throwDiscordThreadNotFound();
+  }
+
+  if (mapping.archivedAt) {
+    return {
+      publicId: input.publicId,
+      archivedByDiscordUserId: input.actorDiscordUserId,
+      status: 'archived',
+    };
+  }
+
   await prisma.supportTicketDiscordThread.update({
     where: { ticketId },
     data: {
