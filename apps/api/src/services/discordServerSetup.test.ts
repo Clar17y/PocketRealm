@@ -36,6 +36,11 @@ function asName(value: unknown): string {
   return typeof name === 'string' ? name : '';
 }
 
+interface RecordedDiscordRequest {
+  method: string;
+  body: unknown;
+}
+
 describe('discordServerSetup', () => {
   it('parses local env files without exposing comments or quotes', () => {
     expect(parseLocalEnv([
@@ -158,13 +163,18 @@ describe('discordServerSetup', () => {
       { id: 'existing-spam-rule-id', name: 'PocketRealm: spam protection' },
       { id: 'existing-private-rule-id', name: 'PocketRealm: private data guard' },
     ];
-    const requestBodies: unknown[] = [];
+    const requests: RecordedDiscordRequest[] = [];
 
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(input instanceof Request ? input.url : input.toString());
       const path = url.pathname.replace('/api/v10', '');
       const method = init?.method ?? 'GET';
-      if (typeof init?.body === 'string') requestBodies.push(JSON.parse(init.body) as unknown);
+      if (typeof init?.body === 'string') {
+        requests.push({
+          method,
+          body: JSON.parse(init.body) as unknown,
+        });
+      }
 
       if (path === '/users/@me') return jsonResponse({ id: 'bot-user-id' });
       if (path.endsWith('/roles') && method === 'GET') return jsonResponse(roles);
@@ -183,11 +193,11 @@ describe('discordServerSetup', () => {
       }
       if (path.endsWith('/auto-moderation/rules') && method === 'GET') return jsonResponse(existingAutoModRules);
       if (path.endsWith('/auto-moderation/rules') && method === 'POST') {
-        const body = requestBodies.at(-1);
+        const body = requests.at(-1)?.body;
         return jsonResponse({ id: 'created-rule-id', name: asName(body) });
       }
       if (path.includes('/auto-moderation/rules/') && method === 'PATCH') {
-        const body = requestBodies.at(-1);
+        const body = requests.at(-1)?.body;
         return jsonResponse({ id: path.split('/').at(-1), name: asName(body) });
       }
       throw new Error(`Unhandled Discord test request: ${method} ${path}`);
@@ -207,9 +217,19 @@ describe('discordServerSetup', () => {
     expect(result.channelIdsByName['mod-log']).toBe('mod-log-id');
     expect(result.roleIdsByKey.linked).toBe('linked-role-id');
 
-    const autoModBodies = requestBodies.filter((body) => asName(body).startsWith('PocketRealm:'));
+    const autoModRequests = requests.filter((request) => asName(request.body).startsWith('PocketRealm:'));
+    const createBodies = autoModRequests
+      .filter((request) => request.method === 'POST')
+      .map((request) => request.body);
+    const updateBodies = autoModRequests
+      .filter((request) => request.method === 'PATCH')
+      .map((request) => request.body);
+
+    const autoModBodies = autoModRequests.map((request) => request.body);
     expect(autoModBodies).toHaveLength(4);
     expect(autoModBodies.some((body) => 'guild_id' in asObject(body))).toBe(false);
+    expect(createBodies.every((body) => 'trigger_type' in asObject(body))).toBe(true);
+    expect(updateBodies.every((body) => 'trigger_type' in asObject(body))).toBe(false);
     expect(JSON.stringify(autoModBodies)).toContain('gold spam');
     expect(JSON.stringify(autoModBodies)).toContain('token leak');
   });

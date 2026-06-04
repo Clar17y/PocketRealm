@@ -113,6 +113,8 @@ interface AutoModRulePayload {
   enabled: boolean;
 }
 
+type AutoModRuleUpdatePayload = Omit<AutoModRulePayload, 'trigger_type'>;
+
 interface DiscordAutoModRule {
   id: string;
   name: string;
@@ -242,6 +244,11 @@ export function buildAutoModRules(options: { alertChannelId: string; extraKeywor
       enabled: true,
     },
   ];
+}
+
+function buildAutoModRuleUpdatePayload(rule: AutoModRulePayload): AutoModRuleUpdatePayload {
+  const { trigger_type: _triggerType, ...updatePayload } = rule;
+  return updatePayload;
 }
 
 export function buildDiscordSetupPlan(): DiscordSetupPlan {
@@ -624,7 +631,7 @@ class DiscordRestClient {
   async updateAutoModRule(guildId: string, ruleId: string, rule: AutoModRulePayload): Promise<DiscordAutoModRule> {
     const data = await this.request(`/guilds/${guildId}/auto-moderation/rules/${ruleId}`, {
       method: 'PATCH',
-      body: JSON.stringify(rule),
+      body: JSON.stringify(buildAutoModRuleUpdatePayload(rule)),
     });
     return parseAutoModRule(data);
   }
