@@ -19,10 +19,11 @@ describe('syncLinkedRoles', () => {
   };
   const config = {
     guildId: '234567890123456789',
+    playerRoleId: '456789012345678901',
     verifiedRoleId: '345678901234567890',
   } as BotConfig;
 
-  it('adds the verified role for unsynced links and marks them synced', async () => {
+  it('adds the player and verified roles for unsynced links before marking them synced', async () => {
     const get = vi.fn(async <T>(): Promise<T> => unsyncedLinksResponse as T);
     const post = vi.fn(async <T>(): Promise<T> => null as T);
     const api = { get, post } as Pick<PocketRealmApiClient, 'get' | 'post'>;
@@ -38,6 +39,7 @@ describe('syncLinkedRoles', () => {
 
     expect(get).toHaveBeenCalledWith('/api/v1/discord/links/unsynced?guildId=234567890123456789');
     expect(fetch).toHaveBeenCalledWith('123456789012345678');
+    expect(add).toHaveBeenCalledWith('456789012345678901');
     expect(add).toHaveBeenCalledWith('345678901234567890');
     expect(post).toHaveBeenCalledWith('/api/v1/discord/links/link-1/synced', {});
     expect(summary).toEqual({
@@ -86,7 +88,7 @@ describe('syncLinkedRoles', () => {
 
     const summary = await syncLinkedRoles({ api, guild, config });
 
-    expect(add).toHaveBeenCalledWith('345678901234567890');
+    expect(add).toHaveBeenCalledWith('456789012345678901');
     expect(post).not.toHaveBeenCalled();
     expect(summary).toEqual({
       fetched: 1,

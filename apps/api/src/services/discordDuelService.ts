@@ -224,6 +224,29 @@ async function throwDiscordDuelClaimError(
   throw new AppError(409, 'Discord duel could not be claimed', 'DISCORD_DUEL_CLAIM_CONFLICT');
 }
 
+async function restorePendingDiscordDuelClaim(
+  duelId: string,
+  acceptedByDiscordUserId: string,
+  acceptedAt: Date,
+): Promise<void> {
+  try {
+    await prisma.discordDuel.updateMany({
+      where: {
+        id: duelId,
+        status: DISCORD_DUEL_RESOLVING_STATUS,
+        acceptedAt,
+        targetDiscordUserId: acceptedByDiscordUserId,
+      },
+      data: {
+        status: 'pending',
+        acceptedAt: null,
+      },
+    });
+  } catch {
+    // Preserve the original simulation/write failure; a later accept will report the current duel state.
+  }
+}
+
 export async function createPendingDiscordDuel(input: CreateDiscordDuelInput): Promise<PendingDiscordDuelDto> {
   if (input.challengerDiscordUserId === input.targetDiscordUserId) {
     throw new AppError(400, 'Cannot challenge yourself to a Discord duel', 'DISCORD_DUEL_SELF_CHALLENGE');
@@ -315,52 +338,57 @@ export async function resolveDiscordDuel(
     await throwDiscordDuelClaimError(duelId, acceptedByDiscordUserId, now);
   }
 
-  const [challengerCombatant, targetCombatant] = await Promise.all([
-    buildDiscordDuelCombatant(duel.challengerPlayerId, duel.challenger.username),
-    buildDiscordDuelCombatant(duel.targetPlayerId, duel.target.username),
-  ]);
+  try {
+    const [challengerCombatant, targetCombatant] = await Promise.all([
+      buildDiscordDuelCombatant(duel.challengerPlayerId, duel.challenger.username),
+      buildDiscordDuelCombatant(duel.targetPlayerId, duel.target.username),
+    ]);
 
-  const combatResult = runTemplateCombat(challengerCombatant, targetCombatant, { combatMode: 'pvp' });
-  const combatLog = mapTemplateCombatLog(combatResult.log);
-  const isDraw = combatResult.outcome === 'draw';
-  const challengerWon = combatResult.outcome === 'victory';
-  const winnerPlayerId = isDraw ? null : challengerWon ? duel.challengerPlayerId : duel.targetPlayerId;
-  const winnerUsername = isDraw ? null : challengerWon ? duel.challenger.username : duel.target.username;
-  const summary = {
-    outcome: combatResult.outcome,
-    totalRounds: combatResult.totalRounds,
-    challengerUsername: duel.challenger.username,
-    targetUsername: duel.target.username,
-    winnerUsername,
-    isDraw,
-    challengerHpRemaining: combatResult.combatantAHpRemaining,
-    targetHpRemaining: combatResult.combatantBHpRemaining,
-  };
-
-  const completion = await prisma.discordDuel.updateMany({
-    where: {
-      id: duelId,
-      status: DISCORD_DUEL_RESOLVING_STATUS,
-      acceptedAt: now,
-      targetDiscordUserId: acceptedByDiscordUserId,
-    },
-    data: {
-      status: 'completed',
-      completedAt: now,
-      winnerPlayerId,
+    const combatResult = runTemplateCombat(challengerCombatant, targetCombatant, { combatMode: 'pvp' });
+    const combatLog = mapTemplateCombatLog(combatResult.log);
+    const isDraw = combatResult.outcome === 'draw';
+    const challengerWon = combatResult.outcome === 'victory';
+    const winnerPlayerId = isDraw ? null : challengerWon ? duel.challengerPlayerId : duel.targetPlayerId;
+    const winnerUsername = isDraw ? null : challengerWon ? duel.challenger.username : duel.target.username;
+    const summary = {
+      outcome: combatResult.outcome,
+      totalRounds: combatResult.totalRounds,
+      challengerUsername: duel.challenger.username,
+      targetUsername: duel.target.username,
+      winnerUsername,
       isDraw,
-      combatLog: combatLog as unknown as Prisma.InputJsonValue,
-      summary: summary as unknown as Prisma.InputJsonValue,
-    },
-  });
+      challengerHpRemaining: combatResult.combatantAHpRemaining,
+      targetHpRemaining: combatResult.combatantBHpRemaining,
+    };
 
-  if (completion.count !== 1) {
-    throw new AppError(409, 'Discord duel completion could not be applied', 'DISCORD_DUEL_COMPLETION_CONFLICT');
+    const completion = await prisma.discordDuel.updateMany({
+      where: {
+        id: duelId,
+        status: DISCORD_DUEL_RESOLVING_STATUS,
+        acceptedAt: now,
+        targetDiscordUserId: acceptedByDiscordUserId,
+      },
+      data: {
+        status: 'completed',
+        completedAt: now,
+        winnerPlayerId,
+        isDraw,
+        combatLog: combatLog as unknown as Prisma.InputJsonValue,
+        summary: summary as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    if (completion.count !== 1) {
+      throw new AppError(409, 'Discord duel completion could not be applied', 'DISCORD_DUEL_COMPLETION_CONFLICT');
+    }
+
+    const updated = await getDuelOrThrow(duelId);
+
+    return completedDto(updated);
+  } catch (error) {
+    await restorePendingDiscordDuelClaim(duelId, acceptedByDiscordUserId, now);
+    throw error;
   }
-
-  const updated = await getDuelOrThrow(duelId);
-
-  return completedDto(updated);
 }
 
 export async function getDiscordDuelReplay(duelId: string, page: number): Promise<DiscordDuelReplayDto> {

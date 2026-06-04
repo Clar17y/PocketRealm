@@ -52,6 +52,18 @@ describe('message XP', () => {
     });
   });
 
+  it('rejects the configured duels channel by id even if the channel is renamed', async () => {
+    expect(
+      await evaluateXpMessage(
+        createMessage({ channelId: duelsChannelId, channelName: 'friendly-arena' }),
+        { config: createConfig({ duelsChannelId }) },
+      ),
+    ).toMatchObject({
+      eligible: false,
+      reason: 'ignored_channel',
+    });
+  });
+
   it('rejects cooldown hits using Redis NX semantics', async () => {
     const redis = createRedis({ setResult: null });
     const prisma = createPrisma();
@@ -328,6 +340,7 @@ describe('message XP', () => {
 function createConfig(overrides: Partial<Pick<
   BotConfig,
   | 'guildId'
+  | 'duelsChannelId'
   | 'supportCategoryId'
   | 'supportTriageChannelId'
   | 'supportStaffRoleIds'
@@ -337,6 +350,7 @@ function createConfig(overrides: Partial<Pick<
 >> = {}): Pick<
   BotConfig,
   | 'guildId'
+  | 'duelsChannelId'
   | 'supportCategoryId'
   | 'supportTriageChannelId'
   | 'supportStaffRoleIds'
@@ -346,6 +360,7 @@ function createConfig(overrides: Partial<Pick<
 > {
   return {
     guildId,
+    duelsChannelId,
     supportCategoryId: '999999999999999999',
     supportTriageChannelId: '888888888888888888',
     supportStaffRoleIds: [],

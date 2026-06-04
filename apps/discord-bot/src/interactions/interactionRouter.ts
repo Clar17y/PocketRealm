@@ -26,6 +26,7 @@ export interface InteractionRouterOptions {
     BotConfig,
     'guildId'
     | 'webBaseUrl'
+    | 'playerRoleId'
     | 'verifiedRoleId'
     | 'supportStaffRoleIds'
     | 'levelRoleMap'
@@ -45,7 +46,9 @@ export async function routeInteraction(
 
     if (parseSupportButtonId(interaction.customId)) {
       await handleSupportThreadAction(interaction, options);
+      return;
     }
+    await replyUnhandledInteraction(interaction);
     return;
   }
 
@@ -102,5 +105,22 @@ export async function routeInteraction(
 
   if (interaction.commandName === 'duel') {
     await handleDuelCommand(interaction, options.api, options.config);
+    return;
   }
+
+  await replyUnhandledInteraction(interaction);
+}
+
+async function replyUnhandledInteraction(interaction: Interaction): Promise<void> {
+  if (!interaction.isRepliable() || interaction.replied) {
+    return;
+  }
+
+  const content = 'This interaction is no longer supported. Try the command again.';
+  if (interaction.deferred) {
+    await interaction.editReply({ content });
+    return;
+  }
+
+  await interaction.reply({ ephemeral: true, content });
 }

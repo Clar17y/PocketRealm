@@ -25,7 +25,7 @@ export interface RoleSyncSummary {
 export interface SyncLinkedRolesOptions {
   api: Pick<PocketRealmApiClient, 'get' | 'post'>;
   guild: Guild;
-  config: Pick<BotConfig, 'guildId' | 'verifiedRoleId'>;
+  config: Pick<BotConfig, 'guildId' | 'playerRoleId' | 'verifiedRoleId'>;
 }
 
 export async function syncLinkedRoles({
@@ -51,7 +51,9 @@ export async function syncLinkedRoles({
     }
 
     try {
-      await member.roles.add(config.verifiedRoleId);
+      for (const roleId of requiredLinkedRoleIds(config)) {
+        await member.roles.add(roleId);
+      }
       await api.post(`/api/v1/discord/links/${link.id}/synced`, {});
       summary.roleSynced += 1;
     } catch {
@@ -60,4 +62,8 @@ export async function syncLinkedRoles({
   }
 
   return summary;
+}
+
+function requiredLinkedRoleIds(config: Pick<BotConfig, 'playerRoleId' | 'verifiedRoleId'>): string[] {
+  return [...new Set([config.playerRoleId, config.verifiedRoleId])];
 }

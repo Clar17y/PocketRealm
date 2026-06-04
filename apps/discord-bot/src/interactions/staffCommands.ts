@@ -12,7 +12,7 @@ const MAX_XP_DECREMENT_ATTEMPTS = 5;
 
 type StaffConfig = Pick<
   BotConfig,
-  'guildId' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'
+  'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'
 >;
 
 interface DiscordCommunityProfileRecord {
@@ -165,11 +165,17 @@ async function handleSyncRoles(
   }
 
   const syncLinkedRoles = options.syncLinkedRoles ?? defaultSyncLinkedRoles;
-  const summary = await syncLinkedRoles({
-    api: options.api,
-    guild: interaction.guild,
-    config: options.config,
-  });
+  let summary: RoleSyncSummary;
+  try {
+    summary = await syncLinkedRoles({
+      api: options.api,
+      guild: interaction.guild,
+      config: options.config,
+    });
+  } catch {
+    await interaction.editReply({ content: 'Could not sync roles right now. Try again or check bot logs.' });
+    return;
+  }
 
   await interaction.editReply({
     content: `Role sync complete: ${summary.roleSynced} synced, ${summary.missingMembers} missing, ${summary.failed} failed out of ${summary.fetched} linked players.`,

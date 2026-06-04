@@ -51,6 +51,7 @@ function ticket(overrides: object = {}) {
     reporterDisplayName: 'Mira',
     realmLabel: 'Spring Realm',
     discordMessageId: null,
+    discordReporterUserId: '1234567890123456',
     createdAt: CREATED_AT,
     reporterAccount: {
       discordAccountLinks: [{ discordUserId: '1234567890123456' }],
@@ -140,7 +141,7 @@ describe('discordSupportThreadService', () => {
     vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue(ticket() as never);
     vi.mocked(prisma.supportTicket.updateMany).mockResolvedValue({ count: 1 } as never);
     vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue(null as never);
-    vi.mocked(prisma.supportTicketDiscordThread.create).mockResolvedValue({} as never);
+    vi.mocked(prisma.supportTicketDiscordThread.upsert).mockResolvedValue({} as never);
 
     await markSupportTriageMessage({
       publicId: 'SUP-ABC12345',
@@ -154,8 +155,9 @@ describe('discordSupportThreadService', () => {
       where: { id: 'ticket-1', discordMessageId: null },
       data: { discordMessageId: '3456789012345678' },
     });
-    expect(prisma.supportTicketDiscordThread.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(prisma.supportTicketDiscordThread.upsert).toHaveBeenCalledWith({
+      where: { ticketId: 'ticket-1' },
+      create: expect.objectContaining({
         ticketId: 'ticket-1',
         guildId: '1234567890123456',
         triageChannelId: '2345678901234567',
@@ -163,7 +165,37 @@ describe('discordSupportThreadService', () => {
         reporterDiscordUserId: '1234567890123456',
         status: 'triage_posted',
       }),
+      update: {
+        guildId: '1234567890123456',
+        triageChannelId: '2345678901234567',
+        triageMessageId: '3456789012345678',
+      },
     });
+  });
+
+  it('uses the canonical Discord reporter even if active links changed before triage posting', async () => {
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue(ticket({
+      discordReporterUserId: '9999999999999999',
+      reporterAccount: {
+        discordAccountLinks: [{ discordUserId: '1111111111111111' }],
+      },
+    }) as never);
+    vi.mocked(prisma.supportTicket.updateMany).mockResolvedValue({ count: 1 } as never);
+    vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue(null as never);
+    vi.mocked(prisma.supportTicketDiscordThread.upsert).mockResolvedValue({} as never);
+
+    await markSupportTriageMessage({
+      publicId: 'SUP-ABC12345',
+      guildId: '1234567890123456',
+      triageChannelId: '2345678901234567',
+      triageMessageId: '3456789012345678',
+    });
+
+    expect(prisma.supportTicketDiscordThread.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        reporterDiscordUserId: '9999999999999999',
+      }),
+    }));
   });
 
   it('allows retrying triage marking with the same Discord message id', async () => {
@@ -234,7 +266,7 @@ describe('discordSupportThreadService', () => {
     });
 
     expect(prisma.supportTicket.updateMany).not.toHaveBeenCalled();
-    expect(prisma.supportTicketDiscordThread.create).not.toHaveBeenCalled();
+    expect(prisma.supportTicketDiscordThread.upsert).not.toHaveBeenCalled();
   });
 
   it('returns a conflict when the Discord thread mapping has a different triage message', async () => {
@@ -256,7 +288,7 @@ describe('discordSupportThreadService', () => {
 
     expect(prisma.supportTicket.updateMany).not.toHaveBeenCalled();
     expect(prisma.supportTicketDiscordThread.update).not.toHaveBeenCalled();
-    expect(prisma.supportTicketDiscordThread.create).not.toHaveBeenCalled();
+    expect(prisma.supportTicketDiscordThread.upsert).not.toHaveBeenCalled();
   });
 
   it('marks a Discord support thread as created', async () => {

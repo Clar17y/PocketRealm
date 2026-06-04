@@ -30,6 +30,7 @@ vi.mock('./staffCommands.js', () => ({
 const routerConfig = {
   guildId: 'guild-123',
   webBaseUrl: 'https://pocketrealm.app',
+  playerRoleId: 'player-role-1',
   verifiedRoleId: 'verified-role-1',
   duelsChannelId: 'duels-channel-1',
   supportStaffRoleIds: ['staff-role-1'],
@@ -154,18 +155,45 @@ describe('routeInteraction', () => {
     expect(handleReportModalSubmit).toHaveBeenCalledWith(interaction, api);
   });
 
-  it('ignores unknown chat input commands', async () => {
+  it('replies ephemerally to unknown chat input commands', async () => {
     const reply = vi.fn<ChatInputCommandInteraction['reply']>();
     const interaction = {
       isChatInputCommand: () => true,
+      isRepliable: () => true,
       commandName: 'unknown',
+      replied: false,
+      deferred: false,
       reply,
     } as unknown as Interaction;
     const api = createApi(null);
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(reply).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'This interaction is no longer supported. Try the command again.',
+    });
+  });
+
+  it('replies ephemerally to unknown button interactions', async () => {
+    const reply = vi.fn<ChatInputCommandInteraction['reply']>();
+    const interaction = {
+      isChatInputCommand: () => false,
+      isButton: () => true,
+      isRepliable: () => true,
+      customId: 'unknown:button',
+      replied: false,
+      deferred: false,
+      reply,
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'This interaction is no longer supported. Try the command again.',
+    });
   });
 
   it('routes support button interactions to the support thread action handler', async () => {

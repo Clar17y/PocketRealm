@@ -144,6 +144,7 @@ describe('discordServerSetup', () => {
     const roleKeys = plan.roles.map((role) => role.key);
 
     expect(roleKeys).toEqual(expect.arrayContaining([
+      'player',
       'linked',
       'level5',
       'level10',

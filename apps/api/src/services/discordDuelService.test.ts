@@ -377,6 +377,32 @@ describe('discordDuelService', () => {
     expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
   });
 
+  it('restores a pending duel claim when simulation fails after the atomic claim', async () => {
+    const error = new Error('template unavailable');
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel());
+    mockPrisma.discordDuel.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    mocks.buildPvpCombatant.mockReset();
+    mocks.buildPvpCombatant.mockRejectedValueOnce(error);
+
+    await expect(resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID)).rejects.toBe(error);
+
+    expect(runTemplateCombat).not.toHaveBeenCalled();
+    expect(mockPrisma.discordDuel.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: DUEL_ID,
+        status: 'resolving',
+        acceptedAt: NOW,
+        targetDiscordUserId: TARGET_DISCORD_ID,
+      },
+      data: {
+        status: 'pending',
+        acceptedAt: null,
+      },
+    });
+  });
+
   it('records the Discord message id for a duel', async () => {
     mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ messageId: MESSAGE_ID }));
     mockPrisma.discordDuel.updateMany.mockResolvedValue({ count: 1 });

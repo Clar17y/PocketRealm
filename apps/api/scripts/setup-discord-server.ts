@@ -26,6 +26,7 @@ async function main(): Promise<void> {
   console.log(`DISCORD_DUELS_CHANNEL_ID=${result.channelIdsByName.duels ?? ''}`);
   console.log(`DISCORD_SUPPORT_TRIAGE_CHANNEL_ID=${result.channelIdsByName['support-triage'] ?? ''}`);
   console.log(`DISCORD_BOT_HEALTH_CHANNEL_ID=${result.channelIdsByName['bot-health'] ?? ''}`);
+  console.log(`DISCORD_PLAYER_ROLE_ID=${result.roleIdsByKey.player ?? ''}`);
   console.log(`DISCORD_VERIFIED_ROLE_ID=${result.roleIdsByKey.linked ?? ''}`);
   console.log(`DISCORD_LEVEL_ROLE_MAP=${levelRoleMap}`);
 }

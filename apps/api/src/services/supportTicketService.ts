@@ -24,6 +24,8 @@ interface CreateSupportTicketParams {
   realmLabel: string;
   input: CreateSupportTicketInput;
   source?: 'in_game' | 'discord';
+  discordReporterGuildId?: string;
+  discordReporterUserId?: string;
 }
 
 interface ExportOptions {
@@ -143,6 +145,8 @@ export async function createSupportTicket(params: CreateSupportTicketParams) {
         requestId: input.requestId,
         sentryEventId: input.sentryEventId,
         attachmentMetadata: input.attachments as Prisma.InputJsonValue | undefined,
+        discordReporterGuildId: params.discordReporterGuildId,
+        discordReporterUserId: params.discordReporterUserId,
       },
     });
 
@@ -201,6 +205,8 @@ export async function createDiscordSupportTicket(params: {
     realmLabel: realmLabelFor(player?.seasonId ?? null, player?.season?.name),
     input: params.input,
     source: 'discord',
+    discordReporterGuildId: params.discordGuildId,
+    discordReporterUserId: params.discordUserId,
   });
 }
 

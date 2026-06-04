@@ -9,6 +9,7 @@ import type { StaffPrismaClient } from './staffCommands.js';
 const guildId = '234567890123456789';
 const staffRoleId = '345678901234567890';
 const userRoleId = '456789012345678901';
+const playerRoleId = '456789012345678902';
 const verifiedRoleId = '567890123456789012';
 const actorUserId = '678901234567890123';
 const targetUserId = '789012345678901234';
@@ -16,10 +17,11 @@ const levelTwoRoleId = '890123456789012345';
 
 const config = {
   guildId,
+  playerRoleId,
   verifiedRoleId,
   supportStaffRoleIds: [staffRoleId],
   levelRoleMap: new Map<number, string>(),
-} satisfies Pick<BotConfig, 'guildId' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'>;
+} satisfies Pick<BotConfig, 'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'>;
 
 describe('handleStaffCommand', () => {
   it('rejects non-staff users ephemerally', async () => {
@@ -204,6 +206,28 @@ describe('handleStaffCommand', () => {
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: 'Role sync complete: 2 synced, 1 missing, 0 failed out of 3 linked players.',
+    });
+  });
+
+  it('edits the deferred reply when role sync fails', async () => {
+    const syncLinkedRoles = vi.fn(async (): Promise<never> => {
+      throw new Error('api unavailable');
+    });
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'sync-roles',
+      guild: createGuild(memberWithRoles([staffRoleId])),
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+      syncLinkedRoles,
+    });
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Could not sync roles right now. Try again or check bot logs.',
     });
   });
 });

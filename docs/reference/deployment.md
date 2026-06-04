@@ -136,14 +136,19 @@ The export writes JSONL to stdout. The records are redacted for emails, bearer t
 
 ### Discord Bot Launch Runbook
 
-Run staging first, then repeat the same steps for production after staging passes:
+Run staging first, then repeat the same steps for production after staging passes. Live staging setup and smoke checks mutate a Discord guild, so run them only after the deployment owner approves the target guild.
 
 ```powershell
 npm run discord:setup-server
-npm run discord:register-commands
 ```
 
 `npm run discord:setup-server` reads setup-only Discord credentials from `.discord-setup.env` in the repo root or `apps/api`; start from `apps/api/.discord-setup.env.example`. The file must provide `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID`; it may also provide setup-only `DISCORD_AUTOMOD_EXTRA_KEYWORDS` for comma-separated keyword additions. The command is idempotent and prints the channel, category, webhook, and role IDs needed for the API and bot worker env. If a local setup token was used outside a secure deployment context, rotate it before public launch.
+
+After setup, populate the Discord bot worker env from `apps/discord-bot/.env.example`, adding the setup output plus `DISCORD_CLIENT_ID`, `POCKETREALM_API_BASE_URL`, `POCKETREALM_WEB_BASE_URL`, and `DISCORD_INTERNAL_API_KEY`. Then register commands:
+
+```powershell
+npm run discord:register-commands
+```
 
 Before public launch:
 - Confirm Server Members Intent and Message Content Intent are enabled in the Discord Developer Portal.
@@ -151,7 +156,8 @@ Before public launch:
 - Confirm the worker posts a health message in the bot-health channel.
 - Run `/link` and verify the linked Discord user receives the configured linked role.
 - Run `/wiki` plus player commands (`/profile`, `/turns`, `/skills`, `/rank`).
-- Submit `/report` and confirm a support triage card and support thread are created.
+- Submit `/report` and confirm a support triage card is created.
+- From the triage card, click `Ask Reporter` as staff and confirm a private support thread is created; then verify `Archive Thread`.
 - Trigger an AutoMod test phrase and confirm the expected moderation action.
 - Confirm Discord chat XP ignores `#duels`.
 - Confirm `/duel` works in `#duels` only and is rejected elsewhere.

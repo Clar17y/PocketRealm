@@ -25,6 +25,7 @@ type RoleKey =
   | 'triage'
   | 'tester'
   | 'founder'
+  | 'player'
   | 'linked'
   | 'level5'
   | 'level10'
@@ -310,6 +311,7 @@ export function buildDiscordSetupPlan(): DiscordSetupPlan {
       { key: 'triage', name: 'Support Triage', color: 0x9b59b6 },
       { key: 'tester', name: 'Tester', color: 0x2ecc71 },
       { key: 'founder', name: 'Founder', color: 0xf1c40f },
+      { key: 'player', name: 'PocketRealm Player', color: 0x95a5a6 },
       { key: 'linked', name: 'Linked Account', color: 0x2ecc71 },
       { key: 'level5', name: 'Realm Level 5', color: 0x95a5a6 },
       { key: 'level10', name: 'Realm Level 10', color: 0x3498db },

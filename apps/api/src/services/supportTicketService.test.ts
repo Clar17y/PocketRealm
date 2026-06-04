@@ -161,6 +161,8 @@ describe('supportTicketService', () => {
         seasonId: 'season-1',
         reporterDisplayName: 'Mira',
         realmLabel: 'Spring Realm',
+        discordReporterGuildId: '2345678901234567',
+        discordReporterUserId: '1234567890123456',
       }),
     }));
   });

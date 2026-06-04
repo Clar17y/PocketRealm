@@ -177,6 +177,7 @@ export interface MessageXpLogger {
 type MessageXpConfig = Pick<
   BotConfig,
   | 'guildId'
+  | 'duelsChannelId'
   | 'supportCategoryId'
   | 'supportTriageChannelId'
   | 'supportStaffRoleIds'
@@ -221,6 +222,7 @@ interface GrantTransactionResult extends GrantXpMessageResult {
 
 const emptyConfig: MessageXpConfig = {
   guildId: '',
+  duelsChannelId: '',
   supportCategoryId: '',
   supportTriageChannelId: '',
   supportStaffRoleIds: [],
@@ -485,6 +487,10 @@ function isIgnoredChannel(message: Partial<XpMessage>, config: MessageXpConfig):
   }
 
   if (config.xpEligibleChannelIds.length > 0 && (!channelId || !config.xpEligibleChannelIds.includes(channelId))) {
+    return true;
+  }
+
+  if (channelId && channelId === config.duelsChannelId) {
     return true;
   }
 

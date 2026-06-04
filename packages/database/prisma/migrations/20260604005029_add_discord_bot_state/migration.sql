@@ -100,6 +100,9 @@ CREATE TABLE "support_ticket_discord_threads" (
     CONSTRAINT "support_ticket_discord_threads_pkey" PRIMARY KEY ("id")
 );
 
+ALTER TABLE "support_tickets" ADD COLUMN "discord_reporter_guild_id" VARCHAR(32);
+ALTER TABLE "support_tickets" ADD COLUMN "discord_reporter_user_id" VARCHAR(32);
+
 -- CreateTable
 CREATE TABLE "discord_bot_audit_events" (
     "id" TEXT NOT NULL,
@@ -159,6 +162,9 @@ CREATE INDEX "support_ticket_discord_threads_guild_id_triage_channel_id_idx" ON 
 
 -- CreateIndex
 CREATE INDEX "support_ticket_discord_threads_thread_id_idx" ON "support_ticket_discord_threads"("thread_id");
+
+-- CreateIndex
+CREATE INDEX "support_tickets_discord_reporter_guild_id_discord_reporter_user_id_idx" ON "support_tickets"("discord_reporter_guild_id", "discord_reporter_user_id");
 
 -- CreateIndex
 CREATE INDEX "discord_bot_audit_events_guild_id_created_at_idx" ON "discord_bot_audit_events"("guild_id", "created_at");

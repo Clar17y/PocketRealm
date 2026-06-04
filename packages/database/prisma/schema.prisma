@@ -1387,11 +1387,13 @@ model SupportTicket {
   attachmentMetadata  Json?     @map("attachment_metadata")
   duplicateTicketIds  String[]  @default([]) @map("duplicate_ticket_ids")
   githubIssueUrl      String?   @map("github_issue_url") @db.VarChar(500)
-  staffNotes          String?   @map("staff_notes") @db.VarChar(4000)
-  discordMessageId    String?   @map("discord_message_id") @db.VarChar(64)
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-  closedAt            DateTime? @map("closed_at")
+  staffNotes             String?   @map("staff_notes") @db.VarChar(4000)
+  discordMessageId       String?   @map("discord_message_id") @db.VarChar(64)
+  discordReporterGuildId String?   @map("discord_reporter_guild_id") @db.VarChar(32)
+  discordReporterUserId  String?   @map("discord_reporter_user_id") @db.VarChar(32)
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+  closedAt               DateTime? @map("closed_at")
 
   reporterAccount Account              @relation(fields: [reporterAccountId], references: [id], onDelete: Cascade)
   reporterPlayer  Player?              @relation(fields: [reporterPlayerId], references: [id], onDelete: SetNull)
@@ -1404,6 +1406,7 @@ model SupportTicket {
   @@index([reporterPlayerId, createdAt])
   @@index([seasonId, createdAt])
   @@index([category, area])
+  @@index([discordReporterGuildId, discordReporterUserId])
   @@map("support_tickets")
 }
 

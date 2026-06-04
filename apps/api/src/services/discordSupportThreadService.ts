@@ -69,10 +69,15 @@ function closeTimestampFor(status: SupportTicketStatus, existingClosedAt?: Date 
 }
 
 function firstActiveDiscordUserId(ticket: {
+  discordReporterUserId?: string | null;
   reporterAccount: {
     discordAccountLinks: Array<{ discordUserId: string }>;
   };
 }): string | null {
+  if (ticket.discordReporterUserId) {
+    return ticket.discordReporterUserId;
+  }
+
   return ticket.reporterAccount.discordAccountLinks[0]?.discordUserId ?? null;
 }
 
@@ -156,6 +161,7 @@ export async function markSupportTriageMessage(input: MarkSupportTriageMessageIn
         id: true,
         publicId: true,
         discordMessageId: true,
+        discordReporterUserId: true,
         reporterAccount: {
           select: {
             discordAccountLinks: {
@@ -216,14 +222,16 @@ export async function markSupportTriageMessage(input: MarkSupportTriageMessageIn
         data: triageMessageData,
       });
     } else {
-      await tx.supportTicketDiscordThread.create({
-        data: {
+      await tx.supportTicketDiscordThread.upsert({
+        where: { ticketId: existing.id },
+        create: {
           ticketId: existing.id,
           ...triageMessageData,
           reporterDiscordUserId: firstActiveDiscordUserId(existing),
           status: 'triage_posted',
           archivedAt: null,
         },
+        update: triageMessageData,
       });
     }
 
