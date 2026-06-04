@@ -43,8 +43,8 @@ interface DuelResultResponse {
     winnerUsername: string | null;
     isDraw: boolean;
     expiresAt: string;
-    summary: string | null;
-    replay: unknown[];
+    summary: unknown;
+    replay: unknown;
   };
 }
 
@@ -55,7 +55,7 @@ interface DuelReplayResponse {
     page: number;
     pageSize: number;
     hasMore: boolean;
-    entries: string[];
+    entries: unknown[];
   };
 }
 
@@ -223,7 +223,7 @@ function buildDuelResultMessage(response: DuelResultResponse): InteractionUpdate
   const outcome = duel.isDraw
     ? `${duel.challengerUsername} and ${duel.targetUsername} fought to a draw.`
     : `${duel.winnerUsername ?? 'A player'} won the simulation.`;
-  const summary = duel.summary?.trim();
+  const summary = formatSummary(duel.summary);
 
   return {
     content: [
@@ -262,12 +262,52 @@ function formatReplay(replay: DuelReplayResponse['replay']): string {
     return `Friendly simulation replay page ${replay.page}: no replay entries are available.`;
   }
 
-  const lines = entries.map((entry, index) => `${index + 1}. ${entry}`);
+  const lines = entries.map((entry, index) => `${index + 1}. ${formatReplayEntry(entry)}`);
   if (replay.hasMore) {
     lines.push('More replay pages are available.');
   }
 
   return `Friendly simulation replay page ${replay.page}\n${lines.join('\n')}`;
+}
+
+function formatSummary(summary: unknown): string | null {
+  if (typeof summary === 'string') {
+    return summary.trim() || null;
+  }
+
+  if (!isRecord(summary)) {
+    return null;
+  }
+
+  const parts = [
+    typeof summary.totalRounds === 'number' ? `${summary.totalRounds} rounds` : null,
+    typeof summary.challengerHpRemaining === 'number' ? `${summary.challengerHpRemaining} challenger HP left` : null,
+    typeof summary.targetHpRemaining === 'number' ? `${summary.targetHpRemaining} target HP left` : null,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function formatReplayEntry(entry: unknown): string {
+  if (typeof entry === 'string') {
+    return entry;
+  }
+
+  if (!isRecord(entry)) {
+    return JSON.stringify(entry);
+  }
+
+  const message = typeof entry.message === 'string' ? entry.message : null;
+  if (message) {
+    return message;
+  }
+
+  const round = typeof entry.round === 'number' ? `Round ${entry.round}` : null;
+  const actionName = typeof entry.actionName === 'string' ? entry.actionName : null;
+  const damage = typeof entry.damageDealt === 'number' ? `${entry.damageDealt} damage` : null;
+  const parts = [round, actionName, damage].filter((part): part is string => Boolean(part));
+
+  return parts.length > 0 ? parts.join(' · ') : JSON.stringify(entry);
 }
 
 async function recordDuelMessage(

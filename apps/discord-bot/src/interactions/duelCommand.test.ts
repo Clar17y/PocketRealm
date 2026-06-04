@@ -113,8 +113,19 @@ describe('handleDuelButton', () => {
         winnerUsername: 'Astra',
         isDraw: false,
         expiresAt: '2026-06-04T12:15:00.000Z',
-        summary: 'Astra wins after three quick rounds.',
-        replay: [],
+        summary: {
+          totalRounds: 3,
+          challengerHpRemaining: 42,
+          targetHpRemaining: 0,
+        },
+        replay: {
+          id: 'duel-123',
+          status: 'resolved',
+          page: 1,
+          pageSize: 10,
+          hasMore: false,
+          entries: [],
+        },
       },
     });
     const update = vi.fn<ButtonInteraction['update']>();
@@ -165,8 +176,8 @@ describe('handleDuelButton', () => {
         pageSize: 3,
         hasMore: false,
         entries: [
-          'Astra opens with a careful strike.',
-          'Borin blocks and counters.',
+          { round: 1, message: 'Astra opens with a careful strike.' },
+          { round: 2, actionName: 'Counter', damageDealt: 7 },
         ],
       },
     });
@@ -184,6 +195,9 @@ describe('handleDuelButton', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=1');
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('Astra opens with a careful strike.'),
+    });
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('Round 2 · Counter · 7 damage'),
     });
   });
 });
