@@ -1,0 +1,318 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  runTemplateCombat: vi.fn(),
+  buildPvpCombatant: vi.fn(),
+  mapTemplateCombatLog: vi.fn(),
+}));
+
+vi.mock('@pocketrealm/game-engine', () => ({
+  runTemplateCombat: mocks.runTemplateCombat,
+}));
+
+vi.mock('./pvpCombatantBuilder', () => ({
+  buildPvpCombatant: mocks.buildPvpCombatant,
+}));
+
+vi.mock('./combatLogMapper', () => ({
+  mapTemplateCombatLog: mocks.mapTemplateCombatLog,
+}));
+
+import { mockPrisma } from '../__test__/setup';
+import { buildPvpCombatant } from './pvpCombatantBuilder';
+import { runTemplateCombat } from '@pocketrealm/game-engine';
+import {
+  createPendingDiscordDuel,
+  getDiscordDuelReplay,
+  recordDiscordDuelMessage,
+  resolveDiscordDuel,
+} from './discordDuelService';
+
+const GUILD_ID = '2345678901234567';
+const CHANNEL_ID = '3456789012345678';
+const CHALLENGER_DISCORD_ID = '1234567890123456';
+const TARGET_DISCORD_ID = '4567890123456789';
+const DUEL_ID = '11111111-1111-4111-8111-111111111111';
+const MESSAGE_ID = '5678901234567890';
+const NOW = new Date('2026-06-04T12:00:00.000Z');
+
+function mockModel() {
+  return {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  };
+}
+
+function linkedPlayer(playerId: string, username: string) {
+  return {
+    account: {
+      activePlayerId: playerId,
+      activePlayer: { id: playerId, username },
+    },
+  };
+}
+
+function pendingDuel(overrides: Record<string, unknown> = {}) {
+  return {
+    id: DUEL_ID,
+    guildId: GUILD_ID,
+    channelId: CHANNEL_ID,
+    messageId: null,
+    challengerDiscordUserId: CHALLENGER_DISCORD_ID,
+    targetDiscordUserId: TARGET_DISCORD_ID,
+    challengerPlayerId: 'player-1',
+    targetPlayerId: 'player-2',
+    status: 'pending',
+    winnerPlayerId: null,
+    isDraw: false,
+    combatLog: null,
+    summary: null,
+    createdAt: NOW,
+    acceptedAt: null,
+    completedAt: null,
+    expiresAt: new Date(NOW.getTime() + 60_000),
+    challenger: { username: 'Mira' },
+    target: { username: 'Theo' },
+    winner: null,
+    ...overrides,
+  };
+}
+
+function combatant(id: string, name: string) {
+  return {
+    id,
+    name,
+    stats: {
+      hp: 4,
+      maxHp: 100,
+      attack: 15,
+      defence: 10,
+      magicPower: 0,
+      magicDefence: 5,
+      accuracy: 60,
+      dodge: 10,
+      speed: 5,
+      damageMin: 5,
+      damageMax: 15,
+      critChance: 0.05,
+      critDamage: 1.5,
+      evasion: 5,
+      damageType: 'physical',
+    },
+    template: [{ actionId: 'light_attack' }],
+    stamina: 3,
+    maxStamina: 100,
+    staminaRegenPerRound: 10,
+    mana: 2,
+    maxMana: 50,
+    manaRegenPerRound: 5,
+    actionDefinitions: {},
+  };
+}
+
+describe('discordDuelService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.setSystemTime(NOW);
+    mockPrisma.discordDuel = mockModel();
+    mockPrisma.discordAccountLink = mockModel();
+    mockPrisma.turnBank = mockPrisma.turnBank ?? mockModel();
+    mockPrisma.pvpRating = mockPrisma.pvpRating ?? mockModel();
+    mockPrisma.player = mockPrisma.player ?? mockModel();
+    mockPrisma.discordAccountLink.findFirst
+      .mockResolvedValueOnce(linkedPlayer('player-1', 'Mira'))
+      .mockResolvedValueOnce(linkedPlayer('player-2', 'Theo'));
+    mockPrisma.discordDuel.create.mockResolvedValue(pendingDuel());
+    mockPrisma.discordDuel.update.mockResolvedValue(pendingDuel({
+      status: 'completed',
+      winnerPlayerId: 'player-1',
+      isDraw: false,
+      summary: { outcome: 'victory', totalRounds: 3 },
+      combatLog: [{ round: 1, message: 'Mira hits Theo.' }],
+      completedAt: NOW,
+      acceptedAt: NOW,
+    }));
+    mocks.buildPvpCombatant
+      .mockResolvedValueOnce(combatant('player-1', 'Mira'))
+      .mockResolvedValueOnce(combatant('player-2', 'Theo'));
+    mocks.runTemplateCombat.mockReturnValue({
+      outcome: 'victory',
+      log: [{ round: 1, message: 'Mira hits Theo.' }],
+      combatantAMaxHp: 100,
+      combatantBMaxHp: 100,
+      combatantAHpRemaining: 80,
+      combatantBHpRemaining: 0,
+      combatantAMaxStamina: 100,
+      combatantBMaxStamina: 100,
+      combatantAStaminaRemaining: 65,
+      combatantBStaminaRemaining: 20,
+      combatantAMaxMana: 50,
+      combatantBMaxMana: 50,
+      combatantAManaRemaining: 35,
+      combatantBManaRemaining: 15,
+      potionsConsumed: [],
+      totalRounds: 3,
+    });
+    mocks.mapTemplateCombatLog.mockImplementation((log: unknown[]) => log);
+  });
+
+  it('rejects self challenges before resolving account links', async () => {
+    await expect(createPendingDiscordDuel({
+      guildId: GUILD_ID,
+      channelId: CHANNEL_ID,
+      challengerDiscordUserId: '1234567890123456',
+      targetDiscordUserId: '1234567890123456',
+    })).rejects.toMatchObject({ code: 'DISCORD_DUEL_SELF_CHALLENGE' });
+
+    expect(mockPrisma.discordAccountLink.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.discordDuel.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a pending duel for two linked active players in the same guild', async () => {
+    const result = await createPendingDiscordDuel({
+      guildId: GUILD_ID,
+      channelId: CHANNEL_ID,
+      challengerDiscordUserId: CHALLENGER_DISCORD_ID,
+      targetDiscordUserId: TARGET_DISCORD_ID,
+    });
+
+    expect(mockPrisma.discordAccountLink.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { discordGuildId: GUILD_ID, discordUserId: CHALLENGER_DISCORD_ID, unlinkedAt: null },
+    }));
+    expect(mockPrisma.discordAccountLink.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: { discordGuildId: GUILD_ID, discordUserId: TARGET_DISCORD_ID, unlinkedAt: null },
+    }));
+    expect(mockPrisma.discordDuel.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        guildId: GUILD_ID,
+        channelId: CHANNEL_ID,
+        challengerDiscordUserId: CHALLENGER_DISCORD_ID,
+        targetDiscordUserId: TARGET_DISCORD_ID,
+        challengerPlayerId: 'player-1',
+        targetPlayerId: 'player-2',
+        status: 'pending',
+      }),
+      include: expect.any(Object),
+    });
+    expect(result).toEqual(expect.objectContaining({
+      id: DUEL_ID,
+      status: 'pending',
+      challengerUsername: 'Mira',
+      targetUsername: 'Theo',
+      expiresAt: expect.any(Date),
+    }));
+  });
+
+  it('rejects a resolve attempt from anyone except the target Discord user', async () => {
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel());
+
+    await expect(resolveDiscordDuel(DUEL_ID, CHALLENGER_DISCORD_ID))
+      .rejects.toMatchObject({ code: 'DISCORD_DUEL_NOT_TARGET' });
+
+    expect(buildPvpCombatant).not.toHaveBeenCalled();
+    expect(runTemplateCombat).not.toHaveBeenCalled();
+    expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects an expired pending duel', async () => {
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({
+      expiresAt: new Date(NOW.getTime() - 1),
+    }));
+
+    await expect(resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID))
+      .rejects.toMatchObject({ code: 'DISCORD_DUEL_EXPIRED' });
+
+    expect(runTemplateCombat).not.toHaveBeenCalled();
+    expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a duel that is no longer pending', async () => {
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ status: 'completed' }));
+
+    await expect(resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID))
+      .rejects.toMatchObject({ code: 'DISCORD_DUEL_NOT_PENDING' });
+
+    expect(runTemplateCombat).not.toHaveBeenCalled();
+    expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
+  });
+
+  it('resolves a Discord duel without mutating player resources, turns, or ratings', async () => {
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel());
+
+    const result = await resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID);
+
+    expect(buildPvpCombatant).toHaveBeenCalledWith('player-1', 'Mira', false);
+    expect(buildPvpCombatant).toHaveBeenCalledWith('player-2', 'Theo', false);
+    expect(runTemplateCombat).toHaveBeenCalledWith(
+      expect.objectContaining({ stamina: 100, mana: 50, stats: expect.objectContaining({ hp: 100 }) }),
+      expect.objectContaining({ stamina: 100, mana: 50, stats: expect.objectContaining({ hp: 100 }) }),
+      { combatMode: 'pvp' },
+    );
+    expect(mockPrisma.turnBank.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.pvpRating.update).not.toHaveBeenCalled();
+    expect(mockPrisma.player.update).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ currentHp: expect.anything() }),
+    }));
+    expect(mockPrisma.discordDuel.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: DUEL_ID },
+      data: expect.objectContaining({
+        status: 'completed',
+        winnerPlayerId: 'player-1',
+        isDraw: false,
+        combatLog: [{ round: 1, message: 'Mira hits Theo.' }],
+      }),
+    }));
+    expect(result).toEqual(expect.objectContaining({
+      id: DUEL_ID,
+      status: 'completed',
+      winnerUsername: 'Mira',
+      isDraw: false,
+      summary: expect.objectContaining({ outcome: 'victory', totalRounds: 3 }),
+      replay: expect.objectContaining({ page: 1, hasMore: false }),
+    }));
+  });
+
+  it('records the Discord message id for a duel', async () => {
+    mockPrisma.discordDuel.update.mockResolvedValue(pendingDuel({ messageId: MESSAGE_ID }));
+
+    const result = await recordDiscordDuelMessage(DUEL_ID, MESSAGE_ID);
+
+    expect(mockPrisma.discordDuel.update).toHaveBeenCalledWith({
+      where: { id: DUEL_ID },
+      data: { messageId: MESSAGE_ID },
+      select: { id: true, messageId: true },
+    });
+    expect(result).toEqual({ id: DUEL_ID, messageId: MESSAGE_ID });
+  });
+
+  it('returns bounded replay pages with hasMore', async () => {
+    const combatLog = Array.from({ length: 22 }, (_, index) => ({ round: index + 1 }));
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({
+      status: 'completed',
+      combatLog,
+      winnerPlayerId: 'player-1',
+      winner: { username: 'Mira' },
+    }));
+
+    const replay = await getDiscordDuelReplay(DUEL_ID, 2);
+
+    expect(replay).toEqual({
+      id: DUEL_ID,
+      status: 'completed',
+      page: 2,
+      pageSize: 10,
+      hasMore: true,
+      entries: combatLog.slice(10, 20),
+    });
+  });
+
+  it('returns a controlled error for missing duels', async () => {
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(null);
+
+    await expect(getDiscordDuelReplay(DUEL_ID, 1))
+      .rejects.toMatchObject({ code: 'DISCORD_DUEL_NOT_FOUND' });
+  });
+});

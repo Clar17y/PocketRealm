@@ -25,11 +25,18 @@ import {
 } from '../services/discordProfileService';
 import {
   claimDiscordLinkCodeSchema,
+  discordDuelCreateSchema,
   discordGuildLinkSchema,
   discordLinkIdParamsSchema,
   discordSnowflakeSchema,
   discordUnsyncedLinksQuerySchema,
 } from '../services/discordSchemas';
+import {
+  createPendingDiscordDuel,
+  getDiscordDuelReplay,
+  recordDiscordDuelMessage,
+  resolveDiscordDuel,
+} from '../services/discordDuelService';
 import { createDiscordSupportTicket } from '../services/supportTicketService';
 import { createSupportTicketSchema } from '../services/supportTicketSchemas';
 import { searchWikiForDiscord } from '../services/wikiSearchService';
@@ -56,6 +63,22 @@ const discordWikiSearchQuerySchema = z.object({
 const discordReportSchema = createSupportTicketSchema.extend({
   discordGuildId: discordSnowflakeSchema,
   discordUserId: discordSnowflakeSchema,
+}).strict();
+
+const discordDuelParamsSchema = z.object({
+  duelId: z.string().uuid(),
+}).strict();
+
+const discordDuelMessageSchema = z.object({
+  messageId: discordSnowflakeSchema,
+}).strict();
+
+const discordDuelResolveSchema = z.object({
+  acceptedByDiscordUserId: discordSnowflakeSchema,
+}).strict();
+
+const discordDuelReplayQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
 }).strict();
 
 const publicIdParamsSchema = z.object({
@@ -132,6 +155,37 @@ discordRouter.post('/links/:id/synced', requireInternalBotAuth, asyncHandler(asy
   const link = await markDiscordLinkSynced(params.id);
 
   res.json({ link });
+}));
+
+discordRouter.post('/duels', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const input = discordDuelCreateSchema.parse(req.body);
+  const duel = await createPendingDiscordDuel(input);
+
+  res.status(201).json({ duel });
+}));
+
+discordRouter.post('/duels/:duelId/message', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const params = discordDuelParamsSchema.parse(req.params);
+  const input = discordDuelMessageSchema.parse(req.body);
+  const duel = await recordDiscordDuelMessage(params.duelId, input.messageId);
+
+  res.json({ duel });
+}));
+
+discordRouter.post('/duels/:duelId/resolve', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const params = discordDuelParamsSchema.parse(req.params);
+  const input = discordDuelResolveSchema.parse(req.body);
+  const duel = await resolveDiscordDuel(params.duelId, input.acceptedByDiscordUserId);
+
+  res.json({ duel });
+}));
+
+discordRouter.get('/duels/:duelId/replay', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const params = discordDuelParamsSchema.parse(req.params);
+  const query = discordDuelReplayQuerySchema.parse(req.query);
+  const replay = await getDiscordDuelReplay(params.duelId, query.page ?? 1);
+
+  res.json({ replay });
 }));
 
 discordRouter.get('/users/:discordUserId/profile', requireInternalBotAuth, asyncHandler(async (req, res) => {

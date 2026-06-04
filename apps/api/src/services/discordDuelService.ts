@@ -1,0 +1,295 @@
+import { Prisma, prisma } from '@pocketrealm/database';
+import { runTemplateCombat } from '@pocketrealm/game-engine';
+import { AppError } from '../middleware/errorHandler';
+import { mapTemplateCombatLog } from './combatLogMapper';
+import { buildPvpCombatant } from './pvpCombatantBuilder';
+
+const DISCORD_DUEL_TTL_MS = 2 * 60 * 1000;
+const DISCORD_DUEL_REPLAY_PAGE_SIZE = 10;
+
+export interface CreateDiscordDuelInput {
+  guildId: string;
+  channelId: string;
+  challengerDiscordUserId: string;
+  targetDiscordUserId: string;
+}
+
+interface LinkedDiscordPlayer {
+  id: string;
+  username: string;
+}
+
+interface DiscordDuelPlayerSummary {
+  username: string;
+}
+
+interface DiscordDuelRecord {
+  id: string;
+  status: string;
+  challengerDiscordUserId: string;
+  targetDiscordUserId: string;
+  challengerPlayerId: string;
+  targetPlayerId: string;
+  winnerPlayerId: string | null;
+  isDraw: boolean;
+  combatLog: Prisma.JsonValue | null;
+  summary: Prisma.JsonValue | null;
+  expiresAt: Date;
+  challenger: DiscordDuelPlayerSummary;
+  target: DiscordDuelPlayerSummary;
+}
+
+export interface DiscordDuelDto {
+  id: string;
+  status: string;
+  challengerUsername: string;
+  targetUsername: string;
+  winnerUsername: string | null;
+  isDraw: boolean;
+  expiresAt: Date;
+  summary: Prisma.JsonValue | null;
+  replay: DiscordDuelReplayDto;
+}
+
+export interface PendingDiscordDuelDto {
+  id: string;
+  status: string;
+  challengerUsername: string;
+  targetUsername: string;
+  expiresAt: Date;
+}
+
+export interface DiscordDuelReplayDto {
+  id: string;
+  status: string;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  entries: unknown[];
+}
+
+function discordDuelInclude() {
+  return {
+    challenger: { select: { username: true } },
+    target: { select: { username: true } },
+  } as const;
+}
+
+function winnerUsernameFor(duel: DiscordDuelRecord): string | null {
+  if (!duel.winnerPlayerId) return null;
+  if (duel.winnerPlayerId === duel.challengerPlayerId) return duel.challenger.username;
+  if (duel.winnerPlayerId === duel.targetPlayerId) return duel.target.username;
+  return null;
+}
+
+function safeReplayPage(duel: Pick<DiscordDuelRecord, 'id' | 'status' | 'combatLog'>, page: number): DiscordDuelReplayDto {
+  const entries = Array.isArray(duel.combatLog) ? duel.combatLog : [];
+  const start = (page - 1) * DISCORD_DUEL_REPLAY_PAGE_SIZE;
+  const pageEntries = entries.slice(start, start + DISCORD_DUEL_REPLAY_PAGE_SIZE);
+
+  return {
+    id: duel.id,
+    status: duel.status,
+    page,
+    pageSize: DISCORD_DUEL_REPLAY_PAGE_SIZE,
+    hasMore: start + DISCORD_DUEL_REPLAY_PAGE_SIZE < entries.length,
+    entries: pageEntries,
+  };
+}
+
+function pendingDto(duel: DiscordDuelRecord): PendingDiscordDuelDto {
+  return {
+    id: duel.id,
+    status: duel.status,
+    challengerUsername: duel.challenger.username,
+    targetUsername: duel.target.username,
+    expiresAt: duel.expiresAt,
+  };
+}
+
+function completedDto(duel: DiscordDuelRecord): DiscordDuelDto {
+  return {
+    id: duel.id,
+    status: duel.status,
+    challengerUsername: duel.challenger.username,
+    targetUsername: duel.target.username,
+    winnerUsername: winnerUsernameFor(duel),
+    isDraw: duel.isDraw,
+    expiresAt: duel.expiresAt,
+    summary: duel.summary,
+    replay: safeReplayPage(duel, 1),
+  };
+}
+
+async function getLinkedActivePlayer(
+  guildId: string,
+  discordUserId: string,
+  participant: 'challenger' | 'target',
+): Promise<LinkedDiscordPlayer> {
+  const link = await prisma.discordAccountLink.findFirst({
+    where: {
+      discordGuildId: guildId,
+      discordUserId,
+      unlinkedAt: null,
+    },
+    orderBy: { linkedAt: 'desc' },
+    select: {
+      account: {
+        select: {
+          activePlayerId: true,
+          activePlayer: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!link) {
+    throw new AppError(
+      404,
+      `${participant === 'challenger' ? 'Challenger' : 'Target'} Discord account is not linked`,
+      participant === 'challenger' ? 'DISCORD_DUEL_CHALLENGER_LINK_REQUIRED' : 'DISCORD_DUEL_TARGET_LINK_REQUIRED',
+    );
+  }
+
+  const player = link.account.activePlayer;
+  if (!link.account.activePlayerId || !player) {
+    throw new AppError(
+      404,
+      `${participant === 'challenger' ? 'Challenger' : 'Target'} linked account has no active player`,
+      participant === 'challenger' ? 'DISCORD_DUEL_CHALLENGER_PLAYER_NOT_FOUND' : 'DISCORD_DUEL_TARGET_PLAYER_NOT_FOUND',
+    );
+  }
+
+  return player;
+}
+
+async function buildDiscordDuelCombatant(playerId: string, username: string) {
+  const combatant = await buildPvpCombatant(playerId, username, false);
+
+  return {
+    ...combatant,
+    stamina: combatant.maxStamina,
+    mana: combatant.maxMana,
+    stats: { ...combatant.stats, hp: combatant.stats.maxHp },
+  };
+}
+
+async function getDuelOrThrow(duelId: string): Promise<DiscordDuelRecord> {
+  const duel = await prisma.discordDuel.findUnique({
+    where: { id: duelId },
+    include: discordDuelInclude(),
+  });
+
+  if (!duel) {
+    throw new AppError(404, 'Discord duel not found', 'DISCORD_DUEL_NOT_FOUND');
+  }
+
+  return duel;
+}
+
+export async function createPendingDiscordDuel(input: CreateDiscordDuelInput): Promise<PendingDiscordDuelDto> {
+  if (input.challengerDiscordUserId === input.targetDiscordUserId) {
+    throw new AppError(400, 'Cannot challenge yourself to a Discord duel', 'DISCORD_DUEL_SELF_CHALLENGE');
+  }
+
+  const [challenger, target] = await Promise.all([
+    getLinkedActivePlayer(input.guildId, input.challengerDiscordUserId, 'challenger'),
+    getLinkedActivePlayer(input.guildId, input.targetDiscordUserId, 'target'),
+  ]);
+
+  const duel = await prisma.discordDuel.create({
+    data: {
+      guildId: input.guildId,
+      channelId: input.channelId,
+      challengerDiscordUserId: input.challengerDiscordUserId,
+      targetDiscordUserId: input.targetDiscordUserId,
+      challengerPlayerId: challenger.id,
+      targetPlayerId: target.id,
+      status: 'pending',
+      expiresAt: new Date(Date.now() + DISCORD_DUEL_TTL_MS),
+    },
+    include: discordDuelInclude(),
+  });
+
+  return pendingDto(duel);
+}
+
+export async function recordDiscordDuelMessage(
+  duelId: string,
+  messageId: string,
+): Promise<{ id: string; messageId: string | null }> {
+  const duel = await prisma.discordDuel.update({
+    where: { id: duelId },
+    data: { messageId },
+    select: { id: true, messageId: true },
+  });
+
+  return { id: duel.id, messageId: duel.messageId };
+}
+
+export async function resolveDiscordDuel(
+  duelId: string,
+  acceptedByDiscordUserId: string,
+): Promise<DiscordDuelDto> {
+  const duel = await getDuelOrThrow(duelId);
+  const now = new Date();
+
+  if (duel.status !== 'pending') {
+    throw new AppError(409, 'Discord duel is no longer pending', 'DISCORD_DUEL_NOT_PENDING');
+  }
+  if (duel.expiresAt <= now) {
+    throw new AppError(410, 'Discord duel challenge has expired', 'DISCORD_DUEL_EXPIRED');
+  }
+  if (acceptedByDiscordUserId !== duel.targetDiscordUserId) {
+    throw new AppError(403, 'Only the challenged Discord user can accept this duel', 'DISCORD_DUEL_NOT_TARGET');
+  }
+
+  const [challengerCombatant, targetCombatant] = await Promise.all([
+    buildDiscordDuelCombatant(duel.challengerPlayerId, duel.challenger.username),
+    buildDiscordDuelCombatant(duel.targetPlayerId, duel.target.username),
+  ]);
+
+  const combatResult = runTemplateCombat(challengerCombatant, targetCombatant, { combatMode: 'pvp' });
+  const combatLog = mapTemplateCombatLog(combatResult.log);
+  const isDraw = combatResult.outcome === 'draw';
+  const challengerWon = combatResult.outcome === 'victory';
+  const winnerPlayerId = isDraw ? null : challengerWon ? duel.challengerPlayerId : duel.targetPlayerId;
+  const winnerUsername = isDraw ? null : challengerWon ? duel.challenger.username : duel.target.username;
+  const summary = {
+    outcome: combatResult.outcome,
+    totalRounds: combatResult.totalRounds,
+    challengerUsername: duel.challenger.username,
+    targetUsername: duel.target.username,
+    winnerUsername,
+    isDraw,
+    challengerHpRemaining: combatResult.combatantAHpRemaining,
+    targetHpRemaining: combatResult.combatantBHpRemaining,
+  };
+
+  const updated = await prisma.discordDuel.update({
+    where: { id: duelId },
+    data: {
+      status: 'completed',
+      acceptedAt: now,
+      completedAt: now,
+      winnerPlayerId,
+      isDraw,
+      combatLog: combatLog as unknown as Prisma.InputJsonValue,
+      summary: summary as unknown as Prisma.InputJsonValue,
+    },
+    include: discordDuelInclude(),
+  });
+
+  return completedDto(updated);
+}
+
+export async function getDiscordDuelReplay(duelId: string, page: number): Promise<DiscordDuelReplayDto> {
+  const duel = await getDuelOrThrow(duelId);
+
+  return safeReplayPage(duel, page);
+}

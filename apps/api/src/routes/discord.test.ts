@@ -20,6 +20,10 @@ const mocks = vi.hoisted(() => ({
   markSupportTriageMessage: vi.fn(),
   markSupportThreadCreated: vi.fn(),
   archiveSupportThread: vi.fn(),
+  createPendingDiscordDuel: vi.fn(),
+  recordDiscordDuelMessage: vi.fn(),
+  resolveDiscordDuel: vi.fn(),
+  getDiscordDuelReplay: vi.fn(),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -78,11 +82,22 @@ vi.mock('../services/discordSupportThreadService', () => ({
   archiveSupportThread: mocks.archiveSupportThread,
 }));
 
+vi.mock('../services/discordDuelService', () => ({
+  createPendingDiscordDuel: mocks.createPendingDiscordDuel,
+  recordDiscordDuelMessage: mocks.recordDiscordDuelMessage,
+  resolveDiscordDuel: mocks.resolveDiscordDuel,
+  getDiscordDuelReplay: mocks.getDiscordDuelReplay,
+}));
+
 import { discordRouter } from './discord';
 
 const DISCORD_USER_ID = '1234567890123456';
 const DISCORD_GUILD_ID = '2345678901234567';
+const DISCORD_CHANNEL_ID = '3456789012345678';
+const DISCORD_TARGET_USER_ID = '4567890123456789';
+const DISCORD_MESSAGE_ID = '5678901234567890';
 const LINK_ID = '11111111-1111-4111-8111-111111111111';
+const DUEL_ID = '22222222-2222-4222-8222-222222222222';
 const LINKED_AT = '2026-06-04T12:00:00.000Z';
 
 function app() {
@@ -461,5 +476,135 @@ describe('discordRouter', () => {
       publicId: 'SUP-ABC12345',
       actorDiscordUserId: '5678901234567890',
     });
+  });
+
+  it('creates a pending Discord duel with internal bot auth', async () => {
+    mocks.createPendingDiscordDuel.mockResolvedValue({
+      id: DUEL_ID,
+      status: 'pending',
+      challengerUsername: 'Mira',
+      targetUsername: 'Theo',
+      expiresAt: new Date(LINKED_AT),
+    });
+
+    const res = await request(app())
+      .post('/api/v1/discord/duels')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        guildId: DISCORD_GUILD_ID,
+        channelId: DISCORD_CHANNEL_ID,
+        challengerDiscordUserId: DISCORD_USER_ID,
+        targetDiscordUserId: DISCORD_TARGET_USER_ID,
+      })
+      .expect(201);
+
+    expect(res.body.duel).toEqual({
+      id: DUEL_ID,
+      status: 'pending',
+      challengerUsername: 'Mira',
+      targetUsername: 'Theo',
+      expiresAt: LINKED_AT,
+    });
+    expect(mocks.createPendingDiscordDuel).toHaveBeenCalledWith({
+      guildId: DISCORD_GUILD_ID,
+      channelId: DISCORD_CHANNEL_ID,
+      challengerDiscordUserId: DISCORD_USER_ID,
+      targetDiscordUserId: DISCORD_TARGET_USER_ID,
+    });
+  });
+
+  it('rejects malformed Discord duel create bodies', async () => {
+    await request(app())
+      .post('/api/v1/discord/duels')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        guildId: DISCORD_GUILD_ID,
+        channelId: DISCORD_CHANNEL_ID,
+        challengerDiscordUserId: 'not-a-snowflake',
+        targetDiscordUserId: DISCORD_TARGET_USER_ID,
+      })
+      .expect(400);
+
+    expect(mocks.createPendingDiscordDuel).not.toHaveBeenCalled();
+  });
+
+  it('records a Discord duel message id', async () => {
+    mocks.recordDiscordDuelMessage.mockResolvedValue({ id: DUEL_ID, messageId: DISCORD_MESSAGE_ID });
+
+    const res = await request(app())
+      .post(`/api/v1/discord/duels/${DUEL_ID}/message`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ messageId: DISCORD_MESSAGE_ID })
+      .expect(200);
+
+    expect(res.body.duel).toEqual({ id: DUEL_ID, messageId: DISCORD_MESSAGE_ID });
+    expect(mocks.recordDiscordDuelMessage).toHaveBeenCalledWith(DUEL_ID, DISCORD_MESSAGE_ID);
+  });
+
+  it('resolves a Discord duel for the accepting target', async () => {
+    mocks.resolveDiscordDuel.mockResolvedValue({
+      id: DUEL_ID,
+      status: 'completed',
+      winnerUsername: 'Mira',
+      isDraw: false,
+      summary: { outcome: 'victory', totalRounds: 3 },
+      replay: { page: 1, pageSize: 10, hasMore: false, entries: [{ round: 1 }] },
+    });
+
+    const res = await request(app())
+      .post(`/api/v1/discord/duels/${DUEL_ID}/resolve`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ acceptedByDiscordUserId: DISCORD_TARGET_USER_ID })
+      .expect(200);
+
+    expect(res.body.duel).toEqual({
+      id: DUEL_ID,
+      status: 'completed',
+      winnerUsername: 'Mira',
+      isDraw: false,
+      summary: { outcome: 'victory', totalRounds: 3 },
+      replay: { page: 1, pageSize: 10, hasMore: false, entries: [{ round: 1 }] },
+    });
+    expect(mocks.resolveDiscordDuel).toHaveBeenCalledWith(DUEL_ID, DISCORD_TARGET_USER_ID);
+  });
+
+  it('returns a paginated Discord duel replay', async () => {
+    mocks.getDiscordDuelReplay.mockResolvedValue({
+      id: DUEL_ID,
+      status: 'completed',
+      page: 2,
+      pageSize: 10,
+      hasMore: false,
+      entries: [{ round: 11 }],
+    });
+
+    const res = await request(app())
+      .get(`/api/v1/discord/duels/${DUEL_ID}/replay?page=2`)
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body.replay).toEqual({
+      id: DUEL_ID,
+      status: 'completed',
+      page: 2,
+      pageSize: 10,
+      hasMore: false,
+      entries: [{ round: 11 }],
+    });
+    expect(mocks.getDiscordDuelReplay).toHaveBeenCalledWith(DUEL_ID, 2);
+  });
+
+  it('requires internal bot auth for Discord duel routes', async () => {
+    await request(app())
+      .post('/api/v1/discord/duels')
+      .send({
+        guildId: DISCORD_GUILD_ID,
+        channelId: DISCORD_CHANNEL_ID,
+        challengerDiscordUserId: DISCORD_USER_ID,
+        targetDiscordUserId: DISCORD_TARGET_USER_ID,
+      })
+      .expect(401);
+
+    expect(mocks.createPendingDiscordDuel).not.toHaveBeenCalled();
   });
 });
