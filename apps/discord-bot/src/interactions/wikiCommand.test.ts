@@ -1,0 +1,58 @@
+import type { ChatInputCommandInteraction } from 'discord.js';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { handleWikiCommand } from './wikiCommand.js';
+
+describe('handleWikiCommand', () => {
+  it('returns up to 5 absolute wiki links for a search query', async () => {
+    const results = Array.from({ length: 6 }, (_, index) => ({
+      title: `Forge Guide ${index + 1}`,
+      section: index === 0 ? 'Crafting' : undefined,
+      snippet: `Snippet ${index + 1}`,
+      url: `/wiki/forge-${index + 1}`,
+    }));
+    const get = vi.fn(async <T>(): Promise<T> => ({ results }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => 'forge'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
+    expect(get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
+    const reply = editReply.mock.calls[0]?.[0];
+    expect(reply).toEqual({
+      content: expect.stringContaining('Forge Guide 1'),
+    });
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).toContain('https://pocketrealm.app/wiki/forge-1');
+    expect(content).toContain('https://pocketrealm.app/wiki/forge-5');
+    expect(content).not.toContain('Forge Guide 6');
+  });
+
+  it('responds safely when no wiki results are found', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({ results: [] }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => 'missing topic'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'No wiki results found for "missing topic".',
+    });
+  });
+});

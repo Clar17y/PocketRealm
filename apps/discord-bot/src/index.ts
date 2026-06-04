@@ -31,7 +31,7 @@ async function main(): Promise<void> {
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
-      await routeInteraction(interaction, { api });
+      await routeInteraction(interaction, { api, config });
     } catch (error) {
       logger.warn({ error }, 'Failed to handle Discord interaction');
     }

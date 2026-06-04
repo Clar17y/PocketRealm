@@ -1,18 +1,22 @@
 import type { Interaction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import type { BotConfig } from '../config.js';
 import { handleLinkCommand } from './linkCommand.js';
+import {
+  handleProfileCommand,
+  handleRankCommand,
+  handleSkillsCommand,
+  handleTurnsCommand,
+} from './playerCommands.js';
+import { handleWikiCommand } from './wikiCommand.js';
 
 export interface InteractionRouterOptions {
-  api: Pick<PocketRealmApiClient, 'post'>;
+  api: Pick<PocketRealmApiClient, 'get' | 'post'>;
+  config: Pick<BotConfig, 'guildId'>;
 }
 
 const UNIMPLEMENTED_REGISTERED_CHAT_COMMANDS = new Set([
-  'wiki',
-  'profile',
-  'turns',
-  'skills',
-  'rank',
   'duel',
   'report',
   'staff',
@@ -26,6 +30,31 @@ export async function routeInteraction(
 
   if (interaction.commandName === 'link') {
     await handleLinkCommand(interaction, options.api);
+    return;
+  }
+
+  if (interaction.commandName === 'wiki') {
+    await handleWikiCommand(interaction, options.api);
+    return;
+  }
+
+  if (interaction.commandName === 'profile') {
+    await handleProfileCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'turns') {
+    await handleTurnsCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'skills') {
+    await handleSkillsCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'rank') {
+    await handleRankCommand(interaction, options.api, options.config);
     return;
   }
 
