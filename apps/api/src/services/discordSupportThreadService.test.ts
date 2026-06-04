@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       upsert: vi.fn(),
+      updateMany: vi.fn(),
       update: vi.fn(),
     },
     $transaction: vi.fn(),
@@ -90,6 +91,24 @@ describe('discordSupportThreadService', () => {
       where: { discordMessageId: null, status: { in: ['new', 'needs_info'] } },
       take: 25,
     }));
+  });
+
+  it('withholds raw body text when privacy is not_sure', async () => {
+    vi.mocked(prisma.supportTicket.findMany).mockResolvedValue([ticket({
+      privacy: 'not_sure',
+      description: 'Raw unsure body with player@example.com and password=hunter2.',
+      sensitivityFlags: ['personal_data'],
+    })] as never);
+
+    const result = await listUnpostedSupportTicketsForDiscord(5);
+
+    expect(result[0]).toEqual(expect.objectContaining({
+      privacy: 'not_sure',
+      summary: 'Private report body withheld. Review in staff support tools.',
+    }));
+    expect(JSON.stringify(result)).not.toContain('Raw unsure body');
+    expect(JSON.stringify(result)).not.toContain('player@example.com');
+    expect(JSON.stringify(result)).not.toContain('hunter2');
   });
 
   it('summarizes public candidate tickets without exposing raw sensitive text', async () => {
@@ -181,10 +200,32 @@ describe('discordSupportThreadService', () => {
     expect(prisma.supportTicketDiscordThread.create).not.toHaveBeenCalled();
   });
 
+  it('returns a conflict when the Discord thread mapping has a different triage message', async () => {
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue(ticket({ discordMessageId: '3456789012345678' }) as never);
+    vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue({
+      ticketId: 'ticket-1',
+      triageMessageId: '9999999999999999',
+    } as never);
+
+    await expect(markSupportTriageMessage({
+      publicId: 'SUP-ABC12345',
+      guildId: '1234567890123456',
+      triageChannelId: '2345678901234567',
+      triageMessageId: '3456789012345678',
+    })).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'SUPPORT_TRIAGE_MESSAGE_CONFLICT',
+    });
+
+    expect(prisma.supportTicket.updateMany).not.toHaveBeenCalled();
+    expect(prisma.supportTicketDiscordThread.update).not.toHaveBeenCalled();
+    expect(prisma.supportTicketDiscordThread.create).not.toHaveBeenCalled();
+  });
+
   it('marks a Discord support thread as created', async () => {
     vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({ id: 'ticket-1' } as never);
     vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue({ threadId: null } as never);
-    vi.mocked(prisma.supportTicketDiscordThread.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.supportTicketDiscordThread.updateMany).mockResolvedValue({ count: 1 } as never);
 
     await markSupportThreadCreated({
       publicId: 'SUP-ABC12345',
@@ -192,8 +233,11 @@ describe('discordSupportThreadService', () => {
       createdByDiscordUserId: '5678901234567890',
     });
 
-    expect(prisma.supportTicketDiscordThread.update).toHaveBeenCalledWith({
-      where: { ticketId: 'ticket-1' },
+    expect(prisma.supportTicketDiscordThread.updateMany).toHaveBeenCalledWith({
+      where: {
+        ticketId: 'ticket-1',
+        OR: [{ threadId: null }, { threadId: '4567890123456789' }],
+      },
       data: {
         threadId: '4567890123456789',
         createdByDiscordUserId: '5678901234567890',
@@ -232,20 +276,37 @@ describe('discordSupportThreadService', () => {
     expect(prisma.supportTicketDiscordThread.update).not.toHaveBeenCalled();
   });
 
+  it('returns not found when the triage mapping disappears before thread creation is recorded', async () => {
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({ id: 'ticket-1' } as never);
+    vi.mocked(prisma.supportTicketDiscordThread.findUnique)
+      .mockResolvedValue(null as never)
+      .mockResolvedValueOnce({ threadId: null } as never);
+    vi.mocked(prisma.supportTicketDiscordThread.updateMany).mockResolvedValue({ count: 0 } as never);
+
+    await expect(markSupportThreadCreated({
+      publicId: 'SUP-ABC12345',
+      threadId: '4567890123456789',
+      createdByDiscordUserId: '5678901234567890',
+    })).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'SUPPORT_DISCORD_THREAD_NOT_FOUND',
+    });
+  });
+
   it('archives a Discord support thread', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(CREATED_AT);
     vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({ id: 'ticket-1' } as never);
     vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue({ archivedAt: null } as never);
-    vi.mocked(prisma.supportTicketDiscordThread.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.supportTicketDiscordThread.updateMany).mockResolvedValue({ count: 1 } as never);
 
     await archiveSupportThread({
       publicId: 'SUP-ABC12345',
       actorDiscordUserId: '5678901234567890',
     });
 
-    expect(prisma.supportTicketDiscordThread.update).toHaveBeenCalledWith({
-      where: { ticketId: 'ticket-1' },
+    expect(prisma.supportTicketDiscordThread.updateMany).toHaveBeenCalledWith({
+      where: { ticketId: 'ticket-1', archivedAt: null },
       data: {
         archivedAt: CREATED_AT,
         status: 'archived',
@@ -258,6 +319,22 @@ describe('discordSupportThreadService', () => {
   it('returns not found when archiving without a triage mapping', async () => {
     vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({ id: 'ticket-1' } as never);
     vi.mocked(prisma.supportTicketDiscordThread.findUnique).mockResolvedValue(null as never);
+
+    await expect(archiveSupportThread({
+      publicId: 'SUP-ABC12345',
+      actorDiscordUserId: '5678901234567890',
+    })).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'SUPPORT_DISCORD_THREAD_NOT_FOUND',
+    });
+  });
+
+  it('returns not found when the triage mapping disappears before archive is recorded', async () => {
+    vi.mocked(prisma.supportTicket.findUnique).mockResolvedValue({ id: 'ticket-1' } as never);
+    vi.mocked(prisma.supportTicketDiscordThread.findUnique)
+      .mockResolvedValue(null as never)
+      .mockResolvedValueOnce({ archivedAt: null } as never);
+    vi.mocked(prisma.supportTicketDiscordThread.updateMany).mockResolvedValue({ count: 0 } as never);
 
     await expect(archiveSupportThread({
       publicId: 'SUP-ABC12345',
