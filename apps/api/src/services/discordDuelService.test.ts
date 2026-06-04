@@ -46,6 +46,65 @@ function mockModel() {
   };
 }
 
+const GAMEPLAY_WRITE_DELEGATES = [
+  'turnBank',
+  'pvpRating',
+  'player',
+  'playerSkill',
+  'playerEquipment',
+  'item',
+  'activityLog',
+  'playerAchievement',
+  'playerStats',
+  'playerCrown',
+  'playerQuest',
+  'playerQuestState',
+  'playerBuff',
+  'playerShopPurchase',
+  'playerRecipe',
+  'playerZoneDiscovery',
+  'playerZoneExploration',
+  'playerResourceNode',
+  'playerBestiary',
+  'playerBestiaryPrefix',
+  'playerBossRotation',
+  'persistedMob',
+  'pvpCooldown',
+  'pvpMatch',
+  'pvpScoutLog',
+  'combatTemplate',
+  'combatTemplateSlot',
+  'skillPointAllocation',
+  'guildExpedition',
+  'guildExpeditionMember',
+  'playerExpeditionBestiary',
+  'expeditionCooldown',
+] as const;
+
+const WRITE_METHODS = [
+  'create',
+  'createMany',
+  'createManyAndReturn',
+  'update',
+  'updateMany',
+  'upsert',
+  'delete',
+  'deleteMany',
+] as const;
+
+function expectNoGameplayWrites() {
+  for (const delegateName of GAMEPLAY_WRITE_DELEGATES) {
+    const delegate = mockPrisma[delegateName] as Record<string, unknown> | undefined;
+
+    for (const method of WRITE_METHODS) {
+      const operation = delegate?.[method];
+      if (vi.isMockFunction(operation)) {
+        expect(operation, `${delegateName}.${method}`).not.toHaveBeenCalled();
+      }
+    }
+  }
+}
+
 function linkedPlayer(playerId: string, username: string) {
   return {
     account: {
@@ -239,7 +298,7 @@ describe('discordDuelService', () => {
     expect(mockPrisma.discordDuel.update).not.toHaveBeenCalled();
   });
 
-  it('resolves a Discord duel without mutating player resources, turns, or ratings', async () => {
+  it('resolves a Discord duel without mutating gameplay state', async () => {
     mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel());
 
     const result = await resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID);
@@ -251,11 +310,7 @@ describe('discordDuelService', () => {
       expect.objectContaining({ stamina: 100, mana: 50, stats: expect.objectContaining({ hp: 100 }) }),
       { combatMode: 'pvp' },
     );
-    expect(mockPrisma.turnBank.updateMany).not.toHaveBeenCalled();
-    expect(mockPrisma.pvpRating.update).not.toHaveBeenCalled();
-    expect(mockPrisma.player.update).not.toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ currentHp: expect.anything() }),
-    }));
+    expectNoGameplayWrites();
     expect(mockPrisma.discordDuel.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: DUEL_ID },
       data: expect.objectContaining({
