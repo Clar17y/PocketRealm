@@ -7,6 +7,7 @@ import { PocketRealmApiClient } from './api/pocketRealmApi.js';
 import { loadBotConfig } from './config.js';
 import { syncLinkedRoles } from './discord/roleSync.js';
 import { routeInteraction } from './interactions/interactionRouter.js';
+import { buildTriageCard, type UnpostedTicketsResponse } from './support/triageCards.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
@@ -27,7 +28,9 @@ async function main(): Promise<void> {
     ],
   });
   let roleSyncInterval: NodeJS.Timeout | undefined;
+  let supportTriageInterval: NodeJS.Timeout | undefined;
   let isRoleSyncRunning = false;
+  let isSupportTriageRunning = false;
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
@@ -73,12 +76,60 @@ async function main(): Promise<void> {
     roleSyncInterval = setInterval(() => {
       void runRoleSync();
     }, 60_000);
+
+    const runSupportTriagePoll = async (): Promise<void> => {
+      if (isSupportTriageRunning) {
+        logger.debug('Discord support triage poll skipped because a previous run is still active');
+        return;
+      }
+
+      isSupportTriageRunning = true;
+      try {
+        const channel = await readyClient.channels.fetch(config.supportTriageChannelId);
+        if (!channel?.isSendable()) {
+          logger.warn(
+            { channelId: config.supportTriageChannelId },
+            'Discord support triage channel is not sendable',
+          );
+          return;
+        }
+
+        const { tickets } = await api.get<UnpostedTicketsResponse>(
+          '/api/v1/discord/support/tickets/unposted',
+        );
+
+        for (const ticket of tickets) {
+          try {
+            const message = await channel.send(buildTriageCard(ticket));
+            await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/triage-message`, {
+              guildId: config.guildId,
+              triageChannelId: config.supportTriageChannelId,
+              triageMessageId: message.id,
+            });
+          } catch (error) {
+            logger.warn({ error, publicId: ticket.publicId }, 'Failed to post Discord support triage card');
+          }
+        }
+      } catch (error) {
+        logger.warn({ error }, 'Discord support triage poll failed');
+      } finally {
+        isSupportTriageRunning = false;
+      }
+    };
+
+    void runSupportTriagePoll();
+    supportTriageInterval = setInterval(() => {
+      void runSupportTriagePoll();
+    }, 30_000);
   });
 
   const shutdown = (signal: NodeJS.Signals): void => {
     logger.info({ signal }, 'Shutting down Discord bot');
     if (roleSyncInterval) {
       clearInterval(roleSyncInterval);
+    }
+    if (supportTriageInterval) {
+      clearInterval(supportTriageInterval);
     }
     client.destroy();
     process.exit(0);
