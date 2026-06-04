@@ -303,8 +303,8 @@ describe('discordDuelService', () => {
 
     const result = await resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID);
 
-    expect(buildPvpCombatant).toHaveBeenCalledWith('player-1', 'Mira', false);
-    expect(buildPvpCombatant).toHaveBeenCalledWith('player-2', 'Theo', false);
+    expect(buildPvpCombatant).toHaveBeenCalledWith('player-1', 'Mira', false, { readOnlySkillAllocation: true });
+    expect(buildPvpCombatant).toHaveBeenCalledWith('player-2', 'Theo', false, { readOnlySkillAllocation: true });
     expect(runTemplateCombat).toHaveBeenCalledWith(
       expect.objectContaining({ stamina: 100, mana: 50, stats: expect.objectContaining({ hp: 100 }) }),
       expect.objectContaining({ stamina: 100, mana: 50, stats: expect.objectContaining({ hp: 100 }) }),

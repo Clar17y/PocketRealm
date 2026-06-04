@@ -302,6 +302,25 @@ describe('pvpCombatantBuilder', () => {
       expect(mockGetSkillPoints).toHaveBeenCalledWith(PLAYER_ID);
     });
 
+    it('uses an empty read-only skill allocation when the allocation record is missing', async () => {
+      mockPrisma.skillPointAllocation.findUnique.mockResolvedValue(null);
+      mockGetSkillPoints.mockResolvedValue(fakeSkillPoints(['power_strike']));
+
+      await buildPvpCombatant(PLAYER_ID, USERNAME, false, { readOnlySkillAllocation: true });
+
+      expect(mockGetSkillPoints).not.toHaveBeenCalled();
+      expect(mockPrisma.skillPointAllocation.findUnique).toHaveBeenCalledWith({
+        where: { playerId: PLAYER_ID },
+        select: { allocations: true },
+      });
+      expect(mockPrisma.skillPointAllocation.create).not.toHaveBeenCalled();
+      expect(mockPrisma.skillPointAllocation.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.skillPointAllocation.update).not.toHaveBeenCalled();
+      expect(mockBuildPlayerTemplateCombatant).toHaveBeenCalledWith(
+        expect.objectContaining({ unlockedActions: [] }),
+      );
+    });
+
     it('queries skill levels for melee, ranged, evasion, and magic', async () => {
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 

@@ -5,6 +5,7 @@ import {
   calculateMaxMana, calculateManaRegenPerRound,
 } from '@pocketrealm/game-engine';
 import type { SkillType } from '@pocketrealm/shared';
+import { getTalentNode } from '@pocketrealm/shared/constants/talentTreeDefinitions';
 import { normalizePlayerAttributes } from './attributesService';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
 import { getSkillLevels, getMainHandAttackSkill, buildPerActionScaling } from './combatStatsService';
@@ -13,8 +14,13 @@ import { getEquipmentStats } from './equipmentService';
 import { getHpState } from './hpService';
 import { getResourceState } from './resourceService';
 import { getSkillPoints } from './skillPointService';
+import { skillPointAllocationsSchema } from '../utils/jsonColumnSchemas';
 
 export type AttackStyle = 'melee' | 'ranged' | 'magic';
+
+interface BuildPvpCombatantOptions {
+  readOnlySkillAllocation?: boolean;
+}
 
 /** Determine attack style from main-hand weapon's required skill. */
 export async function getAttackStyle(playerId: string): Promise<AttackStyle> {
@@ -28,6 +34,22 @@ export async function getAttackStyle(playerId: string): Promise<AttackStyle> {
   return 'melee';
 }
 
+async function getReadonlyUnlockedActions(playerId: string): Promise<string[]> {
+  const record = await prisma.skillPointAllocation.findUnique({
+    where: { playerId },
+    select: { allocations: true },
+  });
+  const allocations = skillPointAllocationsSchema.catch({}).parse(record?.allocations ?? {});
+
+  const unlockedActions: string[] = [];
+  for (const nodeId of Object.keys(allocations)) {
+    const node = getTalentNode(nodeId);
+    if (node?.unlocksAction) unlockedActions.push(node.unlocksAction);
+  }
+
+  return unlockedActions;
+}
+
 /**
  * Build a TemplateCombatant for PvP-style combat (arena, spar).
  *
@@ -38,8 +60,13 @@ export async function buildPvpCombatant(
   playerId: string,
   username: string,
   useCurrentResources: boolean,
+  options: BuildPvpCombatantOptions = {},
 ) {
-  const [player, equipStats, weaponRequiredSkill, template, skillPoints, levels] = await Promise.all([
+  const unlockedActionsPromise = options.readOnlySkillAllocation
+    ? getReadonlyUnlockedActions(playerId)
+    : getSkillPoints(playerId).then((skillPoints) => skillPoints.unlockedActions);
+
+  const [player, equipStats, weaponRequiredSkill, template, unlockedActions, levels] = await Promise.all([
     prisma.player.findUniqueOrThrow({
       where: { id: playerId },
       select: { attributes: true },
@@ -47,7 +74,7 @@ export async function buildPvpCombatant(
     getEquipmentStats(playerId),
     getMainHandAttackSkill(playerId),
     getActiveTemplate(playerId),
-    getSkillPoints(playerId),
+    unlockedActionsPromise,
     getSkillLevels(playerId, ['melee', 'ranged', 'evasion', 'magic'] as SkillType[]),
   ]);
 
@@ -117,7 +144,7 @@ export async function buildPvpCombatant(
     mana,
     maxMana,
     manaRegenPerRound: calculateManaRegenPerRound(magicLevel),
-    unlockedActions: skillPoints.unlockedActions,
+    unlockedActions,
     perActionScaling,
   });
 }

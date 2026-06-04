@@ -169,7 +169,7 @@ async function getLinkedActivePlayer(
 }
 
 async function buildDiscordDuelCombatant(playerId: string, username: string) {
-  const combatant = await buildPvpCombatant(playerId, username, false);
+  const combatant = await buildPvpCombatant(playerId, username, false, { readOnlySkillAllocation: true });
 
   return {
     ...combatant,
