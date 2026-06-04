@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import type { RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
 
 export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationCommandsJSONBody[] {
@@ -53,6 +53,7 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
     new SlashCommandBuilder()
       .setName('staff')
       .setDescription('Pocketrealm staff support commands.')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .addSubcommand((subcommand) =>
         subcommand
           .setName('sync-roles')

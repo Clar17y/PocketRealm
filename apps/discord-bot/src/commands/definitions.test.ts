@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType } from 'discord.js';
+import { ApplicationCommandOptionType, PermissionFlagsBits } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 
 import { buildCommandDefinitions } from './definitions.js';
@@ -8,7 +8,7 @@ describe('buildCommandDefinitions', () => {
     const commands = buildCommandDefinitions();
     const commandNames = commands.map((command) => command.name);
 
-    expect(commandNames).toEqual(expect.arrayContaining([
+    expect(commandNames).toEqual([
       'link',
       'wiki',
       'profile',
@@ -18,7 +18,40 @@ describe('buildCommandDefinitions', () => {
       'duel',
       'report',
       'staff',
-    ]));
+    ]);
+    expect(commands).toHaveLength(9);
+  });
+
+  it('builds public command options with the expected schema', () => {
+    const commands = buildCommandDefinitions();
+
+    expect(commands.find((command) => command.name === 'wiki')?.options).toEqual([
+      expect.objectContaining({
+        name: 'query',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      }),
+    ]);
+    expect(commands.find((command) => command.name === 'profile')?.options).toEqual([
+      expect.objectContaining({
+        name: 'user',
+        type: ApplicationCommandOptionType.User,
+      }),
+    ]);
+    expect(commands.find((command) => command.name === 'rank')?.options).toEqual([
+      expect.objectContaining({
+        name: 'category',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      }),
+    ]);
+    expect(commands.find((command) => command.name === 'duel')?.options).toEqual([
+      expect.objectContaining({
+        name: 'opponent',
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      }),
+    ]);
   });
 
   it('builds staff moderation subcommands', () => {
@@ -28,12 +61,74 @@ describe('buildCommandDefinitions', () => {
       ?.filter((option) => option.type === ApplicationCommandOptionType.Subcommand)
       .map((option) => option.name);
 
-    expect(staffSubcommandNames).toEqual(expect.arrayContaining([
+    expect(staffSubcommandNames).toEqual([
       'sync-roles',
       'repair-ticket',
       'sync-ticket',
       'xp-adjust',
       'known-issue',
+    ]);
+  });
+
+  it('builds staff command options with the expected schema', () => {
+    const commands = buildCommandDefinitions();
+    const staffCommand = commands.find((command) => command.name === 'staff');
+    const staffSubcommands = staffCommand?.options?.filter(
+      (option) => option.type === ApplicationCommandOptionType.Subcommand,
+    );
+
+    expect(staffCommand?.default_member_permissions).toBe(String(PermissionFlagsBits.ManageGuild));
+    expect(staffSubcommands).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'repair-ticket',
+        options: [
+          expect.objectContaining({
+            name: 'public_id',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        name: 'sync-ticket',
+        options: [
+          expect.objectContaining({
+            name: 'public_id',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        name: 'xp-adjust',
+        options: [
+          expect.objectContaining({
+            name: 'user',
+            type: ApplicationCommandOptionType.User,
+            required: true,
+          }),
+          expect.objectContaining({
+            name: 'amount',
+            type: ApplicationCommandOptionType.Integer,
+            required: true,
+          }),
+          expect.objectContaining({
+            name: 'reason',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        name: 'known-issue',
+        options: [
+          expect.objectContaining({
+            name: 'public_id',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+          }),
+        ],
+      }),
     ]));
   });
 });
