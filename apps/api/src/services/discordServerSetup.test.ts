@@ -38,7 +38,72 @@ function asName(value: unknown): string {
 
 interface RecordedDiscordRequest {
   method: string;
+  path: string;
   body: unknown;
+}
+
+function stubDiscordSetupFetch(existingAutoModRules: unknown[]): RecordedDiscordRequest[] {
+  const plan = buildDiscordSetupPlan();
+  const roles = plan.roles.map((role) => ({
+    id: `${role.key}-role-id`,
+    name: role.name,
+  }));
+  const channels = plan.categories.flatMap((category) => {
+    const categoryId = `${category.name.toLowerCase()}-category-id`;
+    return [
+      { id: categoryId, name: category.name, type: 4, parent_id: null },
+      ...category.channels.map((channel) => ({
+        id: `${channel.name}-id`,
+        name: channel.name,
+        type: 0,
+        parent_id: categoryId,
+      })),
+    ];
+  });
+  const channelsById = new Map(channels.map((channel) => [channel.id, channel]));
+  const requests: RecordedDiscordRequest[] = [];
+
+  const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input.toString());
+    const path = url.pathname.replace('/api/v10', '');
+    const method = init?.method ?? 'GET';
+    if (typeof init?.body === 'string') {
+      requests.push({
+        method,
+        path,
+        body: JSON.parse(init.body) as unknown,
+      });
+    }
+
+    if (path === '/users/@me') return jsonResponse({ id: 'bot-user-id' });
+    if (path.endsWith('/roles') && method === 'GET') return jsonResponse(roles);
+    if (path.includes('/members/') && path.includes('/roles/') && method === 'PUT') return emptyResponse();
+    if (path.endsWith('/channels') && method === 'GET') return jsonResponse(channels);
+    if (path.startsWith('/channels/') && method === 'PATCH') {
+      const channelId = path.split('/')[2];
+      return jsonResponse(channelsById.get(channelId));
+    }
+    if (path.endsWith('/messages') && method === 'GET') return jsonResponse([]);
+    if (path.endsWith('/messages') && method === 'POST') {
+      return jsonResponse({ id: 'message-id', content: '', author: { id: 'bot-user-id' } });
+    }
+    if (path.endsWith('/webhooks') && method === 'GET') {
+      return jsonResponse([{ id: 'webhook-id', name: 'PocketRealm Support', url: 'https://discord.test/webhook' }]);
+    }
+    if (path.endsWith('/auto-moderation/rules') && method === 'GET') return jsonResponse(existingAutoModRules);
+    if (path.endsWith('/auto-moderation/rules') && method === 'POST') {
+      const body = requests.at(-1)?.body;
+      return jsonResponse({ id: 'created-rule-id', name: asName(body) });
+    }
+    if (path.includes('/auto-moderation/rules/') && method === 'PATCH') {
+      const body = requests.at(-1)?.body;
+      return jsonResponse({ id: path.split('/').at(-1), name: asName(body) });
+    }
+    throw new Error(`Unhandled Discord test request: ${method} ${path}`);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  return requests;
 }
 
 describe('discordServerSetup', () => {
@@ -135,74 +200,19 @@ describe('discordServerSetup', () => {
     ]);
     expect(rules.every((rule) => rule.actions.some((action) => action.type === 1))).toBe(true);
     expect(rules.every((rule) => rule.actions.some((action) => action.type === 2))).toBe(true);
+    expect(rules.every((rule) => rule.exempt_roles.length === 0)).toBe(true);
+    expect(rules.every((rule) => rule.exempt_channels.length === 0)).toBe(true);
     expect(JSON.stringify(rules)).not.toContain('"type":3');
   });
 
   it('creates missing AutoMod rules and updates existing planned rules by name', async () => {
     vi.stubEnv('DISCORD_AUTOMOD_EXTRA_KEYWORDS', 'gold spam, ,token leak');
 
-    const plan = buildDiscordSetupPlan();
-    const roles = plan.roles.map((role) => ({
-      id: `${role.key}-role-id`,
-      name: role.name,
-    }));
-    const channels = plan.categories.flatMap((category) => {
-      const categoryId = `${category.name.toLowerCase()}-category-id`;
-      return [
-        { id: categoryId, name: category.name, type: 4, parent_id: null },
-        ...category.channels.map((channel) => ({
-          id: `${channel.name}-id`,
-          name: channel.name,
-          type: 0,
-          parent_id: categoryId,
-        })),
-      ];
-    });
-    const channelsById = new Map(channels.map((channel) => [channel.id, channel]));
     const existingAutoModRules = [
-      { id: 'existing-spam-rule-id', name: 'PocketRealm: spam protection' },
-      { id: 'existing-private-rule-id', name: 'PocketRealm: private data guard' },
+      { id: 'existing-spam-rule-id', name: 'PocketRealm: spam protection', trigger_type: 3 },
+      { id: 'existing-private-rule-id', name: 'PocketRealm: private data guard', trigger_type: 1 },
     ];
-    const requests: RecordedDiscordRequest[] = [];
-
-    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : input.toString());
-      const path = url.pathname.replace('/api/v10', '');
-      const method = init?.method ?? 'GET';
-      if (typeof init?.body === 'string') {
-        requests.push({
-          method,
-          body: JSON.parse(init.body) as unknown,
-        });
-      }
-
-      if (path === '/users/@me') return jsonResponse({ id: 'bot-user-id' });
-      if (path.endsWith('/roles') && method === 'GET') return jsonResponse(roles);
-      if (path.includes('/members/') && path.includes('/roles/') && method === 'PUT') return emptyResponse();
-      if (path.endsWith('/channels') && method === 'GET') return jsonResponse(channels);
-      if (path.startsWith('/channels/') && method === 'PATCH') {
-        const channelId = path.split('/')[2];
-        return jsonResponse(channelsById.get(channelId));
-      }
-      if (path.endsWith('/messages') && method === 'GET') return jsonResponse([]);
-      if (path.endsWith('/messages') && method === 'POST') {
-        return jsonResponse({ id: 'message-id', content: '', author: { id: 'bot-user-id' } });
-      }
-      if (path.endsWith('/webhooks') && method === 'GET') {
-        return jsonResponse([{ id: 'webhook-id', name: 'PocketRealm Support', url: 'https://discord.test/webhook' }]);
-      }
-      if (path.endsWith('/auto-moderation/rules') && method === 'GET') return jsonResponse(existingAutoModRules);
-      if (path.endsWith('/auto-moderation/rules') && method === 'POST') {
-        const body = requests.at(-1)?.body;
-        return jsonResponse({ id: 'created-rule-id', name: asName(body) });
-      }
-      if (path.includes('/auto-moderation/rules/') && method === 'PATCH') {
-        const body = requests.at(-1)?.body;
-        return jsonResponse({ id: path.split('/').at(-1), name: asName(body) });
-      }
-      throw new Error(`Unhandled Discord test request: ${method} ${path}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    const requests = stubDiscordSetupFetch(existingAutoModRules);
 
     const result = await setupDiscordServer({ botToken: 'token', guildId: 'guild-id' });
 
@@ -230,8 +240,30 @@ describe('discordServerSetup', () => {
     expect(autoModBodies.some((body) => 'guild_id' in asObject(body))).toBe(false);
     expect(createBodies.every((body) => 'trigger_type' in asObject(body))).toBe(true);
     expect(updateBodies.every((body) => 'trigger_type' in asObject(body))).toBe(false);
+    expect(autoModBodies.every((body) => Array.isArray(asObject(body).exempt_roles))).toBe(true);
+    expect(autoModBodies.every((body) => Array.isArray(asObject(body).exempt_channels))).toBe(true);
+    expect(autoModBodies.every((body) => (asObject(body).exempt_roles as unknown[]).length === 0)).toBe(true);
+    expect(autoModBodies.every((body) => (asObject(body).exempt_channels as unknown[]).length === 0)).toBe(true);
     expect(JSON.stringify(autoModBodies)).toContain('gold spam');
     expect(JSON.stringify(autoModBodies)).toContain('token leak');
+  });
+
+  it('rejects unmanaged AutoMod rules that conflict with planned singleton trigger types', async () => {
+    const requests = stubDiscordSetupFetch([
+      { id: 'external-spam-rule-id', name: 'Existing spam rule', trigger_type: 3 },
+    ]);
+
+    await expect(setupDiscordServer({ botToken: 'token', guildId: 'guild-id' }))
+      .rejects.toThrow(
+        'Discord AutoMod rule "Existing spam rule" already uses trigger type 3. '
+        + 'Rename or remove it before running PocketRealm setup.',
+      );
+
+    const autoModMutations = requests.filter((request) => (
+      request.path.includes('/auto-moderation/rules')
+      && ['POST', 'PATCH'].includes(request.method)
+    ));
+    expect(autoModMutations).toEqual([]);
   });
 
   it('uses deny view/send overwrites for private channels', () => {

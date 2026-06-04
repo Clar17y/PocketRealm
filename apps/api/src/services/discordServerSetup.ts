@@ -111,6 +111,8 @@ interface AutoModRulePayload {
   };
   actions: AutoModAction[];
   enabled: boolean;
+  exempt_roles: string[];
+  exempt_channels: string[];
 }
 
 type AutoModRuleUpdatePayload = Omit<AutoModRulePayload, 'trigger_type'>;
@@ -118,6 +120,7 @@ type AutoModRuleUpdatePayload = Omit<AutoModRulePayload, 'trigger_type'>;
 interface DiscordAutoModRule {
   id: string;
   name: string;
+  trigger_type: number;
 }
 
 interface PermissionOverwrite {
@@ -199,14 +202,25 @@ function buildAutoModActions(alertChannelId: string): AutoModAction[] {
   ];
 }
 
+function buildAutoModRuleBase(alertChannelId: string): Pick<
+  AutoModRulePayload,
+  'actions' | 'enabled' | 'exempt_roles' | 'exempt_channels'
+> {
+  return {
+    actions: buildAutoModActions(alertChannelId),
+    enabled: true,
+    exempt_roles: [],
+    exempt_channels: [],
+  };
+}
+
 export function buildAutoModRules(options: { alertChannelId: string; extraKeywords: string[] }): AutoModRulePayload[] {
   return [
     {
       name: 'PocketRealm: spam protection',
       event_type: AutoModEventType.MessageSend,
       trigger_type: AutoModTriggerType.Spam,
-      actions: buildAutoModActions(options.alertChannelId),
-      enabled: true,
+      ...buildAutoModRuleBase(options.alertChannelId),
     },
     {
       name: 'PocketRealm: mention protection',
@@ -216,16 +230,14 @@ export function buildAutoModRules(options: { alertChannelId: string; extraKeywor
         mention_total_limit: 8,
         mention_raid_protection_enabled: true,
       },
-      actions: buildAutoModActions(options.alertChannelId),
-      enabled: true,
+      ...buildAutoModRuleBase(options.alertChannelId),
     },
     {
       name: 'PocketRealm: preset safety',
       event_type: AutoModEventType.MessageSend,
       trigger_type: AutoModTriggerType.KeywordPreset,
       trigger_metadata: { presets: [1, 2, 3] },
-      actions: buildAutoModActions(options.alertChannelId),
-      enabled: true,
+      ...buildAutoModRuleBase(options.alertChannelId),
     },
     {
       name: 'PocketRealm: private data guard',
@@ -240,8 +252,7 @@ export function buildAutoModRules(options: { alertChannelId: string; extraKeywor
           ...options.extraKeywords,
         ],
       },
-      actions: buildAutoModActions(options.alertChannelId),
-      enabled: true,
+      ...buildAutoModRuleBase(options.alertChannelId),
     },
   ];
 }
@@ -249,6 +260,34 @@ export function buildAutoModRules(options: { alertChannelId: string; extraKeywor
 function buildAutoModRuleUpdatePayload(rule: AutoModRulePayload): AutoModRuleUpdatePayload {
   const { trigger_type: _triggerType, ...updatePayload } = rule;
   return updatePayload;
+}
+
+function isSingletonAutoModTriggerType(triggerType: number): boolean {
+  return triggerType === AutoModTriggerType.Spam
+    || triggerType === AutoModTriggerType.KeywordPreset
+    || triggerType === AutoModTriggerType.MentionSpam;
+}
+
+function assertNoUnmanagedAutoModConflicts(
+  existingRules: DiscordAutoModRule[],
+  plannedRules: AutoModRulePayload[],
+): void {
+  const plannedNames = new Set(plannedRules.map((rule) => rule.name));
+  const plannedSingletonTriggerTypes = new Set<number>(
+    plannedRules
+      .map((rule) => rule.trigger_type)
+      .filter(isSingletonAutoModTriggerType),
+  );
+
+  for (const existingRule of existingRules) {
+    if (plannedNames.has(existingRule.name)) continue;
+    if (!plannedSingletonTriggerTypes.has(existingRule.trigger_type)) continue;
+
+    throw new Error(
+      `Discord AutoMod rule "${existingRule.name}" already uses trigger type ${existingRule.trigger_type}. `
+      + 'Rename or remove it before running PocketRealm setup.',
+    );
+  }
 }
 
 export function buildDiscordSetupPlan(): DiscordSetupPlan {
@@ -509,6 +548,7 @@ function parseAutoModRule(value: unknown): DiscordAutoModRule {
   return {
     id: requireString(record.id, 'autoModRule.id'),
     name: requireString(record.name, 'autoModRule.name'),
+    trigger_type: typeof record.trigger_type === 'number' ? record.trigger_type : -1,
   };
 }
 
@@ -849,13 +889,14 @@ export async function setupDiscordServer(options: SetupOptions): Promise<SetupRe
   const modLogChannelId = result.channelIdsByName['mod-log'];
   if (!modLogChannelId) throw new Error('Discord setup plan did not create or find mod-log channel');
 
-  const existingAutoModRulesByName = new Map(
-    (await client.getAutoModRules(options.guildId)).map((rule) => [rule.name, rule]),
-  );
+  const existingAutoModRules = await client.getAutoModRules(options.guildId);
   const plannedAutoModRules = buildAutoModRules({
     alertChannelId: modLogChannelId,
     extraKeywords: readAutoModExtraKeywords(),
   });
+  assertNoUnmanagedAutoModConflicts(existingAutoModRules, plannedAutoModRules);
+
+  const existingAutoModRulesByName = new Map(existingAutoModRules.map((rule) => [rule.name, rule]));
 
   for (const rule of plannedAutoModRules) {
     const existing = existingAutoModRulesByName.get(rule.name);
