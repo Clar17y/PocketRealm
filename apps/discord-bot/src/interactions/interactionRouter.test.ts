@@ -3,12 +3,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
+import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { routeInteraction } from './interactionRouter.js';
 import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
 import { handleStaffCommand } from './staffCommands.js';
 
 vi.mock('../support/threadActions.js', () => ({
   handleSupportThreadAction: vi.fn(),
+}));
+
+vi.mock('./duelCommand.js', () => ({
+  handleDuelButton: vi.fn(),
+  handleDuelCommand: vi.fn(),
 }));
 
 vi.mock('./reportCommand.js', () => ({
@@ -25,6 +31,7 @@ const routerConfig = {
   guildId: 'guild-123',
   webBaseUrl: 'https://pocketrealm.app',
   verifiedRoleId: 'verified-role-1',
+  duelsChannelId: 'duels-channel-1',
   supportStaffRoleIds: ['staff-role-1'],
   levelRoleMap: new Map<number, string>(),
 };
@@ -77,20 +84,32 @@ describe('routeInteraction', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/turns?guildId=guild-123');
   });
 
-  it('replies ephemerally for a known registered command without an implementation', async () => {
-    const reply = vi.fn<ChatInputCommandInteraction['reply']>();
+  it('routes duel commands to the duel handler', async () => {
     const interaction = {
       isChatInputCommand: () => true,
       commandName: 'duel',
-      reply,
     } as unknown as Interaction;
     const api = createApi(null);
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: 'The /duel command is not available yet.',
+    expect(handleDuelCommand).toHaveBeenCalledWith(interaction, api, routerConfig);
+  });
+
+  it('routes duel button interactions to the duel handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => false,
+      isButton: () => true,
+      customId: 'duel:accept:duel-1:target-1',
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleDuelButton).toHaveBeenCalledWith(interaction, api);
+    expect(handleSupportThreadAction).not.toHaveBeenCalledWith(interaction, {
+      api,
+      config: routerConfig,
     });
   });
 

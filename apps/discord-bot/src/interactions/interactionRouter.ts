@@ -2,8 +2,9 @@ import type { Interaction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
-import { parseSupportButtonId } from '../discord/components.js';
+import { parseDuelButtonId, parseSupportButtonId } from '../discord/components.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
+import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { handleLinkCommand } from './linkCommand.js';
 import {
   handleProfileCommand,
@@ -23,19 +24,25 @@ export interface InteractionRouterOptions {
   api: Pick<PocketRealmApiClient, 'get' | 'post'>;
   config: Pick<
     BotConfig,
-    'guildId' | 'webBaseUrl' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'
+    'guildId'
+    | 'webBaseUrl'
+    | 'verifiedRoleId'
+    | 'supportStaffRoleIds'
+    | 'levelRoleMap'
+    | 'duelsChannelId'
   >;
 }
-
-const UNIMPLEMENTED_REGISTERED_CHAT_COMMANDS = new Set([
-  'duel',
-]);
 
 export async function routeInteraction(
   interaction: Interaction,
   options: InteractionRouterOptions,
 ): Promise<void> {
   if (typeof interaction.isButton === 'function' && interaction.isButton()) {
+    if (parseDuelButtonId(interaction.customId)) {
+      await handleDuelButton(interaction, options.api);
+      return;
+    }
+
     if (parseSupportButtonId(interaction.customId)) {
       await handleSupportThreadAction(interaction, options);
     }
@@ -93,10 +100,7 @@ export async function routeInteraction(
     return;
   }
 
-  if (UNIMPLEMENTED_REGISTERED_CHAT_COMMANDS.has(interaction.commandName)) {
-    await interaction.reply({
-      ephemeral: true,
-      content: `The /${interaction.commandName} command is not available yet.`,
-    });
+  if (interaction.commandName === 'duel') {
+    await handleDuelCommand(interaction, options.api, options.config);
   }
 }

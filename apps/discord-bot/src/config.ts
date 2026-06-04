@@ -14,6 +14,7 @@ const envSchema = z.object({
   DISCORD_BOT_HEALTH_CHANNEL_ID: snowflakeSchema,
   DISCORD_SUPPORT_TRIAGE_CHANNEL_ID: snowflakeSchema,
   DISCORD_SUPPORT_CATEGORY_ID: snowflakeSchema,
+  DISCORD_DUELS_CHANNEL_ID: snowflakeSchema,
   DISCORD_PLAYER_ROLE_ID: snowflakeSchema,
   DISCORD_VERIFIED_ROLE_ID: snowflakeSchema,
   DISCORD_SUPPORT_STAFF_ROLE_IDS: z.string().optional(),
@@ -32,6 +33,7 @@ export interface BotConfig {
   botHealthChannelId: string;
   supportTriageChannelId: string;
   supportCategoryId: string;
+  duelsChannelId: string;
   playerRoleId: string;
   verifiedRoleId: string;
   supportStaffRoleIds: string[];
@@ -88,6 +90,7 @@ export function parseBotConfig(env: Record<string, string | undefined>): BotConf
     botHealthChannelId: parsed.DISCORD_BOT_HEALTH_CHANNEL_ID,
     supportTriageChannelId: parsed.DISCORD_SUPPORT_TRIAGE_CHANNEL_ID,
     supportCategoryId: parsed.DISCORD_SUPPORT_CATEGORY_ID,
+    duelsChannelId: parsed.DISCORD_DUELS_CHANNEL_ID,
     playerRoleId: parsed.DISCORD_PLAYER_ROLE_ID,
     verifiedRoleId: parsed.DISCORD_VERIFIED_ROLE_ID,
     supportStaffRoleIds: parseSnowflakeList(parsed.DISCORD_SUPPORT_STAFF_ROLE_IDS),
