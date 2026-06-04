@@ -248,6 +248,7 @@ async function showReplay(
     );
     await interaction.editReply({
       content: formatReplay(response.replay),
+      components: buildReplayRows(response.replay),
     });
   } catch {
     await interaction.editReply({
@@ -268,6 +269,21 @@ function formatReplay(replay: DuelReplayResponse['replay']): string {
   }
 
   return `Friendly simulation replay page ${replay.page}\n${lines.join('\n')}`;
+}
+
+function buildReplayRows(replay: DuelReplayResponse['replay']): ActionRowBuilder<ButtonBuilder>[] {
+  if (!replay.hasMore) {
+    return [];
+  }
+
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(duelReplayButtonId(replay.id, replay.page + 1))
+        .setLabel('Next Replay Page')
+        .setStyle(ButtonStyle.Secondary),
+    ),
+  ];
 }
 
 function formatSummary(summary: unknown): string | null {

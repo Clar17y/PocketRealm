@@ -174,7 +174,7 @@ describe('handleDuelButton', () => {
         status: 'resolved',
         page: 1,
         pageSize: 3,
-        hasMore: false,
+        hasMore: true,
         entries: [
           { round: 1, message: 'Astra opens with a careful strike.' },
           { round: 2, actionName: 'Counter', damageDealt: 7 },
@@ -193,12 +193,44 @@ describe('handleDuelButton', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=1');
-    expect(editReply).toHaveBeenCalledWith({
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('Astra opens with a careful strike.'),
-    });
-    expect(editReply).toHaveBeenCalledWith({
+      components: expect.any(Array),
+    }));
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('Round 2 · Counter · 7 damage'),
+    }));
+    const replayPayload = editReply.mock.calls[0]?.[0] as { components: Array<{ toJSON: () => unknown }> };
+    expect(JSON.stringify(replayPayload.components[0]?.toJSON())).toContain('duel:replay:duel-123:2');
+  });
+
+  it('loads later replay pages from replay pagination buttons', async () => {
+    const api = createApi();
+    vi.mocked(api.get).mockResolvedValue({
+      replay: {
+        id: 'duel-123',
+        status: 'resolved',
+        page: 2,
+        pageSize: 3,
+        hasMore: false,
+        entries: [{ round: 4, message: 'Borin makes a final stand.' }],
+      },
     });
+    const deferReply = vi.fn<ButtonInteraction['deferReply']>();
+    const editReply = vi.fn<ButtonInteraction['editReply']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:replay:duel-123:2',
+      deferReply,
+      editReply,
+    });
+
+    await handleDuelButton(interaction, api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=2');
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('Friendly simulation replay page 2'),
+      components: [],
+    }));
   });
 });
 
