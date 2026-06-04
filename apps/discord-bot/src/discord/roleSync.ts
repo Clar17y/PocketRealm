@@ -7,7 +7,8 @@ interface UnsyncedDiscordLink {
   id: string;
   discordUserId: string;
   discordGuildId: string;
-  status: string;
+  linkedAt: string;
+  roleSyncedAt: string | null;
 }
 
 interface UnsyncedLinksResponse {
@@ -43,8 +44,6 @@ export async function syncLinkedRoles({
   };
 
   for (const link of links.links) {
-    if (link.status !== 'active') continue;
-
     const member = await guild.members.fetch(link.discordUserId).catch(() => null);
     if (!member) {
       summary.missingMembers += 1;

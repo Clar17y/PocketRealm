@@ -6,14 +6,15 @@ import type { BotConfig } from '../config.js';
 import { syncLinkedRoles } from './roleSync.js';
 
 describe('syncLinkedRoles', () => {
-  it('adds the verified role for unsynced active links and marks them synced', async () => {
+  it('adds the verified role for unsynced links and marks them synced', async () => {
     const unsyncedLinksResponse = {
       links: [
         {
           id: 'link-1',
           discordUserId: '123456789012345678',
           discordGuildId: '234567890123456789',
-          status: 'active',
+          linkedAt: '2026-06-04T12:00:00.000Z',
+          roleSyncedAt: null,
         },
       ],
     };
