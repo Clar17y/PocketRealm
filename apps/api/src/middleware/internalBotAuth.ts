@@ -1,11 +1,11 @@
-import { timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { AppError } from './errorHandler';
 
 function safeEqual(a: string, b: string): boolean {
-  const aBuffer = Buffer.from(a);
-  const bBuffer = Buffer.from(b);
-  return aBuffer.length === bBuffer.length && timingSafeEqual(aBuffer, bBuffer);
+  const aDigest = createHash('sha256').update(a).digest();
+  const bDigest = createHash('sha256').update(b).digest();
+  return timingSafeEqual(aDigest, bDigest);
 }
 
 export function requireInternalBotAuth(req: Request, _res: Response, next: NextFunction): void {
