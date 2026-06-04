@@ -139,10 +139,18 @@ async function handleArchiveThread(
   publicId: string,
 ): Promise<void> {
   const { ticket } = await fetchActionContext(api, publicId);
-  const thread = currentPrivateThread(interaction.channel, ticket.threadId);
 
-  if (thread) {
-    await thread.setArchived(true, `Support thread archived for ${ticket.publicId}`);
+  try {
+    const thread = await resolveArchiveTargetThread(interaction.channel, ticket.threadId);
+    if (thread) {
+      await thread.setArchived(true, `Support thread archived for ${ticket.publicId}`);
+    }
+  } catch {
+    await interaction.reply({
+      ephemeral: true,
+      content: `Could not archive the Discord thread for \`${ticket.publicId}\`. Try again or archive it manually.`,
+    });
+    return;
   }
 
   await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/archive-thread`, {
@@ -169,7 +177,7 @@ function currentPrivateThread(
   channel: ButtonInteraction['channel'],
   expectedThreadId: Snowflake | null,
 ): PrivateThreadChannel | null {
-  if (!channel || !('setArchived' in channel) || typeof channel.setArchived !== 'function') {
+  if (!isPrivateThreadChannel(channel)) {
     return null;
   }
 
@@ -178,4 +186,46 @@ function currentPrivateThread(
   }
 
   return channel as PrivateThreadChannel;
+}
+
+async function resolveArchiveTargetThread(
+  channel: ButtonInteraction['channel'],
+  threadId: Snowflake | null,
+): Promise<PrivateThreadChannel | null> {
+  const currentThread = currentPrivateThread(channel, threadId);
+  if (currentThread) {
+    return currentThread;
+  }
+
+  if (!threadId) {
+    return null;
+  }
+
+  if (!isThreadFetchableTextChannel(channel)) {
+    throw new Error('Mapped support thread is not fetchable from this interaction channel.');
+  }
+
+  const thread = await channel.threads.fetch(threadId);
+  if (!isPrivateThreadChannel(thread)) {
+    throw new Error('Mapped support thread could not be fetched.');
+  }
+
+  return thread;
+}
+
+function isThreadFetchableTextChannel(
+  channel: ButtonInteraction['channel'],
+): channel is TextChannel & { threads: { fetch(threadId: Snowflake): Promise<unknown> } } {
+  return Boolean(channel && 'threads' in channel && typeof channel.threads.fetch === 'function');
+}
+
+function isPrivateThreadChannel(channel: unknown): channel is PrivateThreadChannel {
+  return Boolean(
+    channel &&
+      typeof channel === 'object' &&
+      'id' in channel &&
+      typeof channel.id === 'string' &&
+      'setArchived' in channel &&
+      typeof channel.setArchived === 'function',
+  );
 }

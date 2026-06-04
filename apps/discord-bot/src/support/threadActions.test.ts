@@ -133,6 +133,37 @@ describe('handleSupportThreadAction', () => {
     });
   });
 
+  it('archives the mapped Discord thread from a triage card click before marking the mapping archived', async () => {
+    const api = createApi({
+      ticket: {
+        ...ticketContext.ticket,
+        threadId: THREAD_ID,
+      },
+    });
+    const thread = createThread();
+    const channel = createTriageChannel(thread);
+    const interaction = createButtonInteraction({
+      customId: 'support:archive_thread:SUP-ABC12345',
+      channel,
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(channel.threads.fetch).toHaveBeenCalledWith(THREAD_ID);
+    expect(thread.setArchived).toHaveBeenCalledWith(true, 'Support thread archived for SUP-ABC12345');
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/support/tickets/SUP-ABC12345/archive-thread', {
+      actorDiscordUserId: ACTOR_ID,
+    });
+    expect(vi.mocked(thread.setArchived).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(api.post).mock.invocationCallOrder[0],
+    );
+    expect(interaction.reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'Archived support thread for `SUP-ABC12345`.',
+    });
+  });
+
   it('updates canonical ticket status for status buttons', async () => {
     const api = createApi(ticketContext);
     const interaction = createButtonInteraction({
@@ -204,6 +235,7 @@ function createTriageChannel(thread: PrivateThreadChannel): TextChannel {
     id: TRIAGE_CHANNEL_ID,
     threads: {
       create: vi.fn(async () => thread),
+      fetch: vi.fn(async () => thread),
     },
   } as unknown as TextChannel;
 }
