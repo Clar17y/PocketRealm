@@ -45,6 +45,7 @@ import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { premiumRouter } from './routes/premium';
 import { supportRouter } from './routes/support';
+import { discordRouter } from './routes/discord';
 
 interface CorsOriginCheckerOptions {
   isProduction?: boolean;
@@ -165,6 +166,7 @@ export function createApp({ isAllowedCorsOrigin }: CreateAppOptions): express.Ex
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/premium', premiumRouter);
   app.use('/api/v1/support', supportRouter);
+  app.use('/api/v1/discord', discordRouter);
 
   Sentry.setupExpressErrorHandler(app);
   app.use(errorHandler);
