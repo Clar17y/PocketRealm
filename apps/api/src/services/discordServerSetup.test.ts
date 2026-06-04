@@ -179,6 +179,7 @@ describe('discordServerSetup', () => {
       'ManageRoles',
       'CreatePublicThreads',
       'CreatePrivateThreads',
+      'ManageThreads',
       'SendMessagesInThreads',
       'ManageGuild',
     ]);

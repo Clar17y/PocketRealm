@@ -23,7 +23,7 @@ PocketRealm is deployed as a split stack: the Next.js web app on Vercel and the 
 - Build: `npm install && npm run build:discord-bot`
 - Start: `npm run start:discord-bot`
 - Discord Developer Portal privileged intents: enable Server Members Intent and Message Content Intent.
-- Install with the `bot` and `applications.commands` scopes. Bot permissions: View Channels, Send Messages, Read Message History, Manage Channels, Manage Roles, Create Public Threads, Create Private Threads, Send Messages in Threads, and Manage Server for AutoMod setup.
+- Install with the `bot` and `applications.commands` scopes. Bot permissions: View Channels, Send Messages, Read Message History, Manage Channels, Manage Roles, Create Public Threads, Create Private Threads, Manage Threads, Send Messages in Threads, and Manage Server for AutoMod setup.
 - Do not grant Kick Members or Ban Members.
 
 ### Database (Neon Postgres)

@@ -191,6 +191,7 @@ export function buildRequiredBotPermissionBits(): string[] {
     'ManageRoles',
     'CreatePublicThreads',
     'CreatePrivateThreads',
+    'ManageThreads',
     'SendMessagesInThreads',
     'ManageGuild',
   ];
