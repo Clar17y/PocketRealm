@@ -135,10 +135,11 @@ describe('message XP', () => {
       }),
     });
     const message = createMessage();
+    const redis = createRedis();
 
     const result = await grantXpForMessage(message, {
       prisma,
-      redis: createRedis(),
+      redis,
       config: createConfig(),
       now: () => now,
       random: () => 0.375,
@@ -175,6 +176,7 @@ describe('message XP', () => {
     expect(prisma.discordXpEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.not.objectContaining({ content: expect.any(String) }),
     }));
+    expect(redis.del).not.toHaveBeenCalled();
   });
 
   it('caps partial grants at the daily soft cap', async () => {
