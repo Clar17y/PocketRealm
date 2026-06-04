@@ -334,83 +334,95 @@ export async function grantXpForMessage(
   }
 
   const now = deps.now?.() ?? new Date();
-  const transactionResult = await deps.prisma.$transaction(async (tx) => {
-    const existingEvent = await tx.discordXpEvent.findUnique({
-      where: {
-        discordGuildId_messageId: {
-          discordGuildId: guildId,
-          messageId: message.id,
-        },
-      },
-    });
-    if (existingEvent) {
-      return { eligible: false, reason: 'already_processed' } satisfies GrantTransactionResult;
-    }
+  const cooldownReleaseKey = cooldownKey(guildId, userId);
+  let transactionResult: GrantTransactionResult;
 
-    const profile = await findProfile(tx, guildId, userId);
-    if (profile?.excludedFromXp) {
-      return { eligible: false, reason: 'excluded_from_xp' } satisfies GrantTransactionResult;
-    }
-
-    const today = startOfUtcDay(now);
-    const previousXp = profile?.xp ?? 0;
-    const previousLevel = profile?.level ?? levelForDiscordXp(previousXp);
-    const currentDailyXp = profile && isSameUtcDay(profile.dailyXpDate, today) ? profile.dailyXp : 0;
-    const remainingDailyXp = Math.max(0, DAILY_SOFT_CAP - currentDailyXp);
-    if (remainingDailyXp <= 0) {
-      return { eligible: false, reason: 'daily_cap' } satisfies GrantTransactionResult;
-    }
-
-    const rolledXp = randomXp(deps.random?.() ?? Math.random());
-    const xpGranted = Math.min(rolledXp, remainingDailyXp);
-    const newXp = previousXp + xpGranted;
-    const newLevel = levelForDiscordXp(newXp);
-
-    const updatedProfile = profile
-      ? await tx.discordCommunityProfile.update({
-          where: { id: profile.id },
-          data: {
-            xp: { increment: xpGranted },
-            level: newLevel,
-            dailyXp: currentDailyXp + xpGranted,
-            dailyXpDate: today,
-            lastXpGrantedAt: now,
-          },
-        })
-      : await tx.discordCommunityProfile.create({
-          data: {
+  try {
+    transactionResult = await deps.prisma.$transaction(async (tx) => {
+      const existingEvent = await tx.discordXpEvent.findUnique({
+        where: {
+          discordGuildId_messageId: {
             discordGuildId: guildId,
-            discordUserId: userId,
-            xp: xpGranted,
-            level: newLevel,
-            dailyXp: xpGranted,
-            dailyXpDate: today,
-            lastXpGrantedAt: now,
+            messageId: message.id,
           },
-        });
+        },
+      });
+      if (existingEvent) {
+        return { eligible: false, reason: 'already_processed' } satisfies GrantTransactionResult;
+      }
 
-    await tx.discordXpEvent.create({
-      data: {
-        discordGuildId: guildId,
-        discordUserId: userId,
-        channelId: message.channelId,
-        messageId: message.id,
-        messageFingerprint: fingerprint,
-        xp: xpGranted,
-        reason: MESSAGE_XP_REASON,
-        createdAt: now,
-      },
+      const profile = await findProfile(tx, guildId, userId);
+      if (profile?.excludedFromXp) {
+        return { eligible: false, reason: 'excluded_from_xp' } satisfies GrantTransactionResult;
+      }
+
+      const today = startOfUtcDay(now);
+      const previousXp = profile?.xp ?? 0;
+      const previousLevel = profile?.level ?? levelForDiscordXp(previousXp);
+      const currentDailyXp = profile && isSameUtcDay(profile.dailyXpDate, today) ? profile.dailyXp : 0;
+      const remainingDailyXp = Math.max(0, DAILY_SOFT_CAP - currentDailyXp);
+      if (remainingDailyXp <= 0) {
+        return { eligible: false, reason: 'daily_cap' } satisfies GrantTransactionResult;
+      }
+
+      const rolledXp = randomXp(deps.random?.() ?? Math.random());
+      const xpGranted = Math.min(rolledXp, remainingDailyXp);
+      const newXp = previousXp + xpGranted;
+      const newLevel = levelForDiscordXp(newXp);
+
+      const updatedProfile = profile
+        ? await tx.discordCommunityProfile.update({
+            where: { id: profile.id },
+            data: {
+              xp: { increment: xpGranted },
+              level: newLevel,
+              dailyXp: currentDailyXp + xpGranted,
+              dailyXpDate: today,
+              lastXpGrantedAt: now,
+            },
+          })
+        : await tx.discordCommunityProfile.create({
+            data: {
+              discordGuildId: guildId,
+              discordUserId: userId,
+              xp: xpGranted,
+              level: newLevel,
+              dailyXp: xpGranted,
+              dailyXpDate: today,
+              lastXpGrantedAt: now,
+            },
+          });
+
+      await tx.discordXpEvent.create({
+        data: {
+          discordGuildId: guildId,
+          discordUserId: userId,
+          channelId: message.channelId,
+          messageId: message.id,
+          messageFingerprint: fingerprint,
+          xp: xpGranted,
+          reason: MESSAGE_XP_REASON,
+          createdAt: now,
+        },
+      });
+
+      return {
+        eligible: true,
+        reason: 'granted',
+        xpGranted,
+        previousLevel,
+        newLevel,
+        profileId: updatedProfile.id,
+      } satisfies GrantTransactionResult;
     });
+  } catch (error) {
+    await releaseCooldown(deps.redis, cooldownReleaseKey);
+    throw error;
+  }
 
-    return {
-      eligible: true,
-      reason: 'granted',
-      xpGranted,
-      previousLevel,
-      newLevel,
-      profileId: updatedProfile.id,
-    } satisfies GrantTransactionResult;
-  });
+  if (!transactionResult.eligible) {
+    await releaseCooldown(deps.redis, cooldownReleaseKey);
+  }
 
   if (
     transactionResult.eligible &&
@@ -429,6 +441,17 @@ export async function grantXpForMessage(
     previousLevel: transactionResult.previousLevel,
     newLevel: transactionResult.newLevel,
   };
+}
+
+async function releaseCooldown(
+  redis: MessageXpRedisClient | undefined,
+  key: string,
+): Promise<void> {
+  try {
+    await redis?.del?.(key);
+  } catch {
+    // Cooldown release is best effort; the caller should keep the original result/error.
+  }
 }
 
 function grantReasonForIneligibleMessage(reason: XpEligibilityReason): GrantXpReason {

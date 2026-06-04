@@ -222,10 +222,11 @@ describe('message XP', () => {
         dailyXpDate: now,
       }),
     });
+    const redis = createRedis();
 
     const result = await grantXpForMessage(createMessage(), {
       prisma,
-      redis: createRedis(),
+      redis,
       config: createConfig(),
       now: () => now,
       random: () => 0.375,
@@ -237,6 +238,46 @@ describe('message XP', () => {
     });
     expect(prisma.discordCommunityProfile.update).not.toHaveBeenCalled();
     expect(prisma.discordXpEvent.create).not.toHaveBeenCalled();
+    expect(redis.del).toHaveBeenCalledWith(`discord:xp:cooldown:${guildId}:${userId}`);
+  });
+
+  it('releases the cooldown when the message was already processed', async () => {
+    const prisma = createPrisma({
+      existingEvent: { id: 'event-existing' },
+    });
+    const redis = createRedis();
+
+    const result = await grantXpForMessage(createMessage(), {
+      prisma,
+      redis,
+      config: createConfig(),
+      now: () => now,
+      random: () => 0.375,
+    });
+
+    expect(result).toMatchObject({
+      eligible: false,
+      reason: 'already_processed',
+    });
+    expect(prisma.discordCommunityProfile.update).not.toHaveBeenCalled();
+    expect(prisma.discordXpEvent.create).not.toHaveBeenCalled();
+    expect(redis.del).toHaveBeenCalledWith(`discord:xp:cooldown:${guildId}:${userId}`);
+  });
+
+  it('releases the cooldown when the XP transaction fails', async () => {
+    const transactionError = new Error('database unavailable');
+    const prisma = createPrisma({ transactionError });
+    const redis = createRedis();
+
+    await expect(grantXpForMessage(createMessage(), {
+      prisma,
+      redis,
+      config: createConfig(),
+      now: () => now,
+      random: () => 0.375,
+    })).rejects.toThrow('database unavailable');
+
+    expect(redis.del).toHaveBeenCalledWith(`discord:xp:cooldown:${guildId}:${userId}`);
   });
 
   it('adds the highest configured level role when a member is available and level increases', async () => {
@@ -365,6 +406,8 @@ function createProfile(overrides: Partial<MockProfile> = {}): MockProfile {
 function createPrisma(options: {
   profile?: MockProfile | null;
   duplicateEvent?: { id: string } | null;
+  existingEvent?: { id: string } | null;
+  transactionError?: Error;
 } = {}): MessageXpPrismaClient {
   const profile = options.profile === undefined ? createProfile() : options.profile;
   const baseProfile = profile ?? createProfile({ id: 'profile-new' });
@@ -386,15 +429,20 @@ function createPrisma(options: {
   const tx: MessageXpTransactionClient = {
     discordCommunityProfile,
     discordXpEvent: {
-      findUnique: vi.fn(async () => null),
+      findUnique: vi.fn(async () => options.existingEvent ?? null),
       findFirst: vi.fn(async () => options.duplicateEvent ?? null),
       create: vi.fn(async () => ({ id: 'event-new' })),
     },
   };
   const prisma: MessageXpPrismaClient = {
     ...tx,
-    $transaction: async <T>(callback: (transaction: MessageXpTransactionClient) => Promise<T>): Promise<T> =>
-      callback(tx),
+    $transaction: async <T>(callback: (transaction: MessageXpTransactionClient) => Promise<T>): Promise<T> => {
+      if (options.transactionError) {
+        throw options.transactionError;
+      }
+
+      return callback(tx);
+    },
   };
 
   return prisma;
