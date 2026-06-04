@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleWikiCommand } from './wikiCommand.js';
 
+const wikiConfig = { webBaseUrl: 'https://pocketrealm.app' };
+
 describe('handleWikiCommand', () => {
   it('returns up to 5 absolute wiki links for a search query', async () => {
     const results = Array.from({ length: 6 }, (_, index) => ({
@@ -23,7 +25,7 @@ describe('handleWikiCommand', () => {
       editReply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>);
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
@@ -49,7 +51,7 @@ describe('handleWikiCommand', () => {
       editReply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>);
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
     expect(editReply).toHaveBeenCalledWith({
       content: 'No wiki results found for "missing topic".',
@@ -76,7 +78,7 @@ describe('handleWikiCommand', () => {
       editReply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>);
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
     expect(editReply).toHaveBeenCalledOnce();
     const reply = editReply.mock.calls[0]?.[0];
@@ -86,5 +88,37 @@ describe('handleWikiCommand', () => {
     expect(content).not.toContain('evil.example');
     expect(content).not.toContain('javascript:');
     expect(content).not.toContain('https://[bad-url');
+  });
+
+  it('uses the configured web origin for wiki result URLs', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      results: [
+        { title: 'Configured Guide', url: 'https://pocketrealm.example/wiki/forge' },
+        { title: 'Relative Guide', url: '/wiki/forge-tools' },
+        { title: 'Off Site Guide', url: 'https://pocketrealm.app/wiki/forge' },
+      ],
+    }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => 'forge'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(
+      interaction,
+      { get } as Pick<PocketRealmApiClient, 'get'>,
+      { webBaseUrl: 'https://pocketrealm.example' },
+    );
+
+    expect(editReply).toHaveBeenCalledOnce();
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).toContain('https://pocketrealm.example/wiki/forge');
+    expect(content).toContain('https://pocketrealm.example/wiki/forge-tools');
+    expect(content).not.toContain('https://pocketrealm.app/wiki/forge');
   });
 });

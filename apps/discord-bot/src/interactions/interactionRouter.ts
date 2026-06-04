@@ -13,7 +13,7 @@ import { handleWikiCommand } from './wikiCommand.js';
 
 export interface InteractionRouterOptions {
   api: Pick<PocketRealmApiClient, 'get' | 'post'>;
-  config: Pick<BotConfig, 'guildId'>;
+  config: Pick<BotConfig, 'guildId' | 'webBaseUrl'>;
 }
 
 const UNIMPLEMENTED_REGISTERED_CHAT_COMMANDS = new Set([
@@ -34,7 +34,7 @@ export async function routeInteraction(
   }
 
   if (interaction.commandName === 'wiki') {
-    await handleWikiCommand(interaction, options.api);
+    await handleWikiCommand(interaction, options.api, options.config);
     return;
   }
 

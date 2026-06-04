@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { routeInteraction } from './interactionRouter.js';
 
+const routerConfig = {
+  guildId: 'guild-123',
+  webBaseUrl: 'https://pocketrealm.app',
+};
+
 describe('routeInteraction', () => {
   it('routes wiki commands to the wiki handler', async () => {
     const api = createApi({ results: [] });
@@ -21,7 +26,7 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, {
       api,
-      config: { guildId: 'guild-123' },
+      config: routerConfig,
     });
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
@@ -46,7 +51,7 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, {
       api,
-      config: { guildId: 'guild-123' },
+      config: routerConfig,
     });
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/turns?guildId=guild-123');
@@ -61,7 +66,7 @@ describe('routeInteraction', () => {
     } as unknown as Interaction;
     const api = createApi(null);
 
-    await routeInteraction(interaction, { api, config: { guildId: 'guild-123' } });
+    await routeInteraction(interaction, { api, config: routerConfig });
 
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
@@ -78,7 +83,7 @@ describe('routeInteraction', () => {
     } as unknown as Interaction;
     const api = createApi(null);
 
-    await routeInteraction(interaction, { api, config: { guildId: 'guild-123' } });
+    await routeInteraction(interaction, { api, config: routerConfig });
 
     expect(reply).not.toHaveBeenCalled();
   });

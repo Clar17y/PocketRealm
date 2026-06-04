@@ -1,8 +1,8 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import type { BotConfig } from '../config.js';
 
-const WIKI_BASE_URL = 'https://pocketrealm.app';
 const MAX_WIKI_RESULTS = 5;
 
 interface WikiSearchResponse {
@@ -17,10 +17,12 @@ interface WikiResult {
 }
 
 type WikiApiClient = Pick<PocketRealmApiClient, 'get'>;
+type WikiConfig = Pick<BotConfig, 'webBaseUrl'>;
 
 export async function handleWikiCommand(
   interaction: ChatInputCommandInteraction,
   api: WikiApiClient,
+  config: WikiConfig,
 ): Promise<void> {
   const query = interaction.options.getString('query', true).trim();
 
@@ -38,8 +40,9 @@ export async function handleWikiCommand(
     return;
   }
 
+  const wikiBaseUrl = new URL(config.webBaseUrl);
   const results = response.results
-    .map(formatWikiResult)
+    .map((result) => formatWikiResult(result, wikiBaseUrl))
     .filter((result): result is string => Boolean(result))
     .slice(0, MAX_WIKI_RESULTS);
 
@@ -58,8 +61,8 @@ export async function handleWikiCommand(
   });
 }
 
-function formatWikiResult(result: WikiResult): string | null {
-  const url = toAbsoluteWikiUrl(result.url);
+function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
+  const url = toAbsoluteWikiUrl(result.url, wikiBaseUrl);
   if (!url) {
     return null;
   }
@@ -70,15 +73,15 @@ function formatWikiResult(result: WikiResult): string | null {
   return `- ${title}: ${url}${snippet}`;
 }
 
-function toAbsoluteWikiUrl(url: string): string | null {
+function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {
   let parsedUrl: URL;
   try {
-    parsedUrl = new URL(url, WIKI_BASE_URL);
+    parsedUrl = new URL(url, wikiBaseUrl);
   } catch {
     return null;
   }
 
-  if (parsedUrl.protocol !== 'https:' || parsedUrl.origin !== WIKI_BASE_URL) {
+  if (parsedUrl.origin !== wikiBaseUrl.origin) {
     return null;
   }
 
