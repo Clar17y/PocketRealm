@@ -485,6 +485,16 @@ const BESTIARY_ACHIEVEMENTS: AchievementDef[] = [
 // --- General achievements ---
 const GENERAL_ACHIEVEMENTS: AchievementDef[] = [
   {
+    id: 'discord_linked',
+    category: 'general',
+    title: 'Linked Adventurer',
+    description: 'Link a Discord account to your PocketRealm account.',
+    flavorText: 'Your Discord name and PocketRealm account now point at the same adventurer. This title proves the bridge works.',
+    titleReward: 'Linked Adventurer',
+    threshold: 0,
+    tier: 1,
+  },
+  {
     id: 'turns_10000',
     category: 'general',
     title: 'Time Invested',
