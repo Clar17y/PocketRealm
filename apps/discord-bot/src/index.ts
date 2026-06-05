@@ -1,15 +1,16 @@
 import 'dotenv/config';
 
 import { prisma } from '@pocketrealm/database';
-import { Client, Events, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits, type GuildMember } from 'discord.js';
 import { Redis } from 'ioredis';
 import pino from 'pino';
 
 import { PocketRealmApiClient } from './api/pocketRealmApi.js';
 import { loadBotConfig } from './config.js';
 import { syncLinkedRoles } from './discord/roleSync.js';
+import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './discord/welcome.js';
 import { routeInteraction } from './interactions/interactionRouter.js';
-import { buildTriageCard, type UnpostedTicketsResponse } from './support/triageCards.js';
+import { pollSupportTriageTickets } from './support/triagePoll.js';
 import { createMessageXpService } from './xp/messageXp.js';
 
 const logger = pino({
@@ -45,6 +46,31 @@ async function main(): Promise<void> {
   redis.on('error', (error: unknown) => {
     logger.warn({ error }, 'Discord XP Redis connection error');
   });
+
+  const sendWelcomeForMember = async (member: GuildMember): Promise<void> => {
+    try {
+      const result = await welcomeGuildMember(member, { client, config });
+      if (!result.sent) {
+        logger.debug(
+          {
+            guildId: member.guild.id,
+            discordUserId: member.id,
+            reason: result.reason,
+          },
+          'Discord welcome skipped',
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          error,
+          guildId: member.guild.id,
+          discordUserId: member.id,
+        },
+        'Failed to send Discord welcome message',
+      );
+    }
+  };
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
@@ -94,6 +120,18 @@ async function main(): Promise<void> {
     }
   });
 
+  client.on(Events.GuildMemberAdd, async (member) => {
+    await sendWelcomeForMember(member);
+  });
+
+  client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    if (!shouldWelcomeAfterMemberUpdate(oldMember, newMember)) {
+      return;
+    }
+
+    await sendWelcomeForMember(newMember);
+  });
+
   client.once(Events.ClientReady, async (readyClient) => {
     logger.info({ user: readyClient.user.tag }, 'Discord bot ready');
 
@@ -139,31 +177,13 @@ async function main(): Promise<void> {
 
       isSupportTriageRunning = true;
       try {
-        const channel = await readyClient.channels.fetch(config.supportTriageChannelId);
-        if (!channel?.isSendable()) {
-          logger.warn(
-            { channelId: config.supportTriageChannelId },
-            'Discord support triage channel is not sendable',
-          );
-          return;
-        }
-
-        const { tickets } = await api.get<UnpostedTicketsResponse>(
-          '/api/v1/discord/support/tickets/unposted',
-        );
-
-        for (const ticket of tickets) {
-          try {
-            const message = await channel.send(buildTriageCard(ticket));
-            await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/triage-message`, {
-              guildId: config.guildId,
-              triageChannelId: config.supportTriageChannelId,
-              triageMessageId: message.id,
-            });
-          } catch (error) {
-            logger.warn({ error, publicId: ticket.publicId }, 'Failed to post Discord support triage card');
-          }
-        }
+        await pollSupportTriageTickets({
+          api,
+          config,
+          logger,
+          readyClient,
+          redis,
+        });
       } catch (error) {
         logger.warn({ error }, 'Discord support triage poll failed');
       } finally {

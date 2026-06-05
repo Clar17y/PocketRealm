@@ -29,6 +29,7 @@ export interface InteractionRouterOptions {
     | 'playerRoleId'
     | 'verifiedRoleId'
     | 'supportStaffRoleIds'
+    | 'supportTriageChannelId'
     | 'levelRoleMap'
     | 'duelsChannelId'
   >;

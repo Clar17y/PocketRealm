@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 const snowflakeSchema = z.string().trim().regex(/^\d{17,20}$/, 'Expected a Discord snowflake id');
+const optionalSnowflakeSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  snowflakeSchema.optional(),
+);
 const requiredStringSchema = z.string().trim().min(1);
 const requiredUrlSchema = z.string().trim().url();
 
@@ -12,6 +16,7 @@ const envSchema = z.object({
   POCKETREALM_WEB_BASE_URL: requiredUrlSchema,
   DISCORD_INTERNAL_API_KEY: z.string().trim().min(32),
   DISCORD_BOT_HEALTH_CHANNEL_ID: snowflakeSchema,
+  DISCORD_WELCOME_CHANNEL_ID: optionalSnowflakeSchema,
   DISCORD_SUPPORT_TRIAGE_CHANNEL_ID: snowflakeSchema,
   DISCORD_SUPPORT_CATEGORY_ID: snowflakeSchema,
   DISCORD_DUELS_CHANNEL_ID: snowflakeSchema,
@@ -31,6 +36,7 @@ export interface BotConfig {
   webBaseUrl: string;
   internalApiKey: string;
   botHealthChannelId: string;
+  welcomeChannelId: string | null;
   supportTriageChannelId: string;
   supportCategoryId: string;
   duelsChannelId: string;
@@ -88,6 +94,7 @@ export function parseBotConfig(env: Record<string, string | undefined>): BotConf
     webBaseUrl: parsed.POCKETREALM_WEB_BASE_URL,
     internalApiKey: parsed.DISCORD_INTERNAL_API_KEY,
     botHealthChannelId: parsed.DISCORD_BOT_HEALTH_CHANNEL_ID,
+    welcomeChannelId: parsed.DISCORD_WELCOME_CHANNEL_ID ?? null,
     supportTriageChannelId: parsed.DISCORD_SUPPORT_TRIAGE_CHANNEL_ID,
     supportCategoryId: parsed.DISCORD_SUPPORT_CATEGORY_ID,
     duelsChannelId: parsed.DISCORD_DUELS_CHANNEL_ID,

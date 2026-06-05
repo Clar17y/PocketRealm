@@ -83,6 +83,28 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
       )
       .addSubcommand((subcommand) =>
         subcommand
+          .setName('cleanup-triage')
+          .setDescription('Preview or remove duplicate support triage cards.')
+          .addStringOption((option) =>
+            option
+              .setName('public_id')
+              .setDescription('Optional public support ticket id to clean up.'),
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName('scan_limit')
+              .setDescription('Recent triage messages to scan.')
+              .setMinValue(1)
+              .setMaxValue(100),
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName('confirm')
+              .setDescription('Actually delete duplicate cards. Defaults to preview only.'),
+          ),
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
           .setName('xp-adjust')
           .setDescription('Adjust a player Discord XP balance.')
           .addUserOption((option) =>

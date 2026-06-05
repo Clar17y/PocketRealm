@@ -33,6 +33,7 @@ const routerConfig = {
   playerRoleId: 'player-role-1',
   verifiedRoleId: 'verified-role-1',
   duelsChannelId: 'duels-channel-1',
+  supportTriageChannelId: 'support-triage-channel-1',
   supportStaffRoleIds: ['staff-role-1'],
   levelRoleMap: new Map<number, string>(),
 };

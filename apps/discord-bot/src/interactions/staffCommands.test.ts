@@ -14,14 +14,20 @@ const verifiedRoleId = '567890123456789012';
 const actorUserId = '678901234567890123';
 const targetUserId = '789012345678901234';
 const levelTwoRoleId = '890123456789012345';
+const supportTriageChannelId = '901234567890123456';
+const botUserId = '112233445566778899';
 
 const config = {
   guildId,
   playerRoleId,
   verifiedRoleId,
+  supportTriageChannelId,
   supportStaffRoleIds: [staffRoleId],
   levelRoleMap: new Map<number, string>(),
-} satisfies Pick<BotConfig, 'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'>;
+} satisfies Pick<
+  BotConfig,
+  'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportTriageChannelId' | 'supportStaffRoleIds' | 'levelRoleMap'
+>;
 
 describe('handleStaffCommand', () => {
   it('rejects non-staff users ephemerally', async () => {
@@ -230,6 +236,83 @@ describe('handleStaffCommand', () => {
       content: 'Could not sync roles right now. Try again or check bot logs.',
     });
   });
+
+  it('previews support triage cleanup by default', async () => {
+    const channel = createCleanupChannel();
+    const cleanupSupportTriageMessages = vi.fn(async () => ({
+      scanned: 20,
+      matchedTickets: 1,
+      duplicateTicketCount: 1,
+      duplicateCandidates: 2,
+      deleted: 0,
+      skipped: 0,
+      failed: 0,
+      confirmed: false,
+      scanLimit: 50,
+      targetPublicId: 'SUP-ABC12345',
+    }));
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'cleanup-triage',
+      publicId: 'SUP-ABC12345',
+      scanLimit: 50,
+      confirm: false,
+      cleanupChannel: channel,
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+      cleanupSupportTriageMessages,
+    });
+
+    expect(interaction.client.channels.fetch).toHaveBeenCalledWith(supportTriageChannelId);
+    expect(cleanupSupportTriageMessages).toHaveBeenCalledWith({
+      channel,
+      botUserId,
+      publicId: 'SUP-ABC12345',
+      scanLimit: 50,
+      confirm: false,
+    });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Triage cleanup preview for `SUP-ABC12345`: 2 duplicate cards would be deleted across 1 ticket. Re-run with `confirm:true` to delete.',
+    });
+  });
+
+  it('runs confirmed support triage cleanup', async () => {
+    const cleanupSupportTriageMessages = vi.fn(async () => ({
+      scanned: 100,
+      matchedTickets: 2,
+      duplicateTicketCount: 2,
+      duplicateCandidates: 3,
+      deleted: 2,
+      skipped: 1,
+      failed: 0,
+      confirmed: true,
+      scanLimit: 100,
+      targetPublicId: null,
+    }));
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'cleanup-triage',
+      confirm: true,
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+      cleanupSupportTriageMessages,
+    });
+
+    expect(cleanupSupportTriageMessages).toHaveBeenCalledWith(expect.objectContaining({
+      publicId: null,
+      scanLimit: 100,
+      confirm: true,
+    }));
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Triage cleanup complete: deleted 2 duplicate cards across 2 tickets. 1 skipped, 0 failed.',
+    });
+  });
 });
 
 function createApi(): Pick<PocketRealmApiClient, 'get' | 'post'> {
@@ -359,6 +442,15 @@ function createGuild(member: GuildMember) {
   };
 }
 
+function createCleanupChannel() {
+  return {
+    id: supportTriageChannelId,
+    messages: {
+      fetch: vi.fn(),
+    },
+  };
+}
+
 function createStaffInteraction(input: {
   member: unknown;
   subcommand: string;
@@ -366,15 +458,28 @@ function createStaffInteraction(input: {
   amount?: number;
   reason?: string;
   guild?: ReturnType<typeof createGuild>;
+  publicId?: string;
+  scanLimit?: number;
+  confirm?: boolean;
+  cleanupChannel?: unknown;
 }): ChatInputCommandInteraction {
   const guild = input.guild ?? {
     id: guildId,
   };
+  const cleanupChannel = input.cleanupChannel ?? createCleanupChannel();
 
   return {
     commandName: 'staff',
     guildId,
     guild,
+    client: {
+      user: {
+        id: botUserId,
+      },
+      channels: {
+        fetch: vi.fn(async () => cleanupChannel),
+      },
+    },
     user: {
       id: actorUserId,
     },
@@ -384,8 +489,9 @@ function createStaffInteraction(input: {
       getUser: vi.fn(() => ({
         id: input.targetUserId ?? targetUserId,
       })),
-      getInteger: vi.fn(() => input.amount ?? 0),
-      getString: vi.fn(() => input.reason ?? 'staff adjustment'),
+      getInteger: vi.fn((name: string) => (name === 'scan_limit' ? input.scanLimit ?? null : input.amount ?? 0)),
+      getString: vi.fn((name: string) => (name === 'public_id' ? input.publicId ?? null : input.reason ?? 'staff adjustment')),
+      getBoolean: vi.fn(() => input.confirm ?? false),
     },
     reply: vi.fn(),
     deferReply: vi.fn(),

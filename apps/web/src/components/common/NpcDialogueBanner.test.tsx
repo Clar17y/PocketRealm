@@ -83,7 +83,7 @@ describe('NpcDialogueBanner', () => {
       data: { reaction: { activityId: 'activity-1', eventType: 'rare_loot', line: 'Temporary activity line' } },
     });
 
-    const hook = renderHook(() => useNpcActivityReaction('millbrook-blacksmith', true));
+    const hook = renderHook(() => useNpcActivityReaction('millbrook-general-store', true));
 
     await act(async () => {
       await Promise.resolve();
@@ -97,5 +97,55 @@ describe('NpcDialogueBanner', () => {
     });
 
     expect(hook.result.current).toBeNull();
+  });
+
+  it('shares an in-flight NPC activity reaction request for the same NPC', async () => {
+    const getNpcActivityReactionMock = vi.mocked(getNpcActivityReaction);
+    const { useNpcActivityReaction } =
+      await vi.importActual<typeof import('../../hooks/useNpcActivityReaction')>(
+        '../../hooks/useNpcActivityReaction',
+      );
+
+    getNpcActivityReactionMock.mockResolvedValue({
+      data: { reaction: { activityId: 'activity-2', eventType: 'rare_loot', line: 'Shared activity line' } },
+    });
+
+    const first = renderHook(() => useNpcActivityReaction('millbrook-casino', true));
+    const second = renderHook(() => useNpcActivityReaction('millbrook-casino', true));
+
+    await waitFor(() => {
+      expect(first.result.current).toBe('Shared activity line');
+      expect(second.result.current).toBe('Shared activity line');
+    });
+
+    expect(getNpcActivityReactionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses a recent cached NPC activity reaction on quick remount', async () => {
+    const getNpcActivityReactionMock = vi.mocked(getNpcActivityReaction);
+    const { useNpcActivityReaction } =
+      await vi.importActual<typeof import('../../hooks/useNpcActivityReaction')>(
+        '../../hooks/useNpcActivityReaction',
+      );
+
+    getNpcActivityReactionMock.mockResolvedValue({
+      data: { reaction: { activityId: 'activity-3', eventType: 'rare_loot', line: 'Cached activity line' } },
+    });
+
+    const first = renderHook(() => useNpcActivityReaction('millbrook-guild-recruiter', true));
+
+    await waitFor(() => {
+      expect(first.result.current).toBe('Cached activity line');
+    });
+
+    first.unmount();
+
+    const second = renderHook(() => useNpcActivityReaction('millbrook-guild-recruiter', true));
+
+    await waitFor(() => {
+      expect(second.result.current).toBe('Cached activity line');
+    });
+
+    expect(getNpcActivityReactionMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -5,6 +5,12 @@ import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { syncLinkedRoles as defaultSyncLinkedRoles } from '../discord/roleSync.js';
 import type { RoleSyncSummary, SyncLinkedRolesOptions } from '../discord/roleSync.js';
+import {
+  cleanupSupportTriageMessages as defaultCleanupSupportTriageMessages,
+  isTriageCleanupChannel,
+  type CleanupSupportTriageMessagesFn,
+  type TriageCleanupSummary,
+} from '../support/triageCleanup.js';
 import { isStaffMember } from '../support/threadActions.js';
 import { highestRoleIdForLevel, levelForDiscordXp } from '../xp/messageXp.js';
 
@@ -12,7 +18,7 @@ const MAX_XP_DECREMENT_ATTEMPTS = 5;
 
 type StaffConfig = Pick<
   BotConfig,
-  'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportStaffRoleIds' | 'levelRoleMap'
+  'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportTriageChannelId' | 'supportStaffRoleIds' | 'levelRoleMap'
 >;
 
 interface DiscordCommunityProfileRecord {
@@ -105,6 +111,7 @@ export interface StaffCommandOptions {
   config: StaffConfig;
   prisma?: StaffPrismaClient;
   syncLinkedRoles?: SyncLinkedRolesFn;
+  cleanupSupportTriageMessages?: CleanupSupportTriageMessagesFn;
   now?: () => Date;
 }
 
@@ -150,9 +157,63 @@ export async function handleStaffCommand(
     return;
   }
 
+  if (subcommand === 'cleanup-triage') {
+    await handleCleanupTriage(interaction, options);
+    return;
+  }
+
   await interaction.editReply({
     content: `The /staff ${subcommand} command is not available yet.`,
   });
+}
+
+async function handleCleanupTriage(
+  interaction: ChatInputCommandInteraction,
+  options: StaffCommandOptions,
+): Promise<void> {
+  const channel = await interaction.client.channels.fetch(options.config.supportTriageChannelId).catch(() => null);
+  if (!isTriageCleanupChannel(channel)) {
+    await interaction.editReply({ content: 'Could not clean up support triage because the channel is unavailable.' });
+    return;
+  }
+
+  const cleanupSupportTriageMessages = options.cleanupSupportTriageMessages ?? defaultCleanupSupportTriageMessages;
+  const publicId = interaction.options.getString('public_id')?.trim() || null;
+  const scanLimit = interaction.options.getInteger('scan_limit') ?? 100;
+  const confirm = interaction.options.getBoolean('confirm') ?? false;
+
+  try {
+    const summary = await cleanupSupportTriageMessages({
+      channel,
+      botUserId: interaction.client.user?.id ?? null,
+      publicId,
+      scanLimit,
+      confirm,
+    });
+    await interaction.editReply({ content: formatTriageCleanupSummary(summary) });
+  } catch {
+    await interaction.editReply({ content: 'Could not clean up support triage right now. Try again or check bot logs.' });
+  }
+}
+
+function formatTriageCleanupSummary(summary: TriageCleanupSummary): string {
+  const scope = summary.targetPublicId ? ` for \`${summary.targetPublicId}\`` : '';
+  const cardLabel = pluralize(summary.duplicateCandidates, 'card');
+  const ticketLabel = pluralize(summary.duplicateTicketCount, 'ticket');
+
+  if (summary.duplicateCandidates === 0) {
+    return `Triage cleanup found no duplicate support triage cards${scope} in the last ${summary.scanned} scanned messages.`;
+  }
+
+  if (!summary.confirmed) {
+    return `Triage cleanup preview${scope}: ${summary.duplicateCandidates} duplicate ${cardLabel} would be deleted across ${summary.duplicateTicketCount} ${ticketLabel}. Re-run with \`confirm:true\` to delete.`;
+  }
+
+  return `Triage cleanup complete${scope}: deleted ${summary.deleted} duplicate ${pluralize(summary.deleted, 'card')} across ${summary.duplicateTicketCount} ${ticketLabel}. ${summary.skipped} skipped, ${summary.failed} failed.`;
+}
+
+function pluralize(count: number, singular: string): string {
+  return count === 1 ? singular : `${singular}s`;
 }
 
 async function handleSyncRoles(

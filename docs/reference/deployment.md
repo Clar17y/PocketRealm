@@ -92,6 +92,7 @@ All variables are required in production unless marked optional. Set them in Ren
 | `POCKETREALM_WEB_BASE_URL` | yes | - | Public web base URL used for player-facing links. |
 | `DISCORD_INTERNAL_API_KEY` | yes | - | Shared internal auth key. Must match the API value. Use 32+ random bytes. |
 | `DISCORD_BOT_HEALTH_CHANNEL_ID` | yes | - | Channel where the worker posts startup and health messages. |
+| `DISCORD_WELCOME_CHANNEL_ID` | no | - | Public welcome channel where the worker posts lightweight member welcomes. |
 | `DISCORD_SUPPORT_TRIAGE_CHANNEL_ID` | yes | - | Private staff channel where support triage cards are posted. |
 | `DISCORD_SUPPORT_CATEGORY_ID` | yes | - | Discord category where support threads are created. |
 | `DISCORD_DUELS_CHANNEL_ID` | yes | - | Channel where `/duel` is allowed. Include this channel in XP ignore checks. |

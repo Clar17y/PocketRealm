@@ -65,6 +65,7 @@ describe('buildCommandDefinitions', () => {
       'sync-roles',
       'repair-ticket',
       'sync-ticket',
+      'cleanup-triage',
       'xp-adjust',
       'known-issue',
     ]);
@@ -96,6 +97,28 @@ describe('buildCommandDefinitions', () => {
             name: 'public_id',
             type: ApplicationCommandOptionType.String,
             required: true,
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        name: 'cleanup-triage',
+        options: [
+          expect.objectContaining({
+            name: 'public_id',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+          }),
+          expect.objectContaining({
+            name: 'scan_limit',
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            min_value: 1,
+            max_value: 100,
+          }),
+          expect.objectContaining({
+            name: 'confirm',
+            type: ApplicationCommandOptionType.Boolean,
+            required: false,
           }),
         ],
       }),

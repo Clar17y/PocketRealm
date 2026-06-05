@@ -32,8 +32,17 @@ describe('parseBotConfig', () => {
       webBaseUrl: 'https://pocketrealm.test',
       internalApiKey: 'a'.repeat(32),
       botHealthChannelId: '345678901234567890',
+      welcomeChannelId: null,
       duelsChannelId: '678901234567890123',
     });
+  });
+
+  it('parses an optional welcome channel id', () => {
+    expect(parseBotConfig({
+      ...validEnv,
+      DISCORD_WELCOME_CHANNEL_ID: '901234567890123456',
+    }).welcomeChannelId).toBe('901234567890123456');
+    expect(() => parseBotConfig({ ...validEnv, DISCORD_WELCOME_CHANNEL_ID: 'not-a-snowflake' })).toThrow();
   });
 
   it('parses configured level role mappings by numeric level', () => {

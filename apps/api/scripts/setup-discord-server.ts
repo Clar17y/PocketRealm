@@ -23,6 +23,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('Set these on the Discord bot worker:');
   console.log(`DISCORD_SUPPORT_CATEGORY_ID=${result.categoryIdsByName.Support ?? ''}`);
+  console.log(`DISCORD_WELCOME_CHANNEL_ID=${result.channelIdsByName.welcome ?? ''}`);
   console.log(`DISCORD_DUELS_CHANNEL_ID=${result.channelIdsByName.duels ?? ''}`);
   console.log(`DISCORD_SUPPORT_TRIAGE_CHANNEL_ID=${result.channelIdsByName['support-triage'] ?? ''}`);
   console.log(`DISCORD_BOT_HEALTH_CHANNEL_ID=${result.channelIdsByName['bot-health'] ?? ''}`);

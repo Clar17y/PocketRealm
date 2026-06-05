@@ -40,6 +40,17 @@ interface ArchivableDiscordThread {
   delete?(reason?: string): Promise<unknown>;
 }
 
+interface ThreadMemberAddable {
+  members: {
+    add(discordUserId: string): Promise<unknown>;
+  };
+}
+
+interface EditableTriageMessage {
+  embeds: unknown[];
+  edit(payload: { embeds: unknown[] }): Promise<unknown>;
+}
+
 export function isStaffMember(member: unknown, staffRoleIds: Set<string>): boolean {
   if (!isRecord(member) || !isRecord(member.roles)) {
     return false;
@@ -96,13 +107,7 @@ export async function handleSupportThreadAction(
 
     const status = STATUS_ACTIONS.get(parsed.action);
     if (status) {
-      await options.api.post(`/api/v1/discord/support/tickets/${parsed.publicId}/status`, {
-        status,
-        actorDiscordUserId: interaction.user.id,
-      });
-      await interaction.editReply({
-        content: `Updated \`${parsed.publicId}\` status to \`${status}\`.`,
-      });
+      await handleStatusUpdate(interaction, options.api, parsed.publicId, status);
       return;
     }
 
@@ -145,13 +150,10 @@ async function handleAskReporter(
     reason: `Support follow-up for ${ticket.publicId}`,
   });
 
+  const actorAddFailed = await addThreadMember(thread, interaction.user.id);
   let reporterAddFailed = false;
-  if (ticket.reporterDiscordUserId) {
-    try {
-      await thread.members.add(ticket.reporterDiscordUserId);
-    } catch {
-      reporterAddFailed = true;
-    }
+  if (ticket.reporterDiscordUserId && ticket.reporterDiscordUserId !== interaction.user.id) {
+    reporterAddFailed = await addThreadMember(thread, ticket.reporterDiscordUserId);
   }
 
   await thread.send({
@@ -187,10 +189,55 @@ async function handleAskReporter(
   }
 
   await interaction.editReply({
-    content: reporterAddFailed
-      ? `Created follow-up thread <#${thread.id}>, but the reporter could not be added.`
+    content: actorAddFailed || reporterAddFailed
+      ? `Created follow-up thread <#${thread.id}>, but ${threadAddFailureLabel(actorAddFailed, reporterAddFailed)} could not be added.`
       : `Created follow-up thread <#${thread.id}>.`,
   });
+}
+
+async function handleStatusUpdate(
+  interaction: ButtonInteraction,
+  api: Pick<PocketRealmApiClient, 'get' | 'post'>,
+  publicId: string,
+  status: string,
+): Promise<void> {
+  await api.post(`/api/v1/discord/support/tickets/${publicId}/status`, {
+    status,
+    actorDiscordUserId: interaction.user.id,
+  });
+
+  let context: SupportActionContextResponse | null = null;
+  try {
+    context = await fetchActionContext(api, publicId);
+  } catch {
+    // Status already changed canonically; Discord surface updates are best effort.
+  }
+
+  await Promise.all([
+    updateTriageMessageStatus(interaction, publicId, status),
+    context?.ticket.threadId
+      ? postStatusUpdateToThread(interaction, context.ticket.threadId, publicId, status)
+      : Promise.resolve(),
+  ]);
+
+  await interaction.editReply({
+    content: `Updated \`${publicId}\` status to \`${status}\`.`,
+  });
+}
+
+async function addThreadMember(thread: ThreadMemberAddable, discordUserId: string): Promise<boolean> {
+  try {
+    await thread.members.add(discordUserId);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function threadAddFailureLabel(actorAddFailed: boolean, reporterAddFailed: boolean): string {
+  if (actorAddFailed && reporterAddFailed) return 'the staff member and reporter';
+  if (actorAddFailed) return 'the staff member';
+  return 'the reporter';
 }
 
 async function handleArchiveThread(
@@ -227,6 +274,43 @@ async function handleArchiveThread(
   await interaction.editReply({
     content: `Archived support thread for \`${ticket.publicId}\`.`,
   });
+}
+
+async function updateTriageMessageStatus(
+  interaction: ButtonInteraction,
+  publicId: string,
+  status: string,
+): Promise<void> {
+  const message = editableTriageMessage(interaction.message);
+  if (!message || message.embeds.length === 0) return;
+
+  try {
+    await message.edit({
+      embeds: message.embeds.map((embed, index) => (
+        index === 0 ? updateStatusEmbed(embed, publicId, status, interaction.user.id) : embed
+      )),
+    });
+  } catch {
+    // Status is canonical in the API; Discord embed edits are best effort.
+  }
+}
+
+async function postStatusUpdateToThread(
+  interaction: ButtonInteraction,
+  threadId: Snowflake,
+  publicId: string,
+  status: string,
+): Promise<void> {
+  try {
+    const thread = await resolveArchiveTargetThread(interaction.channel, threadId);
+    if (!thread) return;
+
+    await thread.send({
+      content: `Ticket \`${publicId}\` marked \`${status}\` by <@${interaction.user.id}>.`,
+    });
+  } catch {
+    // Staff can still see the canonical status on the triage card/API.
+  }
 }
 
 async function fetchActionContext(
@@ -297,6 +381,69 @@ function isPrivateThreadChannel(channel: unknown): channel is PrivateThreadChann
   );
 }
 
+function editableTriageMessage(message: unknown): EditableTriageMessage | null {
+  if (!isRecord(message) || !Array.isArray(message.embeds) || typeof message.edit !== 'function') {
+    return null;
+  }
+
+  return message as unknown as EditableTriageMessage;
+}
+
+function updateStatusEmbed(embed: unknown, publicId: string, status: string, actorDiscordUserId: string): unknown {
+  const data = embedData(embed);
+  const fields = embedFields(data.fields);
+  const statusIndex = fields.findIndex((field) => field.name.toLowerCase() === 'status');
+
+  if (statusIndex >= 0) {
+    fields[statusIndex] = { ...fields[statusIndex], value: status };
+  } else {
+    fields.unshift({ name: 'Status', value: status, inline: true });
+  }
+
+  const updateField = {
+    name: 'Last Update',
+    value: `\`${publicId}\` marked \`${status}\` by <@${actorDiscordUserId}>.`,
+    inline: false,
+  };
+  const updateIndex = fields.findIndex((field) => field.name.toLowerCase() === 'last update');
+  if (updateIndex >= 0) {
+    fields[updateIndex] = updateField;
+  } else {
+    fields.push(updateField);
+  }
+
+  return {
+    ...data,
+    fields,
+  };
+}
+
+function embedData(embed: unknown): Record<string, unknown> {
+  if (isRecord(embed) && typeof embed.toJSON === 'function') {
+    return asRecord(embed.toJSON());
+  }
+
+  if (isRecord(embed) && isRecord(embed.data)) {
+    return embed.data;
+  }
+
+  return asRecord(embed);
+}
+
+function embedFields(value: unknown): Array<{ name: string; value: string; inline?: boolean }> {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((field): field is { name: string; value: string; inline?: boolean } => (
+      isRecord(field) && typeof field.name === 'string' && typeof field.value === 'string'
+    ))
+    .map((field) => ({
+      name: field.name,
+      value: field.value,
+      ...(typeof field.inline === 'boolean' && { inline: field.inline }),
+    }));
+}
+
 async function cleanupDuplicateThread(thread: ArchivableDiscordThread, publicId: string): Promise<boolean> {
   try {
     await thread.setArchived(true, `Duplicate support follow-up for ${publicId}`);
@@ -341,4 +488,8 @@ function isDiscordThreadConflict(error: unknown): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
 }

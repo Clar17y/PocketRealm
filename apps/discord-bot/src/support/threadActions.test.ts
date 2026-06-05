@@ -73,6 +73,7 @@ describe('handleSupportThreadAction', () => {
       reason: 'Support follow-up for SUP-ABC12345',
     });
     expect(thread.members.add).toHaveBeenCalledWith(REPORTER_ID);
+    expect(thread.members.add).toHaveBeenCalledWith(ACTOR_ID);
     expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('SUP-ABC12345'),
     }));
@@ -90,7 +91,9 @@ describe('handleSupportThreadAction', () => {
   it('records a follow-up thread when adding the reporter fails', async () => {
     const api = createApi(ticketContext);
     const thread = createThread();
-    vi.mocked(thread.members.add).mockRejectedValue(new Error('Missing Access') as never);
+    vi.mocked(thread.members.add)
+      .mockResolvedValueOnce(undefined as never)
+      .mockRejectedValueOnce(new Error('Missing Access') as never);
     const interaction = createButtonInteraction({
       customId: 'support:ask_reporter:SUP-ABC12345',
       channel: createTriageChannel(thread),
@@ -231,19 +234,34 @@ describe('handleSupportThreadAction', () => {
     });
   });
 
-  it('updates canonical ticket status for status buttons', async () => {
-    const api = createApi(ticketContext);
+  it('updates canonical ticket status and reflects it in Discord surfaces for status buttons', async () => {
+    const api = createApi({
+      ticket: {
+        ...ticketContext.ticket,
+        threadId: THREAD_ID,
+      },
+    });
+    const thread = createThread();
+    const message = createTriageMessage();
     const interaction = createButtonInteraction({
       customId: 'support:accepted:SUP-ABC12345',
-      channel: createTriageChannel(createThread()),
+      channel: createTriageChannel(thread),
       member: memberWithRoles([STAFF_ROLE_ID]),
+      message,
     });
 
     await handleSupportThreadAction(interaction, { api, config });
 
+    expect(api.get).toHaveBeenCalledWith('/api/v1/discord/support/tickets/SUP-ABC12345/action-context');
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/support/tickets/SUP-ABC12345/status', {
       status: 'accepted',
       actorDiscordUserId: ACTOR_ID,
+    });
+    expect(message.edit).toHaveBeenCalledWith(expect.objectContaining({
+      embeds: expect.any(Array),
+    }));
+    expect(thread.send).toHaveBeenCalledWith({
+      content: 'Ticket `SUP-ABC12345` marked `accepted` by <@7777777777777777>.',
     });
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(interaction.editReply).toHaveBeenCalledWith({
@@ -345,15 +363,31 @@ function createTriageChannel(thread: PrivateThreadChannel): TextChannel {
   } as unknown as TextChannel;
 }
 
+function createTriageMessage() {
+  return {
+    embeds: [{
+      data: {
+        fields: [
+          { name: 'Status', value: 'new', inline: true },
+          { name: 'Privacy', value: 'private', inline: true },
+        ],
+      },
+    }],
+    edit: vi.fn(),
+  };
+}
+
 function createButtonInteraction(input: {
   customId: string;
   channel: ButtonInteraction['channel'];
   member: unknown;
+  message?: unknown;
 }): ButtonInteraction {
   return {
     customId: input.customId,
     channel: input.channel,
     member: input.member,
+    message: input.message ?? createTriageMessage(),
     user: { id: ACTOR_ID },
     reply: vi.fn(),
     deferReply: vi.fn(),
