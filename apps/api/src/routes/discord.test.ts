@@ -604,6 +604,23 @@ describe('discordRouter', () => {
     });
   });
 
+  it.each([null, 0, '0'])('rejects non-ISO syncedAt values for Discord XP role sync: %s', async (syncedAt) => {
+    await request(app())
+      .post('/api/v1/discord/xp/role-sync')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        profileId: '11111111-1111-4111-8111-111111111111',
+        discordGuildId: DISCORD_GUILD_ID,
+        discordUserId: DISCORD_USER_ID,
+        roleId: '78901234567890123',
+        level: 2,
+        syncedAt,
+      })
+      .expect(400);
+
+    expect(mocks.markDiscordXpRoleSynced).not.toHaveBeenCalled();
+  });
+
   it('creates a Discord support report for a linked user', async () => {
     const ticket = {
       publicId: 'SUP-ABC12345',

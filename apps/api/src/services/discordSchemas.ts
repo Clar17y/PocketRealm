@@ -34,7 +34,7 @@ export const discordXpRoleSyncSchema = z.object({
   discordUserId: discordSnowflakeSchema,
   roleId: discordSnowflakeSchema,
   level: z.number().int().min(1),
-  syncedAt: z.coerce.date().optional(),
+  syncedAt: z.string().datetime().transform((value) => new Date(value)).optional(),
 }).strict();
 
 export const discordDuelCreateSchema = z.object({
