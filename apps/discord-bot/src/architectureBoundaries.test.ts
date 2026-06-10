@@ -54,6 +54,24 @@ describe('discord bot architecture boundaries', () => {
     expect(packageJson.dependencies?.['@pocketrealm/database']).toBeUndefined();
   });
 
+  it('does not build the database package before the bot', () => {
+    const packageJson = JSON.parse(readRepoFile('package.json')) as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(packageJson.scripts?.['build:discord-bot'] ?? '').not.toContain('packages/database');
+  });
+
+  it('does not reference the database package TypeScript project', () => {
+    const tsconfig = JSON.parse(readRepoFile('apps/discord-bot/tsconfig.json')) as {
+      references?: Array<{ path?: string }>;
+    };
+
+    const references = tsconfig.references?.map((reference) => reference.path) ?? [];
+
+    expect(references).not.toContain('../../packages/database');
+  });
+
   it('keeps production bot source free of Prisma imports', () => {
     const productionFiles = listProductionTypeScriptFiles(discordBotSourceRoot);
 
