@@ -14,7 +14,6 @@
     "register-commands": "tsx src/commands/register.ts"
   },
   "dependencies": {
-    "@pocketrealm/database": "*",
     "@pocketrealm/shared": "*",
     "discord.js": "^14.16.3",
     "dotenv": "^16.6.1",
