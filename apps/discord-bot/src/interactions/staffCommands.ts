@@ -1,10 +1,15 @@
-import { prisma as defaultPrisma } from '@pocketrealm/database';
 import type { ChatInputCommandInteraction, Guild, GuildMember, User } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { syncLinkedRoles as defaultSyncLinkedRoles } from '../discord/roleSync.js';
 import type { RoleSyncSummary, SyncLinkedRolesOptions } from '../discord/roleSync.js';
+import { getDefaultDiscordPrisma } from '../prismaTypes.js';
+import type {
+  DiscordCommunityProfileRecord,
+  StaffPrismaClient,
+  StaffTransactionClient,
+} from '../prismaTypes.js';
 import {
   cleanupSupportTriageMessages as defaultCleanupSupportTriageMessages,
   isTriageCleanupChannel,
@@ -20,78 +25,6 @@ type StaffConfig = Pick<
   BotConfig,
   'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportTriageChannelId' | 'supportStaffRoleIds' | 'levelRoleMap'
 >;
-
-interface DiscordCommunityProfileRecord {
-  id: string;
-  discordGuildId: string;
-  discordUserId: string;
-  xp: number;
-  level: number;
-}
-
-type StaffCommunityProfileWhere =
-  | {
-      discordGuildId_discordUserId: {
-        discordGuildId: string;
-        discordUserId: string;
-      };
-    }
-  | { id: string };
-
-interface StaffCommunityProfileDelegate {
-  findUnique(args: {
-    where: StaffCommunityProfileWhere;
-  }): Promise<DiscordCommunityProfileRecord | null>;
-  update(args: {
-    where: { id: string };
-    data: {
-      xp?: number | { increment: number } | { decrement: number };
-      level?: number;
-      lastRoleSyncAt?: Date;
-    };
-  }): Promise<DiscordCommunityProfileRecord>;
-  updateMany(args: {
-    where: {
-      id: string;
-      xp?: number;
-    };
-    data: {
-      xp: { decrement: number };
-    };
-  }): Promise<{ count: number }>;
-  create(args: {
-    data: {
-      discordGuildId: string;
-      discordUserId: string;
-      xp: number;
-      level: number;
-      dailyXp?: number;
-    };
-  }): Promise<DiscordCommunityProfileRecord>;
-}
-
-interface StaffAuditDelegate {
-  create(args: {
-    data: {
-      guildId: string;
-      actorDiscordUserId: string;
-      targetDiscordUserId?: string;
-      command: string;
-      status: string;
-      errorCode?: string;
-      metadata?: Record<string, unknown>;
-    };
-  }): Promise<unknown>;
-}
-
-interface StaffTransactionClient {
-  discordCommunityProfile: StaffCommunityProfileDelegate;
-  discordBotAuditEvent: StaffAuditDelegate;
-}
-
-export interface StaffPrismaClient extends StaffTransactionClient {
-  $transaction<T>(callback: (tx: StaffTransactionClient) => Promise<T>): Promise<T>;
-}
 
 interface XpAdjustmentResult {
   profileId: string | null;
@@ -247,7 +180,7 @@ async function handleXpAdjust(
   interaction: ChatInputCommandInteraction,
   options: StaffCommandOptions,
 ): Promise<void> {
-  const prisma = (options.prisma ?? defaultPrisma) as unknown as StaffPrismaClient;
+  const prisma: StaffPrismaClient = options.prisma ?? getDefaultDiscordPrisma();
   const target = interaction.options.getUser('user', true);
   const amount = interaction.options.getInteger('amount', true);
   const reason = normalizeReason(interaction.options.getString('reason', true));

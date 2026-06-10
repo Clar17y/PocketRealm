@@ -1,3 +1,4 @@
+import { RESTRICTED_SUPPORT_PRIVACY } from '@pocketrealm/shared/support/supportTickets';
 import { logger } from '../logger';
 import { redactSupportText } from './supportTicketRedaction';
 
@@ -19,6 +20,12 @@ function webhookUrl(): string | null {
   return value && value.length > 0 ? value : null;
 }
 
+function reporterDisplayFor(ticket: Pick<TicketNotification, 'publicId' | 'privacy' | 'reporterDisplayName'>): string {
+  return (RESTRICTED_SUPPORT_PRIVACY as readonly string[]).includes(ticket.privacy)
+    ? `Reporter ${ticket.publicId}`
+    : ticket.reporterDisplayName;
+}
+
 export async function notifySupportTicketCreated(ticket: TicketNotification): Promise<void> {
   const url = webhookUrl();
   if (!url) return;
@@ -34,7 +41,7 @@ export async function notifySupportTicketCreated(ticket: TicketNotification): Pr
           { name: 'Privacy', value: ticket.privacy, inline: true },
           { name: 'Category', value: ticket.category, inline: true },
           { name: 'Area', value: ticket.area, inline: true },
-          { name: 'Reporter', value: ticket.reporterDisplayName, inline: true },
+          { name: 'Reporter', value: reporterDisplayFor(ticket), inline: true },
           { name: 'Realm', value: ticket.realmLabel, inline: true },
           { name: 'Screen', value: ticket.screen ?? 'unknown', inline: true },
         ],

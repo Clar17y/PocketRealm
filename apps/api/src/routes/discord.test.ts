@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   recordDiscordDuelMessage: vi.fn(),
   resolveDiscordDuel: vi.fn(),
   getDiscordDuelReplay: vi.fn(),
+  notifySupportTicketCreated: vi.fn(),
+  emitAchievementNotifications: vi.fn(),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -87,20 +89,27 @@ vi.mock('../services/discordSupportThreadService', () => ({
 }));
 
 vi.mock('../services/discordDuelService', () => ({
-  DISCORD_DUEL_REPLAY_MAX_PAGE: 100,
   createPendingDiscordDuel: mocks.createPendingDiscordDuel,
   recordDiscordDuelMessage: mocks.recordDiscordDuelMessage,
   resolveDiscordDuel: mocks.resolveDiscordDuel,
   getDiscordDuelReplay: mocks.getDiscordDuelReplay,
 }));
 
+vi.mock('../services/discordSupportNotifier', () => ({
+  notifySupportTicketCreated: mocks.notifySupportTicketCreated,
+}));
+
+vi.mock('../services/achievementService', () => ({
+  emitAchievementNotifications: mocks.emitAchievementNotifications,
+}));
+
 import { discordRouter } from './discord';
 
-const DISCORD_USER_ID = '1234567890123456';
-const DISCORD_GUILD_ID = '2345678901234567';
-const DISCORD_CHANNEL_ID = '3456789012345678';
-const DISCORD_TARGET_USER_ID = '4567890123456789';
-const DISCORD_MESSAGE_ID = '5678901234567890';
+const DISCORD_USER_ID = '12345678901234567';
+const DISCORD_GUILD_ID = '23456789012345678';
+const DISCORD_CHANNEL_ID = '34567890123456789';
+const DISCORD_TARGET_USER_ID = '45678901234567890';
+const DISCORD_MESSAGE_ID = '56789012345678901';
 const LINK_ID = '11111111-1111-4111-8111-111111111111';
 const DUEL_ID = '22222222-2222-4222-8222-222222222222';
 const LINKED_AT = '2026-06-04T12:00:00.000Z';
@@ -153,6 +162,7 @@ describe('discordRouter', () => {
       linkedAt: new Date(LINKED_AT),
       roleSyncedAt: null,
       titleAchievementId: 'discord_linked',
+      achievementGranted: false,
     });
 
     const res = await request(app())
@@ -176,6 +186,32 @@ describe('discordRouter', () => {
       playerId: 'player-1',
       code: 'ABC12345',
     });
+    expect(mocks.emitAchievementNotifications).not.toHaveBeenCalled();
+  });
+
+  it('emits the achievement notification only when the claim newly grants it', async () => {
+    mocks.claimDiscordLinkCode.mockResolvedValue({
+      id: LINK_ID,
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+      linkedAt: new Date(LINKED_AT),
+      roleSyncedAt: null,
+      titleAchievementId: 'discord_linked',
+      achievementGranted: true,
+    });
+
+    const res = await request(app())
+      .post('/api/v1/discord/link')
+      .set('authorization', 'Bearer test-token')
+      .send({ code: 'ABC12345' })
+      .expect(201);
+
+    expect(res.body.titleAchievementId).toBe('discord_linked');
+    expect(res.body.link).not.toHaveProperty('achievementGranted');
+    expect(mocks.emitAchievementNotifications).toHaveBeenCalledWith(
+      'player-1',
+      [expect.objectContaining({ id: 'discord_linked' })],
+    );
   });
 
   it('returns active Discord link status for the authenticated account', async () => {
@@ -379,7 +415,9 @@ describe('discordRouter', () => {
   });
 
   it('searches the wiki with the configured public web URL', async () => {
+    const originalBaseUrl = process.env.POCKETREALM_WEB_BASE_URL;
     const originalPublicWebUrl = process.env.PUBLIC_WEB_URL;
+    delete process.env.POCKETREALM_WEB_BASE_URL;
     process.env.PUBLIC_WEB_URL = 'https://pocketrealm.example';
     mocks.searchWikiForDiscord.mockReturnValue([{ title: 'Forge', url: 'https://pocketrealm.example/wiki/items/forge' }]);
 
@@ -391,6 +429,37 @@ describe('discordRouter', () => {
     expect(res.body.results).toEqual([{ title: 'Forge', url: 'https://pocketrealm.example/wiki/items/forge' }]);
     expect(mocks.searchWikiForDiscord).toHaveBeenCalledWith('forge', 'https://pocketrealm.example');
 
+    if (originalBaseUrl === undefined) {
+      delete process.env.POCKETREALM_WEB_BASE_URL;
+    } else {
+      process.env.POCKETREALM_WEB_BASE_URL = originalBaseUrl;
+    }
+    if (originalPublicWebUrl === undefined) {
+      delete process.env.PUBLIC_WEB_URL;
+    } else {
+      process.env.PUBLIC_WEB_URL = originalPublicWebUrl;
+    }
+  });
+
+  it('prefers POCKETREALM_WEB_BASE_URL over PUBLIC_WEB_URL for wiki links', async () => {
+    const originalBaseUrl = process.env.POCKETREALM_WEB_BASE_URL;
+    const originalPublicWebUrl = process.env.PUBLIC_WEB_URL;
+    process.env.POCKETREALM_WEB_BASE_URL = 'https://base.pocketrealm.example';
+    process.env.PUBLIC_WEB_URL = 'https://legacy.pocketrealm.example';
+    mocks.searchWikiForDiscord.mockReturnValue([]);
+
+    await request(app())
+      .get('/api/v1/discord/wiki/search?q=forge')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(mocks.searchWikiForDiscord).toHaveBeenCalledWith('forge', 'https://base.pocketrealm.example');
+
+    if (originalBaseUrl === undefined) {
+      delete process.env.POCKETREALM_WEB_BASE_URL;
+    } else {
+      process.env.POCKETREALM_WEB_BASE_URL = originalBaseUrl;
+    }
     if (originalPublicWebUrl === undefined) {
       delete process.env.PUBLIC_WEB_URL;
     } else {
@@ -399,10 +468,12 @@ describe('discordRouter', () => {
   });
 
   it('creates a Discord support report for a linked user', async () => {
-    mocks.createDiscordSupportTicket.mockResolvedValue({
+    const ticket = {
       publicId: 'SUP-ABC12345',
       status: 'new',
-    });
+    };
+    mocks.createDiscordSupportTicket.mockResolvedValue(ticket);
+    mocks.notifySupportTicketCreated.mockResolvedValue(undefined);
 
     const res = await request(app())
       .post('/api/v1/discord/reports')
@@ -430,12 +501,14 @@ describe('discordRouter', () => {
         description: 'The forge did not refresh after upgrade.',
       },
     });
+    expect(mocks.notifySupportTicketCreated).toHaveBeenCalledOnce();
+    expect(mocks.notifySupportTicketCreated.mock.calls[0]?.[0]).toBe(ticket);
   });
 
   it('delegates Discord support triage thread routes', async () => {
     mocks.listUnpostedSupportTicketsForDiscord.mockResolvedValue([{ publicId: 'SUP-ABC12345' }]);
-    mocks.markSupportTriageMessage.mockResolvedValue({ publicId: 'SUP-ABC12345', discordMessageId: '3456789012345678' });
-    mocks.markSupportThreadCreated.mockResolvedValue({ publicId: 'SUP-ABC12345', threadId: '4567890123456789' });
+    mocks.markSupportTriageMessage.mockResolvedValue({ publicId: 'SUP-ABC12345', discordMessageId: '34567890123456789' });
+    mocks.markSupportThreadCreated.mockResolvedValue({ publicId: 'SUP-ABC12345', threadId: '45678901234567890' });
     mocks.archiveSupportThread.mockResolvedValue({ publicId: 'SUP-ABC12345', status: 'archived' });
     mocks.getSupportTicketActionContextForDiscord.mockResolvedValue({ publicId: 'SUP-ABC12345' });
     mocks.updateSupportTicketStatusFromDiscord.mockResolvedValue({ publicId: 'SUP-ABC12345', status: 'accepted' });
@@ -449,22 +522,22 @@ describe('discordRouter', () => {
       .set('x-pocketrealm-bot-key', 'bot-key')
       .send({
         guildId: DISCORD_GUILD_ID,
-        triageChannelId: '2345678901234567',
-        triageMessageId: '3456789012345678',
+        triageChannelId: '23456789012345678',
+        triageMessageId: '34567890123456789',
       })
       .expect(200);
     await request(app())
       .post('/api/v1/discord/support/tickets/SUP-ABC12345/thread')
       .set('x-pocketrealm-bot-key', 'bot-key')
       .send({
-        threadId: '4567890123456789',
-        createdByDiscordUserId: '5678901234567890',
+        threadId: '45678901234567890',
+        createdByDiscordUserId: '56789012345678901',
       })
       .expect(200);
     await request(app())
       .post('/api/v1/discord/support/tickets/SUP-ABC12345/archive-thread')
       .set('x-pocketrealm-bot-key', 'bot-key')
-      .send({ actorDiscordUserId: '5678901234567890' })
+      .send({ actorDiscordUserId: '56789012345678901' })
       .expect(200);
     await request(app())
       .get('/api/v1/discord/support/tickets/SUP-ABC12345/action-context')
@@ -473,30 +546,30 @@ describe('discordRouter', () => {
     await request(app())
       .post('/api/v1/discord/support/tickets/SUP-ABC12345/status')
       .set('x-pocketrealm-bot-key', 'bot-key')
-      .send({ status: 'accepted', actorDiscordUserId: '5678901234567890' })
+      .send({ status: 'accepted', actorDiscordUserId: '56789012345678901' })
       .expect(200);
 
     expect(mocks.listUnpostedSupportTicketsForDiscord).toHaveBeenCalledWith(5);
     expect(mocks.markSupportTriageMessage).toHaveBeenCalledWith({
       publicId: 'SUP-ABC12345',
       guildId: DISCORD_GUILD_ID,
-      triageChannelId: '2345678901234567',
-      triageMessageId: '3456789012345678',
+      triageChannelId: '23456789012345678',
+      triageMessageId: '34567890123456789',
     });
     expect(mocks.markSupportThreadCreated).toHaveBeenCalledWith({
       publicId: 'SUP-ABC12345',
-      threadId: '4567890123456789',
-      createdByDiscordUserId: '5678901234567890',
+      threadId: '45678901234567890',
+      createdByDiscordUserId: '56789012345678901',
     });
     expect(mocks.archiveSupportThread).toHaveBeenCalledWith({
       publicId: 'SUP-ABC12345',
-      actorDiscordUserId: '5678901234567890',
+      actorDiscordUserId: '56789012345678901',
     });
     expect(mocks.getSupportTicketActionContextForDiscord).toHaveBeenCalledWith('SUP-ABC12345');
     expect(mocks.updateSupportTicketStatusFromDiscord).toHaveBeenCalledWith({
       publicId: 'SUP-ABC12345',
       status: 'accepted',
-      actorDiscordUserId: '5678901234567890',
+      actorDiscordUserId: '56789012345678901',
     });
   });
 
@@ -504,7 +577,7 @@ describe('discordRouter', () => {
     await request(app())
       .post('/api/v1/discord/support/tickets/SUP-ABC12345/status')
       .set('x-pocketrealm-bot-key', 'bot-key')
-      .send({ status: 'duplicate', actorDiscordUserId: '5678901234567890' })
+      .send({ status: 'duplicate', actorDiscordUserId: '56789012345678901' })
       .expect(400);
 
     expect(mocks.updateSupportTicketStatusFromDiscord).not.toHaveBeenCalled();

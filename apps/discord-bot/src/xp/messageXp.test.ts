@@ -2,14 +2,16 @@ import { ChannelType, type GuildMember } from 'discord.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BotConfig } from '../config.js';
+import type {
+  DiscordCommunityProfileDelegate,
+  MessageXpPrismaClient,
+  MessageXpTransactionClient,
+} from '../prismaTypes.js';
 import {
   evaluateXpMessage,
   grantXpForMessage,
   levelForDiscordXp,
-  type MessageXpProfileDelegate,
-  type MessageXpPrismaClient,
   type MessageXpRedisClient,
-  type MessageXpTransactionClient,
   type XpMessage,
 } from './messageXp.js';
 
@@ -428,19 +430,21 @@ function createPrisma(options: {
 } = {}): MessageXpPrismaClient {
   const profile = options.profile === undefined ? createProfile() : options.profile;
   const baseProfile = profile ?? createProfile({ id: 'profile-new' });
-  const discordCommunityProfile: MessageXpProfileDelegate = {
+  const discordCommunityProfile: DiscordCommunityProfileDelegate = {
     findUnique: vi.fn(async () => profile),
-    update: vi.fn(async ({ data }: Parameters<MessageXpProfileDelegate['update']>[0]) => ({
+    update: vi.fn(async ({ data }: Parameters<DiscordCommunityProfileDelegate['update']>[0]) => ({
       ...baseProfile,
-      xp: baseProfile.xp + (data.xp?.increment ?? 0),
+      xp: applyXpChange(baseProfile.xp, data.xp),
       level: data.level ?? baseProfile.level,
       dailyXp: data.dailyXp ?? baseProfile.dailyXp,
       dailyXpDate: data.dailyXpDate ?? baseProfile.dailyXpDate,
     })),
-    create: vi.fn(async ({ data }: Parameters<MessageXpProfileDelegate['create']>[0]) => ({
+    updateMany: vi.fn(async () => ({ count: 0 })),
+    create: vi.fn(async ({ data }: Parameters<DiscordCommunityProfileDelegate['create']>[0]) => ({
       id: 'profile-new',
       excludedFromXp: false,
       ...data,
+      dailyXpDate: data.dailyXpDate ?? null,
     })),
   };
   const tx: MessageXpTransactionClient = {
@@ -463,6 +467,16 @@ function createPrisma(options: {
   };
 
   return prisma;
+}
+
+function applyXpChange(
+  currentXp: number,
+  change: Parameters<DiscordCommunityProfileDelegate['update']>[0]['data']['xp'],
+): number {
+  if (typeof change === 'number') return change;
+  if (change && 'increment' in change) return currentXp + change.increment;
+  if (change && 'decrement' in change) return currentXp - change.decrement;
+  return currentXp;
 }
 
 function createRedis(options: { setResult?: 'OK' | null } = {}): MessageXpRedisClient {

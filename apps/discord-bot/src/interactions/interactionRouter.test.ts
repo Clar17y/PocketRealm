@@ -124,7 +124,7 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(handleReportCommand).toHaveBeenCalledWith(interaction);
+    expect(handleReportCommand).toHaveBeenCalledWith(interaction, api, routerConfig);
   });
 
   it('routes staff commands to the staff handler', async () => {

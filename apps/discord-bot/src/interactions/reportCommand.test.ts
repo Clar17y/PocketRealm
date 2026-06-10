@@ -5,31 +5,81 @@ import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
 
+const commandConfig = { guildId: '234567890123456789' };
+
 describe('handleReportCommand', () => {
-  it('shows the report modal in a guild', async () => {
+  it('shows the report modal for linked users in a guild', async () => {
+    const api = createLinkCheckApi(async () => ({ profile: { username: 'Astra' } }));
     const showModal = vi.fn<ChatInputCommandInteraction['showModal']>();
     const interaction = {
       guildId: 'guild-123',
       user: { id: 'user-123' },
       showModal,
+      reply: vi.fn(),
     } as unknown as ChatInputCommandInteraction;
 
-    await handleReportCommand(interaction);
+    await handleReportCommand(interaction, api, commandConfig);
 
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/discord/users/user-123/profile?guildId=234567890123456789',
+    );
     expect(showModal).toHaveBeenCalledTimes(1);
     const modal = showModal.mock.calls[0]?.[0] as { toJSON: () => { custom_id: string } } | undefined;
     expect(modal?.toJSON().custom_id).toBe('report:user-123');
   });
 
-  it('replies ephemerally outside a guild', async () => {
+  it('prompts unlinked users to link instead of showing the modal', async () => {
+    const api = createLinkCheckApi(async () => {
+      throw new PocketRealmApiError('Link required', 404, 'DISCORD_LINK_REQUIRED', {});
+    });
+    const showModal = vi.fn<ChatInputCommandInteraction['showModal']>();
+    const reply = vi.fn<ChatInputCommandInteraction['reply']>();
+    const interaction = {
+      guildId: 'guild-123',
+      user: { id: 'user-123' },
+      showModal,
+      reply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleReportCommand(interaction, api, commandConfig);
+
+    expect(showModal).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'Link your PocketRealm account first, or use the in-game report flow.',
+    });
+  });
+
+  it('fails open and shows the modal when the link pre-check errors', async () => {
+    const api = createLinkCheckApi(async () => {
+      throw new Error('API down');
+    });
+    const showModal = vi.fn<ChatInputCommandInteraction['showModal']>();
+    const reply = vi.fn<ChatInputCommandInteraction['reply']>();
+    const interaction = {
+      guildId: 'guild-123',
+      user: { id: 'user-123' },
+      showModal,
+      reply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleReportCommand(interaction, api, commandConfig);
+
+    expect(showModal).toHaveBeenCalledTimes(1);
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it('replies ephemerally outside a guild without calling the API', async () => {
+    const api = createLinkCheckApi(async () => ({}));
     const reply = vi.fn<ChatInputCommandInteraction['reply']>();
     const interaction = {
       guildId: null,
       reply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleReportCommand(interaction);
+    await handleReportCommand(interaction, api, commandConfig);
 
+    expect(api.get).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
       content: 'Reports only work in the PocketRealm Discord server.',
@@ -191,6 +241,12 @@ describe('handleReportModalSubmit', () => {
 function createApi(response: unknown): Pick<PocketRealmApiClient, 'post'> {
   return {
     post: vi.fn(async <T>(): Promise<T> => response as T) as Pick<PocketRealmApiClient, 'post'>['post'],
+  };
+}
+
+function createLinkCheckApi(get: () => Promise<unknown>): Pick<PocketRealmApiClient, 'get'> {
+  return {
+    get: vi.fn(get) as Pick<PocketRealmApiClient, 'get'>['get'],
   };
 }
 

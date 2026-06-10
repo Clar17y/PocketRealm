@@ -1,12 +1,11 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { runTemplateCombat } from '@pocketrealm/game-engine';
+import { DISCORD_DUEL_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import { AppError } from '../middleware/errorHandler';
 import { mapTemplateCombatLog } from './combatLogMapper';
+import { requireLinkedDiscordPlayer } from './discordLinkedPlayer';
 import { buildPvpCombatant } from './pvpCombatantBuilder';
 
-const DISCORD_DUEL_TTL_MS = 2 * 60 * 1000;
-const DISCORD_DUEL_REPLAY_PAGE_SIZE = 10;
-export const DISCORD_DUEL_REPLAY_MAX_PAGE = 100;
 const DISCORD_DUEL_RESOLVING_STATUS = 'resolving';
 
 export interface CreateDiscordDuelInput {
@@ -86,15 +85,15 @@ function winnerUsernameFor(duel: DiscordDuelRecord): string | null {
 
 function safeReplayPage(duel: Pick<DiscordDuelRecord, 'id' | 'status' | 'combatLog'>, page: number): DiscordDuelReplayDto {
   const entries = Array.isArray(duel.combatLog) ? duel.combatLog : [];
-  const start = (page - 1) * DISCORD_DUEL_REPLAY_PAGE_SIZE;
-  const pageEntries = entries.slice(start, start + DISCORD_DUEL_REPLAY_PAGE_SIZE);
+  const start = (page - 1) * DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE;
+  const pageEntries = entries.slice(start, start + DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE);
 
   return {
     id: duel.id,
     status: duel.status,
     page,
-    pageSize: DISCORD_DUEL_REPLAY_PAGE_SIZE,
-    hasMore: start + DISCORD_DUEL_REPLAY_PAGE_SIZE < entries.length,
+    pageSize: DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE,
+    hasMore: start + DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE < entries.length,
     entries: pageEntries,
   };
 }
@@ -128,44 +127,22 @@ async function getLinkedActivePlayer(
   discordUserId: string,
   participant: 'challenger' | 'target',
 ): Promise<LinkedDiscordPlayer> {
-  const link = await prisma.discordAccountLink.findFirst({
-    where: {
-      discordGuildId: guildId,
-      discordUserId,
-      unlinkedAt: null,
-    },
-    orderBy: { linkedAt: 'desc' },
-    select: {
-      account: {
-        select: {
-          activePlayerId: true,
-          activePlayer: {
-            select: {
-              id: true,
-              username: true,
-            },
-          },
-        },
+  const label = participant === 'challenger' ? 'Challenger' : 'Target';
+  const codePrefix = participant === 'challenger' ? 'DISCORD_DUEL_CHALLENGER' : 'DISCORD_DUEL_TARGET';
+
+  const { player } = await requireLinkedDiscordPlayer(
+    { guildId, discordUserId },
+    {
+      linkRequired: {
+        message: `${label} Discord account is not linked`,
+        code: `${codePrefix}_LINK_REQUIRED`,
+      },
+      playerRequired: {
+        message: `${label} linked account has no active player`,
+        code: `${codePrefix}_PLAYER_NOT_FOUND`,
       },
     },
-  });
-
-  if (!link) {
-    throw new AppError(
-      404,
-      `${participant === 'challenger' ? 'Challenger' : 'Target'} Discord account is not linked`,
-      participant === 'challenger' ? 'DISCORD_DUEL_CHALLENGER_LINK_REQUIRED' : 'DISCORD_DUEL_TARGET_LINK_REQUIRED',
-    );
-  }
-
-  const player = link.account.activePlayer;
-  if (!link.account.activePlayerId || !player) {
-    throw new AppError(
-      404,
-      `${participant === 'challenger' ? 'Challenger' : 'Target'} linked account has no active player`,
-      participant === 'challenger' ? 'DISCORD_DUEL_CHALLENGER_PLAYER_NOT_FOUND' : 'DISCORD_DUEL_TARGET_PLAYER_NOT_FOUND',
-    );
-  }
+  );
 
   return player;
 }
@@ -266,7 +243,7 @@ export async function createPendingDiscordDuel(input: CreateDiscordDuelInput): P
       challengerPlayerId: challenger.id,
       targetPlayerId: target.id,
       status: 'pending',
-      expiresAt: new Date(Date.now() + DISCORD_DUEL_TTL_MS),
+      expiresAt: new Date(Date.now() + DISCORD_DUEL_CONSTANTS.TTL_MS),
     },
     include: discordDuelInclude(),
   });
@@ -338,6 +315,9 @@ export async function resolveDiscordDuel(
     await throwDiscordDuelClaimError(duelId, acceptedByDiscordUserId, now);
   }
 
+  // Guarded region: only the combat simulation + completion write may restore
+  // the pending claim on failure. The post-completion re-read happens after,
+  // so a transient read failure cannot revert an already-completed duel.
   try {
     const [challengerCombatant, targetCombatant] = await Promise.all([
       buildDiscordDuelCombatant(duel.challengerPlayerId, duel.challenger.username),
@@ -381,14 +361,14 @@ export async function resolveDiscordDuel(
     if (completion.count !== 1) {
       throw new AppError(409, 'Discord duel completion could not be applied', 'DISCORD_DUEL_COMPLETION_CONFLICT');
     }
-
-    const updated = await getDuelOrThrow(duelId);
-
-    return completedDto(updated);
   } catch (error) {
     await restorePendingDiscordDuelClaim(duelId, acceptedByDiscordUserId, now);
     throw error;
   }
+
+  const updated = await getDuelOrThrow(duelId);
+
+  return completedDto(updated);
 }
 
 export async function getDiscordDuelReplay(duelId: string, page: number): Promise<DiscordDuelReplayDto> {

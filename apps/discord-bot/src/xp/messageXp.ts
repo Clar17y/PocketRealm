@@ -1,19 +1,28 @@
 import { createHash } from 'node:crypto';
 
+import { DISCORD_XP_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import { ChannelType } from 'discord.js';
 
 import type { BotConfig } from '../config.js';
+import type {
+  DiscordCommunityProfileRecord,
+  MessageXpPrismaClient,
+  MessageXpTransactionClient,
+} from '../prismaTypes.js';
 
-const XP_PER_MESSAGE_MIN = 5;
-const XP_PER_MESSAGE_MAX = 12;
-const XP_COOLDOWN_SECONDS = 90;
-const MIN_MESSAGE_LENGTH = 20;
-const DAILY_SOFT_CAP = 500;
-const RECENT_FINGERPRINT_WINDOW_SECONDS = 10 * 60;
+const {
+  XP_PER_MESSAGE_MIN,
+  XP_PER_MESSAGE_MAX,
+  XP_COOLDOWN_SECONDS,
+  MIN_MESSAGE_LENGTH,
+  DAILY_SOFT_CAP,
+  RECENT_FINGERPRINT_WINDOW_SECONDS,
+  LEVEL_CURVE_XP_DIVISOR,
+} = DISCORD_XP_CONSTANTS;
 const MESSAGE_XP_REASON = 'chat_message';
 
 export function levelForDiscordXp(xp: number): number {
-  return Math.floor(Math.sqrt(xp / 100)) + 1;
+  return Math.floor(Math.sqrt(xp / LEVEL_CURVE_XP_DIVISOR)) + 1;
 }
 
 export type XpEligibilityReason =
@@ -67,95 +76,6 @@ export interface XpMessage {
   channel?: XpMessageChannel | null;
   member?: XpGuildMember | null;
   guild?: XpMessageGuild | null;
-}
-
-export interface DiscordCommunityProfileRecord {
-  id: string;
-  discordUserId: string;
-  discordGuildId: string;
-  xp: number;
-  level: number;
-  dailyXp: number;
-  dailyXpDate: Date | null;
-  excludedFromXp: boolean;
-}
-
-export interface DiscordXpEventRecord {
-  id: string;
-}
-
-export interface MessageXpProfileDelegate {
-  findUnique(args: {
-    where: {
-      discordGuildId_discordUserId: {
-        discordGuildId: string;
-        discordUserId: string;
-      };
-    };
-  }): Promise<DiscordCommunityProfileRecord | null>;
-  update(args: {
-    where: { id: string };
-    data: {
-      xp?: { increment: number };
-      level?: number;
-      dailyXp?: number;
-      dailyXpDate?: Date;
-      lastXpGrantedAt?: Date;
-      lastRoleSyncAt?: Date;
-    };
-  }): Promise<DiscordCommunityProfileRecord>;
-  create(args: {
-    data: {
-      discordGuildId: string;
-      discordUserId: string;
-      xp: number;
-      level: number;
-      dailyXp: number;
-      dailyXpDate: Date;
-      lastXpGrantedAt: Date;
-    };
-  }): Promise<DiscordCommunityProfileRecord>;
-}
-
-export interface MessageXpEventDelegate {
-  findUnique(args: {
-    where: {
-      discordGuildId_messageId: {
-        discordGuildId: string;
-        messageId: string;
-      };
-    };
-  }): Promise<DiscordXpEventRecord | null>;
-  findFirst(args: {
-    where: {
-      discordGuildId: string;
-      discordUserId: string;
-      messageFingerprint: string;
-      createdAt: { gte: Date };
-    };
-    select: { id: true };
-  }): Promise<DiscordXpEventRecord | null>;
-  create(args: {
-    data: {
-      discordGuildId: string;
-      discordUserId: string;
-      channelId: string;
-      messageId: string;
-      messageFingerprint: string;
-      xp: number;
-      reason: string;
-      createdAt: Date;
-    };
-  }): Promise<DiscordXpEventRecord>;
-}
-
-export interface MessageXpTransactionClient {
-  discordCommunityProfile: MessageXpProfileDelegate;
-  discordXpEvent: MessageXpEventDelegate;
-}
-
-export interface MessageXpPrismaClient extends MessageXpTransactionClient {
-  $transaction<T>(callback: (tx: MessageXpTransactionClient) => Promise<T>): Promise<T>;
 }
 
 export interface MessageXpRedisClient {
@@ -511,7 +431,6 @@ function isIgnoredChannel(message: Partial<XpMessage>, config: MessageXpConfig):
     channelName.includes('support') ||
     channelName.includes('staff') ||
     channelName.startsWith('mod-') ||
-    channelName === 'mod-log' ||
     channelName === 'moderation-log';
 }
 

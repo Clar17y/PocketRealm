@@ -141,8 +141,8 @@ describe('supportTicketService', () => {
     });
 
     const ticket = await createDiscordSupportTicket({
-      discordGuildId: '2345678901234567',
-      discordUserId: '1234567890123456',
+      discordGuildId: '23456789012345678',
+      discordUserId: '12345678901234567',
       input: {
         privacy: 'private',
         category: 'bug',
@@ -161,8 +161,8 @@ describe('supportTicketService', () => {
         seasonId: 'season-1',
         reporterDisplayName: 'Mira',
         realmLabel: 'Spring Realm',
-        discordReporterGuildId: '2345678901234567',
-        discordReporterUserId: '1234567890123456',
+        discordReporterGuildId: '23456789012345678',
+        discordReporterUserId: '12345678901234567',
       }),
     }));
   });
@@ -171,8 +171,8 @@ describe('supportTicketService', () => {
     vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue(null);
 
     await expect(createDiscordSupportTicket({
-      discordGuildId: '2345678901234567',
-      discordUserId: '1234567890123456',
+      discordGuildId: '23456789012345678',
+      discordUserId: '12345678901234567',
       input: {
         privacy: 'private',
         category: 'bug',
@@ -193,6 +193,7 @@ describe('supportTicketService', () => {
       id: 'ticket-1',
       publicId: 'SUP-1',
       status: 'new',
+      closedAt: null,
     });
     tx.supportTicket.update.mockResolvedValue({
       id: 'ticket-1',
@@ -225,6 +226,73 @@ describe('supportTicketService', () => {
     }));
   });
 
+  it('logs an updated event without touching status or closedAt when the status is unchanged', async () => {
+    const closedAt = new Date('2026-06-01T08:00:00.000Z');
+    tx.supportTicket.findUniqueOrThrow.mockResolvedValue({
+      id: 'ticket-1',
+      publicId: 'SUP-1',
+      status: 'closed',
+      closedAt,
+    });
+    tx.supportTicket.update.mockResolvedValue({
+      id: 'ticket-1',
+      publicId: 'SUP-1',
+      status: 'closed',
+    });
+
+    await updateSupportTicket('SUP-1', 'admin-account', {
+      status: 'closed',
+      note: 'Confirmed with reporter.',
+    });
+
+    expect(tx.supportTicket.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: undefined,
+        closedAt: undefined,
+        staffNotes: 'Confirmed with reporter.',
+      }),
+    }));
+    expect(tx.supportTicketEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        eventType: 'updated',
+        fromStatus: undefined,
+        toStatus: undefined,
+        note: 'Confirmed with reporter.',
+      }),
+    }));
+  });
+
+  it('preserves the original closedAt when moving between closed statuses', async () => {
+    const closedAt = new Date('2026-06-01T08:00:00.000Z');
+    tx.supportTicket.findUniqueOrThrow.mockResolvedValue({
+      id: 'ticket-1',
+      publicId: 'SUP-1',
+      status: 'rejected',
+      closedAt,
+    });
+    tx.supportTicket.update.mockResolvedValue({
+      id: 'ticket-1',
+      publicId: 'SUP-1',
+      status: 'closed',
+    });
+
+    await updateSupportTicket('SUP-1', 'admin-account', { status: 'closed' });
+
+    expect(tx.supportTicket.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'closed',
+        closedAt,
+      }),
+    }));
+    expect(tx.supportTicketEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        eventType: 'status_changed',
+        fromStatus: 'rejected',
+        toStatus: 'closed',
+      }),
+    }));
+  });
+
   it('serializes tickets as JSONL lines', () => {
     const line = supportTicketToJsonl({
       publicId: 'SUP-1',
@@ -238,6 +306,7 @@ describe('supportTicketService', () => {
       actualBehavior: null,
       reproductionSteps: null,
       reporterDisplayName: 'Mira',
+      discordReporterUserId: null,
       realmLabel: 'Preseason',
       seasonId: null,
       screen: 'inventory',
@@ -273,6 +342,7 @@ describe('supportTicketService', () => {
       actualBehavior: null,
       reproductionSteps: null,
       reporterDisplayName: 'Mira',
+      discordReporterUserId: null,
       realmLabel: 'Preseason',
       seasonId: null,
       screen: 'inventory',
@@ -301,11 +371,57 @@ describe('supportTicketService', () => {
   it('lists new and needs_info tickets for export by default', async () => {
     vi.mocked(prisma.supportTicket.findMany).mockResolvedValue([]);
 
-    await listSupportTicketsForExport({});
+    const result = await listSupportTicketsForExport({});
 
+    expect(result).toEqual({ tickets: [], hasMore: false });
     expect(prisma.supportTicket.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { status: { in: ['new', 'needs_info'] } },
       orderBy: { createdAt: 'asc' },
+      take: 101,
     }));
+  });
+
+  it('reports hasMore and trims the export page when more rows exist', async () => {
+    const row = (publicId: string) => ({
+      publicId,
+      status: 'new',
+      privacy: 'private',
+      category: 'bug',
+      area: 'inventory',
+      title: 'Inventory bug',
+      description: 'Potions did not stack.',
+      expectedBehavior: null,
+      actualBehavior: null,
+      reproductionSteps: null,
+      reporterDisplayName: 'Mira',
+      discordReporterUserId: '12345678901234567',
+      realmLabel: 'Preseason',
+      seasonId: null,
+      screen: null,
+      appVersion: null,
+      apiVersion: null,
+      browser: null,
+      device: null,
+      requestId: null,
+      sentryEventId: null,
+      duplicateTicketIds: [],
+      githubIssueUrl: null,
+      sensitivityFlags: [],
+      staffNotes: null,
+      createdAt: new Date('2026-05-30T12:00:00.000Z'),
+      updatedAt: new Date('2026-05-30T12:01:00.000Z'),
+    });
+    vi.mocked(prisma.supportTicket.findMany).mockResolvedValue([
+      row('SUP-1'),
+      row('SUP-2'),
+      row('SUP-3'),
+    ] as never);
+
+    const result = await listSupportTicketsForExport({ limit: 2 });
+
+    expect(prisma.supportTicket.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 3 }));
+    expect(result.hasMore).toBe(true);
+    expect(result.tickets.map((ticket) => ticket.publicId)).toEqual(['SUP-1', 'SUP-2']);
+    expect(result.tickets[0]?.discordReporterUserId).toBe('12345678901234567');
   });
 });

@@ -10,13 +10,20 @@ import type {
   ModalSubmitInteraction,
 } from 'discord.js';
 
+import {
+  SUPPORT_TICKET_AREAS,
+  SUPPORT_TICKET_PRIVACY,
+  type SupportTicketArea,
+  type SupportTicketPrivacy,
+} from '@pocketrealm/shared/support/supportTickets';
+
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import type { BotConfig } from '../config.js';
 
 type ReportApiClient = Pick<PocketRealmApiClient, 'post'>;
-
-type SupportTicketArea = typeof SUPPORT_TICKET_AREAS[number];
-type SupportTicketPrivacy = typeof SUPPORT_TICKET_PRIVACY[number];
+type ReportLinkCheckApiClient = Pick<PocketRealmApiClient, 'get'>;
+type ReportCommandConfig = Pick<BotConfig, 'guildId'>;
 
 interface CreateDiscordReportResponse {
   ticket: {
@@ -32,22 +39,7 @@ const REPORT_STEPS_FIELD = 'steps';
 const REPORT_AREA_FIELD = 'area';
 const REPORT_PRIVACY_FIELD = 'privacy';
 
-const SUPPORT_TICKET_AREAS = [
-  'combat',
-  'exploration',
-  'crafting',
-  'inventory',
-  'social',
-  'guild',
-  'casino',
-  'payments',
-  'auth',
-  'mobile',
-  'performance',
-  'other',
-] as const;
-
-const SUPPORT_TICKET_PRIVACY = ['public_candidate', 'private', 'not_sure'] as const;
+const LINK_REQUIRED_COPY = 'Link your PocketRealm account first, or use the in-game report flow.';
 
 const areaSet = new Set<string>(SUPPORT_TICKET_AREAS);
 const privacySet = new Set<string>(SUPPORT_TICKET_PRIVACY);
@@ -58,6 +50,8 @@ export function isReportModalCustomId(customId: string): boolean {
 
 export async function handleReportCommand(
   interaction: ChatInputCommandInteraction,
+  api: ReportLinkCheckApiClient,
+  config: ReportCommandConfig,
 ): Promise<void> {
   if (!interaction.guildId) {
     await interaction.reply({
@@ -67,7 +61,39 @@ export async function handleReportCommand(
     return;
   }
 
+  if (!(await isLinkedPocketRealmUser(api, interaction.user.id, config.guildId))) {
+    await interaction.reply({
+      ephemeral: true,
+      content: LINK_REQUIRED_COPY,
+    });
+    return;
+  }
+
   await interaction.showModal(buildReportModal(interaction.user.id));
+}
+
+/**
+ * Pre-check linkage so unlinked users get a link prompt instead of filling a
+ * 5-field modal that is guaranteed to fail. Fails open on API errors so an
+ * API outage never blocks report submission.
+ */
+async function isLinkedPocketRealmUser(
+  api: ReportLinkCheckApiClient,
+  discordUserId: string,
+  guildId: string,
+): Promise<boolean> {
+  try {
+    await api.get(
+      `/api/v1/discord/users/${encodeURIComponent(discordUserId)}/profile?guildId=${encodeURIComponent(guildId)}`,
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof PocketRealmApiError && error.code === 'DISCORD_LINK_REQUIRED') {
+      return false;
+    }
+
+    return true;
+  }
 }
 
 export async function handleReportModalSubmit(
@@ -185,7 +211,7 @@ function optionalSteps(value: string): { reproductionSteps?: string } {
 
 function reportErrorCopy(error: unknown): string {
   if (error instanceof PocketRealmApiError && error.code === 'DISCORD_LINK_REQUIRED') {
-    return 'Link your PocketRealm account first, or use the in-game report flow.';
+    return LINK_REQUIRED_COPY;
   }
 
   return 'Unable to create a report right now. Please try again later.';

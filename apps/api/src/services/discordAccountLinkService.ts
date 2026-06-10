@@ -30,6 +30,8 @@ export interface DiscordLinkStatusDto {
 
 export interface ClaimedDiscordLinkDto extends DiscordLinkDto {
   titleAchievementId: typeof LINKED_TITLE_ACHIEVEMENT_ID;
+  /** True only when this claim created the discord_linked achievement row. */
+  achievementGranted: boolean;
 }
 
 function randomLinkCode(): string {
@@ -48,7 +50,9 @@ function normalizeLinkCode(code: string): string {
 }
 
 function hashLinkCode(code: string): string {
-  const secret = process.env.DISCORD_INTERNAL_API_KEY?.trim();
+  // Dedicated secret so the internal API key can be rotated independently;
+  // falls back to DISCORD_INTERNAL_API_KEY for backwards compatibility.
+  const secret = process.env.DISCORD_LINK_CODE_SECRET?.trim() || process.env.DISCORD_INTERNAL_API_KEY?.trim();
   if (!secret || secret.length < 32) {
     throw new AppError(500, 'Discord link code HMAC secret is not configured', 'DISCORD_LINK_CODE_HMAC_NOT_CONFIGURED');
   }
@@ -68,6 +72,10 @@ function toDiscordLinkDto(link: DiscordLinkRecord): DiscordLinkDto {
 
 function isPrismaP2002(err: unknown): err is { code: 'P2002'; meta?: { target?: string[] | string } } {
   return Boolean(err && typeof err === 'object' && 'code' in err && err.code === 'P2002');
+}
+
+function isPrismaP2003(err: unknown): err is { code: 'P2003' } {
+  return Boolean(err && typeof err === 'object' && 'code' in err && err.code === 'P2003');
 }
 
 function uniqueTargetIncludes(err: { meta?: { target?: string[] | string } }, fields: string[]): boolean {
@@ -206,15 +214,29 @@ export async function claimDiscordLinkCode(input: {
       throw err;
     }
 
-    await tx.playerAchievement.upsert({
-      where: { playerId_achievementId: { playerId: input.playerId, achievementId: 'discord_linked' } },
-      create: { playerId: input.playerId, achievementId: 'discord_linked' },
-      update: {},
+    const existingAchievement = await tx.playerAchievement.findUnique({
+      where: { playerId_achievementId: { playerId: input.playerId, achievementId: LINKED_TITLE_ACHIEVEMENT_ID } },
+      select: { playerId: true },
     });
+
+    try {
+      await tx.playerAchievement.upsert({
+        where: { playerId_achievementId: { playerId: input.playerId, achievementId: LINKED_TITLE_ACHIEVEMENT_ID } },
+        create: { playerId: input.playerId, achievementId: LINKED_TITLE_ACHIEVEMENT_ID },
+        update: {},
+      });
+    } catch (err: unknown) {
+      // FK violation: the JWT's player row no longer exists.
+      if (isPrismaP2003(err)) {
+        throw new AppError(404, 'Player not found', 'PLAYER_NOT_FOUND');
+      }
+      throw err;
+    }
 
     return {
       ...toDiscordLinkDto(link),
       titleAchievementId: LINKED_TITLE_ACHIEVEMENT_ID,
+      achievementGranted: !existingAchievement,
     };
   });
 }

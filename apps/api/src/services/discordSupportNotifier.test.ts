@@ -90,6 +90,47 @@ describe('discordSupportNotifier', () => {
     ]));
   });
 
+  it.each(['private', 'not_sure'])('redacts the reporter display name for %s tickets', async (privacy) => {
+    process.env.DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL = 'https://discord.com/api/webhooks/1/token';
+
+    await notifySupportTicketCreated({
+      publicId: 'SUP-1',
+      title: 'Bug report',
+      privacy,
+      category: 'bug',
+      area: 'combat',
+      reporterDisplayName: 'Mira',
+      realmLabel: 'Preseason',
+      screen: null,
+    });
+
+    const body = webhookBody();
+    expect(body.embeds[0]?.fields).toEqual(expect.arrayContaining([
+      { name: 'Reporter', value: 'Reporter SUP-1', inline: true },
+    ]));
+    expect(JSON.stringify(body)).not.toContain('Mira');
+  });
+
+  it('keeps the reporter display name for public candidate tickets', async () => {
+    process.env.DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL = 'https://discord.com/api/webhooks/1/token';
+
+    await notifySupportTicketCreated({
+      publicId: 'SUP-1',
+      title: 'Bug report',
+      privacy: 'public_candidate',
+      category: 'bug',
+      area: 'combat',
+      reporterDisplayName: 'Mira',
+      realmLabel: 'Preseason',
+      screen: null,
+    });
+
+    const body = webhookBody();
+    expect(body.embeds[0]?.fields).toEqual(expect.arrayContaining([
+      { name: 'Reporter', value: 'Mira', inline: true },
+    ]));
+  });
+
   it('logs Discord failures without throwing', async () => {
     process.env.DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL = 'https://discord.com/api/webhooks/1/token';
     vi.mocked(fetch).mockResolvedValueOnce(failedDiscordResponse());

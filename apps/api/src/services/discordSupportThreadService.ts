@@ -1,13 +1,12 @@
-import { prisma } from '@pocketrealm/database';
+import { prisma, type Prisma } from '@pocketrealm/database';
+import { closeTimestampFor, isRestrictedSupportPrivacy } from '@pocketrealm/shared/support/supportTickets';
 import { AppError } from '../middleware/errorHandler';
-import { redactSupportText } from './supportTicketRedaction';
+import { PRIVATE_SUPPORT_SUMMARY, redactSupportText } from './supportTicketRedaction';
 import type { SupportSensitivityFlag, SupportTicketArea, SupportTicketCategory, SupportTicketPrivacy, SupportTicketStatus } from './supportTicketSchemas';
 
 const DISCORD_SUPPORT_TRIAGE_STATUSES = ['new', 'needs_info'] as const;
-const PRIVATE_SUPPORT_SUMMARY = 'Private report body withheld. Review in staff support tools.';
 const MAX_DISCORD_TITLE_LENGTH = 80;
 const MAX_DISCORD_SUMMARY_LENGTH = 240;
-const CLOSED_TICKET_STATUSES: SupportTicketStatus[] = ['closed', 'rejected', 'duplicate'];
 
 export interface MarkSupportTriageMessageInput {
   publicId: string;
@@ -53,19 +52,11 @@ function supportTicketSummary(ticket: {
   privacy: SupportTicketPrivacy;
   description: string;
 }): string {
-  if (ticket.privacy === 'private' || ticket.privacy === 'not_sure') {
+  if (isRestrictedSupportPrivacy(ticket.privacy)) {
     return PRIVATE_SUPPORT_SUMMARY;
   }
 
   return safeText(ticket.description, MAX_DISCORD_SUMMARY_LENGTH);
-}
-
-function closeTimestampFor(status: SupportTicketStatus, existingClosedAt?: Date | null): Date | null {
-  if (!CLOSED_TICKET_STATUSES.includes(status)) {
-    return null;
-  }
-
-  return existingClosedAt ?? new Date();
 }
 
 function firstActiveDiscordUserId(ticket: {
@@ -81,8 +72,8 @@ function firstActiveDiscordUserId(ticket: {
   return ticket.reporterAccount.discordAccountLinks[0]?.discordUserId ?? null;
 }
 
-async function findTicketId(publicId: string): Promise<string> {
-  const ticket = await prisma.supportTicket.findUnique({
+async function findTicketId(client: Prisma.TransactionClient, publicId: string): Promise<string> {
+  const ticket = await client.supportTicket.findUnique({
     where: { publicId },
     select: { id: true },
   });
@@ -245,52 +236,54 @@ export async function markSupportTriageMessage(input: MarkSupportTriageMessageIn
 }
 
 export async function markSupportThreadCreated(input: MarkSupportThreadCreatedInput) {
-  const ticketId = await findTicketId(input.publicId);
-  const mapping = await prisma.supportTicketDiscordThread.findUnique({
-    where: { ticketId },
-    select: { threadId: true },
-  });
-
-  if (!mapping) {
-    throwDiscordThreadNotFound();
-  }
-
-  if (mapping.threadId && mapping.threadId !== input.threadId) {
-    throwDiscordThreadConflict();
-  }
-
-  const updated = await prisma.supportTicketDiscordThread.updateMany({
-    where: {
-      ticketId,
-      OR: [{ threadId: null }, { threadId: input.threadId }],
-    },
-    data: {
-      threadId: input.threadId,
-      createdByDiscordUserId: input.createdByDiscordUserId,
-      status: 'thread_created',
-    },
-  });
-
-  if (updated.count === 0) {
-    const current = await prisma.supportTicketDiscordThread.findUnique({
+  return prisma.$transaction(async (tx) => {
+    const ticketId = await findTicketId(tx, input.publicId);
+    const mapping = await tx.supportTicketDiscordThread.findUnique({
       where: { ticketId },
       select: { threadId: true },
     });
 
-    if (!current) {
+    if (!mapping) {
       throwDiscordThreadNotFound();
     }
 
-    if (current.threadId !== input.threadId) {
+    if (mapping.threadId && mapping.threadId !== input.threadId) {
       throwDiscordThreadConflict();
     }
-  }
 
-  return {
-    publicId: input.publicId,
-    threadId: input.threadId,
-    status: 'thread_created',
-  };
+    const updated = await tx.supportTicketDiscordThread.updateMany({
+      where: {
+        ticketId,
+        OR: [{ threadId: null }, { threadId: input.threadId }],
+      },
+      data: {
+        threadId: input.threadId,
+        createdByDiscordUserId: input.createdByDiscordUserId,
+        status: 'thread_created',
+      },
+    });
+
+    if (updated.count === 0) {
+      const current = await tx.supportTicketDiscordThread.findUnique({
+        where: { ticketId },
+        select: { threadId: true },
+      });
+
+      if (!current) {
+        throwDiscordThreadNotFound();
+      }
+
+      if (current.threadId !== input.threadId) {
+        throwDiscordThreadConflict();
+      }
+    }
+
+    return {
+      publicId: input.publicId,
+      threadId: input.threadId,
+      status: 'thread_created',
+    };
+  });
 }
 
 export async function getSupportTicketActionContextForDiscord(publicId: string) {
@@ -379,46 +372,48 @@ export async function updateSupportTicketStatusFromDiscord(input: UpdateSupportT
 }
 
 export async function archiveSupportThread(input: ArchiveSupportThreadInput) {
-  const ticketId = await findTicketId(input.publicId);
-  const mapping = await prisma.supportTicketDiscordThread.findUnique({
-    where: { ticketId },
-    select: { archivedAt: true },
-  });
+  return prisma.$transaction(async (tx) => {
+    const ticketId = await findTicketId(tx, input.publicId);
+    const mapping = await tx.supportTicketDiscordThread.findUnique({
+      where: { ticketId },
+      select: { archivedAt: true },
+    });
 
-  if (!mapping) {
-    throwDiscordThreadNotFound();
-  }
+    if (!mapping) {
+      throwDiscordThreadNotFound();
+    }
 
-  if (mapping.archivedAt) {
+    if (mapping.archivedAt) {
+      return {
+        publicId: input.publicId,
+        archivedByDiscordUserId: input.actorDiscordUserId,
+        status: 'archived',
+      };
+    }
+
+    const archived = await tx.supportTicketDiscordThread.updateMany({
+      where: { ticketId, archivedAt: null },
+      data: {
+        archivedAt: new Date(),
+        status: 'archived',
+      },
+    });
+
+    if (archived.count === 0) {
+      const current = await tx.supportTicketDiscordThread.findUnique({
+        where: { ticketId },
+        select: { archivedAt: true },
+      });
+
+      if (!current) {
+        throwDiscordThreadNotFound();
+      }
+    }
+
     return {
       publicId: input.publicId,
       archivedByDiscordUserId: input.actorDiscordUserId,
       status: 'archived',
     };
-  }
-
-  const archived = await prisma.supportTicketDiscordThread.updateMany({
-    where: { ticketId, archivedAt: null },
-    data: {
-      archivedAt: new Date(),
-      status: 'archived',
-    },
   });
-
-  if (archived.count === 0) {
-    const current = await prisma.supportTicketDiscordThread.findUnique({
-      where: { ticketId },
-      select: { archivedAt: true },
-    });
-
-    if (!current) {
-      throwDiscordThreadNotFound();
-    }
-  }
-
-  return {
-    publicId: input.publicId,
-    archivedByDiscordUserId: input.actorDiscordUserId,
-    status: 'archived',
-  };
 }

@@ -6,17 +6,14 @@ import {
   type TextChannel,
 } from 'discord.js';
 
+import { DISCORD_SUPPORT_BUTTON_STATUSES } from '@pocketrealm/shared/support/supportTickets';
+
 import { PocketRealmApiError, type PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { parseSupportButtonId } from '../discord/components.js';
+import { isRecord } from '../utils.js';
 
-const STATUS_ACTIONS = new Map<string, string>([
-  ['needs_info', 'needs_info'],
-  ['accepted', 'accepted'],
-  ['rejected', 'rejected'],
-  ['security', 'security'],
-  ['closed', 'closed'],
-]);
+const STATUS_ACTIONS = new Set<string>(DISCORD_SUPPORT_BUTTON_STATUSES);
 
 interface SupportThreadActionOptions {
   api: Pick<PocketRealmApiClient, 'get' | 'post'>;
@@ -52,12 +49,16 @@ interface EditableTriageMessage {
 }
 
 export function isStaffMember(member: unknown, staffRoleIds: Set<string>): boolean {
-  if (!isRecord(member) || !isRecord(member.roles)) {
+  if (!isRecord(member)) {
     return false;
   }
 
   if (Array.isArray(member.roles)) {
     return member.roles.some((roleId) => typeof roleId === 'string' && staffRoleIds.has(roleId));
+  }
+
+  if (!isRecord(member.roles)) {
+    return false;
   }
 
   const cache = member.roles.cache;
@@ -105,9 +106,8 @@ export async function handleSupportThreadAction(
       return;
     }
 
-    const status = STATUS_ACTIONS.get(parsed.action);
-    if (status) {
-      await handleStatusUpdate(interaction, options.api, parsed.publicId, status);
+    if (STATUS_ACTIONS.has(parsed.action)) {
+      await handleStatusUpdate(interaction, options.api, parsed.publicId, parsed.action);
       return;
     }
 
@@ -156,15 +156,8 @@ async function handleAskReporter(
     reporterAddFailed = await addThreadMember(thread, ticket.reporterDiscordUserId);
   }
 
-  await thread.send({
-    content: [
-      `Support follow-up for \`${ticket.publicId}\`: ${ticket.title}`,
-      ticket.reporterDiscordUserId
-        ? 'Use this thread for staff questions and reporter follow-up. Keep raw private report details in staff tools.'
-        : 'Reporter Discord account is not linked or available. Use this thread for staff coordination only.',
-    ].join('\n'),
-  });
-
+  // Register the thread before posting into it so a registration conflict only
+  // ever has to clean up an empty thread.
   try {
     await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/thread`, {
       threadId: thread.id,
@@ -176,7 +169,7 @@ async function handleAskReporter(
       const existingThreadId = await refetchThreadId(api, ticket.publicId);
       const cleanupMessage = duplicateCleanedUp
         ? 'Removed the duplicate thread.'
-        : 'A duplicate thread was created but could not be removed automatically.';
+        : `A duplicate thread (<#${thread.id}>) was created but could not be removed automatically. Remove it manually.`;
       await interaction.editReply({
         content: existingThreadId
           ? `Follow-up thread already exists: <#${existingThreadId}>. ${cleanupMessage}`
@@ -188,11 +181,52 @@ async function handleAskReporter(
     throw error;
   }
 
+  const introSendFailed = await sendFollowUpIntro(thread, ticket);
+
   await interaction.editReply({
-    content: actorAddFailed || reporterAddFailed
-      ? `Created follow-up thread <#${thread.id}>, but ${threadAddFailureLabel(actorAddFailed, reporterAddFailed)} could not be added.`
-      : `Created follow-up thread <#${thread.id}>.`,
+    content: askReporterSuccessCopy(thread.id, actorAddFailed, reporterAddFailed, introSendFailed),
   });
+}
+
+async function sendFollowUpIntro(
+  thread: { send(payload: { content: string }): Promise<unknown> },
+  ticket: SupportActionContextResponse['ticket'],
+): Promise<boolean> {
+  try {
+    await thread.send({
+      content: [
+        `Support follow-up for \`${ticket.publicId}\`: ${ticket.title}`,
+        ticket.reporterDiscordUserId
+          ? 'Use this thread for staff questions and reporter follow-up. Keep raw private report details in staff tools.'
+          : 'Reporter Discord account is not linked or available. Use this thread for staff coordination only.',
+      ].join('\n'),
+    });
+    return false;
+  } catch {
+    // The thread is registered canonically; the intro message is repairable by hand.
+    return true;
+  }
+}
+
+function askReporterSuccessCopy(
+  threadId: string,
+  actorAddFailed: boolean,
+  reporterAddFailed: boolean,
+  introSendFailed: boolean,
+): string {
+  const caveats: string[] = [];
+  if (actorAddFailed || reporterAddFailed) {
+    caveats.push(`${threadAddFailureLabel(actorAddFailed, reporterAddFailed)} could not be added`);
+  }
+  if (introSendFailed) {
+    caveats.push('the introduction message could not be posted; post follow-up questions in the thread manually');
+  }
+
+  if (caveats.length === 0) {
+    return `Created follow-up thread <#${threadId}>.`;
+  }
+
+  return `Created follow-up thread <#${threadId}>, but ${caveats.join(' and ')}.`;
 }
 
 async function handleStatusUpdate(
@@ -254,12 +288,14 @@ async function handleArchiveThread(
     return;
   }
 
+  let thread: PrivateThreadChannel;
   try {
-    const thread = await resolveArchiveTargetThread(interaction.channel, ticket.threadId);
-    if (!thread) {
+    const resolvedThread = await resolveArchiveTargetThread(interaction.channel, ticket.threadId);
+    if (!resolvedThread) {
       throw new Error('Mapped support thread could not be resolved.');
     }
 
+    thread = resolvedThread;
     await thread.setArchived(true, `Support thread archived for ${ticket.publicId}`);
   } catch {
     await interaction.editReply({
@@ -268,12 +304,32 @@ async function handleArchiveThread(
     return;
   }
 
-  await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/archive-thread`, {
-    actorDiscordUserId: interaction.user.id,
-  });
+  try {
+    await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/archive-thread`, {
+      actorDiscordUserId: interaction.user.id,
+    });
+  } catch {
+    const reverted = await revertThreadArchive(thread, ticket.publicId);
+    await interaction.editReply({
+      content: reverted
+        ? `Could not mark \`${ticket.publicId}\` archived in PocketRealm. The Discord thread was unarchived; try again.`
+        : `Archived the Discord thread for \`${ticket.publicId}\`, but PocketRealm still shows it open and the thread could not be unarchived. Repair it with staff tools.`,
+    });
+    return;
+  }
+
   await interaction.editReply({
     content: `Archived support thread for \`${ticket.publicId}\`.`,
   });
+}
+
+async function revertThreadArchive(thread: PrivateThreadChannel, publicId: string): Promise<boolean> {
+  try {
+    await thread.setArchived(false, `Reverting archive for ${publicId} after the PocketRealm update failed`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function updateTriageMessageStatus(
@@ -484,10 +540,6 @@ function isDiscordThreadConflict(error: unknown): boolean {
   return isRecord(error) &&
     error.statusCode === 409 &&
     error.code === 'SUPPORT_DISCORD_THREAD_CONFLICT';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

@@ -242,6 +242,66 @@ describe('AdminScreen support tab', () => {
     await waitFor(() => expect(adminListSupportTicketsMock).toHaveBeenCalledTimes(2));
   });
 
+  it('clears local drafts after a successful apply so refreshed server data wins', async () => {
+    const refreshedTickets = supportTickets.map((ticket) => (
+      ticket.id === 'SUP-1B10429D'
+        ? {
+            ...ticket,
+            status: 'accepted',
+            githubIssueUrl: 'https://github.com/pocketrealm/pocketrealm/issues/99',
+          }
+        : ticket
+    ));
+    adminListSupportTicketsMock
+      .mockResolvedValueOnce({ data: { tickets: supportTickets }, error: null })
+      .mockResolvedValueOnce({ data: { tickets: refreshedTickets }, error: null });
+
+    await openSupportTab();
+    await screen.findByTestId('support-ticket-SUP-1B10429D');
+
+    const row = screen.getByTestId('support-ticket-SUP-1B10429D');
+    fireEvent.change(within(row).getByLabelText('Status'), { target: { value: 'duplicate' } });
+    fireEvent.change(within(row).getByLabelText('Staff note'), {
+      target: { value: 'Stale draft note that must not be resubmitted.' },
+    });
+    fireEvent.click(within(row).getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => expect(adminListSupportTicketsMock).toHaveBeenCalledTimes(2));
+
+    const refreshedRow = screen.getByTestId('support-ticket-SUP-1B10429D');
+    await waitFor(() => expect(within(refreshedRow).getByLabelText('Status')).toHaveProperty('value', 'accepted'));
+    expect(within(refreshedRow).getByLabelText('Staff note')).toHaveProperty('value', '');
+    expect(within(refreshedRow).getByLabelText('GitHub issue URL')).toHaveProperty(
+      'value',
+      'https://github.com/pocketrealm/pocketrealm/issues/99',
+    );
+  });
+
+  it('discards local drafts when tickets are refreshed', async () => {
+    const refreshedTickets = supportTickets.map((ticket) => (
+      ticket.id === 'SUP-1B10429D' ? { ...ticket, status: 'needs_info' } : ticket
+    ));
+    adminListSupportTicketsMock
+      .mockResolvedValueOnce({ data: { tickets: supportTickets }, error: null })
+      .mockResolvedValueOnce({ data: { tickets: refreshedTickets }, error: null });
+
+    await openSupportTab();
+    await screen.findByTestId('support-ticket-SUP-1B10429D');
+
+    const row = screen.getByTestId('support-ticket-SUP-1B10429D');
+    fireEvent.change(within(row).getByLabelText('Status'), { target: { value: 'rejected' } });
+    fireEvent.change(within(row).getByLabelText('Staff note'), {
+      target: { value: 'Draft note that should be discarded on refresh.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    await waitFor(() => expect(adminListSupportTicketsMock).toHaveBeenCalledTimes(2));
+
+    const refreshedRow = screen.getByTestId('support-ticket-SUP-1B10429D');
+    await waitFor(() => expect(within(refreshedRow).getByLabelText('Status')).toHaveProperty('value', 'needs_info'));
+    expect(within(refreshedRow).getByLabelText('Staff note')).toHaveProperty('value', '');
+  });
+
   it('applies pasted Codex JSONL decisions in bulk', async () => {
     await openSupportTab();
 

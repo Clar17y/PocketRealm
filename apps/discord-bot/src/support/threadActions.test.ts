@@ -114,6 +114,48 @@ describe('handleSupportThreadAction', () => {
     });
   });
 
+  it('registers the follow-up thread with the API before posting the intro message into it', async () => {
+    const api = createApi(ticketContext);
+    const thread = createThread();
+    const interaction = createButtonInteraction({
+      customId: 'support:ask_reporter:SUP-ABC12345',
+      channel: createTriageChannel(thread),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(thread.send).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(api.post).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(thread.send).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('still reports thread creation with a note when the intro message cannot be posted after registration', async () => {
+    const api = createApi(ticketContext);
+    const thread = createThread();
+    vi.mocked(thread.send).mockRejectedValue(new Error('Missing Access') as never);
+    const interaction = createButtonInteraction({
+      customId: 'support:ask_reporter:SUP-ABC12345',
+      channel: createTriageChannel(thread),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/support/tickets/SUP-ABC12345/thread', {
+      threadId: THREAD_ID,
+      createdByDiscordUserId: ACTOR_ID,
+    });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining(`<#${THREAD_ID}>`),
+    });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('introduction message could not be posted'),
+    });
+  });
+
   it('cleans up a duplicate follow-up thread when recording hits a mapping conflict', async () => {
     const conflict = Object.assign(new Error('Conflict'), { statusCode: 409, code: 'SUPPORT_DISCORD_THREAD_CONFLICT' });
     const api = createApi(ticketContext);
@@ -127,9 +169,33 @@ describe('handleSupportThreadAction', () => {
 
     await handleSupportThreadAction(interaction, { api, config });
 
+    expect(thread.send).not.toHaveBeenCalled();
     expect(thread.setArchived).toHaveBeenCalledWith(true, 'Duplicate support follow-up for SUP-ABC12345');
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('already exists'),
+    });
+  });
+
+  it('includes the orphan thread id when duplicate cleanup fails after a mapping conflict', async () => {
+    const conflict = Object.assign(new Error('Conflict'), { statusCode: 409, code: 'SUPPORT_DISCORD_THREAD_CONFLICT' });
+    const api = createApi(ticketContext);
+    vi.mocked(api.post).mockRejectedValue(conflict as never);
+    const thread = createThread();
+    vi.mocked(thread.setArchived).mockRejectedValue(new Error('Missing Permissions') as never);
+    const interaction = createButtonInteraction({
+      customId: 'support:ask_reporter:SUP-ABC12345',
+      channel: createTriageChannel(thread),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(thread.send).not.toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining(`<#${THREAD_ID}>`),
+    });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('could not be removed automatically'),
     });
   });
 
@@ -212,6 +278,56 @@ describe('handleSupportThreadAction', () => {
     );
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: 'Archived support thread for `SUP-ABC12345`.',
+    });
+  });
+
+  it('reverts the Discord archive and reports partial failure when the archive API call fails', async () => {
+    const api = createApi({
+      ticket: {
+        ...ticketContext.ticket,
+        threadId: THREAD_ID,
+      },
+    });
+    vi.mocked(api.post).mockRejectedValue(new Error('API down') as never);
+    const thread = createThread();
+    const interaction = createButtonInteraction({
+      customId: 'support:archive_thread:SUP-ABC12345',
+      channel: thread,
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(thread.setArchived).toHaveBeenNthCalledWith(1, true, 'Support thread archived for SUP-ABC12345');
+    expect(thread.setArchived).toHaveBeenNthCalledWith(2, false, expect.stringContaining('Reverting archive'));
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Could not mark `SUP-ABC12345` archived in PocketRealm. The Discord thread was unarchived; try again.',
+    });
+  });
+
+  it('points staff at manual repair when the archive API call fails and the revert also fails', async () => {
+    const api = createApi({
+      ticket: {
+        ...ticketContext.ticket,
+        threadId: THREAD_ID,
+      },
+    });
+    vi.mocked(api.post).mockRejectedValue(new Error('API down') as never);
+    const thread = createThread();
+    vi.mocked(thread.setArchived)
+      .mockResolvedValueOnce(undefined as never)
+      .mockRejectedValueOnce(new Error('Missing Permissions') as never);
+    const interaction = createButtonInteraction({
+      customId: 'support:archive_thread:SUP-ABC12345',
+      channel: thread,
+      member: memberWithRoles([STAFF_ROLE_ID]),
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    expect(thread.setArchived).toHaveBeenCalledTimes(2);
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('Repair it with staff tools'),
     });
   });
 

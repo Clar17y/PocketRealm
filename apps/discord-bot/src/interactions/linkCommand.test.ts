@@ -2,7 +2,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
-import { formatDiscordTimestamp, handleLinkCommand } from './linkCommand.js';
+import { handleLinkCommand } from './linkCommand.js';
 
 describe('handleLinkCommand', () => {
   it('defers ephemerally, creates a link code, and edits the reply with the code', async () => {
@@ -30,6 +30,9 @@ describe('handleLinkCommand', () => {
     });
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('Enter this code in PocketRealm Settings: ABC12345'),
+    });
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('<t:1780574400:F>'),
     });
   });
 
@@ -73,15 +76,5 @@ describe('handleLinkCommand', () => {
       ephemeral: true,
       content: '/link only works in the PocketRealm Discord server.',
     });
-  });
-});
-
-describe('formatDiscordTimestamp', () => {
-  it('formats valid dates as Discord timestamps', () => {
-    expect(formatDiscordTimestamp('2026-06-04T12:00:00.000Z')).toBe('<t:1780574400:F>');
-  });
-
-  it('falls back to clear copy for invalid dates', () => {
-    expect(formatDiscordTimestamp('not-a-date')).toBe('the listed expiry time');
   });
 });

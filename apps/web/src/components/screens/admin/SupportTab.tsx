@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import {
+  SUPPORT_SENSITIVITY_FLAGS,
+  SUPPORT_TICKET_STATUSES,
+} from '@pocketrealm/shared/support/supportTickets';
 import { PixelButton } from '@/components/PixelButton';
 import { PixelCard } from '@/components/PixelCard';
 import {
@@ -14,25 +18,9 @@ import { useAdminAction } from './useAdminAction';
 
 const DEFAULT_STATUS_FILTER = 'new,needs_info';
 
-const STATUS_OPTIONS: AdminSupportTicketStatus[] = [
-  'new',
-  'needs_info',
-  'accepted',
-  'duplicate',
-  'known_issue',
-  'rejected',
-  'security',
-  'closed',
-];
+const STATUS_OPTIONS = SUPPORT_TICKET_STATUSES;
 
-const SENSITIVITY_FLAGS: AdminSupportSensitivityFlag[] = [
-  'personal_data',
-  'payment',
-  'account',
-  'security',
-  'exploit',
-  'harassment',
-];
+const SENSITIVITY_FLAGS = SUPPORT_SENSITIVITY_FLAGS;
 
 interface TicketDraft {
   status: AdminSupportTicketStatus;
@@ -171,6 +159,9 @@ export function SupportTab() {
         return;
       }
       setTickets(res.data?.tickets ?? []);
+      // Drop local drafts so fresh server data wins after any reload, and a
+      // re-applied draft can never resubmit a stale staff note.
+      setDrafts({});
     } finally {
       setLoading(false);
     }

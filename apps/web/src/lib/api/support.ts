@@ -1,20 +1,11 @@
+import type {
+  SupportTicketArea,
+  SupportTicketCategory,
+  SupportTicketPrivacy,
+} from '@pocketrealm/shared/support/supportTickets';
 import { fetchApi } from './core';
 
-export type SupportTicketPrivacy = 'public_candidate' | 'private' | 'not_sure';
-export type SupportTicketCategory = 'bug' | 'suggestion' | 'balance' | 'account' | 'security' | 'abuse' | 'other';
-export type SupportTicketArea =
-  | 'combat'
-  | 'exploration'
-  | 'crafting'
-  | 'inventory'
-  | 'social'
-  | 'guild'
-  | 'casino'
-  | 'payments'
-  | 'auth'
-  | 'mobile'
-  | 'performance'
-  | 'other';
+export type { SupportTicketArea, SupportTicketCategory, SupportTicketPrivacy };
 
 export interface CreateSupportTicketRequest {
   privacy: SupportTicketPrivacy;

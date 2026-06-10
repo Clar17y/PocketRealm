@@ -4,6 +4,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
+import { formatDiscordTimestamp } from '../utils.js';
 
 interface ProfileResponse {
   profile: {
@@ -193,7 +194,7 @@ function formatTurns(turns: TurnsResponse['turns']): string {
   }
 
   if (turns.lastRegenAt) {
-    lines.push(`Last regenerated: ${formatDiscordTimestamp(turns.lastRegenAt)}.`);
+    lines.push(`Last regenerated: ${formatDiscordTimestamp(turns.lastRegenAt, 'R', 'unknown')}.`);
   }
 
   return lines.join('\n');
@@ -223,7 +224,7 @@ function buildRankEmbed(rank: RankResponse['rank']): EmbedBuilder {
   }
 
   if (rank.lastRefreshedAt) {
-    lines.push(`Updated: ${formatDiscordTimestamp(rank.lastRefreshedAt)}`);
+    lines.push(`Updated: ${formatDiscordTimestamp(rank.lastRefreshedAt, 'R', 'unknown')}`);
   }
 
   return new EmbedBuilder()
@@ -247,13 +248,4 @@ function formatDuration(milliseconds: number): string {
   if (hours === 0) return `${minutes}m`;
   if (minutes === 0) return `${hours}h`;
   return `${hours}h ${minutes}m`;
-}
-
-function formatDiscordTimestamp(value: string): string {
-  const timestamp = Math.floor(new Date(value).getTime() / 1000);
-  if (!Number.isFinite(timestamp)) {
-    return 'unknown';
-  }
-
-  return `<t:${timestamp}:R>`;
 }

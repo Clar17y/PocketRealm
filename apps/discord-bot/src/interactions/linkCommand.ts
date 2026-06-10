@@ -1,6 +1,7 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { formatDiscordTimestamp } from '../utils.js';
 
 interface LinkCodeResponse {
   code: string;
@@ -37,15 +38,6 @@ export async function handleLinkCommand(
   }
 
   await interaction.editReply({
-    content: `Enter this code in PocketRealm Settings: ${response.code}\nIt expires at ${formatDiscordTimestamp(response.expiresAt)}.`,
+    content: `Enter this code in PocketRealm Settings: ${response.code}\nIt expires at ${formatDiscordTimestamp(response.expiresAt, 'F', 'the listed expiry time')}.`,
   });
-}
-
-export function formatDiscordTimestamp(value: string): string {
-  const timestamp = Math.floor(new Date(value).getTime() / 1000);
-  if (!Number.isFinite(timestamp)) {
-    return 'the listed expiry time';
-  }
-
-  return `<t:${timestamp}:F>`;
 }

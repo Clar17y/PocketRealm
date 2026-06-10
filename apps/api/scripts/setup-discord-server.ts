@@ -1,6 +1,35 @@
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 import { loadLocalEnvFile, readDiscordSetupOptions, setupDiscordServer } from '../src/services/discordServerSetup';
+
+const SETUP_ENV_FILENAME = '.discord-setup.env';
+
+function maskSecret(value: string): string {
+  return `...${value.slice(-4)}`;
+}
+
+/** Update key=value in the env file (preserving other lines), appending when missing. */
+function upsertEnvValue(filePath: string, key: string, value: string): void {
+  const lines = existsSync(filePath)
+    ? readFileSync(filePath, 'utf8').split(/\r?\n/)
+    : [];
+
+  while (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
+    lines.pop();
+  }
+
+  const line = `${key}=${value}`;
+  const keyIndex = lines.findIndex((entry) => entry.trim().startsWith(`${key}=`));
+
+  if (keyIndex >= 0) {
+    lines[keyIndex] = line;
+  } else {
+    lines.push(line);
+  }
+
+  writeFileSync(filePath, `${lines.join('\n')}\n`, 'utf8');
+}
 
 async function main(): Promise<void> {
   loadLocalEnvFile(resolve(process.cwd(), '../..'));
@@ -18,8 +47,16 @@ async function main(): Promise<void> {
   console.log(`Starter messages: ${result.seededStarterMessages.length} posted, ${result.existingStarterMessages.length} existing.`);
   console.log(`AutoMod rules: ${result.createdAutoModRules.length} created, ${result.updatedAutoModRules.length} updated.`);
   console.log('');
-  console.log('Set this on the API service if webhook mirroring is enabled:');
-  console.log(`DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL=${result.webhookUrl}`);
+  if (result.webhookUrl) {
+    // The webhook URL embeds its token; keep it out of stdout and write it to
+    // the gitignored local setup env file instead.
+    const setupEnvPath = resolve(__dirname, '..', SETUP_ENV_FILENAME);
+    upsertEnvValue(setupEnvPath, 'DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL', result.webhookUrl);
+    console.log('Set this on the API service if webhook mirroring is enabled:');
+    console.log(`DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL=${maskSecret(result.webhookUrl)} (full value written to ${setupEnvPath})`);
+  } else {
+    console.log('No support triage webhook URL was returned by Discord.');
+  }
   console.log('');
   console.log('Set these on the Discord bot worker:');
   console.log(`DISCORD_SUPPORT_CATEGORY_ID=${result.categoryIdsByName.Support ?? ''}`);

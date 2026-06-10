@@ -1,3 +1,5 @@
+import { isRecord } from '../utils.js';
+
 const DEFAULT_SCAN_LIMIT = 100;
 const MAX_SCAN_LIMIT = 100;
 const MIN_SCAN_LIMIT = 1;
@@ -165,8 +167,4 @@ function compareNewestFirst(a: TriageCleanupMessage, b: TriageCleanupMessage): n
   }
 
   return b.id.localeCompare(a.id);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }

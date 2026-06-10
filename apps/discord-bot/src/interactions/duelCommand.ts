@@ -20,6 +20,7 @@ import {
   duelReplayButtonId,
   parseDuelButtonId,
 } from '../discord/components.js';
+import { isRecord, truncateText } from '../utils.js';
 
 type DuelApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
 type DuelCommandConfig = Pick<BotConfig, 'duelsChannelId'>;
@@ -117,10 +118,19 @@ export async function handleDuelCommand(
     return;
   }
 
-  const replyResult = await interaction.followUp({
-    content: `<@${opponent.id}>, ${interaction.user} challenged you to a friendly simulation.`,
-    components: [buildChallengeRow(response.duel.id, opponent.id)],
-  });
+  let replyResult: unknown;
+  try {
+    replyResult = await interaction.followUp({
+      content: `<@${opponent.id}>, ${interaction.user} challenged you to a friendly simulation.`,
+      components: [buildChallengeRow(response.duel.id, opponent.id)],
+    });
+  } catch {
+    await interaction.editReply({
+      content: 'Could not post the public duel challenge. Please run /duel again.',
+    });
+    return;
+  }
+
   await interaction.editReply({ content: 'Friendly simulation challenge posted.' });
   await recordDuelMessage(api, interaction, response.duel.id, replyResult);
 }
@@ -436,12 +446,4 @@ function resolveDuelErrorCopy(error: unknown): string {
   }
 
   return 'Unable to resolve that friendly duel right now. Please try again later.';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function truncateText(value: string, maxLength: number): string {
-  return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
 }

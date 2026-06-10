@@ -95,7 +95,7 @@ export async function routeInteraction(
   }
 
   if (interaction.commandName === 'report') {
-    await handleReportCommand(interaction);
+    await handleReportCommand(interaction, options.api, options.config);
     return;
   }
 

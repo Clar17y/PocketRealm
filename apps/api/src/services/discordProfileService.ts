@@ -1,7 +1,13 @@
 import { prisma } from '@pocketrealm/database';
 import { resolveAchievementTitleDisplay } from '@pocketrealm/shared/utils/titleDisplay';
 import { AppError } from '../middleware/errorHandler';
+import {
+  DISCORD_LINK_REQUIRED_ERROR,
+  requireLinkedDiscordPlayer,
+  type LinkedDiscordActivePlayer,
+} from './discordLinkedPlayer';
 import { getLeaderboard } from './leaderboardService';
+import { realmLabelFor } from './supportTicketService';
 import { getTurnState } from './turnBankService';
 
 export interface DiscordUserLookup {
@@ -9,66 +15,19 @@ export interface DiscordUserLookup {
   discordUserId: string;
 }
 
-interface LinkedDiscordActivePlayer {
-  id: string;
-  username: string;
-  characterLevel: number;
-  seasonId: string | null;
-  activeTitle: string | null;
-  season: { name: string } | null;
-}
-
 interface LinkedDiscordContext {
   accountId: string;
   player: LinkedDiscordActivePlayer;
 }
 
-function realmLabelFor(player: Pick<LinkedDiscordActivePlayer, 'seasonId' | 'season'>): string {
-  if (!player.seasonId) return 'Preseason';
-  return player.season?.name ?? 'Seasonal Realm';
-}
-
 async function getLinkedDiscordContext(input: DiscordUserLookup): Promise<LinkedDiscordContext> {
-  const link = await prisma.discordAccountLink.findFirst({
-    where: {
-      discordGuildId: input.guildId,
-      discordUserId: input.discordUserId,
-      unlinkedAt: null,
-    },
-    orderBy: { linkedAt: 'desc' },
-    select: {
-      account: {
-        select: {
-          id: true,
-          activePlayerId: true,
-          activePlayer: {
-            select: {
-              id: true,
-              username: true,
-              characterLevel: true,
-              seasonId: true,
-              activeTitle: true,
-              season: { select: { name: true } },
-            },
-          },
-        },
-      },
+  return requireLinkedDiscordPlayer(input, {
+    linkRequired: DISCORD_LINK_REQUIRED_ERROR,
+    playerRequired: {
+      message: 'Linked PocketRealm account has no active player',
+      code: 'DISCORD_PLAYER_NOT_FOUND',
     },
   });
-
-  if (!link) {
-    throw new AppError(404, 'Discord account is not linked to a PocketRealm account', 'DISCORD_LINK_REQUIRED');
-  }
-
-  const player = link.account.activePlayer;
-  if (!link.account.activePlayerId || !player) {
-    throw new AppError(404, 'Linked PocketRealm account has no active player', 'DISCORD_PLAYER_NOT_FOUND');
-  }
-
-  return {
-    accountId: link.account.id,
-    player,
-  };
 }
 
 export async function getLinkedDiscordProfile(input: DiscordUserLookup) {
@@ -79,7 +38,7 @@ export async function getLinkedDiscordProfile(input: DiscordUserLookup) {
     username: player.username,
     characterLevel: player.characterLevel,
     activeTitle: titleDisplay.title ?? null,
-    realmLabel: realmLabelFor(player),
+    realmLabel: realmLabelFor(player.seasonId, player.season?.name),
   };
 }
 

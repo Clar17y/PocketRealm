@@ -5,7 +5,6 @@ import {
   calculateMaxMana, calculateManaRegenPerRound,
 } from '@pocketrealm/game-engine';
 import type { SkillType } from '@pocketrealm/shared';
-import { getTalentNode } from '@pocketrealm/shared/constants/talentTreeDefinitions';
 import { normalizePlayerAttributes } from './attributesService';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
 import { getSkillLevels, getMainHandAttackSkill, buildPerActionScaling } from './combatStatsService';
@@ -13,7 +12,7 @@ import { getActiveTemplate } from './combatTemplateService';
 import { getEquipmentStats } from './equipmentService';
 import { getHpState } from './hpService';
 import { getResourceState } from './resourceService';
-import { getSkillPoints } from './skillPointService';
+import { deriveUnlockedActions, getSkillPoints } from './skillPointService';
 import { skillPointAllocationsSchema } from '../utils/jsonColumnSchemas';
 
 export type AttackStyle = 'melee' | 'ranged' | 'magic';
@@ -41,13 +40,7 @@ async function getReadonlyUnlockedActions(playerId: string): Promise<string[]> {
   });
   const allocations = skillPointAllocationsSchema.catch({}).parse(record?.allocations ?? {});
 
-  const unlockedActions: string[] = [];
-  for (const nodeId of Object.keys(allocations)) {
-    const node = getTalentNode(nodeId);
-    if (node?.unlocksAction) unlockedActions.push(node.unlocksAction);
-  }
-
-  return unlockedActions;
+  return deriveUnlockedActions(allocations);
 }
 
 /**

@@ -33,8 +33,8 @@ import {
   getLinkedDiscordTurns,
 } from './discordProfileService';
 
-const DISCORD_USER_ID = '1234567890123456';
-const DISCORD_GUILD_ID = '2345678901234567';
+const DISCORD_USER_ID = '12345678901234567';
+const DISCORD_GUILD_ID = '23456789012345678';
 
 function linkedAccount(activePlayer: object | null = {
   id: 'player-1',

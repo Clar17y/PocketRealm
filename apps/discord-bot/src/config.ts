@@ -1,6 +1,7 @@
+import { DISCORD_SNOWFLAKE_REGEX } from '@pocketrealm/shared/discord/discordIds';
 import { z } from 'zod';
 
-const snowflakeSchema = z.string().trim().regex(/^\d{17,20}$/, 'Expected a Discord snowflake id');
+const snowflakeSchema = z.string().trim().regex(DISCORD_SNOWFLAKE_REGEX, 'Expected a Discord snowflake id');
 const optionalSnowflakeSchema = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
   snowflakeSchema.optional(),
@@ -14,6 +15,7 @@ const envSchema = z.object({
   DISCORD_GUILD_ID: snowflakeSchema,
   POCKETREALM_API_BASE_URL: requiredUrlSchema,
   POCKETREALM_WEB_BASE_URL: requiredUrlSchema,
+  REDIS_URL: requiredUrlSchema,
   DISCORD_INTERNAL_API_KEY: z.string().trim().min(32),
   DISCORD_BOT_HEALTH_CHANNEL_ID: snowflakeSchema,
   DISCORD_WELCOME_CHANNEL_ID: optionalSnowflakeSchema,
@@ -34,6 +36,7 @@ export interface BotConfig {
   guildId: string;
   apiBaseUrl: string;
   webBaseUrl: string;
+  redisUrl: string;
   internalApiKey: string;
   botHealthChannelId: string;
   welcomeChannelId: string | null;
@@ -92,6 +95,7 @@ export function parseBotConfig(env: Record<string, string | undefined>): BotConf
     guildId: parsed.DISCORD_GUILD_ID,
     apiBaseUrl: parsed.POCKETREALM_API_BASE_URL,
     webBaseUrl: parsed.POCKETREALM_WEB_BASE_URL,
+    redisUrl: parsed.REDIS_URL,
     internalApiKey: parsed.DISCORD_INTERNAL_API_KEY,
     botHealthChannelId: parsed.DISCORD_BOT_HEALTH_CHANNEL_ID,
     welcomeChannelId: parsed.DISCORD_WELCOME_CHANNEL_ID ?? null,

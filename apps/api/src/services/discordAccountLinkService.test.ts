@@ -41,10 +41,11 @@ import {
 
 const NOW = new Date('2026-06-04T12:00:00.000Z');
 const FUTURE = new Date('2026-06-04T12:15:00.000Z');
-const DISCORD_USER_ID = '1234567890123456';
-const DISCORD_GUILD_ID = '2345678901234567';
-const VALID_HMAC_SECRET = '12345678901234567890123456789012';
+const DISCORD_USER_ID = '12345678901234567';
+const DISCORD_GUILD_ID = '23456789012345678';
+const VALID_HMAC_SECRET = 'abcdefghijklmnopqrstuvwxyz-123456789';
 const ORIGINAL_DISCORD_INTERNAL_API_KEY = process.env.DISCORD_INTERNAL_API_KEY;
+const ORIGINAL_DISCORD_LINK_CODE_SECRET = process.env.DISCORD_LINK_CODE_SECRET;
 
 const tx = {
   discordLinkCode: {
@@ -57,6 +58,7 @@ const tx = {
     create: vi.fn(),
   },
   playerAchievement: {
+    findUnique: vi.fn(),
     upsert: vi.fn(),
   },
 };
@@ -93,6 +95,7 @@ describe('discordAccountLinkService', () => {
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
     process.env.DISCORD_INTERNAL_API_KEY = VALID_HMAC_SECRET;
+    delete process.env.DISCORD_LINK_CODE_SECRET;
     mocks.prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
   });
 
@@ -102,6 +105,11 @@ describe('discordAccountLinkService', () => {
       delete process.env.DISCORD_INTERNAL_API_KEY;
     } else {
       process.env.DISCORD_INTERNAL_API_KEY = ORIGINAL_DISCORD_INTERNAL_API_KEY;
+    }
+    if (ORIGINAL_DISCORD_LINK_CODE_SECRET === undefined) {
+      delete process.env.DISCORD_LINK_CODE_SECRET;
+    } else {
+      process.env.DISCORD_LINK_CODE_SECRET = ORIGINAL_DISCORD_LINK_CODE_SECRET;
     }
   });
 
@@ -195,6 +203,7 @@ describe('discordAccountLinkService', () => {
     tx.discordAccountLink.findFirst.mockResolvedValue(null);
     tx.discordLinkCode.updateMany.mockResolvedValue({ count: 1 });
     tx.discordAccountLink.create.mockResolvedValue(linkRecord());
+    tx.playerAchievement.findUnique.mockResolvedValue(null);
     tx.playerAchievement.upsert.mockResolvedValue({});
 
     const result = await claimDiscordLinkCode({
@@ -245,7 +254,77 @@ describe('discordAccountLinkService', () => {
       linkedAt: NOW,
       roleSyncedAt: null,
       titleAchievementId: 'discord_linked',
+      achievementGranted: true,
     });
+  });
+
+  it('reports achievementGranted false when the achievement already exists', async () => {
+    tx.discordLinkCode.findUnique.mockResolvedValue({
+      id: 'code-1',
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+      expiresAt: FUTURE,
+      usedAt: null,
+    });
+    tx.discordAccountLink.findFirst.mockResolvedValue(null);
+    tx.discordLinkCode.updateMany.mockResolvedValue({ count: 1 });
+    tx.discordAccountLink.create.mockResolvedValue(linkRecord());
+    tx.playerAchievement.findUnique.mockResolvedValue({ playerId: 'player-1' });
+    tx.playerAchievement.upsert.mockResolvedValue({});
+
+    const result = await claimDiscordLinkCode({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      code: 'ABC12345',
+    });
+
+    expect(result.achievementGranted).toBe(false);
+    expect(tx.playerAchievement.upsert).toHaveBeenCalledOnce();
+  });
+
+  it('maps a deleted player to a 404 when granting the linked achievement', async () => {
+    tx.discordLinkCode.findUnique.mockResolvedValue({
+      id: 'code-1',
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+      expiresAt: FUTURE,
+      usedAt: null,
+    });
+    tx.discordAccountLink.findFirst.mockResolvedValue(null);
+    tx.discordLinkCode.updateMany.mockResolvedValue({ count: 1 });
+    tx.discordAccountLink.create.mockResolvedValue(linkRecord());
+    tx.playerAchievement.findUnique.mockResolvedValue(null);
+    tx.playerAchievement.upsert.mockRejectedValue(Object.assign(new Error('Foreign key constraint failed'), {
+      code: 'P2003',
+    }));
+
+    await expect(claimDiscordLinkCode({
+      accountId: 'account-1',
+      playerId: 'player-1',
+      code: 'ABC12345',
+    })).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'PLAYER_NOT_FOUND',
+      message: 'Player not found',
+    });
+  });
+
+  it('prefers the dedicated link-code secret over the internal API key', async () => {
+    process.env.DISCORD_LINK_CODE_SECRET = 'dedicated-link-code-secret-1234567890';
+    mocks.prisma.discordLinkCode.create.mockResolvedValue({});
+
+    const result = await createDiscordLinkCode({
+      discordUserId: DISCORD_USER_ID,
+      discordGuildId: DISCORD_GUILD_ID,
+    });
+
+    const dedicatedHash = createHmac('sha256', 'dedicated-link-code-secret-1234567890')
+      .update(result.code)
+      .digest('hex');
+    expect(mocks.prisma.discordLinkCode.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ codeHash: dedicatedHash }),
+    }));
+    expect(dedicatedHash).not.toBe(hmacLinkCode(result.code));
   });
 
   it.each([

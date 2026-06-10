@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { DISCORD_SNOWFLAKE_REGEX } from '@pocketrealm/shared/discord/discordIds';
 
-export const discordSnowflakeSchema = z.string().regex(/^\d{16,22}$/);
+export const discordSnowflakeSchema = z.string().regex(DISCORD_SNOWFLAKE_REGEX);
 
 export const discordGuildLinkSchema = z.object({
   discordUserId: discordSnowflakeSchema,

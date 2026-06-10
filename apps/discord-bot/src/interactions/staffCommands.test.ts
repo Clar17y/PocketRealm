@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
+import type { StaffPrismaClient } from '../prismaTypes.js';
 import { handleStaffCommand } from './staffCommands.js';
-import type { StaffPrismaClient } from './staffCommands.js';
 
 const guildId = '234567890123456789';
 const staffRoleId = '345678901234567890';
@@ -396,12 +396,13 @@ function createPrisma(options: { profile?: MockProfile | null } = {}): StaffPris
 
       return { count: 1 };
     }),
-    create: vi.fn(async ({ data }: { data: Omit<MockProfile, 'id' | 'lastRoleSyncAt' | 'excludedFromXp'> }) => {
+    create: vi.fn(async ({ data }: { data: Omit<MockProfile, 'id' | 'lastRoleSyncAt' | 'excludedFromXp' | 'dailyXpDate'> & { dailyXpDate?: Date | null } }) => {
       storedProfile = {
         id: 'profile-new',
         lastRoleSyncAt: null,
         excludedFromXp: false,
         ...data,
+        dailyXpDate: data.dailyXpDate ?? null,
       };
       return storedProfile;
     }),

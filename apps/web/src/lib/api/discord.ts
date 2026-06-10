@@ -51,16 +51,15 @@ export function normalizeDiscordLinkStatus(response: DiscordLinkApiResponse): Di
   return response;
 }
 
-export async function getDiscordLinkStatus(): Promise<ApiResponse<DiscordLinkStatusResponse>> {
-  const response = await fetchApi<DiscordLinkStatusGetResponse>('/api/v1/discord/link');
-  return response.data ? { data: normalizeDiscordLinkStatus(response.data) } : response;
+// These return the raw API shapes; DiscordLinkCard owns normalization via
+// normalizeDiscordLinkStatus, so responses are normalized exactly once.
+export function getDiscordLinkStatus(): Promise<ApiResponse<DiscordLinkStatusGetResponse>> {
+  return fetchApi<DiscordLinkStatusGetResponse>('/api/v1/discord/link');
 }
 
-export async function claimDiscordLinkCode(code: string): Promise<ApiResponse<DiscordLinkStatusResponse>> {
-  const response = await fetchApi<DiscordLinkClaimResponse>('/api/v1/discord/link', {
+export function claimDiscordLinkCode(code: string): Promise<ApiResponse<DiscordLinkClaimResponse>> {
+  return fetchApi<DiscordLinkClaimResponse>('/api/v1/discord/link', {
     method: 'POST',
     body: JSON.stringify({ code }),
   });
-
-  return response.data ? { data: normalizeDiscordLinkStatus(response.data) } : response;
 }

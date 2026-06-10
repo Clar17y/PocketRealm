@@ -8,6 +8,7 @@ const validEnv = {
   DISCORD_GUILD_ID: '234567890123456789',
   POCKETREALM_API_BASE_URL: 'https://api.pocketrealm.test',
   POCKETREALM_WEB_BASE_URL: 'https://pocketrealm.test',
+  REDIS_URL: 'redis://localhost:6379',
   DISCORD_INTERNAL_API_KEY: 'a'.repeat(32),
   DISCORD_BOT_HEALTH_CHANNEL_ID: '345678901234567890',
   DISCORD_SUPPORT_TRIAGE_CHANNEL_ID: '456789012345678901',
@@ -30,6 +31,7 @@ describe('parseBotConfig', () => {
       guildId: '234567890123456789',
       apiBaseUrl: 'https://api.pocketrealm.test',
       webBaseUrl: 'https://pocketrealm.test',
+      redisUrl: 'redis://localhost:6379',
       internalApiKey: 'a'.repeat(32),
       botHealthChannelId: '345678901234567890',
       welcomeChannelId: null,
@@ -57,6 +59,11 @@ describe('parseBotConfig', () => {
   it('rejects invalid snowflake ids and short internal API keys', () => {
     expect(() => parseBotConfig({ ...validEnv, DISCORD_CLIENT_ID: 'not-a-snowflake' })).toThrow();
     expect(() => parseBotConfig({ ...validEnv, DISCORD_INTERNAL_API_KEY: 'too-short' })).toThrow();
+  });
+
+  it('requires a valid REDIS_URL instead of silently falling back to localhost', () => {
+    expect(() => parseBotConfig({ ...validEnv, REDIS_URL: undefined })).toThrow();
+    expect(() => parseBotConfig({ ...validEnv, REDIS_URL: 'not-a-url' })).toThrow();
   });
 
   it('rejects malformed level role mappings', () => {

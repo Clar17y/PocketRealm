@@ -42,7 +42,8 @@ vi.mock('./resourceService', () => ({
   getResourceState: vi.fn(),
 }));
 
-vi.mock('./skillPointService', () => ({
+vi.mock('./skillPointService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./skillPointService')>()),
   getSkillPoints: vi.fn(),
 }));
 
@@ -318,6 +319,19 @@ describe('pvpCombatantBuilder', () => {
       expect(mockPrisma.skillPointAllocation.update).not.toHaveBeenCalled();
       expect(mockBuildPlayerTemplateCombatant).toHaveBeenCalledWith(
         expect.objectContaining({ unlockedActions: [] }),
+      );
+    });
+
+    it('derives read-only unlocked actions from stored allocations', async () => {
+      mockPrisma.skillPointAllocation.findUnique.mockResolvedValue({
+        allocations: { melee_power_strike: 5 },
+      });
+
+      await buildPvpCombatant(PLAYER_ID, USERNAME, false, { readOnlySkillAllocation: true });
+
+      expect(mockGetSkillPoints).not.toHaveBeenCalled();
+      expect(mockBuildPlayerTemplateCombatant).toHaveBeenCalledWith(
+        expect.objectContaining({ unlockedActions: ['power_strike'] }),
       );
     });
 

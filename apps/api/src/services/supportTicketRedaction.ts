@@ -1,4 +1,8 @@
+import { isRestrictedSupportPrivacy } from '@pocketrealm/shared/support/supportTickets';
 import type { SupportSensitivityFlag, SupportTicketArea, SupportTicketCategory, SupportTicketPrivacy, SupportTicketStatus } from './supportTicketSchemas';
+
+/** Placeholder body for restricted-privacy tickets on external surfaces (Discord, JSONL export). */
+export const PRIVATE_SUPPORT_SUMMARY = 'Private report body withheld. Review in staff support tools.';
 
 const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
@@ -27,6 +31,7 @@ export interface SupportTicketExportSource {
   actualBehavior: string | null;
   reproductionSteps: string | null;
   reporterDisplayName: string;
+  discordReporterUserId: string | null;
   realmLabel: string;
   seasonId: string | null;
   screen: string | null;
@@ -78,9 +83,12 @@ export function toSupportTicketJsonlRecord(ticket: SupportTicketExportSource) {
     category: ticket.category,
     area: ticket.area,
     title: redactSupportText(ticket.title) ?? '',
-    body: buildBody(ticket, redactSupportText),
+    body: isRestrictedSupportPrivacy(ticket.privacy)
+      ? PRIVATE_SUPPORT_SUMMARY
+      : buildBody(ticket, redactSupportText),
     reporter: {
       displayName: `Reporter ${ticket.publicId}`,
+      ...(ticket.discordReporterUserId ? { discordId: ticket.discordReporterUserId } : {}),
       realm: ticket.realmLabel,
       seasonId: ticket.seasonId,
     },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import type {
   CreateSupportTicketRequest,
   SupportTicketArea,
@@ -65,6 +65,21 @@ export function ReportBugModal({ open, currentScreen, onClose, onSubmit }: Repor
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // State survives close/reopen because the component stays mounted while
+  // hidden; reset everything when the modal transitions closed so reopening
+  // always shows a clean form.
+  useEffect(() => {
+    if (open) return;
+    setPrivacy('not_sure');
+    setCategory('bug');
+    setArea('other');
+    setTitle('');
+    setDescription('');
+    setReproductionSteps('');
+    setSuccess(null);
+    setError(null);
+  }, [open]);
 
   if (!open) return null;
 

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { prisma, type Prisma } from '@pocketrealm/database';
+import { closeTimestampFor } from '@pocketrealm/shared/support/supportTickets';
 import { AppError } from '../middleware/errorHandler';
 import type {
   CreateSupportTicketInput,
@@ -10,6 +11,7 @@ import type {
   SupportTicketStatus,
   UpdateSupportTicketInput,
 } from './supportTicketSchemas';
+import { DISCORD_LINK_REQUIRED_ERROR, findLinkedDiscordPlayer } from './discordLinkedPlayer';
 import {
   toSupportTicketAdminRecord,
   toSupportTicketJsonlRecord,
@@ -34,9 +36,9 @@ interface ExportOptions {
   createdAfter?: Date;
 }
 
-interface SupportTicketUpdateSeed {
-  id: string;
-  status: string;
+export interface SupportTicketExportPage {
+  tickets: SupportTicketExportSource[];
+  hasMore: boolean;
 }
 
 interface PrismaKnownError {
@@ -44,16 +46,11 @@ interface PrismaKnownError {
 }
 
 const DEFAULT_EXPORT_STATUSES: SupportTicketStatus[] = ['new', 'needs_info'];
-const CLOSED_STATUSES: SupportTicketStatus[] = ['closed', 'rejected', 'duplicate'];
+const MAX_EXPORT_LIMIT = 500;
 
 function nextPublicId(): string {
   const slug = randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
   return `SUP-${slug}`;
-}
-
-function closeTimestampFor(status: SupportTicketStatus | undefined): Date | null | undefined {
-  if (!status) return undefined;
-  return CLOSED_STATUSES.includes(status) ? new Date() : null;
 }
 
 function isPrismaKnownError(error: unknown): error is PrismaKnownError {
@@ -82,6 +79,7 @@ function toExportSource(ticket: {
   actualBehavior: string | null;
   reproductionSteps: string | null;
   reporterDisplayName: string;
+  discordReporterUserId: string | null;
   realmLabel: string;
   seasonId: string | null;
   screen: string | null;
@@ -108,7 +106,8 @@ function toExportSource(ticket: {
   };
 }
 
-function realmLabelFor(seasonId: string | null, seasonName?: string): string {
+/** Human-facing realm label for a player's season context. */
+export function realmLabelFor(seasonId: string | null, seasonName?: string): string {
   if (!seasonId) return 'Preseason';
   return seasonName ?? 'Seasonal Realm';
 }
@@ -168,37 +167,13 @@ export async function createDiscordSupportTicket(params: {
   discordUserId: string;
   input: CreateSupportTicketInput;
 }) {
-  const link = await prisma.discordAccountLink.findFirst({
-    where: {
-      discordGuildId: params.discordGuildId,
-      discordUserId: params.discordUserId,
-      unlinkedAt: null,
-    },
-    orderBy: { linkedAt: 'desc' },
-    select: {
-      account: {
-        select: {
-          id: true,
-          activePlayer: {
-            select: {
-              id: true,
-              username: true,
-              seasonId: true,
-              season: { select: { name: true } },
-            },
-          },
-        },
-      },
-    },
-  });
+  const { accountId, player } = await findLinkedDiscordPlayer(
+    { guildId: params.discordGuildId, discordUserId: params.discordUserId },
+    { linkRequired: DISCORD_LINK_REQUIRED_ERROR },
+  );
 
-  if (!link) {
-    throw new AppError(404, 'Discord account is not linked to a PocketRealm account', 'DISCORD_LINK_REQUIRED');
-  }
-
-  const player = link.account.activePlayer;
   return createSupportTicket({
-    accountId: link.account.id,
+    accountId,
     playerId: player?.id ?? null,
     seasonId: player?.seasonId ?? null,
     reporterDisplayName: player?.username ?? 'Discord Adventurer',
@@ -217,20 +192,26 @@ export async function updateSupportTicket(
 ) {
   try {
     return await prisma.$transaction(async (tx) => {
-      const existing: SupportTicketUpdateSeed = await tx.supportTicket.findUniqueOrThrow({
+      const existing = await tx.supportTicket.findUniqueOrThrow({
         where: { publicId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, closedAt: true },
       });
+
+      // Only treat the patch as a status change when the status actually differs;
+      // re-applying the current status must not touch status/closedAt or log status_changed.
+      const nextStatus = input.status !== undefined && input.status !== existing.status
+        ? input.status
+        : undefined;
 
       const ticket = await tx.supportTicket.update({
         where: { publicId },
         data: {
-          status: input.status,
+          status: nextStatus,
           githubIssueUrl: input.githubIssueUrl,
           duplicateTicketIds: input.duplicateTicketIds,
           sensitivityFlags: input.sensitivityFlags,
           staffNotes: input.note,
-          closedAt: closeTimestampFor(input.status),
+          closedAt: nextStatus ? closeTimestampFor(nextStatus, existing.closedAt) : undefined,
         },
       });
 
@@ -238,9 +219,9 @@ export async function updateSupportTicket(
         data: {
           ticketId: existing.id,
           actorAccountId,
-          eventType: input.status ? 'status_changed' : 'updated',
-          fromStatus: input.status ? existing.status : undefined,
-          toStatus: input.status,
+          eventType: nextStatus ? 'status_changed' : 'updated',
+          fromStatus: nextStatus ? existing.status : undefined,
+          toStatus: nextStatus,
           note: input.note,
           metadata: buildUpdateMetadata(input),
         },
@@ -256,15 +237,16 @@ export async function updateSupportTicket(
   }
 }
 
-export async function listSupportTicketsForExport(options: ExportOptions): Promise<SupportTicketExportSource[]> {
+export async function listSupportTicketsForExport(options: ExportOptions): Promise<SupportTicketExportPage> {
   const statuses = options.statuses?.length ? options.statuses : DEFAULT_EXPORT_STATUSES;
+  const limit = Math.min(options.limit ?? 100, MAX_EXPORT_LIMIT);
   const tickets = await prisma.supportTicket.findMany({
     where: {
       status: { in: statuses },
       ...(options.createdAfter ? { createdAt: { gte: options.createdAfter } } : {}),
     },
     orderBy: { createdAt: 'asc' },
-    take: Math.min(options.limit ?? 100, 500),
+    take: limit + 1,
     select: {
       publicId: true,
       status: true,
@@ -277,6 +259,7 @@ export async function listSupportTicketsForExport(options: ExportOptions): Promi
       actualBehavior: true,
       reproductionSteps: true,
       reporterDisplayName: true,
+      discordReporterUserId: true,
       realmLabel: true,
       seasonId: true,
       screen: true,
@@ -295,7 +278,12 @@ export async function listSupportTicketsForExport(options: ExportOptions): Promi
     },
   });
 
-  return tickets.map(toExportSource);
+  const hasMore = tickets.length > limit;
+
+  return {
+    tickets: (hasMore ? tickets.slice(0, limit) : tickets).map(toExportSource),
+    hasMore,
+  };
 }
 
 export function supportTicketToJsonl(ticket: SupportTicketExportSource): string {

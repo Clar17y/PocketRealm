@@ -28,12 +28,12 @@ import {
   resolveDiscordDuel,
 } from './discordDuelService';
 
-const GUILD_ID = '2345678901234567';
-const CHANNEL_ID = '3456789012345678';
-const CHALLENGER_DISCORD_ID = '1234567890123456';
-const TARGET_DISCORD_ID = '4567890123456789';
+const GUILD_ID = '23456789012345678';
+const CHANNEL_ID = '34567890123456789';
+const CHALLENGER_DISCORD_ID = '12345678901234567';
+const TARGET_DISCORD_ID = '45678901234567890';
 const DUEL_ID = '11111111-1111-4111-8111-111111111111';
-const MESSAGE_ID = '5678901234567890';
+const MESSAGE_ID = '56789012345678901';
 const NOW = new Date('2026-06-04T12:00:00.000Z');
 
 function mockModel() {
@@ -223,8 +223,8 @@ describe('discordDuelService', () => {
     await expect(createPendingDiscordDuel({
       guildId: GUILD_ID,
       channelId: CHANNEL_ID,
-      challengerDiscordUserId: '1234567890123456',
-      targetDiscordUserId: '1234567890123456',
+      challengerDiscordUserId: '12345678901234567',
+      targetDiscordUserId: '12345678901234567',
     })).rejects.toMatchObject({ code: 'DISCORD_DUEL_SELF_CHALLENGE' });
 
     expect(mockPrisma.discordAccountLink.findFirst).not.toHaveBeenCalled();
@@ -403,6 +403,24 @@ describe('discordDuelService', () => {
     });
   });
 
+  it('does not restore the claim when the post-completion read fails', async () => {
+    const readError = new Error('transient read failure');
+    mockPrisma.discordDuel.findUnique
+      .mockResolvedValueOnce(pendingDuel())
+      .mockRejectedValueOnce(readError);
+    mockPrisma.discordDuel.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+
+    await expect(resolveDiscordDuel(DUEL_ID, TARGET_DISCORD_ID)).rejects.toBe(readError);
+
+    // Claim + completion only — no third updateMany restoring the pending claim.
+    expect(mockPrisma.discordDuel.updateMany).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.discordDuel.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: { status: 'pending', acceptedAt: null },
+    }));
+  });
+
   it('records the Discord message id for a duel', async () => {
     mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ messageId: MESSAGE_ID }));
     mockPrisma.discordDuel.updateMany.mockResolvedValue({ count: 1 });
@@ -436,7 +454,7 @@ describe('discordDuelService', () => {
   });
 
   it('rejects recording a different Discord message id for a duel', async () => {
-    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ messageId: '6789012345678901' }));
+    mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({ messageId: '67890123456789012' }));
     mockPrisma.discordDuel.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(recordDiscordDuelMessage(DUEL_ID, MESSAGE_ID))

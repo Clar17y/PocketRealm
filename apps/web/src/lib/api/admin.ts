@@ -1,5 +1,9 @@
 import { fetchApi } from './core';
 import type { StateUpdates } from '@pocketrealm/shared';
+import type {
+  SupportSensitivityFlag,
+  SupportTicketStatus,
+} from '@pocketrealm/shared/support/supportTickets';
 
 export interface AdminItemTemplate {
   id: string;
@@ -77,23 +81,9 @@ export interface AdminSeason {
   isBootstrapped: boolean;
 }
 
-export type AdminSupportTicketStatus =
-  | 'new'
-  | 'needs_info'
-  | 'duplicate'
-  | 'accepted'
-  | 'rejected'
-  | 'security'
-  | 'known_issue'
-  | 'closed';
+export type AdminSupportTicketStatus = SupportTicketStatus;
 
-export type AdminSupportSensitivityFlag =
-  | 'personal_data'
-  | 'payment'
-  | 'account'
-  | 'security'
-  | 'exploit'
-  | 'harassment';
+export type AdminSupportSensitivityFlag = SupportSensitivityFlag;
 
 export interface AdminSupportTicket {
   id: string;

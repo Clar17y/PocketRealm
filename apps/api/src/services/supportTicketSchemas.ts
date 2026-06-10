@@ -1,46 +1,27 @@
 import { z } from 'zod';
+import {
+  SUPPORT_SENSITIVITY_FLAGS,
+  SUPPORT_TICKET_AREAS,
+  SUPPORT_TICKET_CATEGORIES,
+  SUPPORT_TICKET_PRIVACY,
+  SUPPORT_TICKET_STATUSES,
+  type SupportTicketStatus,
+} from '@pocketrealm/shared/support/supportTickets';
 
-export const SUPPORT_TICKET_STATUSES = [
-  'new',
-  'needs_info',
-  'duplicate',
-  'accepted',
-  'rejected',
-  'security',
-  'known_issue',
-  'closed',
-] as const;
-
-export const SUPPORT_TICKET_PRIVACY = ['public_candidate', 'private', 'not_sure'] as const;
-export const SUPPORT_TICKET_CATEGORIES = ['bug', 'suggestion', 'balance', 'account', 'security', 'abuse', 'other'] as const;
-export const SUPPORT_TICKET_AREAS = [
-  'combat',
-  'exploration',
-  'crafting',
-  'inventory',
-  'social',
-  'guild',
-  'casino',
-  'payments',
-  'auth',
-  'mobile',
-  'performance',
-  'other',
-] as const;
-export const SUPPORT_SENSITIVITY_FLAGS = [
-  'personal_data',
-  'payment',
-  'account',
-  'security',
-  'exploit',
-  'harassment',
-] as const;
-
-export type SupportTicketStatus = typeof SUPPORT_TICKET_STATUSES[number];
-export type SupportTicketPrivacy = typeof SUPPORT_TICKET_PRIVACY[number];
-export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[number];
-export type SupportTicketArea = typeof SUPPORT_TICKET_AREAS[number];
-export type SupportSensitivityFlag = typeof SUPPORT_SENSITIVITY_FLAGS[number];
+export {
+  SUPPORT_SENSITIVITY_FLAGS,
+  SUPPORT_TICKET_AREAS,
+  SUPPORT_TICKET_CATEGORIES,
+  SUPPORT_TICKET_PRIVACY,
+  SUPPORT_TICKET_STATUSES,
+};
+export type {
+  SupportSensitivityFlag,
+  SupportTicketArea,
+  SupportTicketCategory,
+  SupportTicketPrivacy,
+  SupportTicketStatus,
+} from '@pocketrealm/shared/support/supportTickets';
 
 export const attachmentMetadataSchema = z.object({
   name: z.string().max(160),
@@ -77,6 +58,10 @@ export const updateSupportTicketSchema = z.object({
 }).strict().refine((data) => Object.values(data).some((value) => value !== undefined), {
   message: 'At least one update field is required',
 });
+
+export const supportTicketPublicIdParamsSchema = z.object({
+  publicId: z.string().trim().regex(/^SUP-[A-Z0-9]{1,16}$/),
+}).strict();
 
 export const supportTicketStatusListSchema = z.string().transform((raw, ctx) => {
   const values = raw

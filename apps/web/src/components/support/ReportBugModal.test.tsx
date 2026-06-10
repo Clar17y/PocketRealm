@@ -71,6 +71,39 @@ describe('ReportBugModal', () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
+  it('shows a clean form with no success banner after closing and reopening', async () => {
+    const onSubmit = vi.fn().mockResolvedValue({ publicId: 'SUP-1' });
+
+    const { rerender } = render(
+      <ReportBugModal open currentScreen="forge" onClose={vi.fn()} onSubmit={onSubmit} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/privacy/i), { target: { value: 'private' } });
+    fireEvent.change(screen.getByLabelText(/category/i), { target: { value: 'account' } });
+    fireEvent.change(screen.getByLabelText(/area/i), { target: { value: 'combat' } });
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: 'Forge result did not update' },
+    });
+    fireEvent.change(screen.getByLabelText(/what happened/i), {
+      target: { value: 'The result modal showed, but inventory stayed stale.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /send report/i }));
+
+    expect(await screen.findByText(/report sup-1 created/i)).toBeTruthy();
+
+    rerender(<ReportBugModal open={false} currentScreen="forge" onClose={vi.fn()} onSubmit={onSubmit} />);
+    rerender(<ReportBugModal open currentScreen="forge" onClose={vi.fn()} onSubmit={onSubmit} />);
+
+    expect(screen.queryByText(/report sup-1 created/i)).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByLabelText(/privacy/i)).toHaveProperty('value', 'not_sure');
+    expect(screen.getByLabelText(/category/i)).toHaveProperty('value', 'bug');
+    expect(screen.getByLabelText(/area/i)).toHaveProperty('value', 'other');
+    expect(screen.getByLabelText(/title/i)).toHaveProperty('value', '');
+    expect(screen.getByLabelText(/what happened/i)).toHaveProperty('value', '');
+    expect(screen.getByLabelText(/steps/i)).toHaveProperty('value', '');
+  });
+
   it('disables submit until the required title and description are usable', () => {
     render(<ReportBugModal open currentScreen="inventory" onClose={vi.fn()} onSubmit={vi.fn()} />);
 

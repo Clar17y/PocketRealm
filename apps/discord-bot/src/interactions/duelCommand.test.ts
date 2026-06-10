@@ -107,6 +107,42 @@ describe('handleDuelCommand', () => {
     });
   });
 
+  it('edits the deferred reply with a failure message when the public follow-up cannot be posted', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockResolvedValue({
+      duel: {
+        id: 'duel-123',
+        status: 'pending',
+        challengerUsername: 'Astra',
+        targetUsername: 'Borin',
+        expiresAt: '2026-06-04T12:15:00.000Z',
+      },
+    });
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const followUp = vi.fn(async () => {
+      throw new Error('Missing Permissions');
+    });
+    const interaction = createCommandInteraction({
+      opponent: createUser('333333333333333333'),
+      deferReply,
+      editReply,
+      followUp,
+    });
+
+    await handleDuelCommand(interaction, api, config);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(editReply).toHaveBeenCalledTimes(1);
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Could not post the public duel challenge. Please run /duel again.',
+    });
+    expect(api.post).not.toHaveBeenCalledWith(
+      '/api/v1/discord/duels/duel-123/message',
+      expect.anything(),
+    );
+  });
+
   it('edits the deferred command response for duel-specific create errors', async () => {
     const api = createApi();
     vi.mocked(api.post).mockRejectedValue(

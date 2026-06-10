@@ -1442,6 +1442,13 @@ model DiscordAccountLink {
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
+  // Migration 20260604005029 additionally creates two PARTIAL unique indexes that
+  // Prisma cannot express declaratively:
+  //   discord_account_links_active_discord_unique ON (discord_guild_id, discord_user_id) WHERE unlinked_at IS NULL
+  //   discord_account_links_active_account_unique ON (account_id) WHERE unlinked_at IS NULL
+  // They enforce "one active link per Discord user per guild / per account" and the
+  // P2002 conflict handling in discordAccountLinkService relies on them. Do not use
+  // `prisma db push` on this model — it would drop these indexes.
   @@index([discordGuildId, discordUserId])
   @@index([accountId])
   @@index([unlinkedAt, roleSyncedAt])

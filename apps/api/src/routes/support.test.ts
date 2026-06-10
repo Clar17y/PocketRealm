@@ -48,6 +48,8 @@ vi.mock('../services/supportTicketService', () => ({
   listSupportTicketsForExport: mocks.listSupportTicketsForExport,
   supportTicketToAdminRecord: mocks.supportTicketToAdminRecord,
   supportTicketToJsonl: mocks.supportTicketToJsonl,
+  realmLabelFor: (seasonId: string | null, seasonName?: string) =>
+    seasonId ? seasonName ?? 'Seasonal Realm' : 'Preseason',
 }));
 
 vi.mock('../services/discordSupportNotifier', () => ({
@@ -163,6 +165,18 @@ describe('supportRouter', () => {
     expect(mocks.updateSupportTicket).not.toHaveBeenCalled();
   });
 
+  it('rejects malformed support ticket public ids on updates', async () => {
+    mocks.accountRole = 'admin';
+
+    const res = await request(app())
+      .patch('/api/v1/support/tickets/not-a-public-id')
+      .send({ status: 'accepted' })
+      .expect(400);
+
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mocks.updateSupportTicket).not.toHaveBeenCalled();
+  });
+
   it('updates support tickets for admins', async () => {
     mocks.accountRole = 'admin';
     mocks.updateSupportTicket.mockResolvedValue({ publicId: 'SUP-1', status: 'accepted' });
@@ -182,7 +196,7 @@ describe('supportRouter', () => {
   it('exports support tickets as ndjson for admins', async () => {
     mocks.accountRole = 'admin';
     const ticket = { publicId: 'SUP-1' };
-    mocks.listSupportTicketsForExport.mockResolvedValue([ticket]);
+    mocks.listSupportTicketsForExport.mockResolvedValue({ tickets: [ticket], hasMore: false });
     mocks.supportTicketToJsonl.mockReturnValue('{"id":"SUP-1"}\n');
 
     const res = await request(app())
@@ -190,6 +204,7 @@ describe('supportRouter', () => {
       .expect(200);
 
     expect(res.headers['content-type']).toContain('application/x-ndjson');
+    expect(res.headers['x-truncated']).toBeUndefined();
     expect(res.text).toBe('{"id":"SUP-1"}\n');
     expect(mocks.listSupportTicketsForExport).toHaveBeenCalledWith({
       statuses: ['new', 'needs_info'],
@@ -197,6 +212,33 @@ describe('supportRouter', () => {
       createdAfter: new Date('2026-05-30T12:00:00.000Z'),
     });
     expect(mocks.supportTicketToJsonl.mock.calls[0]?.[0]).toBe(ticket);
+  });
+
+  it('signals export truncation with an X-Truncated header', async () => {
+    mocks.accountRole = 'admin';
+    mocks.listSupportTicketsForExport.mockResolvedValue({
+      tickets: [{ publicId: 'SUP-1' }],
+      hasMore: true,
+    });
+    mocks.supportTicketToJsonl.mockReturnValue('{"id":"SUP-1"}\n');
+
+    const res = await request(app())
+      .get('/api/v1/support/tickets/export?limit=1')
+      .expect(200);
+
+    expect(res.headers['x-truncated']).toBe('true');
+    expect(res.text).toBe('{"id":"SUP-1"}\n');
+  });
+
+  it('rejects unknown export query params', async () => {
+    mocks.accountRole = 'admin';
+
+    const res = await request(app())
+      .get('/api/v1/support/tickets/export?nope=1')
+      .expect(400);
+
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mocks.listSupportTicketsForExport).not.toHaveBeenCalled();
   });
 
   it('lists support tickets as json for admins', async () => {
@@ -218,20 +260,35 @@ describe('supportRouter', () => {
       createdAt: '2026-06-01T20:00:00.000Z',
       updatedAt: '2026-06-01T20:00:00.000Z',
     };
-    mocks.listSupportTicketsForExport.mockResolvedValue([ticket]);
+    mocks.listSupportTicketsForExport.mockResolvedValue({ tickets: [ticket], hasMore: false });
     mocks.supportTicketToAdminRecord.mockReturnValue(record);
 
     const res = await request(app())
       .get('/api/v1/support/tickets?status=new,needs_info&limit=25')
       .expect(200);
 
-    expect(res.body).toEqual({ tickets: [record] });
+    expect(res.body).toEqual({ tickets: [record], hasMore: false });
     expect(mocks.listSupportTicketsForExport).toHaveBeenCalledWith({
       statuses: ['new', 'needs_info'],
       limit: 25,
       createdAfter: undefined,
     });
     expect(mocks.supportTicketToAdminRecord.mock.calls[0]?.[0]).toBe(ticket);
+  });
+
+  it('reports hasMore when the admin ticket list is truncated', async () => {
+    mocks.accountRole = 'admin';
+    mocks.listSupportTicketsForExport.mockResolvedValue({
+      tickets: [{ publicId: 'SUP-1' }],
+      hasMore: true,
+    });
+    mocks.supportTicketToAdminRecord.mockReturnValue({ id: 'SUP-1' });
+
+    const res = await request(app())
+      .get('/api/v1/support/tickets?limit=1')
+      .expect(200);
+
+    expect(res.body).toEqual({ tickets: [{ id: 'SUP-1' }], hasMore: true });
   });
 
   it('rejects invalid export status filters', async () => {

@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared/constants/achievementDefinitions';
+import { DISCORD_DUEL_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+import { DISCORD_SUPPORT_BUTTON_STATUSES } from '@pocketrealm/shared/support/supportTickets';
 import { authenticate } from '../middleware/auth';
 import { requireInternalBotAuth } from '../middleware/internalBotAuth';
+import { emitAchievementNotifications } from '../services/achievementService';
 import {
   claimDiscordLinkCode,
   createDiscordLinkCode,
@@ -9,7 +13,6 @@ import {
   listUnsyncedDiscordLinks,
   markDiscordLinkSynced,
   unlinkDiscordAccount,
-  type ClaimedDiscordLinkDto,
 } from '../services/discordAccountLinkService';
 import {
   archiveSupportThread,
@@ -35,13 +38,13 @@ import {
 } from '../services/discordSchemas';
 import {
   createPendingDiscordDuel,
-  DISCORD_DUEL_REPLAY_MAX_PAGE,
   getDiscordDuelReplay,
   recordDiscordDuelMessage,
   resolveDiscordDuel,
 } from '../services/discordDuelService';
+import { notifySupportTicketCreated } from '../services/discordSupportNotifier';
 import { createDiscordSupportTicket } from '../services/supportTicketService';
-import { createSupportTicketSchema } from '../services/supportTicketSchemas';
+import { createSupportTicketSchema, supportTicketPublicIdParamsSchema } from '../services/supportTicketSchemas';
 import { searchWikiForDiscord } from '../services/wikiSearchService';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -81,12 +84,10 @@ const discordDuelResolveSchema = z.object({
 }).strict();
 
 const discordDuelReplayQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).max(DISCORD_DUEL_REPLAY_MAX_PAGE).optional(),
+  page: z.coerce.number().int().min(1).max(DISCORD_DUEL_CONSTANTS.REPLAY_MAX_PAGE).optional(),
 }).strict();
 
-const publicIdParamsSchema = z.object({
-  publicId: z.string().trim().regex(/^SUP-[A-Z0-9]{1,16}$/),
-}).strict();
+const publicIdParamsSchema = supportTicketPublicIdParamsSchema;
 
 const unpostedSupportTicketsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
@@ -107,20 +108,13 @@ const archiveThreadSchema = z.object({
   actorDiscordUserId: discordSnowflakeSchema,
 }).strict();
 
-const DISCORD_SUPPORT_BUTTON_STATUSES = ['needs_info', 'accepted', 'rejected', 'security', 'closed'] as const;
-
 const supportTicketStatusSchema = z.object({
   status: z.enum(DISCORD_SUPPORT_BUTTON_STATUSES),
   actorDiscordUserId: discordSnowflakeSchema,
 }).strict();
 
-function splitClaimedLink(result: ClaimedDiscordLinkDto) {
-  const { titleAchievementId, ...link } = result;
-  return { link, titleAchievementId };
-}
-
 function webBaseUrl(): string {
-  return process.env.PUBLIC_WEB_URL ?? process.env.POCKETREALM_WEB_URL ?? 'http://localhost:3002';
+  return process.env.POCKETREALM_WEB_BASE_URL ?? process.env.PUBLIC_WEB_URL ?? 'http://localhost:3002';
 }
 
 discordRouter.post('/link-codes', requireInternalBotAuth, asyncHandler(async (req, res) => {
@@ -132,13 +126,20 @@ discordRouter.post('/link-codes', requireInternalBotAuth, asyncHandler(async (re
 
 discordRouter.post('/link', authenticate, asyncHandler(async (req, res) => {
   const input = claimDiscordLinkCodeSchema.parse(req.body);
-  const result = await claimDiscordLinkCode({
+  const { achievementGranted, titleAchievementId, ...link } = await claimDiscordLinkCode({
     accountId: req.player!.accountId,
     playerId: req.player!.playerId,
     code: input.code,
   });
 
-  res.status(201).json(splitClaimedLink(result));
+  if (achievementGranted) {
+    const achievement = ACHIEVEMENTS_BY_ID.get(titleAchievementId);
+    if (achievement) {
+      await emitAchievementNotifications(req.player!.playerId, [achievement]);
+    }
+  }
+
+  res.status(201).json({ link, titleAchievementId });
 }));
 
 discordRouter.get('/link', authenticate, asyncHandler(async (req, res) => {
@@ -257,6 +258,8 @@ discordRouter.post('/reports', requireInternalBotAuth, asyncHandler(async (req, 
     discordUserId,
     input,
   });
+
+  void notifySupportTicketCreated(ticket);
 
   res.status(201).json({
     ticket: {

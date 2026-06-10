@@ -2,10 +2,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAdmin } from '../middleware/admin';
 import { authenticate } from '../middleware/auth';
-import { createSupportTicketSchema, supportTicketStatusListSchema, updateSupportTicketSchema } from '../services/supportTicketSchemas';
+import {
+  createSupportTicketSchema,
+  supportTicketPublicIdParamsSchema,
+  supportTicketStatusListSchema,
+  updateSupportTicketSchema,
+} from '../services/supportTicketSchemas';
 import {
   createSupportTicket,
   listSupportTicketsForExport,
+  realmLabelFor,
   supportTicketToAdminRecord,
   supportTicketToJsonl,
   updateSupportTicket,
@@ -19,11 +25,16 @@ const exportQuerySchema = z.object({
   status: supportTicketStatusListSchema.optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
   createdAfter: z.string().datetime().optional(),
-});
+}).strict();
 
-function realmLabelFor(seasonId: string | null, seasonName?: string): string {
-  if (!seasonId) return 'Preseason';
-  return seasonName ?? 'Seasonal Realm';
+async function listTicketsFromQuery(query: unknown) {
+  const parsed = exportQuerySchema.parse(query);
+
+  return listSupportTicketsForExport({
+    statuses: parsed.status,
+    limit: parsed.limit,
+    createdAfter: parsed.createdAfter ? new Date(parsed.createdAfter) : undefined,
+  });
 }
 
 supportRouter.use(authenticate);
@@ -50,8 +61,9 @@ supportRouter.post('/tickets', asyncHandler(async (req, res) => {
 }));
 
 supportRouter.patch('/tickets/:publicId', requireAdmin, asyncHandler(async (req, res) => {
+  const params = supportTicketPublicIdParamsSchema.parse(req.params);
   const input = updateSupportTicketSchema.parse(req.body);
-  const ticket = await updateSupportTicket(req.params.publicId, req.player!.accountId, input);
+  const ticket = await updateSupportTicket(params.publicId, req.player!.accountId, input);
 
   res.json({
     ticket: {
@@ -62,27 +74,21 @@ supportRouter.patch('/tickets/:publicId', requireAdmin, asyncHandler(async (req,
 }));
 
 supportRouter.get('/tickets', requireAdmin, asyncHandler(async (req, res) => {
-  const query = exportQuerySchema.parse(req.query);
-  const tickets = await listSupportTicketsForExport({
-    statuses: query.status,
-    limit: query.limit,
-    createdAfter: query.createdAfter ? new Date(query.createdAfter) : undefined,
-  });
+  const { tickets, hasMore } = await listTicketsFromQuery(req.query);
 
   res.json({
     tickets: tickets.map(supportTicketToAdminRecord),
+    hasMore,
   });
 }));
 
 supportRouter.get('/tickets/export', requireAdmin, asyncHandler(async (req, res) => {
-  const query = exportQuerySchema.parse(req.query);
-  const tickets = await listSupportTicketsForExport({
-    statuses: query.status,
-    limit: query.limit,
-    createdAfter: query.createdAfter ? new Date(query.createdAfter) : undefined,
-  });
+  const { tickets, hasMore } = await listTicketsFromQuery(req.query);
 
   res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  if (hasMore) {
+    res.setHeader('X-Truncated', 'true');
+  }
   for (const ticket of tickets) {
     res.write(supportTicketToJsonl(ticket));
   }

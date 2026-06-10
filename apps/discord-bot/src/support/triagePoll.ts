@@ -7,9 +7,14 @@ interface SupportTriageApi {
   post<T>(path: string, body: unknown): Promise<T>;
 }
 
+interface SentTriageMessage {
+  id: string;
+  delete(): Promise<unknown>;
+}
+
 interface SendableChannel {
   isSendable(): boolean;
-  send(payload: unknown): Promise<{ id: string }>;
+  send(payload: unknown): Promise<SentTriageMessage>;
 }
 
 interface ReadyClientLike {
@@ -19,6 +24,7 @@ interface ReadyClientLike {
 }
 
 interface LoggerLike {
+  error(...args: unknown[]): void;
   warn(...args: unknown[]): void;
   debug(...args: unknown[]): void;
 }
@@ -65,23 +71,55 @@ export async function pollSupportTriageTickets(options: SupportTriagePollOptions
       continue;
     }
 
-    let sentMessage = false;
+    let sentMessage: SentTriageMessage | null = null;
     try {
-      const message = await channel.send(buildTriageCard(ticket));
-      sentMessage = true;
+      sentMessage = await channel.send(buildTriageCard(ticket));
       await options.api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/triage-message`, {
         guildId: options.config.guildId,
         triageChannelId: options.config.supportTriageChannelId,
-        triageMessageId: message.id,
+        triageMessageId: sentMessage.id,
       });
       await releaseTriagePosting(options, suppressionKey, ticket.publicId);
     } catch (error) {
       if (!sentMessage) {
         await releaseTriagePosting(options, suppressionKey, ticket.publicId);
+        options.logger.warn({ error, publicId: ticket.publicId }, 'Failed to post Discord support triage card');
+        continue;
       }
-      options.logger.warn({ error, publicId: ticket.publicId }, 'Failed to post Discord support triage card');
+
+      await rollbackUnregisteredTriageCard(options, suppressionKey, ticket.publicId, sentMessage, error);
     }
   }
+}
+
+/**
+ * The card was posted to Discord but could not be registered with the API.
+ * Best effort: delete the posted card so the suppression key can be released
+ * for a clean retry. If the delete also fails, keep the key suppressed so the
+ * card is not duplicated, and flag the ticket for manual repair.
+ */
+async function rollbackUnregisteredTriageCard(
+  options: SupportTriagePollOptions,
+  suppressionKey: string,
+  publicId: string,
+  sentMessage: SentTriageMessage,
+  error: unknown,
+): Promise<void> {
+  try {
+    await sentMessage.delete();
+  } catch (deleteError) {
+    options.logger.error(
+      { error, deleteError, publicId, messageId: sentMessage.id },
+      'Discord support triage card was posted but could not be registered or deleted; requires manual repair (delete the card or register the triage message)',
+    );
+    return;
+  }
+
+  await releaseTriagePosting(options, suppressionKey, publicId);
+  options.logger.warn(
+    { error, publicId, messageId: sentMessage.id },
+    'Discord support triage card registration failed; deleted the posted card so the next poll can retry',
+  );
 }
 
 function triagePostingSuppressionKey(publicId: string): string {
@@ -137,6 +175,10 @@ async function releaseTriagePosting(
 }
 
 function isSendableChannel(channel: unknown): channel is SendableChannel {
+  return hasSendableChannelShape(channel) && channel.isSendable();
+}
+
+function hasSendableChannelShape(channel: unknown): channel is SendableChannel {
   return Boolean(
     channel &&
       typeof channel === 'object' &&

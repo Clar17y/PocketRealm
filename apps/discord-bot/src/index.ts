@@ -1,12 +1,12 @@
 import 'dotenv/config';
 
-import { prisma } from '@pocketrealm/database';
 import { Client, Events, GatewayIntentBits, type GuildMember } from 'discord.js';
 import { Redis } from 'ioredis';
 import pino from 'pino';
 
 import { PocketRealmApiClient } from './api/pocketRealmApi.js';
 import { loadBotConfig } from './config.js';
+import { getDefaultDiscordPrisma } from './prismaTypes.js';
 import { syncLinkedRoles } from './discord/roleSync.js';
 import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './discord/welcome.js';
 import { routeInteraction } from './interactions/interactionRouter.js';
@@ -19,13 +19,13 @@ const logger = pino({
 
 async function main(): Promise<void> {
   const config = loadBotConfig();
-  const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
+  const redis = new Redis(config.redisUrl);
   const api = new PocketRealmApiClient({
     baseUrl: config.apiBaseUrl,
     internalApiKey: config.internalApiKey,
   });
   const messageXp = createMessageXpService({
-    prisma,
+    prisma: getDefaultDiscordPrisma(),
     redis,
     config,
     logger,
