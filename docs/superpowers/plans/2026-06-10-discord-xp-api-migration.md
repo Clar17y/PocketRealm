@@ -21,6 +21,8 @@ This plan handles both Discord XP write paths found in PR 315:
 
 It does not implement the separate unresolved support triage buttons or the unhandled `/staff repair-ticket`, `/staff sync-ticket`, and `/staff known-issue` commands.
 
+Deployment note from the spec: deploy the API before (or together with) the bot so the new endpoints exist before the bot calls them. This plan only changes code; no database migration is involved.
+
 ## File Structure
 
 ### Shared
@@ -41,6 +43,7 @@ It does not implement the separate unresolved support triage buttons or the unha
 | `apps/api/src/services/discordSchemas.ts` | Add strict Zod schemas for Discord XP internal endpoints. |
 | `apps/api/src/routes/discord.ts` | Mount internal bot-authenticated XP routes. |
 | `apps/api/src/routes/discord.test.ts` | Route tests for XP endpoints and validation behavior. |
+| `apps/api/vitest.config.ts` | Explicit vitest alias for the new shared subpath. |
 
 ### Discord Bot
 
@@ -65,6 +68,7 @@ It does not implement the separate unresolved support triage buttons or the unha
 - Create: `packages/shared/src/discord/discordXp.test.ts`
 - Modify: `packages/shared/package.json`
 - Modify: `packages/shared/src/packageExports.test.ts`
+- Modify: `apps/api/vitest.config.ts`
 
 - [ ] **Step 1: Write helper tests**
 
@@ -155,7 +159,15 @@ In `packages/shared/package.json`, add this export next to `./discord/discordIds
 }
 ```
 
-- [ ] **Step 6: Run shared tests**
+- [ ] **Step 6: Add API vitest alias for the new subpath**
+
+In `apps/api/vitest.config.ts`, add this alias next to the `'@pocketrealm/shared/discord/discordIds'` entry, ABOVE the generic `'@pocketrealm/shared'` entry. Order matters: vite alias keys are prefix-matched, so without an explicit subpath alias the generic entry rewrites `@pocketrealm/shared/discord/discordXp` to a broken `.../src/index.ts/discord/discordXp` path and every API test that touches the service fails at import time.
+
+```ts
+'@pocketrealm/shared/discord/discordXp': resolve(__dirname, '../../packages/shared/src/discord/discordXp.ts'),
+```
+
+- [ ] **Step 7: Run shared tests**
 
 Run:
 
@@ -165,10 +177,20 @@ npm test -w packages/shared -- --run src/discord/discordXp.test.ts src/packageEx
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit shared helper**
+- [ ] **Step 8: Build the shared package**
+
+`apps/discord-bot/vitest.config.ts` has no aliases — bot tests resolve `@pocketrealm/shared/*` subpaths through the workspace symlink and package `exports` against `packages/shared/dist`. Build shared now so `dist/discord/discordXp.js` exists before the bot tests in Tasks 5 and 6:
 
 ```powershell
-git add packages/shared/src/discord/discordXp.ts packages/shared/src/discord/discordXp.test.ts packages/shared/package.json packages/shared/src/packageExports.test.ts
+npm run build -w packages/shared
+```
+
+Expected: build succeeds and `packages/shared/dist/discord/discordXp.js` exists. If you later edit `discordXp.ts`, rebuild shared before re-running bot tests.
+
+- [ ] **Step 9: Commit shared helper**
+
+```powershell
+git add packages/shared/src/discord/discordXp.ts packages/shared/src/discord/discordXp.test.ts packages/shared/package.json packages/shared/src/packageExports.test.ts apps/api/vitest.config.ts
 git commit -m "feat(discord): share community xp helpers"
 ```
 
@@ -959,7 +981,6 @@ git commit -m "feat(discord): add xp api service"
 **Files:**
 - Modify: `apps/api/src/services/discordSchemas.ts`
 - Modify: `apps/api/src/routes/discord.ts`
-- Modify: `apps/api/src/routes/discord.test.ts`
 - Test: `apps/api/src/routes/discord.test.ts`
 
 - [ ] **Step 1: Add route mocks to `discord.test.ts`**
@@ -1258,7 +1279,28 @@ function createApi(result: unknown = {
 
 - [ ] **Step 2: Replace DB-backed tests with API-backed assertions**
 
-Replace the deterministic grant test with:
+The API now owns the database-backed checks, so each existing test gets one of three dispositions:
+
+Keep unchanged (pure local eligibility, no Prisma):
+- `rejects messages shorter than the minimum length`
+- `rejects configured ignored channels such as duels`
+- `rejects the configured duels channel by id even if the channel is renamed`
+- `rejects cooldown hits using Redis NX semantics`
+
+Delete (the behavior moved to `discordXpService.test.ts` in Task 2, and these call `evaluateXpMessage`/`grantXpForMessage` with the `prisma` option that no longer exists):
+- `maps Discord XP totals to levels` (already removed in Step 1)
+- `rejects repeated near-identical fingerprints in the recent event window`
+- `rejects users excluded from XP`
+- `caps partial grants at the daily soft cap`
+- `releases the cooldown when the message was already processed` (the API-denial cooldown-release test below covers this path — `already_processed` and `daily_cap` denials behave identically in the bot)
+
+Replace per the snippets below:
+- `grants deterministic message XP, updates level, and stores no raw content`
+- `does not grant XP after the daily soft cap is reached`
+- `releases the cooldown when the XP transaction fails`
+- `adds the highest configured level role when a member is available and level increases`
+
+Replace `grants deterministic message XP, updates level, and stores no raw content` with:
 
 ```ts
 it('sends fingerprint-only message XP grants to the PocketRealm API', async () => {
@@ -1293,7 +1335,7 @@ it('sends fingerprint-only message XP grants to the PocketRealm API', async () =
 });
 ```
 
-Replace the daily-cap test with:
+Replace `does not grant XP after the daily soft cap is reached` with:
 
 ```ts
 it('releases the cooldown when the API denies a message XP grant', async () => {
@@ -1318,7 +1360,7 @@ it('releases the cooldown when the API denies a message XP grant', async () => {
 });
 ```
 
-Replace the transaction-failure test with:
+Replace `releases the cooldown when the XP transaction fails` with:
 
 ```ts
 it('releases the cooldown when the API grant fails', async () => {
@@ -1341,7 +1383,7 @@ it('releases the cooldown when the API grant fails', async () => {
 });
 ```
 
-Replace the role sync test with:
+Replace `adds the highest configured level role when a member is available and level increases` with:
 
 ```ts
 it('adds the highest configured level role and records role sync through the API', async () => {
@@ -1384,7 +1426,7 @@ it('adds the highest configured level role and records role sync through the API
 });
 ```
 
-Keep existing pure eligibility tests for too-short, ignored channel, cooldown, command, DM, and channel-name behavior. Remove fake Prisma delegates from the bottom of the file.
+Remove the `createPrisma` and `createProfile` helpers and the fake Prisma delegate types from the bottom of the file once no remaining test uses them.
 
 - [ ] **Step 3: Run bot message XP test to verify failure**
 
@@ -1398,11 +1440,17 @@ Expected: FAIL because `messageXp.ts` still expects Prisma dependencies.
 
 - [ ] **Step 4: Update `messageXp.ts` dependency types**
 
-In `apps/discord-bot/src/xp/messageXp.ts`, replace Prisma imports with the shared role helper:
+In `apps/discord-bot/src/xp/messageXp.ts`, delete the local `levelForDiscordXp` and `highestRoleIdForLevel` function definitions (the shared package now owns them) and replace the Prisma imports with the shared helper:
 
 ```ts
 import { highestRoleIdForLevel } from '@pocketrealm/shared/discord/discordXp';
+
+// Temporary re-export: staffCommands.ts still imports these from this file
+// until Task 6 switches it to the shared import. Task 6 removes this line.
+export { highestRoleIdForLevel, levelForDiscordXp } from '@pocketrealm/shared/discord/discordXp';
 ```
+
+Without the deletion of the local definitions, the new import collides with the existing `highestRoleIdForLevel` declaration and the file does not compile. Without the temporary re-export, `staffCommands.ts` (migrated in Task 6) breaks the typecheck at this task's commit.
 
 Remove:
 
@@ -1500,7 +1548,7 @@ return {
 };
 ```
 
-Delete `GrantTransactionResult`, `findProfile`, `randomXp`, `startOfUtcDay`, and `isSameUtcDay` from the bot file.
+Delete `GrantTransactionResult`, `findProfile`, `randomXp`, `startOfUtcDay`, and `isSameUtcDay` from the bot file. In the `DISCORD_XP_CONSTANTS` destructure at the top, keep only the constants still used by local eligibility (`XP_COOLDOWN_SECONDS`, `MIN_MESSAGE_LENGTH`, `RECENT_FINGERPRINT_WINDOW_SECONDS` if still referenced) and remove the rest (`XP_PER_MESSAGE_MIN`, `XP_PER_MESSAGE_MAX`, `DAILY_SOFT_CAP`, `LEVEL_CURVE_XP_DIVISOR`) — unused destructured values fail the strict TypeScript build.
 
 - [ ] **Step 7: Update role-sync timestamp reporting**
 
@@ -1562,6 +1610,7 @@ git commit -m "feat(discord): route message xp through api"
 **Files:**
 - Modify: `apps/discord-bot/src/interactions/staffCommands.ts`
 - Modify: `apps/discord-bot/src/interactions/staffCommands.test.ts`
+- Modify: `apps/discord-bot/src/xp/messageXp.ts` (remove the temporary re-export added in Task 5)
 
 - [ ] **Step 1: Update staff command tests to use API fakes**
 
@@ -1746,6 +1795,20 @@ import { highestRoleIdForLevel } from '@pocketrealm/shared/discord/discordXp';
 
 Remove `MAX_XP_DECREMENT_ATTEMPTS`.
 
+Now that nothing imports the XP helpers from `messageXp.js`, remove the temporary re-export line from `apps/discord-bot/src/xp/messageXp.ts`:
+
+```ts
+export { highestRoleIdForLevel, levelForDiscordXp } from '@pocketrealm/shared/discord/discordXp';
+```
+
+Verify no importers remain:
+
+```powershell
+rg -n "from '\.\./xp/messageXp|levelForDiscordXp|highestRoleIdForLevel" apps/discord-bot/src --glob "!*.test.ts"
+```
+
+Expected: only the shared-package imports inside `messageXp.ts` and `staffCommands.ts` remain.
+
 Change `StaffCommandOptions` to remove `prisma?: StaffPrismaClient`.
 
 Change `XpAdjustmentResult` so the target field matches the API response:
@@ -1849,15 +1912,15 @@ Keep the existing Discord role fetch/add behavior.
 Run:
 
 ```powershell
-npm test -w apps/discord-bot -- --run src/interactions/staffCommands.test.ts
+npm test -w apps/discord-bot -- --run src/interactions/staffCommands.test.ts src/xp/messageXp.test.ts
 ```
 
-Expected: PASS.
+Expected: PASS (message XP tests included because this task touches `messageXp.ts`).
 
 - [ ] **Step 8: Commit staff migration**
 
 ```powershell
-git add apps/discord-bot/src/interactions/staffCommands.ts apps/discord-bot/src/interactions/staffCommands.test.ts
+git add apps/discord-bot/src/interactions/staffCommands.ts apps/discord-bot/src/interactions/staffCommands.test.ts apps/discord-bot/src/xp/messageXp.ts
 git commit -m "feat(discord): route staff xp through api"
 ```
 
@@ -1976,6 +2039,8 @@ git commit -m "chore(discord): remove bot prisma dependency"
 ## Task 8: Focused Verification
 
 **Files:** none.
+
+Note: `rtk` is an optional output-compressing wrapper. If it is not available in your shell, run the same commands without the `rtk` prefix.
 
 - [ ] **Step 1: Run API focused tests**
 
