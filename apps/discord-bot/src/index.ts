@@ -6,7 +6,6 @@ import pino from 'pino';
 
 import { PocketRealmApiClient } from './api/pocketRealmApi.js';
 import { loadBotConfig } from './config.js';
-import { getDefaultDiscordPrisma } from './prismaTypes.js';
 import { syncLinkedRoles } from './discord/roleSync.js';
 import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './discord/welcome.js';
 import { routeInteraction } from './interactions/interactionRouter.js';
@@ -25,7 +24,7 @@ async function main(): Promise<void> {
     internalApiKey: config.internalApiKey,
   });
   const messageXp = createMessageXpService({
-    prisma: getDefaultDiscordPrisma(),
+    api,
     redis,
     config,
     logger,

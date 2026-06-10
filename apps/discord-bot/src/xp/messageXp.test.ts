@@ -1,16 +1,10 @@
-import { ChannelType, type GuildMember } from 'discord.js';
+import { ChannelType } from 'discord.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BotConfig } from '../config.js';
-import type {
-  DiscordCommunityProfileDelegate,
-  MessageXpPrismaClient,
-  MessageXpTransactionClient,
-} from '../prismaTypes.js';
 import {
   evaluateXpMessage,
   grantXpForMessage,
-  levelForDiscordXp,
   type MessageXpRedisClient,
   type XpMessage,
 } from './messageXp.js';
@@ -26,13 +20,6 @@ const now = new Date('2026-06-04T12:00:00.000Z');
 describe('message XP', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('maps Discord XP totals to levels', () => {
-    expect(levelForDiscordXp(0)).toBe(1);
-    expect(levelForDiscordXp(99)).toBe(1);
-    expect(levelForDiscordXp(100)).toBe(2);
-    expect(levelForDiscordXp(400)).toBe(3);
   });
 
   it('rejects messages shorter than the minimum length', async () => {
@@ -68,10 +55,8 @@ describe('message XP', () => {
 
   it('rejects cooldown hits using Redis NX semantics', async () => {
     const redis = createRedis({ setResult: null });
-    const prisma = createPrisma();
 
     const result = await evaluateXpMessage(createMessage(), {
-      prisma,
       redis,
       config: createConfig(),
       now: () => now,
@@ -90,73 +75,16 @@ describe('message XP', () => {
     });
   });
 
-  it('rejects repeated near-identical fingerprints in the recent event window', async () => {
-    const prisma = createPrisma({
-      duplicateEvent: {
-        id: 'event-1',
-      },
-    });
-
-    const result = await evaluateXpMessage(createMessage(), {
-      prisma,
-      redis: createRedis(),
-      config: createConfig(),
-      now: () => now,
-    });
-
-    expect(prisma.discordXpEvent.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        discordGuildId: guildId,
-        discordUserId: userId,
-        createdAt: { gte: new Date('2026-06-04T11:50:00.000Z') },
-      }),
-    }));
-    expect(result).toMatchObject({
-      eligible: false,
-      reason: 'duplicate_fingerprint',
-    });
-  });
-
-  it('rejects users excluded from XP', async () => {
-    const prisma = createPrisma({
-      profile: createProfile({
-        excludedFromXp: true,
-      }),
-    });
-
-    const result = await grantXpForMessage(createMessage(), {
-      prisma,
-      redis: createRedis(),
-      config: createConfig(),
-      now: () => now,
-      random: () => 0.375,
-    });
-
-    expect(result).toMatchObject({
-      eligible: false,
-      reason: 'excluded_from_xp',
-    });
-    expect(prisma.discordXpEvent.create).not.toHaveBeenCalled();
-  });
-
-  it('grants deterministic message XP, updates level, and stores no raw content', async () => {
-    const prisma = createPrisma({
-      profile: createProfile({
-        xp: 92,
-        level: 1,
-        dailyXp: 0,
-        dailyXpDate: now,
-      }),
-    });
+  it('sends fingerprint-only message XP grants to the PocketRealm API', async () => {
+    const api = createApi();
     const message = createMessage();
     const redis = createRedis();
 
     const result = await grantXpForMessage(message, {
-      prisma,
+      api: asMessageXpApiClient(api),
       redis,
       config: createConfig(),
       now: () => now,
-      random: () => 0.375,
     });
 
     expect(result).toMatchObject({
@@ -166,154 +94,79 @@ describe('message XP', () => {
       previousLevel: 1,
       newLevel: 2,
     });
-    expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'profile-1' },
-      data: expect.objectContaining({
-        xp: { increment: 8 },
-        level: 2,
-        dailyXp: 8,
-        dailyXpDate: new Date('2026-06-04T00:00:00.000Z'),
-        lastXpGrantedAt: now,
-      }),
-    }));
-    expect(prisma.discordXpEvent.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        discordGuildId: guildId,
-        discordUserId: userId,
-        channelId,
-        messageId: message.id,
-        xp: 8,
-        reason: 'chat_message',
-        createdAt: now,
-      }),
-    }));
-    expect(prisma.discordXpEvent.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.not.objectContaining({ content: expect.any(String) }),
-    }));
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/xp/messages', {
+      discordGuildId: guildId,
+      discordUserId: userId,
+      channelId,
+      messageId: message.id,
+      messageFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(JSON.stringify(api.post.mock.calls)).not.toContain(message.content);
     expect(redis.del).not.toHaveBeenCalled();
   });
 
-  it('caps partial grants at the daily soft cap', async () => {
-    const prisma = createPrisma({
-      profile: createProfile({
-        xp: 92,
-        level: 1,
-        dailyXp: 497,
-        dailyXpDate: now,
-      }),
-    });
-
-    const result = await grantXpForMessage(createMessage(), {
-      prisma,
-      redis: createRedis(),
-      config: createConfig(),
-      now: () => now,
-      random: () => 0.99,
-    });
-
-    expect(result).toMatchObject({
-      eligible: true,
-      reason: 'granted',
-      xpGranted: 3,
-      previousLevel: 1,
-      newLevel: 1,
-    });
-    expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        xp: { increment: 3 },
-        dailyXp: 500,
-      }),
-    }));
-    expect(prisma.discordXpEvent.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ xp: 3 }),
-    }));
-  });
-
-  it('does not grant XP after the daily soft cap is reached', async () => {
-    const prisma = createPrisma({
-      profile: createProfile({
-        xp: 500,
-        level: 3,
-        dailyXp: 500,
-        dailyXpDate: now,
-      }),
+  it('releases the cooldown when the API denies a message XP grant', async () => {
+    const api = createApi({
+      result: {
+        eligible: false,
+        reason: 'daily_cap',
+      },
     });
     const redis = createRedis();
 
     const result = await grantXpForMessage(createMessage(), {
-      prisma,
+      api: asMessageXpApiClient(api),
       redis,
       config: createConfig(),
       now: () => now,
-      random: () => 0.375,
     });
 
     expect(result).toMatchObject({
       eligible: false,
       reason: 'daily_cap',
     });
-    expect(prisma.discordCommunityProfile.update).not.toHaveBeenCalled();
-    expect(prisma.discordXpEvent.create).not.toHaveBeenCalled();
     expect(redis.del).toHaveBeenCalledWith(`discord:xp:cooldown:${guildId}:${userId}`);
   });
 
-  it('releases the cooldown when the message was already processed', async () => {
-    const prisma = createPrisma({
-      existingEvent: { id: 'event-existing' },
-    });
-    const redis = createRedis();
-
-    const result = await grantXpForMessage(createMessage(), {
-      prisma,
-      redis,
-      config: createConfig(),
-      now: () => now,
-      random: () => 0.375,
-    });
-
-    expect(result).toMatchObject({
-      eligible: false,
-      reason: 'already_processed',
-    });
-    expect(prisma.discordCommunityProfile.update).not.toHaveBeenCalled();
-    expect(prisma.discordXpEvent.create).not.toHaveBeenCalled();
-    expect(redis.del).toHaveBeenCalledWith(`discord:xp:cooldown:${guildId}:${userId}`);
-  });
-
-  it('releases the cooldown when the XP transaction fails', async () => {
-    const transactionError = new Error('database unavailable');
-    const prisma = createPrisma({ transactionError });
+  it('releases the cooldown when the API grant fails', async () => {
+    const apiError = new Error('api unavailable');
+    const api: MockApi = {
+      post: vi.fn(async () => {
+        throw apiError;
+      }),
+    };
     const redis = createRedis();
 
     await expect(grantXpForMessage(createMessage(), {
-      prisma,
+      api: asMessageXpApiClient(api),
       redis,
       config: createConfig(),
       now: () => now,
-      random: () => 0.375,
-    })).rejects.toThrow('database unavailable');
+    })).rejects.toThrow('api unavailable');
 
     expect(redis.del).toHaveBeenCalledWith(`discord:xp:cooldown:${guildId}:${userId}`);
   });
 
-  it('adds the highest configured level role when a member is available and level increases', async () => {
-    const prisma = createPrisma({
-      profile: createProfile({
-        xp: 398,
-        level: 2,
-        dailyXp: 0,
-        dailyXpDate: now,
-      }),
+  it('adds highest configured level role and records role sync through API', async () => {
+    const api = createApi({
+      result: {
+        eligible: true,
+        reason: 'granted',
+        xpGranted: 12,
+        previousLevel: 2,
+        newLevel: 3,
+        profileId: 'profile-1',
+      },
     });
-    const add = vi.fn<GuildMember['roles']['add']>(async () => ({} as GuildMember));
+    const add = vi.fn(async () => ({}));
     const member = {
       roles: { add },
-    } as unknown as GuildMember;
+    };
 
     const result = await grantXpForMessage(
       createMessage({ member }),
       {
-        prisma,
+        api: asMessageXpApiClient(api),
         redis: createRedis(),
         config: createConfig({
           levelRoleMap: new Map([
@@ -322,7 +175,6 @@ describe('message XP', () => {
           ]),
         }),
         now: () => now,
-        random: () => 0.99,
       },
     );
 
@@ -333,9 +185,14 @@ describe('message XP', () => {
       newLevel: 3,
     });
     expect(add).toHaveBeenCalledWith(levelTwoRoleId);
-    expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ lastRoleSyncAt: now }),
-    }));
+    expect(api.post).toHaveBeenNthCalledWith(2, '/api/v1/discord/xp/role-sync', {
+      profileId: 'profile-1',
+      discordGuildId: guildId,
+      discordUserId: userId,
+      roleId: levelTwoRoleId,
+      level: 3,
+      syncedAt: now.toISOString(),
+    });
   });
 });
 
@@ -397,86 +254,35 @@ function createMessage(overrides: Partial<XpMessage> & {
   };
 }
 
-interface MockProfile {
-  id: string;
-  discordUserId: string;
-  discordGuildId: string;
-  xp: number;
-  level: number;
-  dailyXp: number;
-  dailyXpDate: Date | null;
-  excludedFromXp: boolean;
+interface MockApi {
+  post: ReturnType<typeof vi.fn>;
 }
 
-function createProfile(overrides: Partial<MockProfile> = {}): MockProfile {
+interface TypedMockApiClient {
+  post<T>(path: string, body: unknown): Promise<T>;
+}
+
+function asMessageXpApiClient(api: MockApi): TypedMockApiClient {
+  const post = api.post as unknown as (path: string, body: unknown) => Promise<unknown>;
+
   return {
-    id: 'profile-1',
-    discordUserId: userId,
-    discordGuildId: guildId,
-    xp: 0,
-    level: 1,
-    dailyXp: 0,
-    dailyXpDate: null,
-    excludedFromXp: false,
-    ...overrides,
+    post: async <T>(path: string, body: unknown) => await post(path, body) as T,
   };
 }
 
-function createPrisma(options: {
-  profile?: MockProfile | null;
-  duplicateEvent?: { id: string } | null;
-  existingEvent?: { id: string } | null;
-  transactionError?: Error;
-} = {}): MessageXpPrismaClient {
-  const profile = options.profile === undefined ? createProfile() : options.profile;
-  const baseProfile = profile ?? createProfile({ id: 'profile-new' });
-  const discordCommunityProfile: DiscordCommunityProfileDelegate = {
-    findUnique: vi.fn(async () => profile),
-    update: vi.fn(async ({ data }: Parameters<DiscordCommunityProfileDelegate['update']>[0]) => ({
-      ...baseProfile,
-      xp: applyXpChange(baseProfile.xp, data.xp),
-      level: data.level ?? baseProfile.level,
-      dailyXp: data.dailyXp ?? baseProfile.dailyXp,
-      dailyXpDate: data.dailyXpDate ?? baseProfile.dailyXpDate,
-    })),
-    updateMany: vi.fn(async () => ({ count: 0 })),
-    create: vi.fn(async ({ data }: Parameters<DiscordCommunityProfileDelegate['create']>[0]) => ({
-      id: 'profile-new',
-      excludedFromXp: false,
-      ...data,
-      dailyXpDate: data.dailyXpDate ?? null,
-    })),
+function createApi(result: unknown = {
+  result: {
+    eligible: true,
+    reason: 'granted',
+    xpGranted: 8,
+    previousLevel: 1,
+    newLevel: 2,
+    profileId: 'profile-1',
+  },
+}): MockApi {
+  return {
+    post: vi.fn(async () => result),
   };
-  const tx: MessageXpTransactionClient = {
-    discordCommunityProfile,
-    discordXpEvent: {
-      findUnique: vi.fn(async () => options.existingEvent ?? null),
-      findFirst: vi.fn(async () => options.duplicateEvent ?? null),
-      create: vi.fn(async () => ({ id: 'event-new' })),
-    },
-  };
-  const prisma: MessageXpPrismaClient = {
-    ...tx,
-    $transaction: async <T>(callback: (transaction: MessageXpTransactionClient) => Promise<T>): Promise<T> => {
-      if (options.transactionError) {
-        throw options.transactionError;
-      }
-
-      return callback(tx);
-    },
-  };
-
-  return prisma;
-}
-
-function applyXpChange(
-  currentXp: number,
-  change: Parameters<DiscordCommunityProfileDelegate['update']>[0]['data']['xp'],
-): number {
-  if (typeof change === 'number') return change;
-  if (change && 'increment' in change) return currentXp + change.increment;
-  if (change && 'decrement' in change) return currentXp - change.decrement;
-  return currentXp;
 }
 
 function createRedis(options: { setResult?: 'OK' | null } = {}): MessageXpRedisClient {

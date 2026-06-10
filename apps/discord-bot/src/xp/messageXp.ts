@@ -1,29 +1,19 @@
 import { createHash } from 'node:crypto';
 
 import { DISCORD_XP_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+import { highestRoleIdForLevel } from '@pocketrealm/shared/discord/discordXp';
 import { ChannelType } from 'discord.js';
 
 import type { BotConfig } from '../config.js';
-import type {
-  DiscordCommunityProfileRecord,
-  MessageXpPrismaClient,
-  MessageXpTransactionClient,
-} from '../prismaTypes.js';
+
+// Temporary re-export: staffCommands.ts still imports these from this file
+// until Task 6 switches it to the shared import. Task 6 removes this line.
+export { highestRoleIdForLevel, levelForDiscordXp } from '@pocketrealm/shared/discord/discordXp';
 
 const {
-  XP_PER_MESSAGE_MIN,
-  XP_PER_MESSAGE_MAX,
   XP_COOLDOWN_SECONDS,
   MIN_MESSAGE_LENGTH,
-  DAILY_SOFT_CAP,
-  RECENT_FINGERPRINT_WINDOW_SECONDS,
-  LEVEL_CURVE_XP_DIVISOR,
 } = DISCORD_XP_CONSTANTS;
-const MESSAGE_XP_REASON = 'chat_message';
-
-export function levelForDiscordXp(xp: number): number {
-  return Math.floor(Math.sqrt(xp / LEVEL_CURVE_XP_DIVISOR)) + 1;
-}
 
 export type XpEligibilityReason =
   | 'eligible'
@@ -94,6 +84,14 @@ export interface MessageXpLogger {
   warn?(details: Record<string, unknown> | string, message?: string): void;
 }
 
+interface DiscordMessageXpApiResponse {
+  result: GrantXpMessageResult & { profileId?: string };
+}
+
+interface MessageXpApiClient {
+  post<T>(path: string, body: unknown): Promise<T>;
+}
+
 type MessageXpConfig = Pick<
   BotConfig,
   | 'guildId'
@@ -107,18 +105,16 @@ type MessageXpConfig = Pick<
 >;
 
 export interface EvaluateXpMessageOptions {
-  prisma?: MessageXpPrismaClient;
   redis?: MessageXpRedisClient;
   config?: Partial<MessageXpConfig>;
   now?: () => Date;
 }
 
 export interface GrantXpMessageDeps {
-  prisma: MessageXpPrismaClient;
+  api: MessageXpApiClient;
   redis?: MessageXpRedisClient;
   config: MessageXpConfig;
   now?: () => Date;
-  random?: () => number;
   logger?: MessageXpLogger;
 }
 
@@ -134,10 +130,6 @@ export interface GrantXpMessageResult {
   xpGranted?: number;
   previousLevel?: number;
   newLevel?: number;
-}
-
-interface GrantTransactionResult extends GrantXpMessageResult {
-  profileId?: string;
 }
 
 const emptyConfig: MessageXpConfig = {
@@ -196,29 +188,6 @@ export async function evaluateXpMessage(
   }
 
   const fingerprint = fingerprintMessageContent(content);
-  const now = options.now?.() ?? new Date();
-
-  if (options.prisma) {
-    const profile = await findProfile(options.prisma, guildId, userId);
-    if (profile?.excludedFromXp) {
-      return { eligible: false, reason: 'excluded_from_xp', fingerprint };
-    }
-
-    const duplicate = await options.prisma.discordXpEvent.findFirst({
-      where: {
-        discordGuildId: guildId,
-        discordUserId: userId,
-        messageFingerprint: fingerprint,
-        createdAt: {
-          gte: new Date(now.getTime() - RECENT_FINGERPRINT_WINDOW_SECONDS * 1000),
-        },
-      },
-      select: { id: true },
-    });
-    if (duplicate) {
-      return { eligible: false, reason: 'duplicate_fingerprint', fingerprint };
-    }
-  }
 
   if (options.redis) {
     const cooldownSet = await options.redis.set(
@@ -257,111 +226,42 @@ export async function grantXpForMessage(
 
   const now = deps.now?.() ?? new Date();
   const cooldownReleaseKey = cooldownKey(guildId, userId);
-  let transactionResult: GrantTransactionResult;
+  let apiResult: DiscordMessageXpApiResponse['result'];
 
   try {
-    transactionResult = await deps.prisma.$transaction(async (tx) => {
-      const existingEvent = await tx.discordXpEvent.findUnique({
-        where: {
-          discordGuildId_messageId: {
-            discordGuildId: guildId,
-            messageId: message.id,
-          },
-        },
-      });
-      if (existingEvent) {
-        return { eligible: false, reason: 'already_processed' } satisfies GrantTransactionResult;
-      }
-
-      const profile = await findProfile(tx, guildId, userId);
-      if (profile?.excludedFromXp) {
-        return { eligible: false, reason: 'excluded_from_xp' } satisfies GrantTransactionResult;
-      }
-
-      const today = startOfUtcDay(now);
-      const previousXp = profile?.xp ?? 0;
-      const previousLevel = profile?.level ?? levelForDiscordXp(previousXp);
-      const currentDailyXp = profile && isSameUtcDay(profile.dailyXpDate, today) ? profile.dailyXp : 0;
-      const remainingDailyXp = Math.max(0, DAILY_SOFT_CAP - currentDailyXp);
-      if (remainingDailyXp <= 0) {
-        return { eligible: false, reason: 'daily_cap' } satisfies GrantTransactionResult;
-      }
-
-      const rolledXp = randomXp(deps.random?.() ?? Math.random());
-      const xpGranted = Math.min(rolledXp, remainingDailyXp);
-      const newXp = previousXp + xpGranted;
-      const newLevel = levelForDiscordXp(newXp);
-
-      const updatedProfile = profile
-        ? await tx.discordCommunityProfile.update({
-            where: { id: profile.id },
-            data: {
-              xp: { increment: xpGranted },
-              level: newLevel,
-              dailyXp: currentDailyXp + xpGranted,
-              dailyXpDate: today,
-              lastXpGrantedAt: now,
-            },
-          })
-        : await tx.discordCommunityProfile.create({
-            data: {
-              discordGuildId: guildId,
-              discordUserId: userId,
-              xp: xpGranted,
-              level: newLevel,
-              dailyXp: xpGranted,
-              dailyXpDate: today,
-              lastXpGrantedAt: now,
-            },
-          });
-
-      await tx.discordXpEvent.create({
-        data: {
-          discordGuildId: guildId,
-          discordUserId: userId,
-          channelId: message.channelId,
-          messageId: message.id,
-          messageFingerprint: fingerprint,
-          xp: xpGranted,
-          reason: MESSAGE_XP_REASON,
-          createdAt: now,
-        },
-      });
-
-      return {
-        eligible: true,
-        reason: 'granted',
-        xpGranted,
-        previousLevel,
-        newLevel,
-        profileId: updatedProfile.id,
-      } satisfies GrantTransactionResult;
+    const response = await deps.api.post<DiscordMessageXpApiResponse>('/api/v1/discord/xp/messages', {
+      discordGuildId: guildId,
+      discordUserId: userId,
+      channelId: message.channelId,
+      messageId: message.id,
+      messageFingerprint: fingerprint,
     });
+    apiResult = response.result;
   } catch (error) {
     await releaseCooldown(deps.redis, cooldownReleaseKey);
     throw error;
   }
 
-  if (!transactionResult.eligible) {
+  if (!apiResult.eligible) {
     await releaseCooldown(deps.redis, cooldownReleaseKey);
   }
 
   if (
-    transactionResult.eligible &&
-    transactionResult.profileId &&
-    transactionResult.previousLevel !== undefined &&
-    transactionResult.newLevel !== undefined &&
-    transactionResult.newLevel > transactionResult.previousLevel
+    apiResult.eligible &&
+    apiResult.profileId &&
+    apiResult.previousLevel !== undefined &&
+    apiResult.newLevel !== undefined &&
+    apiResult.newLevel > apiResult.previousLevel
   ) {
-    await syncHighestLevelRole(message, deps, transactionResult.profileId, transactionResult.newLevel, now);
+    await syncHighestLevelRole(message, deps, apiResult.profileId, apiResult.newLevel, now);
   }
 
   return {
-    eligible: transactionResult.eligible,
-    reason: transactionResult.reason,
-    xpGranted: transactionResult.xpGranted,
-    previousLevel: transactionResult.previousLevel,
-    newLevel: transactionResult.newLevel,
+    eligible: apiResult.eligible,
+    reason: apiResult.reason,
+    xpGranted: apiResult.xpGranted,
+    previousLevel: apiResult.previousLevel,
+    newLevel: apiResult.newLevel,
   };
 }
 
@@ -463,39 +363,6 @@ function cooldownKey(guildId: string, userId: string): string {
   return `discord:xp:cooldown:${guildId}:${userId}`;
 }
 
-function randomXp(randomValue: number): number {
-  const bounded = Math.min(Math.max(randomValue, 0), 0.999999999);
-  return XP_PER_MESSAGE_MIN + Math.floor(bounded * (XP_PER_MESSAGE_MAX - XP_PER_MESSAGE_MIN + 1));
-}
-
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
-function isSameUtcDay(left: Date | null, right: Date): boolean {
-  return Boolean(
-    left &&
-      left.getUTCFullYear() === right.getUTCFullYear() &&
-      left.getUTCMonth() === right.getUTCMonth() &&
-      left.getUTCDate() === right.getUTCDate(),
-  );
-}
-
-function findProfile(
-  prisma: MessageXpTransactionClient,
-  guildId: string,
-  userId: string,
-): Promise<DiscordCommunityProfileRecord | null> {
-  return prisma.discordCommunityProfile.findUnique({
-    where: {
-      discordGuildId_discordUserId: {
-        discordGuildId: guildId,
-        discordUserId: userId,
-      },
-    },
-  });
-}
-
 async function syncHighestLevelRole(
   message: XpMessage,
   deps: GrantXpMessageDeps,
@@ -523,9 +390,13 @@ async function syncHighestLevelRole(
 
   try {
     await member.roles.add(roleId);
-    await deps.prisma.discordCommunityProfile.update({
-      where: { id: profileId },
-      data: { lastRoleSyncAt: now },
+    await deps.api.post('/api/v1/discord/xp/role-sync', {
+      profileId,
+      discordGuildId: message.guildId,
+      discordUserId: message.author.id,
+      roleId,
+      level: newLevel,
+      syncedAt: now.toISOString(),
     });
   } catch (error) {
     deps.logger?.warn?.(
@@ -539,20 +410,6 @@ async function syncHighestLevelRole(
       'Discord XP level role sync failed',
     );
   }
-}
-
-export function highestRoleIdForLevel(level: number, levelRoleMap: Map<number, string>): string | null {
-  let selectedLevel = 0;
-  let selectedRoleId: string | null = null;
-
-  for (const [roleLevel, roleId] of levelRoleMap.entries()) {
-    if (level >= roleLevel && roleLevel > selectedLevel) {
-      selectedLevel = roleLevel;
-      selectedRoleId = roleId;
-    }
-  }
-
-  return selectedRoleId;
 }
 
 async function resolveGuildMember(message: XpMessage): Promise<XpGuildMember | null> {
