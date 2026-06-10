@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(process.cwd(), '../..');
 const discordBotSourceRoot = resolve(repoRoot, 'apps/discord-bot/src');
+const forbiddenPrismaImportMarkers = ['@pocketrealm/database', '@prisma/client', 'prismaTypes'] as const;
 
 function readRepoFile(repoPath: string): string {
   return readFileSync(resolve(repoRoot, repoPath), 'utf8');
@@ -60,8 +61,10 @@ describe('discord bot architecture boundaries', () => {
 
     for (const file of productionFiles) {
       const source = readRepoFile(file);
-      expect(source, file).not.toContain('@pocketrealm/database');
-      expect(source, file).not.toContain('prismaTypes');
+
+      for (const marker of forbiddenPrismaImportMarkers) {
+        expect(source, file).not.toContain(marker);
+      }
     }
   });
 });
