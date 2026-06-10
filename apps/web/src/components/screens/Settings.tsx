@@ -7,9 +7,12 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { changeEmail, changePassword, resendVerification, type CharacterSummary, type SeasonArchiveSummary } from '@/lib/api';
 import type { ConfirmRarity } from '@/lib/rarity';
 import { PRESEASON_REALM_LABEL } from '@/lib/realmLabels';
+import { DISCORD_INVITE_URL, KNOWN_ISSUES_URL } from '@/lib/supportLinks';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import { RaritySelector } from '../common/RaritySelector';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { DiscordLinkCard } from '@/components/support/DiscordLinkCard';
+import { HelpSupportCard } from '@/components/support/HelpSupportCard';
 import { SupportPocketrealmCard } from './SupportPocketrealmCard';
 
 export interface NotificationPrefs {
@@ -97,6 +100,7 @@ interface SettingsProps {
 
   // Account
   onLogout?: () => void;
+  onReportBug?: () => void;
 }
 
 const speedLabel = (ms: number) =>
@@ -198,6 +202,7 @@ export function Settings({
   notificationPrefs,
   onNotificationPrefChange,
   onLogout,
+  onReportBug,
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<'account' | 'game'>('account');
   const [isRealmSwitcherOpen, setIsRealmSwitcherOpen] = useState(false);
@@ -400,6 +405,15 @@ export function Settings({
 
       {activeTab === 'account' && (
         <div className="space-y-4">
+          {onReportBug && (
+            <HelpSupportCard
+              discordUrl={DISCORD_INVITE_URL}
+              knownIssuesUrl={KNOWN_ISSUES_URL}
+              onReportBug={onReportBug}
+            />
+          )}
+          <DiscordLinkCard />
+
           <PixelCard>
             <h3 className="mb-3 text-sm font-bold text-[var(--rpg-text-primary)]">Account</h3>
             <div className="space-y-2 text-sm text-[var(--rpg-text-secondary)]">

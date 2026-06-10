@@ -54,7 +54,11 @@ describe('requestLogger', () => {
   });
 
   it('logs request on response finish with correct fields', () => {
-    const req = createMockReq({ player: { accountId: 'account-1', playerId: 'p1', username: 'hero', seasonId: null, role: 'user' } as any });
+    const req = createMockReq({
+      originalUrl: '/api/v1/chat/activity/npc-reaction?npcKey=millbrook-blacksmith',
+      path: '/activity/npc-reaction',
+      player: { accountId: 'account-1', playerId: 'p1', username: 'hero', seasonId: null, role: 'user' } as any,
+    });
     const res = createMockRes();
     const next = vi.fn();
 
@@ -66,7 +70,7 @@ describe('requestLogger', () => {
     expect(context).toMatchObject({
       requestId: 'test-uuid-1234',
       method: 'GET',
-      path: '/api/v1/player',
+      path: '/api/v1/chat/activity/npc-reaction',
       status: 200,
       playerId: 'p1',
     });

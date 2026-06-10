@@ -1732,3 +1732,33 @@ export const UI_TIMING_CONSTANTS = {
   /** ms before error toast auto-dismisses */
   ERROR_TOAST_DISMISS_MS: 5_000,
 } as const;
+
+// =============================================================================
+// DISCORD COMMUNITY
+// =============================================================================
+
+export const DISCORD_XP_CONSTANTS = {
+  /** Minimum XP granted per eligible Discord message */
+  XP_PER_MESSAGE_MIN: 5,
+  /** Maximum XP granted per eligible Discord message */
+  XP_PER_MESSAGE_MAX: 12,
+  /** Seconds between XP-eligible messages per user */
+  XP_COOLDOWN_SECONDS: 90,
+  /** Minimum message length to qualify for XP */
+  MIN_MESSAGE_LENGTH: 20,
+  /** Soft cap on Discord XP per user per day */
+  DAILY_SOFT_CAP: 500,
+  /** Seconds a message fingerprint is remembered for duplicate suppression */
+  RECENT_FINGERPRINT_WINDOW_SECONDS: 10 * 60,
+  /** Divisor in the community level curve: level = floor(sqrt(xp / divisor)) + 1 */
+  LEVEL_CURVE_XP_DIVISOR: 100,
+} as const;
+
+export const DISCORD_DUEL_CONSTANTS = {
+  /** ms a pending Discord duel challenge stays claimable */
+  TTL_MS: 2 * 60 * 1000,
+  /** Page size for Discord duel replay pagination */
+  REPLAY_PAGE_SIZE: 10,
+  /** Maximum requestable replay page */
+  REPLAY_MAX_PAGE: 100,
+} as const;

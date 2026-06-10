@@ -18,6 +18,14 @@ PocketRealm is deployed as a split stack: the Next.js web app on Vercel and the 
 - Background timers: none fixed-cadence. Boss and expedition rounds resolve via an in-process `setTimeout` registry keyed by `nextRoundAt`, rehydrated from DB on boot. Run exactly one API worker while `ROUND_TIMER_WORKER_MODE=single`. Other maintenance work is activity-triggered or lazy-on-touch. See `docs/superpowers/specs/2026-04-11-event-driven-scheduling-design.md`.
 - Metrics logger (60 s, in-memory only; does not touch Postgres)
 
+### Discord Bot Worker (Render)
+- Background Worker, Node 20 environment
+- Build: `npm install && npm run build:discord-bot`
+- Start: `npm run start:discord-bot`
+- Discord Developer Portal privileged intents: enable Server Members Intent and Message Content Intent.
+- Install with the `bot` and `applications.commands` scopes. Bot permissions: View Channels, Send Messages, Read Message History, Manage Channels, Manage Roles, Create Public Threads, Create Private Threads, Manage Threads, Send Messages in Threads, and Manage Server for AutoMod setup.
+- Do not grant Kick Members or Ban Members.
+
 ### Database (Neon Postgres)
 - Managed Postgres with daily automated backups — see [Backup Verification & Restore](#backup-verification--restore)
 - Migrations: `npm run db:migrate` (dev) / `npm run db:migrate:deploy` (prod/CI)
@@ -43,7 +51,7 @@ What must remain single-owner today:
 
 ## Environment Variables
 
-All variables are required in production unless marked optional. Set them in Render (API) and Vercel (web) dashboards. Never commit secrets to git — `.env.local` is gitignored for local dev.
+All variables are required in production unless marked optional. Set them in Render (API and Discord bot worker) and Vercel (web) dashboards. Never commit secrets to git - `.env.local` is gitignored for local dev.
 
 ### API (Render)
 
@@ -61,11 +69,39 @@ All variables are required in production unless marked optional. Set them in Ren
 | `SENTRY_DSN` | yes (prod), no (dev) | — | Server-side Sentry project DSN. Leave unset to disable Sentry. See [Sentry Error Tracking](#sentry-error-tracking). |
 | `SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Overrides `NODE_ENV` for the Sentry environment tag (`production` / `staging`). |
 | `SENTRY_AUTH_TOKEN` | yes (web build-time) | — | Sentry CLI token used by `next build` to upload web source maps. Not read by the API. |
+| `DISCORD_INTERNAL_API_KEY` | yes | - | Shared internal auth key for Discord bot API requests and link-code signing. Must match the bot worker value. Use 32+ random bytes. |
+| `DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL` | no | - | Optional Discord incoming webhook fallback for private support triage notifications. Leave unset to disable webhook mirroring. |
 | `VAPID_PUBLIC_KEY` | yes | — | Web Push VAPID public key |
 | `VAPID_PRIVATE_KEY` | yes | — | Web Push VAPID private key |
 | `VAPID_SUBJECT` | yes | — | `mailto:` contact for Web Push |
 | `RESEND_API_KEY` | yes | — | Transactional email sender (password resets, verification) |
 | `RESEND_FROM_EMAIL` | yes | — | Verified sender address for Resend |
+
+### Discord Bot Worker (Render)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | yes | - | Neon Postgres connection string used by Prisma. Use the same production database as the API. |
+| `REDIS_URL` | yes | `redis://localhost:6379` | Redis connection string for bot runtime coordination. |
+| `NODE_ENV` | yes | - | `production` on Render, `development` locally, `test` in vitest. |
+| `LOG_LEVEL` | no | `info` (prod), `debug` (dev/test) | pino log level. |
+| `DISCORD_BOT_TOKEN` | yes | - | Discord bot token from the Developer Portal. |
+| `DISCORD_CLIENT_ID` | yes | - | Discord application client ID. |
+| `DISCORD_GUILD_ID` | yes | - | Discord server ID used for guild command registration and runtime checks. |
+| `POCKETREALM_API_BASE_URL` | yes | - | Public Render API base URL used by bot API calls. |
+| `POCKETREALM_WEB_BASE_URL` | yes | - | Public web base URL used for player-facing links. |
+| `DISCORD_INTERNAL_API_KEY` | yes | - | Shared internal auth key. Must match the API value. Use 32+ random bytes. |
+| `DISCORD_BOT_HEALTH_CHANNEL_ID` | yes | - | Channel where the worker posts startup and health messages. |
+| `DISCORD_WELCOME_CHANNEL_ID` | no | - | Public welcome channel where the worker posts lightweight member welcomes. |
+| `DISCORD_SUPPORT_TRIAGE_CHANNEL_ID` | yes | - | Private staff channel where support triage cards are posted. |
+| `DISCORD_SUPPORT_CATEGORY_ID` | yes | - | Discord category where support threads are created. |
+| `DISCORD_DUELS_CHANNEL_ID` | yes | - | Channel where `/duel` is allowed. Include this channel in XP ignore checks. |
+| `DISCORD_PLAYER_ROLE_ID` | yes | - | Base player role managed by the bot. |
+| `DISCORD_VERIFIED_ROLE_ID` | yes | - | Role assigned when a Discord user links a PocketRealm account. |
+| `DISCORD_SUPPORT_STAFF_ROLE_IDS` | no | empty | Comma-separated staff role IDs allowed to use staff support actions. |
+| `DISCORD_XP_IGNORED_CHANNEL_IDS` | no | empty | Comma-separated channel IDs excluded from Discord chat XP. Include `#duels`. |
+| `DISCORD_XP_ELIGIBLE_CHANNEL_IDS` | no | empty | Comma-separated channel allowlist for Discord chat XP. Empty means all non-ignored channels. |
+| `DISCORD_LEVEL_ROLE_MAP` | no | empty | Comma-separated `level:roleId` mappings for Discord level roles. |
 
 ### Web (Vercel)
 
@@ -75,10 +111,57 @@ All variables are required in production unless marked optional. Set them in Ren
 | `APP_VERSION` | yes (build-time) | `0.0.0-dev` | Injected from root `package.json#version` via `next.config.mjs` — see [Release Versioning](#release-versioning) |
 | `NEXT_PUBLIC_SENTRY_DSN` | yes (prod), no (dev) | — | Browser Sentry DSN. Leave unset to disable. See [Sentry Error Tracking](#sentry-error-tracking). |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Environment tag for client-side Sentry init. |
+| `NEXT_PUBLIC_DISCORD_INVITE_URL` | no | — | Public Discord invite URL shown in `/game` help links. |
+| `NEXT_PUBLIC_KNOWN_ISSUES_URL` | no | `NEXT_PUBLIC_DISCORD_INVITE_URL` | Public known-issues URL. Defaults to the Discord invite when unset. |
 | `SENTRY_ORG` | yes (web build-time) | — | Sentry org slug for `next build` source map upload. |
 | `SENTRY_PROJECT` | yes (web build-time) | — | Sentry project slug for `next build` source map upload. |
 
 Parallel phases adding new variables should append rows to these tables rather than creating a new section.
+
+### Discord Support Triage
+
+The support workflow stores canonical tickets in Postgres. The Discord bot worker posts triage cards and support threads using `DISCORD_SUPPORT_TRIAGE_CHANNEL_ID` and `DISCORD_SUPPORT_CATEGORY_ID`. `DISCORD_SUPPORT_TRIAGE_WEBHOOK_URL` remains an optional API webhook fallback for redacted notifications; the webhook must point to a private staff channel and should stay unset in environments that should not post support notifications.
+
+The in-game Help & Support links are configured at web build time through `NEXT_PUBLIC_DISCORD_INVITE_URL` and `NEXT_PUBLIC_KNOWN_ISSUES_URL`. Because these are `NEXT_PUBLIC_*` variables, changing them in Vercel requires a new web deployment before browser bundles show the new URLs. Changing the API webhook or bot worker env on Render requires restarting or redeploying the affected service so the process reads the new runtime environment.
+
+Operators can export new support tickets for manual Codex triage:
+
+```powershell
+npm run support:export-new
+npm run support:export-new -- --limit=50
+npm run support:export-new -- --status=new,needs_info
+npm run support:export-new -- --createdAfter=2026-05-30T00:00:00.000Z
+```
+
+The export writes JSONL to stdout. The records are redacted for emails, bearer tokens, session hints, and UUID-like internal identifiers, and are suitable to paste or attach for manual Codex triage. The command only exports data for review; GitHub issue creation or updating remains a manual operator step after triage.
+
+### Discord Bot Launch Runbook
+
+Run staging first, then repeat the same steps for production after staging passes. Live staging setup and smoke checks mutate a Discord guild, so run them only after the deployment owner approves the target guild.
+
+```powershell
+npm run discord:setup-server
+```
+
+`npm run discord:setup-server` reads setup-only Discord credentials from `.discord-setup.env` in the repo root or `apps/api`; start from `apps/api/.discord-setup.env.example`. The file must provide `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID`; it may also provide setup-only `DISCORD_AUTOMOD_EXTRA_KEYWORDS` for comma-separated keyword additions. The command is idempotent and prints the channel, category, webhook, and role IDs needed for the API and bot worker env. If a local setup token was used outside a secure deployment context, rotate it before public launch.
+
+After setup, populate the Discord bot worker env from `apps/discord-bot/.env.example`, adding the setup output plus `DISCORD_CLIENT_ID`, `POCKETREALM_API_BASE_URL`, `POCKETREALM_WEB_BASE_URL`, and `DISCORD_INTERNAL_API_KEY`. Then register commands:
+
+```powershell
+npm run discord:register-commands
+```
+
+Before public launch:
+- Confirm Server Members Intent and Message Content Intent are enabled in the Discord Developer Portal.
+- Confirm the installed bot has no Kick Members or Ban Members permission.
+- Confirm the worker posts a health message in the bot-health channel.
+- Run `/link` and verify the linked Discord user receives the configured linked role.
+- Run `/wiki` plus player commands (`/profile`, `/turns`, `/skills`, `/rank`).
+- Submit `/report` and confirm a support triage card is created.
+- From the triage card, click `Ask Reporter` as staff and confirm a private support thread is created; then verify `Archive Thread`.
+- Trigger an AutoMod test phrase and confirm the expected moderation action.
+- Confirm Discord chat XP ignores `#duels`.
+- Confirm `/duel` works in `#duels` only and is rejected elsewhere.
 
 ---
 

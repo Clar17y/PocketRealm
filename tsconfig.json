@@ -18,6 +18,7 @@
     { "path": "./packages/shared" },
     { "path": "./packages/game-engine" },
     { "path": "./packages/database" },
-    { "path": "./apps/api" }
+    { "path": "./apps/api" },
+    { "path": "./apps/discord-bot" }
   ]
 }

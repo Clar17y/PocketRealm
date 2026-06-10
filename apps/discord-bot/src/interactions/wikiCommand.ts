@@ -1,0 +1,93 @@
+import type { ChatInputCommandInteraction } from 'discord.js';
+
+import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import type { BotConfig } from '../config.js';
+
+const MAX_WIKI_RESULTS = 5;
+
+interface WikiSearchResponse {
+  results: WikiResult[];
+}
+
+interface WikiResult {
+  title: string;
+  section?: string;
+  snippet?: string;
+  url: string;
+}
+
+type WikiApiClient = Pick<PocketRealmApiClient, 'get'>;
+type WikiConfig = Pick<BotConfig, 'webBaseUrl'>;
+
+export async function handleWikiCommand(
+  interaction: ChatInputCommandInteraction,
+  api: WikiApiClient,
+  config: WikiConfig,
+): Promise<void> {
+  const query = interaction.options.getString('query', true).trim();
+
+  await interaction.deferReply({ ephemeral: false });
+
+  let response: WikiSearchResponse;
+  try {
+    response = await api.get<WikiSearchResponse>(
+      `/api/v1/discord/wiki/search?q=${encodeURIComponent(query)}`,
+    );
+  } catch {
+    await interaction.editReply({
+      content: 'Unable to search the PocketRealm wiki right now. Please try again later.',
+    });
+    return;
+  }
+
+  const wikiBaseUrl = new URL(config.webBaseUrl);
+  const results = response.results
+    .map((result) => formatWikiResult(result, wikiBaseUrl))
+    .filter((result): result is string => Boolean(result))
+    .slice(0, MAX_WIKI_RESULTS);
+
+  if (results.length === 0) {
+    await interaction.editReply({
+      content: `No wiki results found for "${query}".`,
+    });
+    return;
+  }
+
+  await interaction.editReply({
+    content: [
+      `Wiki results for "${query}":`,
+      ...results,
+    ].join('\n'),
+  });
+}
+
+function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
+  const url = toAbsoluteWikiUrl(result.url, wikiBaseUrl);
+  if (!url) {
+    return null;
+  }
+
+  const title = result.section ? `${result.title} - ${result.section}` : result.title;
+  const snippet = result.snippet ? ` - ${result.snippet}` : '';
+
+  return `- ${title}: ${url}${snippet}`;
+}
+
+function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url, wikiBaseUrl);
+  } catch {
+    return null;
+  }
+
+  if (parsedUrl.origin !== wikiBaseUrl.origin) {
+    return null;
+  }
+
+  if (parsedUrl.pathname !== '/wiki' && !parsedUrl.pathname.startsWith('/wiki/')) {
+    return null;
+  }
+
+  return parsedUrl.toString();
+}

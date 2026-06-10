@@ -41,6 +41,8 @@ vi.mock('@/lib/api', () => ({
   adminGrantGuildTreasury: vi.fn().mockResolvedValue({ data: {} }),
   adminResetExpeditionCooldowns: vi.fn().mockResolvedValue({ data: {} }),
   adminFillExpedition: vi.fn().mockResolvedValue({ data: {} }),
+  adminListSupportTickets: vi.fn().mockResolvedValue({ data: { tickets: [] } }),
+  adminUpdateSupportTicket: vi.fn().mockResolvedValue({ data: { ticket: { publicId: 'SUP-1', status: 'closed' } } }),
   adminGetBalanceReport: vi.fn().mockResolvedValue({
     data: {
       activePlayers: 0,

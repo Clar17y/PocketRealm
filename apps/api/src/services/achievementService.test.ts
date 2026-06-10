@@ -40,6 +40,18 @@ describe('achievementService', () => {
     mockGetIo.mockReturnValue(null);
   });
 
+  describe('achievement definitions', () => {
+    it('includes the linked Discord account title achievement', () => {
+      const linked = ACHIEVEMENTS_BY_ID.get('discord_linked');
+      expect(linked).toMatchObject({
+        category: 'general',
+        titleReward: 'Linked Adventurer',
+        threshold: 0,
+        tier: 1,
+      });
+    });
+  });
+
   // ─── checkAchievements ────────────────────────────────────────────
   describe('checkAchievements', () => {
     it('returns empty when no achievements are newly met', async () => {

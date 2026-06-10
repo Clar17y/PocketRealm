@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../logger';
 
+function getLoggedPath(req: Request): string {
+  const originalPath = req.originalUrl?.split('?')[0];
+  return originalPath || req.path;
+}
+
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   if (req.path.startsWith('/health')) return next();
 
@@ -22,7 +27,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     logger[level]({
       requestId: req.requestId,
       method: req.method,
-      path: req.path,
+      path: getLoggedPath(req),
       status: res.statusCode,
       duration,
       playerId: req.player?.playerId,

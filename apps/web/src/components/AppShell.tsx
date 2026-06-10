@@ -5,6 +5,10 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 import { ZoneBackground } from '@/components/ZoneBackground';
+import { HelpSupportMenu } from '@/components/support/HelpSupportMenu';
+
+const headerIconButtonClassName =
+  'relative flex h-6 w-6 items-center justify-center text-[var(--rpg-text-secondary)] transition-colors hover:text-[var(--rpg-gold)]';
 
 interface AppShellProps {
   children: ReactNode;
@@ -15,6 +19,9 @@ interface AppShellProps {
   onSettings?: () => void;
   onLogout?: () => void;
   onWhatsNew?: () => void;
+  onReportBug?: () => void;
+  discordUrl?: string;
+  knownIssuesUrl?: string;
   hasUnseenChangelog?: boolean;
   backgroundSrc?: string;
 }
@@ -28,6 +35,9 @@ export function AppShell({
   onSettings,
   onLogout,
   onWhatsNew,
+  onReportBug,
+  discordUrl,
+  knownIssuesUrl,
   hasUnseenChangelog,
   backgroundSrc,
 }: AppShellProps) {
@@ -61,7 +71,7 @@ export function AppShell({
                   setDropdownOpen(false);
                   onMailClick();
                 }}
-                className="relative text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
+                className={headerIconButtonClassName}
                 aria-label={`Mail${mailUnreadCount > 0 ? ` (${mailUnreadCount} unread)` : ''}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -75,6 +85,13 @@ export function AppShell({
                 )}
               </button>
             )}
+            {onReportBug && (
+              <HelpSupportMenu
+                discordUrl={discordUrl ?? ''}
+                knownIssuesUrl={knownIssuesUrl ?? ''}
+                onReportBug={onReportBug}
+              />
+            )}
             {onSettings && (
               <button
                 type="button"
@@ -82,7 +99,7 @@ export function AppShell({
                   setDropdownOpen(false);
                   onSettings();
                 }}
-                className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
+                className={headerIconButtonClassName}
                 aria-label="Open settings"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

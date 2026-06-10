@@ -11,10 +11,13 @@ import {
   getSeasonArchives,
   joinSeason,
   switchPlayer,
+  createSupportTicket,
   type ActiveSeasonResponse,
   type CharacterSummary,
+  type CreateSupportTicketRequest,
   type SeasonArchiveSummary,
 } from '@/lib/api';
+import { DISCORD_INVITE_URL, KNOWN_ISSUES_URL } from '@/lib/supportLinks';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
@@ -53,6 +56,7 @@ import type { Screen } from './gameController.types';
 import { useChat } from '@/hooks/useChat';
 import { useCasinoSocket } from '@/hooks/useCasinoSocket';
 import { ChatPanel } from '@/components/ChatPanel';
+import { ReportBugModal } from '@/components/support/ReportBugModal';
 import { SKILL_META } from './pageConstants';
 import { GameScreenRenderer } from './GameScreenRenderer';
 import { PASSWORD_UPDATED_RELOGIN_MESSAGE, RELOGIN_MESSAGE_KEY } from '../login/reloginMessage';
@@ -159,6 +163,20 @@ export default function GamePage() {
   const lastDealerCountRef = useRef(0);
   const errorRef = useRef<HTMLDivElement>(null);
   const [mailRecipient, setMailRecipient] = useState<{ id: string; name: string } | null>(null);
+  const [reportBugOpen, setReportBugOpen] = useState(false);
+
+  const handleOpenReportBug = useCallback(() => {
+    setReportBugOpen(true);
+  }, []);
+
+  const handleSubmitSupportTicket = useCallback(async (input: CreateSupportTicketRequest) => {
+    const response = await createSupportTicket(input);
+    if (!response.data) {
+      throw new Error(response.error?.message ?? 'Failed to submit report.');
+    }
+
+    return { publicId: response.data.ticket.publicId };
+  }, []);
 
   useEffect(() => {
     if (actionError && errorRef.current) {
@@ -353,6 +371,9 @@ export default function GamePage() {
         onSettings={() => handleNavigate('settings')}
         onLogout={() => { logout(); router.push('/'); }}
         onWhatsNew={openChangelog}
+        onReportBug={handleOpenReportBug}
+        discordUrl={DISCORD_INVITE_URL}
+        knownIssuesUrl={KNOWN_ISSUES_URL}
         hasUnseenChangelog={showChangelog}
         backgroundSrc={
           screenBackgroundSrc(activeScreen, activeCraftingSkill, expeditionContext ?? undefined)
@@ -528,12 +549,19 @@ export default function GamePage() {
           pushToggle={pushToggle}
           onGuildMembershipChange={chat.refreshGuildChat}
           onLogout={() => { logout(); router.push('/'); }}
+          onReportBug={handleOpenReportBug}
           onAccountRefresh={async () => { await refreshPlayer(); }}
           onForceRelogin={() => {
             sessionStorage.setItem(RELOGIN_MESSAGE_KEY, PASSWORD_UPDATED_RELOGIN_MESSAGE);
             logout();
             router.push('/login');
           }}
+        />
+        <ReportBugModal
+          open={reportBugOpen}
+          currentScreen={activeScreen}
+          onClose={() => setReportBugOpen(false)}
+          onSubmit={handleSubmitSupportTicket}
         />
         <XpRateTutorial skillName={lowestXpRate.skillName} rate={lowestXpRate.rate} />
       </AppShell>

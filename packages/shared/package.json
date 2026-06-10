@@ -48,6 +48,26 @@
     "./utils/titleDisplay": {
       "types": "./dist/utils/titleDisplay.d.ts",
       "default": "./dist/utils/titleDisplay.js"
+    },
+    "./support/supportTickets": {
+      "types": "./dist/support/supportTickets.d.ts",
+      "default": "./dist/support/supportTickets.js"
+    },
+    "./discord/discordIds": {
+      "types": "./dist/discord/discordIds.d.ts",
+      "default": "./dist/discord/discordIds.js"
+    },
+    "./discord/discordXp": {
+      "types": "./dist/discord/discordXp.d.ts",
+      "default": "./dist/discord/discordXp.js"
+    },
+    "./wiki/wikiNavigation": {
+      "types": "./dist/wiki/wikiNavigation.d.ts",
+      "default": "./dist/wiki/wikiNavigation.js"
+    },
+    "./wiki/wikiSearch": {
+      "types": "./dist/wiki/wikiSearch.d.ts",
+      "default": "./dist/wiki/wikiSearch.js"
     }
   },
   "scripts": {

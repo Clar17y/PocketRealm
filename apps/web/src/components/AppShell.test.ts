@@ -131,6 +131,59 @@ describe('AppShell', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
+  it('shows help links and opens report bug from the header support menu', () => {
+    const onReportBug = vi.fn();
+
+    render(
+      React.createElement(
+        AppShell,
+        {
+          username: 'Rook',
+          onReportBug,
+          discordUrl: 'https://discord.gg/pocketrealm',
+          knownIssuesUrl: 'https://status.pocketrealm.example/issues',
+        },
+        React.createElement('div', null, 'Child'),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Help and support' }));
+
+    expect(screen.getByRole('menuitem', { name: /wiki/i }).getAttribute('href')).toBe('/wiki');
+    expect(screen.getByRole('menuitem', { name: /discord/i }).getAttribute('href')).toBe('https://discord.gg/pocketrealm');
+    expect(screen.getByRole('menuitem', { name: /known issues/i }).getAttribute('href')).toBe('https://status.pocketrealm.example/issues');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /report bug/i }));
+
+    expect(onReportBug).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('uses the same fixed header icon box for mail, help, and settings', () => {
+    render(
+      React.createElement(
+        AppShell,
+        {
+          username: 'Rook',
+          mailUnreadCount: 3,
+          onMailClick: vi.fn(),
+          onSettings: vi.fn(),
+          onReportBug: vi.fn(),
+          children: React.createElement('div', null, 'Child'),
+        },
+      ),
+    );
+
+    for (const label of ['Mail (3 unread)', 'Help and support', 'Open settings']) {
+      const className = screen.getByRole('button', { name: label }).className;
+      expect(className).toContain('flex');
+      expect(className).toContain('h-6');
+      expect(className).toContain('w-6');
+      expect(className).toContain('items-center');
+      expect(className).toContain('justify-center');
+    }
+  });
+
   it('keeps the header stable without the legacy realm switch control', () => {
     const appShellProps: React.ComponentProps<typeof AppShell> & {
       realmLabel: string;

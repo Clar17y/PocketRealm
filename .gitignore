@@ -30,6 +30,7 @@ packages/*/src/**/*.d.ts.map
 .env
 .env.local
 .env.*.local
+.discord-setup.env
 
 # IDE
 .idea/

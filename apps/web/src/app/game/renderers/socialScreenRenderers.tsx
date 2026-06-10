@@ -26,6 +26,7 @@ export function SettingsScreenRenderer({
   pushState,
   pushToggle,
   onLogout,
+  onReportBug,
   onAccountRefresh,
   onForceRelogin,
 }: {
@@ -41,6 +42,7 @@ export function SettingsScreenRenderer({
   pushState: GameScreenRendererProps['pushState'];
   pushToggle: GameScreenRendererProps['pushToggle'];
   onLogout: () => void;
+  onReportBug: () => void;
   onAccountRefresh: () => Promise<void>;
   onForceRelogin: () => void;
 }) {
@@ -94,6 +96,7 @@ export function SettingsScreenRenderer({
       onAccountRefresh={onAccountRefresh}
       onForceRelogin={onForceRelogin}
       onLogout={onLogout}
+      onReportBug={onReportBug}
     />
   );
 }

@@ -17,6 +17,10 @@ vi.mock('@/components/rankings/PublicRankings', () => ({
   },
 }));
 
+vi.mock('@/lib/supportLinks', () => ({
+  DISCORD_INVITE_URL: 'https://discord.gg/pocketrealm',
+}));
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -41,5 +45,11 @@ describe('Home page', () => {
     expect(screen.getByRole('link', { name: 'Rankings' }).getAttribute('href')).toBe('#rankings');
     expect(screen.getByText('public rankings component')).toBeTruthy();
     expect(publicRankingsMock).toHaveBeenCalledWith(expect.objectContaining({ embedded: true, initialTab: 'leaderboards' }));
+  });
+
+  it('links to Discord from the homepage when an invite is configured', () => {
+    render(React.createElement(Home));
+
+    expect(screen.getAllByRole('link', { name: 'Discord' })[0]?.getAttribute('href')).toBe('https://discord.gg/pocketrealm');
   });
 });

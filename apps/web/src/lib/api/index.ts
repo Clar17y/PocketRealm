@@ -1,6 +1,24 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs, checkApiReady, ensureFreshAccessToken } from './core';
 export type { ApiRequestOptions, ApiResponse, TaxInfo } from './core';
 
+export { getDiscordLinkStatus, claimDiscordLinkCode, normalizeDiscordLinkStatus } from './discord';
+export type {
+  DiscordLinkApiResponse,
+  DiscordLinkClaimResponse,
+  DiscordLinkResponse,
+  DiscordLinkStatusGetResponse,
+  DiscordLinkStatusResponse,
+} from './discord';
+
+export { createSupportTicket } from './support';
+export type {
+  CreateSupportTicketRequest,
+  CreateSupportTicketResponse,
+  SupportTicketArea,
+  SupportTicketCategory,
+  SupportTicketPrivacy,
+} from './support';
+
 export {
   register,
   login,
@@ -191,6 +209,8 @@ export {
   adminSpawnEncounter,
   adminGetResourceNodes,
   adminGetSeasons,
+  adminListSupportTickets,
+  adminUpdateSupportTicket,
   adminCreateSeason,
   adminBootstrapSeason,
   adminActivateSeason,
@@ -215,6 +235,10 @@ export type {
   AdminActiveEvent,
   AdminResourceNode,
   AdminSeason,
+  AdminSupportTicket,
+  AdminSupportTicketStatus,
+  AdminSupportTicketUpdateInput,
+  AdminSupportSensitivityFlag,
   BalanceReport,
   BalancePeriod,
   LatencyActionSummary,

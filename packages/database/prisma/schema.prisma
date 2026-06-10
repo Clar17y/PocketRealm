@@ -35,6 +35,9 @@ model Account {
   blocksReceived         PlayerBlock[]            @relation("PlayerBlockBlocked")
   friendMailsSent        FriendMail[]             @relation("FriendMailSender")
   friendMailsReceived    FriendMail[]             @relation("FriendMailRecipient")
+  supportTickets         SupportTicket[]
+  supportTicketEvents    SupportTicketEvent[]
+  discordAccountLinks    DiscordAccountLink[]
   seasonArchives         SeasonArchive[]
   hallOfFameEntries      HallOfFameEntry[]
 
@@ -149,7 +152,11 @@ model Player {
   questState           PlayerQuestState?
   shopPurchases        PlayerShopPurchase[]
   buffs                PlayerBuff[]
-  pushSubscriptions   PushSubscription[]
+  pushSubscriptions          PushSubscription[]
+  supportTickets             SupportTicket[]
+  discordDuelsAsChallenger   DiscordDuel[] @relation("DiscordDuelChallenger")
+  discordDuelsAsTarget       DiscordDuel[] @relation("DiscordDuelTarget")
+  discordDuelsWon            DiscordDuel[] @relation("DiscordDuelWinner")
 
   // Encounter site lockout
   activeEncounterSiteId String? @map("active_encounter_site_id")
@@ -249,6 +256,7 @@ model Season {
   seasonArchives    SeasonArchive[]
   hallOfFameEntries HallOfFameEntry[]
   rewardTiers       SeasonRewardTier[]
+  supportTickets    SupportTicket[]
 
   @@index([status])
   @@map("seasons")
@@ -1348,6 +1356,217 @@ model FriendMail {
   @@index([recipientId, isDeletedByRecipient, isRead])
   @@index([senderId, isDeletedBySender])
   @@map("friend_mails")
+}
+
+model SupportTicket {
+  id                  String    @id @default(uuid())
+  publicId            String    @unique @map("public_id") @db.VarChar(24)
+  source              String    @db.VarChar(24)
+  status              String    @default("new") @db.VarChar(24)
+  privacy             String    @db.VarChar(24)
+  category            String    @db.VarChar(24)
+  area                String    @db.VarChar(32)
+  sensitivityFlags    String[]  @default([]) @map("sensitivity_flags")
+  title               String    @db.VarChar(120)
+  description         String    @db.VarChar(4000)
+  expectedBehavior    String?   @map("expected_behavior") @db.VarChar(2000)
+  actualBehavior      String?   @map("actual_behavior") @db.VarChar(2000)
+  reproductionSteps   String?   @map("reproduction_steps") @db.VarChar(3000)
+  reporterAccountId   String    @map("reporter_account_id")
+  reporterPlayerId    String?   @map("reporter_player_id")
+  seasonId            String?   @map("season_id")
+  reporterDisplayName String    @map("reporter_display_name") @db.VarChar(64)
+  realmLabel          String    @map("realm_label") @db.VarChar(80)
+  screen              String?   @db.VarChar(80)
+  appVersion          String?   @map("app_version") @db.VarChar(80)
+  apiVersion          String?   @map("api_version") @db.VarChar(80)
+  browser             String?   @db.VarChar(160)
+  device              String?   @db.VarChar(160)
+  requestId           String?   @map("request_id") @db.VarChar(64)
+  sentryEventId       String?   @map("sentry_event_id") @db.VarChar(64)
+  attachmentMetadata  Json?     @map("attachment_metadata")
+  duplicateTicketIds  String[]  @default([]) @map("duplicate_ticket_ids")
+  githubIssueUrl      String?   @map("github_issue_url") @db.VarChar(500)
+  staffNotes             String?   @map("staff_notes") @db.VarChar(4000)
+  discordMessageId       String?   @map("discord_message_id") @db.VarChar(64)
+  discordReporterGuildId String?   @map("discord_reporter_guild_id") @db.VarChar(32)
+  discordReporterUserId  String?   @map("discord_reporter_user_id") @db.VarChar(32)
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+  closedAt               DateTime? @map("closed_at")
+
+  reporterAccount Account              @relation(fields: [reporterAccountId], references: [id], onDelete: Cascade)
+  reporterPlayer  Player?              @relation(fields: [reporterPlayerId], references: [id], onDelete: SetNull)
+  season           Season?              @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  events        SupportTicketEvent[]
+  discordThread SupportTicketDiscordThread?
+
+  @@index([status, createdAt])
+  @@index([reporterAccountId, createdAt])
+  @@index([reporterPlayerId, createdAt])
+  @@index([seasonId, createdAt])
+  @@index([category, area])
+  @@index([discordReporterGuildId, discordReporterUserId])
+  @@map("support_tickets")
+}
+
+model SupportTicketEvent {
+  id             String   @id @default(uuid())
+  ticketId       String   @map("ticket_id")
+  actorAccountId String?  @map("actor_account_id")
+  eventType      String   @map("event_type") @db.VarChar(32)
+  fromStatus     String?  @map("from_status") @db.VarChar(24)
+  toStatus       String?  @map("to_status") @db.VarChar(24)
+  note           String?  @db.VarChar(2000)
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorAccount Account?      @relation(fields: [actorAccountId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([actorAccountId, createdAt])
+  @@map("support_ticket_events")
+}
+
+model DiscordAccountLink {
+  id             String    @id @default(uuid())
+  discordUserId  String    @map("discord_user_id") @db.VarChar(32)
+  discordGuildId String    @map("discord_guild_id") @db.VarChar(32)
+  accountId      String    @map("account_id")
+  linkedAt       DateTime  @default(now()) @map("linked_at")
+  unlinkedAt     DateTime? @map("unlinked_at")
+  roleSyncedAt   DateTime? @map("role_synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Migration 20260604005029 additionally creates two PARTIAL unique indexes that
+  // Prisma cannot express declaratively:
+  //   discord_account_links_active_discord_unique ON (discord_guild_id, discord_user_id) WHERE unlinked_at IS NULL
+  //   discord_account_links_active_account_unique ON (account_id) WHERE unlinked_at IS NULL
+  // They enforce "one active link per Discord user per guild / per account" and the
+  // P2002 conflict handling in discordAccountLinkService relies on them. Do not use
+  // `prisma db push` on this model — it would drop these indexes.
+  @@index([discordGuildId, discordUserId])
+  @@index([accountId])
+  @@index([unlinkedAt, roleSyncedAt])
+  @@map("discord_account_links")
+}
+
+model DiscordLinkCode {
+  id             String    @id @default(uuid())
+  discordUserId  String    @map("discord_user_id") @db.VarChar(32)
+  discordGuildId String    @map("discord_guild_id") @db.VarChar(32)
+  codeHash       String    @unique @map("code_hash") @db.VarChar(64)
+  expiresAt      DateTime  @map("expires_at")
+  usedAt         DateTime? @map("used_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([discordGuildId, discordUserId, expiresAt])
+  @@map("discord_link_codes")
+}
+
+model DiscordCommunityProfile {
+  id              String    @id @default(uuid())
+  discordUserId   String    @map("discord_user_id") @db.VarChar(32)
+  discordGuildId  String    @map("discord_guild_id") @db.VarChar(32)
+  xp              Int       @default(0)
+  level           Int       @default(1)
+  dailyXp         Int       @default(0) @map("daily_xp")
+  dailyXpDate     DateTime? @map("daily_xp_date") @db.Date
+  lastXpGrantedAt DateTime? @map("last_xp_granted_at")
+  lastRoleSyncAt  DateTime? @map("last_role_sync_at")
+  excludedFromXp  Boolean   @default(false) @map("excluded_from_xp")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([discordGuildId, discordUserId])
+  @@index([discordGuildId, level])
+  @@map("discord_community_profiles")
+}
+
+model DiscordXpEvent {
+  id                 String   @id @default(uuid())
+  discordUserId      String   @map("discord_user_id") @db.VarChar(32)
+  discordGuildId     String   @map("discord_guild_id") @db.VarChar(32)
+  channelId          String   @map("channel_id") @db.VarChar(32)
+  messageId          String   @map("message_id") @db.VarChar(32)
+  messageFingerprint String   @map("message_fingerprint") @db.VarChar(64)
+  xp                 Int
+  reason             String   @db.VarChar(32)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@unique([discordGuildId, messageId])
+  @@index([discordGuildId, discordUserId, createdAt])
+  @@index([messageFingerprint, createdAt])
+  @@map("discord_xp_events")
+}
+
+model DiscordDuel {
+  id                      String    @id @default(uuid())
+  guildId                 String    @map("guild_id") @db.VarChar(32)
+  channelId               String    @map("channel_id") @db.VarChar(32)
+  messageId               String?   @map("message_id") @db.VarChar(32)
+  threadId                String?   @map("thread_id") @db.VarChar(32)
+  challengerDiscordUserId String    @map("challenger_discord_user_id") @db.VarChar(32)
+  targetDiscordUserId     String    @map("target_discord_user_id") @db.VarChar(32)
+  challengerPlayerId      String    @map("challenger_player_id")
+  targetPlayerId          String    @map("target_player_id")
+  status                  String    @default("pending") @db.VarChar(24)
+  winnerPlayerId          String?   @map("winner_player_id")
+  isDraw                  Boolean   @default(false) @map("is_draw")
+  combatLog               Json?     @map("combat_log")
+  summary                 Json?
+  createdAt               DateTime  @default(now()) @map("created_at")
+  acceptedAt              DateTime? @map("accepted_at")
+  completedAt             DateTime? @map("completed_at")
+  expiresAt               DateTime  @map("expires_at")
+
+  challenger Player  @relation("DiscordDuelChallenger", fields: [challengerPlayerId], references: [id], onDelete: Cascade)
+  target     Player  @relation("DiscordDuelTarget", fields: [targetPlayerId], references: [id], onDelete: Cascade)
+  winner     Player? @relation("DiscordDuelWinner", fields: [winnerPlayerId], references: [id], onDelete: SetNull)
+
+  @@index([guildId, channelId, createdAt])
+  @@index([status, expiresAt])
+  @@map("discord_duels")
+}
+
+model SupportTicketDiscordThread {
+  id                     String    @id @default(uuid())
+  ticketId               String    @unique @map("ticket_id")
+  guildId                String    @map("guild_id") @db.VarChar(32)
+  triageChannelId        String    @map("triage_channel_id") @db.VarChar(32)
+  triageMessageId        String    @map("triage_message_id") @db.VarChar(32)
+  threadId               String?   @map("thread_id") @db.VarChar(32)
+  reporterDiscordUserId  String?   @map("reporter_discord_user_id") @db.VarChar(32)
+  createdByDiscordUserId String?   @map("created_by_discord_user_id") @db.VarChar(32)
+  status                 String    @default("triage_posted") @db.VarChar(24)
+  createdAt              DateTime  @default(now()) @map("created_at")
+  archivedAt             DateTime? @map("archived_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, triageChannelId])
+  @@index([threadId])
+  @@map("support_ticket_discord_threads")
+}
+
+model DiscordBotAuditEvent {
+  id                  String   @id @default(uuid())
+  guildId             String   @map("guild_id") @db.VarChar(32)
+  actorDiscordUserId  String?  @map("actor_discord_user_id") @db.VarChar(32)
+  targetDiscordUserId String?  @map("target_discord_user_id") @db.VarChar(32)
+  command             String   @db.VarChar(80)
+  status              String   @db.VarChar(24)
+  errorCode           String?  @map("error_code") @db.VarChar(64)
+  metadata            Json?
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([guildId, createdAt])
+  @@index([actorDiscordUserId, createdAt])
+  @@map("discord_bot_audit_events")
 }
 
 // =============================================================================

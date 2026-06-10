@@ -12,9 +12,14 @@ import { getActiveTemplate } from './combatTemplateService';
 import { getEquipmentStats } from './equipmentService';
 import { getHpState } from './hpService';
 import { getResourceState } from './resourceService';
-import { getSkillPoints } from './skillPointService';
+import { deriveUnlockedActions, getSkillPoints } from './skillPointService';
+import { skillPointAllocationsSchema } from '../utils/jsonColumnSchemas';
 
 export type AttackStyle = 'melee' | 'ranged' | 'magic';
+
+interface BuildPvpCombatantOptions {
+  readOnlySkillAllocation?: boolean;
+}
 
 /** Determine attack style from main-hand weapon's required skill. */
 export async function getAttackStyle(playerId: string): Promise<AttackStyle> {
@@ -28,6 +33,16 @@ export async function getAttackStyle(playerId: string): Promise<AttackStyle> {
   return 'melee';
 }
 
+async function getReadonlyUnlockedActions(playerId: string): Promise<string[]> {
+  const record = await prisma.skillPointAllocation.findUnique({
+    where: { playerId },
+    select: { allocations: true },
+  });
+  const allocations = skillPointAllocationsSchema.catch({}).parse(record?.allocations ?? {});
+
+  return deriveUnlockedActions(allocations);
+}
+
 /**
  * Build a TemplateCombatant for PvP-style combat (arena, spar).
  *
@@ -38,8 +53,13 @@ export async function buildPvpCombatant(
   playerId: string,
   username: string,
   useCurrentResources: boolean,
+  options: BuildPvpCombatantOptions = {},
 ) {
-  const [player, equipStats, weaponRequiredSkill, template, skillPoints, levels] = await Promise.all([
+  const unlockedActionsPromise = options.readOnlySkillAllocation
+    ? getReadonlyUnlockedActions(playerId)
+    : getSkillPoints(playerId).then((skillPoints) => skillPoints.unlockedActions);
+
+  const [player, equipStats, weaponRequiredSkill, template, unlockedActions, levels] = await Promise.all([
     prisma.player.findUniqueOrThrow({
       where: { id: playerId },
       select: { attributes: true },
@@ -47,7 +67,7 @@ export async function buildPvpCombatant(
     getEquipmentStats(playerId),
     getMainHandAttackSkill(playerId),
     getActiveTemplate(playerId),
-    getSkillPoints(playerId),
+    unlockedActionsPromise,
     getSkillLevels(playerId, ['melee', 'ranged', 'evasion', 'magic'] as SkillType[]),
   ]);
 
@@ -117,7 +137,7 @@ export async function buildPvpCombatant(
     mana,
     maxMana,
     manaRegenPerRound: calculateManaRegenPerRound(magicLevel),
-    unlockedActions: skillPoints.unlockedActions,
+    unlockedActions,
     perActionScaling,
   });
 }

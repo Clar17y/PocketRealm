@@ -16,6 +16,7 @@ const {
   getCharactersMock,
   getSeasonArchivesMock,
   getActiveSeasonMock,
+  createSupportTicketMock,
   refreshGuildChatMock,
   gameScreenRendererPropsMock,
 } = vi.hoisted(() => ({
@@ -32,6 +33,7 @@ const {
   getCharactersMock: vi.fn(),
   getSeasonArchivesMock: vi.fn(),
   getActiveSeasonMock: vi.fn(),
+  createSupportTicketMock: vi.fn(),
   refreshGuildChatMock: vi.fn(),
   gameScreenRendererPropsMock: vi.fn(),
 }));
@@ -59,8 +61,16 @@ vi.mock('@/lib/api', async () => {
     getActiveSeason: getActiveSeasonMock,
     joinSeason: joinSeasonMock,
     switchPlayer: switchPlayerMock,
+    createSupportTicket: createSupportTicketMock,
   };
 });
+
+vi.mock('@/lib/supportLinks', () => ({
+  WIKI_URL: '/wiki',
+  DISCORD_INVITE_URL: 'https://discord.gg/pocketrealm',
+  KNOWN_ISSUES_URL: 'https://status.pocketrealm.example/issues',
+  hasDiscordInvite: () => true,
+}));
 
 vi.mock('@/lib/assets', () => ({
   screenBackgroundSrc: vi.fn(() => undefined),
@@ -72,7 +82,27 @@ vi.mock('@pocketrealm/game-engine', () => ({
 }));
 
 vi.mock('@/components/AppShell', () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppShell: ({
+    children,
+    discordUrl,
+    knownIssuesUrl,
+    onReportBug,
+  }: {
+    children: React.ReactNode;
+    discordUrl?: string;
+    knownIssuesUrl?: string;
+    onReportBug?: () => void;
+  }) => (
+    <div>
+      <header>
+        <a href="/wiki">Wiki</a>
+        {discordUrl && <a href={discordUrl}>Discord</a>}
+        {knownIssuesUrl && <a href={knownIssuesUrl}>Known Issues</a>}
+        {onReportBug && <button onClick={onReportBug}>Report Bug</button>}
+      </header>
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/common/JoinSeasonBanner', () => ({
@@ -352,6 +382,51 @@ describe('GamePage realm switching', () => {
     expect(gameScreenRendererPropsMock).toHaveBeenCalledWith(expect.objectContaining({
       onGuildMembershipChange: refreshGuildChatMock,
     }));
+  });
+
+  it('renders in-game support links and submits a report with the active screen', async () => {
+    createSupportTicketMock.mockResolvedValue({
+      data: {
+        ticket: {
+          publicId: 'SUP-9',
+          status: 'new',
+        },
+      },
+    });
+    useGameControllerMock.mockReturnValue({
+      ...createGameControllerState(),
+      activeScreen: 'forge',
+      getActiveTab: vi.fn(() => 'explore'),
+    });
+
+    render(<GamePage />);
+
+    expect(screen.getByRole('link', { name: 'Wiki' }).getAttribute('href')).toBe('/wiki');
+    expect(screen.getByRole('link', { name: 'Discord' }).getAttribute('href')).toBe('https://discord.gg/pocketrealm');
+    expect(screen.getByRole('link', { name: 'Known Issues' }).getAttribute('href')).toBe('https://status.pocketrealm.example/issues');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Report Bug' }));
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: 'Forge result did not update' },
+    });
+    fireEvent.change(screen.getByLabelText(/what happened/i), {
+      target: { value: 'The result modal showed, but inventory stayed stale.' },
+    });
+    fireEvent.change(screen.getByLabelText(/steps/i), {
+      target: { value: 'Open forge, upgrade an item, close result.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /send report/i }));
+
+    await waitFor(() => {
+      expect(createSupportTicketMock).toHaveBeenCalledWith(expect.objectContaining({
+        category: 'bug',
+        title: 'Forge result did not update',
+        description: 'The result modal showed, but inventory stayed stale.',
+        reproductionSteps: 'Open forge, upgrade an item, close result.',
+        screen: 'forge',
+      }));
+    });
+    expect(await screen.findByText(/report sup-9 created/i)).toBeTruthy();
   });
 
   it('keeps Stripe checkout return params after applying the settings deep link', async () => {

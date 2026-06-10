@@ -36,18 +36,22 @@ async function getOrCreateAllocation(playerId: string): Promise<{ allocations: R
   return { allocations: skillPointAllocationsSchema.catch({}).parse(created.allocations ?? {}) };
 }
 
-/** Get current skill point state for a player. */
-export async function getSkillPoints(playerId: string): Promise<SkillPointAllocationData> {
-  const totalPointsEarned = await getTotalPointsEarned(playerId);
-  const { allocations } = await getOrCreateAllocation(playerId);
-  const totalPointsSpent = Object.values(allocations).reduce((sum, v) => sum + v, 0);
-
-  // Derive unlocked actions from allocated nodes
+/** Pure helper: derive unlocked action ids from allocated talent nodes. */
+export function deriveUnlockedActions(allocations: Record<string, number>): string[] {
   const unlockedActions: string[] = [];
   for (const nodeId of Object.keys(allocations)) {
     const node = getTalentNode(nodeId);
     if (node?.unlocksAction) unlockedActions.push(node.unlocksAction);
   }
+  return unlockedActions;
+}
+
+/** Get current skill point state for a player. */
+export async function getSkillPoints(playerId: string): Promise<SkillPointAllocationData> {
+  const totalPointsEarned = await getTotalPointsEarned(playerId);
+  const { allocations } = await getOrCreateAllocation(playerId);
+  const totalPointsSpent = Object.values(allocations).reduce((sum, v) => sum + v, 0);
+  const unlockedActions = deriveUnlockedActions(allocations);
 
   return {
     playerId,
