@@ -57,6 +57,10 @@
       "types": "./dist/discord/discordIds.d.ts",
       "default": "./dist/discord/discordIds.js"
     },
+    "./discord/discordXp": {
+      "types": "./dist/discord/discordXp.d.ts",
+      "default": "./dist/discord/discordXp.js"
+    },
     "./wiki/wikiNavigation": {
       "types": "./dist/wiki/wikiNavigation.d.ts",
       "default": "./dist/wiki/wikiNavigation.js"
