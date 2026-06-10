@@ -156,11 +156,13 @@ describe('handleStaffCommand', () => {
       config,
     });
 
-    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/xp/adjustments', expect.objectContaining({
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/xp/adjustments', {
+      discordGuildId: guildId,
+      actorDiscordUserId: actorUserId,
       targetDiscordUserId: targetUserId,
       amount: -200,
       reason: 'remove mistaken credit',
-    }));
+    });
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: 'Adjusted <@789012345678901234> by -200 XP. New total: 0 XP (level 1).',
     });
