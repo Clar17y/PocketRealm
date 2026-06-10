@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   getLinkedDiscordSkills: vi.fn(),
   getLinkedDiscordRank: vi.fn(),
   searchWikiForDiscord: vi.fn(),
+  grantDiscordMessageXp: vi.fn(),
+  adjustDiscordXp: vi.fn(),
+  markDiscordXpRoleSynced: vi.fn(),
   createDiscordSupportTicket: vi.fn(),
   listUnpostedSupportTicketsForDiscord: vi.fn(),
   markSupportTriageMessage: vi.fn(),
@@ -75,6 +78,12 @@ vi.mock('../services/wikiSearchService', () => ({
   searchWikiForDiscord: mocks.searchWikiForDiscord,
 }));
 
+vi.mock('../services/discordXpService', () => ({
+  grantDiscordMessageXp: mocks.grantDiscordMessageXp,
+  adjustDiscordXp: mocks.adjustDiscordXp,
+  markDiscordXpRoleSynced: mocks.markDiscordXpRoleSynced,
+}));
+
 vi.mock('../services/supportTicketService', () => ({
   createDiscordSupportTicket: mocks.createDiscordSupportTicket,
 }));
@@ -110,6 +119,7 @@ const DISCORD_GUILD_ID = '23456789012345678';
 const DISCORD_CHANNEL_ID = '34567890123456789';
 const DISCORD_TARGET_USER_ID = '45678901234567890';
 const DISCORD_MESSAGE_ID = '56789012345678901';
+const DISCORD_MESSAGE_FINGERPRINT = 'a'.repeat(64);
 const LINK_ID = '11111111-1111-4111-8111-111111111111';
 const DUEL_ID = '22222222-2222-4222-8222-222222222222';
 const LINKED_AT = '2026-06-04T12:00:00.000Z';
@@ -465,6 +475,133 @@ describe('discordRouter', () => {
     } else {
       process.env.PUBLIC_WEB_URL = originalPublicWebUrl;
     }
+  });
+
+  it('grants Discord message XP through the internal API', async () => {
+    mocks.grantDiscordMessageXp.mockResolvedValue({
+      eligible: true,
+      reason: 'granted',
+      xpGranted: 8,
+      previousLevel: 1,
+      newLevel: 2,
+      profileId: 'profile-1',
+    });
+
+    const res = await request(app())
+      .post('/api/v1/discord/xp/messages')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        discordGuildId: DISCORD_GUILD_ID,
+        discordUserId: DISCORD_USER_ID,
+        channelId: DISCORD_CHANNEL_ID,
+        messageId: DISCORD_MESSAGE_ID,
+        messageFingerprint: DISCORD_MESSAGE_FINGERPRINT,
+      })
+      .expect(200);
+
+    expect(res.body.result).toEqual({
+      eligible: true,
+      reason: 'granted',
+      xpGranted: 8,
+      previousLevel: 1,
+      newLevel: 2,
+      profileId: 'profile-1',
+    });
+    expect(mocks.grantDiscordMessageXp).toHaveBeenCalledWith({
+      discordGuildId: DISCORD_GUILD_ID,
+      discordUserId: DISCORD_USER_ID,
+      channelId: DISCORD_CHANNEL_ID,
+      messageId: DISCORD_MESSAGE_ID,
+      messageFingerprint: DISCORD_MESSAGE_FINGERPRINT,
+    });
+  });
+
+  it('rejects raw message content on Discord message XP route', async () => {
+    await request(app())
+      .post('/api/v1/discord/xp/messages')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        discordGuildId: DISCORD_GUILD_ID,
+        discordUserId: DISCORD_USER_ID,
+        channelId: DISCORD_CHANNEL_ID,
+        messageId: DISCORD_MESSAGE_ID,
+        messageFingerprint: DISCORD_MESSAGE_FINGERPRINT,
+        content: 'this must never cross the API boundary',
+      })
+      .expect(400);
+
+    expect(mocks.grantDiscordMessageXp).not.toHaveBeenCalled();
+  });
+
+  it('applies staff Discord XP adjustments through the internal API', async () => {
+    mocks.adjustDiscordXp.mockResolvedValue({
+      profileId: 'profile-1',
+      targetDiscordUserId: DISCORD_TARGET_USER_ID,
+      amount: 20,
+      previousXp: 90,
+      newXp: 110,
+      previousLevel: 1,
+      newLevel: 2,
+      reason: 'manual event credit',
+    });
+
+    const res = await request(app())
+      .post('/api/v1/discord/xp/adjustments')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        discordGuildId: DISCORD_GUILD_ID,
+        actorDiscordUserId: DISCORD_USER_ID,
+        targetDiscordUserId: DISCORD_TARGET_USER_ID,
+        amount: 20,
+        reason: ' manual event credit ',
+      })
+      .expect(200);
+
+    expect(res.body.adjustment).toMatchObject({
+      newXp: 110,
+      newLevel: 2,
+      reason: 'manual event credit',
+    });
+    expect(mocks.adjustDiscordXp).toHaveBeenCalledWith({
+      discordGuildId: DISCORD_GUILD_ID,
+      actorDiscordUserId: DISCORD_USER_ID,
+      targetDiscordUserId: DISCORD_TARGET_USER_ID,
+      amount: 20,
+      reason: 'manual event credit',
+    });
+  });
+
+  it('records Discord XP role sync through the internal API', async () => {
+    mocks.markDiscordXpRoleSynced.mockResolvedValue({
+      profileId: 'profile-1',
+      lastRoleSyncAt: new Date(LINKED_AT),
+    });
+
+    const res = await request(app())
+      .post('/api/v1/discord/xp/role-sync')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        profileId: '11111111-1111-4111-8111-111111111111',
+        discordGuildId: DISCORD_GUILD_ID,
+        discordUserId: DISCORD_USER_ID,
+        roleId: '78901234567890123',
+        level: 2,
+        syncedAt: LINKED_AT,
+      })
+      .expect(200);
+
+    expect(res.body.roleSync).toEqual({
+      profileId: 'profile-1',
+      lastRoleSyncAt: LINKED_AT,
+    });
+    expect(mocks.markDiscordXpRoleSynced).toHaveBeenCalledWith({
+      profileId: '11111111-1111-4111-8111-111111111111',
+      discordGuildId: DISCORD_GUILD_ID,
+      discordUserId: DISCORD_USER_ID,
+      roleId: '78901234567890123',
+      level: 2,
+      syncedAt: new Date(LINKED_AT),
+    });
   });
 
   it('creates a Discord support report for a linked user', async () => {

@@ -23,6 +23,11 @@ import {
   updateSupportTicketStatusFromDiscord,
 } from '../services/discordSupportThreadService';
 import {
+  adjustDiscordXp,
+  grantDiscordMessageXp,
+  markDiscordXpRoleSynced,
+} from '../services/discordXpService';
+import {
   getLinkedDiscordProfile,
   getLinkedDiscordRank,
   getLinkedDiscordSkills,
@@ -35,6 +40,9 @@ import {
   discordLinkIdParamsSchema,
   discordSnowflakeSchema,
   discordUnsyncedLinksQuerySchema,
+  discordXpAdjustmentSchema,
+  discordXpMessageGrantSchema,
+  discordXpRoleSyncSchema,
 } from '../services/discordSchemas';
 import {
   createPendingDiscordDuel,
@@ -249,6 +257,27 @@ discordRouter.get('/wiki/search', requireInternalBotAuth, asyncHandler(async (re
   const results = searchWikiForDiscord(query.q, webBaseUrl());
 
   res.json({ results });
+}));
+
+discordRouter.post('/xp/messages', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const input = discordXpMessageGrantSchema.parse(req.body);
+  const result = await grantDiscordMessageXp(input);
+
+  res.json({ result });
+}));
+
+discordRouter.post('/xp/adjustments', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const input = discordXpAdjustmentSchema.parse(req.body);
+  const adjustment = await adjustDiscordXp(input);
+
+  res.json({ adjustment });
+}));
+
+discordRouter.post('/xp/role-sync', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const input = discordXpRoleSyncSchema.parse(req.body);
+  const roleSync = await markDiscordXpRoleSynced(input);
+
+  res.json({ roleSync });
 }));
 
 discordRouter.post('/reports', requireInternalBotAuth, asyncHandler(async (req, res) => {

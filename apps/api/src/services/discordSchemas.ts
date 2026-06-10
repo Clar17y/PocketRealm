@@ -12,6 +12,31 @@ export const claimDiscordLinkCodeSchema = z.object({
   code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{8}$/),
 }).strict();
 
+export const discordXpMessageGrantSchema = z.object({
+  discordGuildId: discordSnowflakeSchema,
+  discordUserId: discordSnowflakeSchema,
+  channelId: discordSnowflakeSchema,
+  messageId: discordSnowflakeSchema,
+  messageFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();
+
+export const discordXpAdjustmentSchema = z.object({
+  discordGuildId: discordSnowflakeSchema,
+  actorDiscordUserId: discordSnowflakeSchema,
+  targetDiscordUserId: discordSnowflakeSchema,
+  amount: z.number().int(),
+  reason: z.string().trim().min(1).max(500),
+}).strict();
+
+export const discordXpRoleSyncSchema = z.object({
+  profileId: z.string().uuid(),
+  discordGuildId: discordSnowflakeSchema,
+  discordUserId: discordSnowflakeSchema,
+  roleId: discordSnowflakeSchema,
+  level: z.number().int().min(1),
+  syncedAt: z.coerce.date().optional(),
+}).strict();
+
 export const discordDuelCreateSchema = z.object({
   guildId: discordSnowflakeSchema,
   channelId: discordSnowflakeSchema,
