@@ -6,10 +6,6 @@ import { ChannelType } from 'discord.js';
 
 import type { BotConfig } from '../config.js';
 
-// Temporary re-export: staffCommands.ts still imports these from this file
-// until Task 6 switches it to the shared import. Task 6 removes this line.
-export { highestRoleIdForLevel, levelForDiscordXp } from '@pocketrealm/shared/discord/discordXp';
-
 const {
   XP_COOLDOWN_SECONDS,
   MIN_MESSAGE_LENGTH,

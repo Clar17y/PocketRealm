@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
-import type { StaffPrismaClient } from '../prismaTypes.js';
 import { handleStaffCommand } from './staffCommands.js';
 
 const guildId = '234567890123456789';
@@ -48,12 +47,18 @@ describe('handleStaffCommand', () => {
     expect(interaction.deferReply).not.toHaveBeenCalled();
   });
 
-  it('creates an audit event for XP adjustments', async () => {
-    const prisma = createPrisma({
-      profile: createProfile({
-        xp: 90,
-        level: 1,
-      }),
+  it('calls the API for XP adjustments', async () => {
+    const api = createApi({
+      adjustment: {
+        profileId: 'profile-1',
+        targetDiscordUserId: targetUserId,
+        amount: 20,
+        previousXp: 90,
+        newXp: 110,
+        previousLevel: 1,
+        newLevel: 2,
+        reason: 'manual event credit',
+      },
     });
     const interaction = createStaffInteraction({
       member: memberWithRoles([staffRoleId]),
@@ -64,58 +69,37 @@ describe('handleStaffCommand', () => {
     });
 
     await handleStaffCommand(interaction, {
-      api: createApi(),
+      api,
       config,
-      prisma,
     });
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'profile-1' },
-      data: expect.objectContaining({
-        xp: { increment: 20 },
-      }),
-    }));
-    expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'profile-1' },
-      data: expect.objectContaining({
-        level: 2,
-      }),
-    }));
-    expect(prisma.discordBotAuditEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        guildId,
-        actorDiscordUserId: actorUserId,
-        targetDiscordUserId: targetUserId,
-        command: '/staff xp-adjust',
-        status: 'success',
-        metadata: expect.objectContaining({
-          amount: 20,
-          appliedAmount: 20,
-          previousXp: 90,
-          newXp: 110,
-          previousLevel: 1,
-          newLevel: 2,
-          reason: 'manual event credit',
-        }),
-      }),
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/xp/adjustments', {
+      discordGuildId: guildId,
+      actorDiscordUserId: actorUserId,
+      targetDiscordUserId: targetUserId,
+      amount: 20,
+      reason: 'manual event credit',
     });
     expect(interaction.editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Adjusted <@789012345678901234> by 20 XP'),
+      content: 'Adjusted <@789012345678901234> by 20 XP. New total: 110 XP (level 2).',
     });
   });
 
   it('syncs the highest qualifying level role after an XP adjustment changes level', async () => {
     const add = vi.fn<GuildMember['roles']['add']>(async () => ({} as GuildMember));
-    const targetMember = {
-      roles: { add },
-    } as unknown as GuildMember;
+    const targetMember = { roles: { add } } as unknown as GuildMember;
     const guild = createGuild(targetMember);
-    const prisma = createPrisma({
-      profile: createProfile({
-        xp: 90,
-        level: 1,
-      }),
+    const api = createApi({
+      adjustment: {
+        profileId: 'profile-1',
+        targetDiscordUserId: targetUserId,
+        amount: 20,
+        previousXp: 90,
+        newXp: 110,
+        previousLevel: 1,
+        newLevel: 2,
+        reason: 'manual event credit',
+      },
     });
     const interaction = createStaffInteraction({
       member: memberWithRoles([staffRoleId]),
@@ -127,30 +111,37 @@ describe('handleStaffCommand', () => {
     });
 
     await handleStaffCommand(interaction, {
-      api: createApi(),
+      api,
       config: {
         ...config,
         levelRoleMap: new Map([[2, levelTwoRoleId]]),
       },
-      prisma,
     });
 
     expect(guild.members.fetch).toHaveBeenCalledWith(targetUserId);
     expect(add).toHaveBeenCalledWith(levelTwoRoleId);
-    expect(prisma.discordCommunityProfile.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'profile-1' },
-      data: expect.objectContaining({
-        lastRoleSyncAt: expect.any(Date),
-      }),
-    }));
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/xp/role-sync', {
+      profileId: 'profile-1',
+      discordGuildId: guildId,
+      discordUserId: targetUserId,
+      roleId: levelTwoRoleId,
+      level: 2,
+      syncedAt: expect.any(String),
+    });
   });
 
-  it('uses a guarded decrement for negative XP adjustments', async () => {
-    const prisma = createPrisma({
-      profile: createProfile({
-        xp: 90,
-        level: 1,
-      }),
+  it('passes negative XP adjustments through the API', async () => {
+    const api = createApi({
+      adjustment: {
+        profileId: 'profile-1',
+        targetDiscordUserId: targetUserId,
+        amount: -200,
+        previousXp: 90,
+        newXp: 0,
+        previousLevel: 1,
+        newLevel: 1,
+        reason: 'remove mistaken credit',
+      },
     });
     const interaction = createStaffInteraction({
       member: memberWithRoles([staffRoleId]),
@@ -161,25 +152,17 @@ describe('handleStaffCommand', () => {
     });
 
     await handleStaffCommand(interaction, {
-      api: createApi(),
+      api,
       config,
-      prisma,
     });
 
-    expect(prisma.discordCommunityProfile.updateMany).toHaveBeenCalledWith({
-      where: { id: 'profile-1', xp: 90 },
-      data: { xp: { decrement: 90 } },
-    });
-    expect(prisma.discordBotAuditEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        status: 'success',
-        metadata: expect.objectContaining({
-          amount: -200,
-          appliedAmount: -90,
-          previousXp: 90,
-          newXp: 0,
-        }),
-      }),
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/xp/adjustments', expect.objectContaining({
+      targetDiscordUserId: targetUserId,
+      amount: -200,
+      reason: 'remove mistaken credit',
+    }));
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Adjusted <@789012345678901234> by -200 XP. New total: 0 XP (level 1).',
     });
   });
 
@@ -315,113 +298,11 @@ describe('handleStaffCommand', () => {
   });
 });
 
-function createApi(): Pick<PocketRealmApiClient, 'get' | 'post'> {
+function createApi(postResult: unknown = {}): Pick<PocketRealmApiClient, 'get' | 'post'> {
   return {
     get: vi.fn(),
-    post: vi.fn(),
+    post: vi.fn(async () => postResult),
   } as unknown as Pick<PocketRealmApiClient, 'get' | 'post'>;
-}
-
-interface MockProfile {
-  id: string;
-  discordGuildId: string;
-  discordUserId: string;
-  xp: number;
-  level: number;
-  dailyXp: number;
-  dailyXpDate: Date | null;
-  lastRoleSyncAt: Date | null;
-  excludedFromXp: boolean;
-}
-
-interface MockProfileUpdateData {
-  xp?: number | { increment: number } | { decrement: number };
-  level?: number;
-  lastRoleSyncAt?: Date;
-}
-
-function createProfile(overrides: Partial<MockProfile> = {}): MockProfile {
-  return {
-    id: 'profile-1',
-    discordGuildId: guildId,
-    discordUserId: targetUserId,
-    xp: 0,
-    level: 1,
-    dailyXp: 0,
-    dailyXpDate: null,
-    lastRoleSyncAt: null,
-    excludedFromXp: false,
-    ...overrides,
-  };
-}
-
-function createPrisma(options: { profile?: MockProfile | null } = {}): StaffPrismaClient {
-  let storedProfile = options.profile === undefined ? createProfile() : options.profile;
-  const discordCommunityProfile = {
-    findUnique: vi.fn(async () => storedProfile),
-    update: vi.fn(async ({ data }: { where: { id: string }; data: MockProfileUpdateData }) => {
-      const currentProfile = storedProfile ?? createProfile();
-      const xpChange = data.xp;
-      const nextXp = typeof xpChange === 'number'
-        ? xpChange
-        : xpChange && 'increment' in xpChange
-          ? currentProfile.xp + xpChange.increment
-          : xpChange && 'decrement' in xpChange
-            ? currentProfile.xp - xpChange.decrement
-            : currentProfile.xp;
-      const { xp: _xp, ...restData } = data;
-      storedProfile = {
-        ...currentProfile,
-        ...restData,
-        xp: nextXp,
-      };
-      return storedProfile;
-    }),
-    updateMany: vi.fn(async ({ where, data }: {
-      where: { id: string; xp?: number };
-      data: { xp: { decrement: number } };
-    }) => {
-      if (!storedProfile || storedProfile.id !== where.id) {
-        return { count: 0 };
-      }
-
-      if (where.xp !== undefined && storedProfile.xp !== where.xp) {
-        return { count: 0 };
-      }
-
-      storedProfile = {
-        ...storedProfile,
-        xp: storedProfile.xp - data.xp.decrement,
-      };
-
-      return { count: 1 };
-    }),
-    create: vi.fn(async ({ data }: { data: Omit<MockProfile, 'id' | 'lastRoleSyncAt' | 'excludedFromXp' | 'dailyXpDate'> & { dailyXpDate?: Date | null } }) => {
-      storedProfile = {
-        id: 'profile-new',
-        lastRoleSyncAt: null,
-        excludedFromXp: false,
-        ...data,
-        dailyXpDate: data.dailyXpDate ?? null,
-      };
-      return storedProfile;
-    }),
-  };
-  const discordBotAuditEvent = {
-    create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
-      id: 'audit-1',
-      ...data,
-    })),
-  };
-  const tx = {
-    discordCommunityProfile,
-    discordBotAuditEvent,
-  };
-
-  return {
-    ...tx,
-    $transaction: async <T>(callback: (transaction: typeof tx) => Promise<T>): Promise<T> => callback(tx),
-  };
 }
 
 function memberWithRoles(roleIds: string[]): GuildMember {
