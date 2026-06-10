@@ -33,10 +33,6 @@ interface XpAdjustmentApiResponse {
   adjustment: XpAdjustmentResult;
 }
 
-interface XpRoleSyncApiClient {
-  post<T>(path: string, body: unknown): Promise<T>;
-}
-
 type SyncLinkedRolesFn = (options: SyncLinkedRolesOptions) => Promise<RoleSyncSummary>;
 
 export interface StaffCommandOptions {
@@ -207,7 +203,7 @@ async function handleXpAdjust(
 
 async function syncAdjustedLevelRole(
   guild: Guild | null,
-  api: XpRoleSyncApiClient,
+  api: Pick<PocketRealmApiClient, 'post'>,
   config: StaffConfig,
   adjustment: XpAdjustmentResult,
   now: Date,

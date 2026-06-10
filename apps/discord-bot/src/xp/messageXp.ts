@@ -103,7 +103,6 @@ type MessageXpConfig = Pick<
 export interface EvaluateXpMessageOptions {
   redis?: MessageXpRedisClient;
   config?: Partial<MessageXpConfig>;
-  now?: () => Date;
 }
 
 export interface GrantXpMessageDeps {

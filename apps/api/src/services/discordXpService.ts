@@ -2,6 +2,7 @@ import { prisma, type Prisma } from '@pocketrealm/database';
 import { DISCORD_XP_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import { levelForDiscordXp } from '@pocketrealm/shared/discord/discordXp';
 import { AppError } from '../middleware/errorHandler';
+import { getDayStart } from '../utils/dateHelpers';
 
 const {
   XP_PER_MESSAGE_MIN,
@@ -74,10 +75,6 @@ export interface MarkDiscordXpRoleSyncedInput {
   syncedAt?: Date;
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
 function isSameUtcDay(left: Date | null, right: Date): boolean {
   return Boolean(
     left &&
@@ -143,7 +140,7 @@ export async function grantDiscordMessageXp(
       return { eligible: false, reason: 'duplicate_fingerprint' };
     }
 
-    const today = startOfUtcDay(now);
+    const today = getDayStart(now);
     const previousXp = profile?.xp ?? 0;
     const previousLevel = profile?.level ?? levelForDiscordXp(previousXp);
     const currentDailyXp = profile && isSameUtcDay(profile.dailyXpDate, today) ? profile.dailyXp : 0;
@@ -245,6 +242,9 @@ async function applyXpAdjustment(
   return applyGuardedXpDecrement(tx, input.profile, Math.abs(input.amount));
 }
 
+// CAS retry: under read-committed isolation a concurrent committed transaction can
+// change profile.xp between our read and the guarded updateMany, so the xp-matched
+// write may miss and must re-read and retry to keep the decrement clamped at zero.
 async function applyGuardedXpDecrement(
   tx: Prisma.TransactionClient,
   profile: DiscordCommunityProfileForXp,
