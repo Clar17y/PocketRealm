@@ -183,6 +183,39 @@ describe('discordXpService', () => {
     }));
   });
 
+  it('updates an existing profile level when message XP crosses the next level threshold', async () => {
+    mocks.prisma.discordCommunityProfile.findUnique.mockResolvedValue(createProfile({
+      xp: 92,
+      level: 1,
+      dailyXp: 0,
+      dailyXpDate: TODAY,
+    }));
+
+    const result = await grantDiscordMessageXp(messageInput(), {
+      now: NOW,
+      random: () => 0.375,
+    });
+
+    expect(result).toMatchObject({
+      eligible: true,
+      reason: 'granted',
+      xpGranted: 8,
+      previousLevel: 1,
+      newLevel: 2,
+      profileId: 'profile-1',
+    });
+    expect(mocks.prisma.discordCommunityProfile.update).toHaveBeenCalledWith({
+      where: { id: 'profile-1' },
+      data: expect.objectContaining({
+        xp: { increment: 8 },
+        level: 2,
+        dailyXp: 8,
+        dailyXpDate: TODAY,
+        lastXpGrantedAt: NOW,
+      }),
+    });
+  });
+
   it('returns daily_cap when the daily soft cap is exhausted', async () => {
     mocks.prisma.discordCommunityProfile.findUnique.mockResolvedValue(createProfile({
       xp: 500,
