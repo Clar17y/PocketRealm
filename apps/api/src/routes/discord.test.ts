@@ -477,6 +477,18 @@ describe('discordRouter', () => {
     }
   });
 
+  it.each([
+    '/api/v1/discord/xp/messages',
+    '/api/v1/discord/xp/adjustments',
+    '/api/v1/discord/xp/role-sync',
+  ])('requires internal bot auth on %s', async (path) => {
+    await request(app()).post(path).send({}).expect(401);
+
+    expect(mocks.grantDiscordMessageXp).not.toHaveBeenCalled();
+    expect(mocks.adjustDiscordXp).not.toHaveBeenCalled();
+    expect(mocks.markDiscordXpRoleSynced).not.toHaveBeenCalled();
+  });
+
   it('grants Discord message XP through the internal API', async () => {
     mocks.grantDiscordMessageXp.mockResolvedValue({
       eligible: true,

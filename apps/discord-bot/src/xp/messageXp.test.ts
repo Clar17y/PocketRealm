@@ -59,7 +59,6 @@ describe('message XP', () => {
     const result = await evaluateXpMessage(createMessage(), {
       redis,
       config: createConfig(),
-      now: () => now,
     });
 
     expect(redis.set).toHaveBeenCalledWith(
@@ -193,6 +192,42 @@ describe('message XP', () => {
       level: 3,
       syncedAt: now.toISOString(),
     });
+  });
+
+  it('skips role-sync recording when the Discord role assignment fails', async () => {
+    const api = createApi({
+      result: {
+        eligible: true,
+        reason: 'granted',
+        xpGranted: 12,
+        previousLevel: 2,
+        newLevel: 3,
+        profileId: 'profile-1',
+      },
+    });
+    const add = vi.fn(async () => {
+      throw new Error('missing permissions');
+    });
+    const warn = vi.fn();
+
+    const result = await grantXpForMessage(
+      createMessage({ member: { roles: { add } } }),
+      {
+        api: asMessageXpApiClient(api),
+        redis: createRedis(),
+        config: createConfig({ levelRoleMap: new Map([[2, levelTwoRoleId]]) }),
+        now: () => now,
+        logger: { warn },
+      },
+    );
+
+    expect(result).toMatchObject({ eligible: true, reason: 'granted', newLevel: 3 });
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/xp/messages', expect.anything());
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ roleId: levelTwoRoleId, newLevel: 3 }),
+      'Discord XP level role sync failed',
+    );
   });
 });
 

@@ -73,15 +73,7 @@ describe('discordXpService', () => {
     mocks.prisma.discordXpEvent.findUnique.mockResolvedValue(null);
     mocks.prisma.discordXpEvent.findFirst.mockResolvedValue(null);
     mocks.prisma.discordCommunityProfile.findUnique.mockResolvedValue(createProfile());
-    mocks.prisma.discordCommunityProfile.update.mockImplementation(async ({ data }: { data: { xp?: { increment?: number; decrement?: number } | number; level?: number; dailyXp?: number; dailyXpDate?: Date; lastXpGrantedAt?: Date; lastRoleSyncAt?: Date } }) => ({
-      ...createProfile({ xp: 92, level: 1 }),
-      xp: data.xp && typeof data.xp === 'object' && data.xp.increment ? 92 + data.xp.increment : 92,
-      level: data.level ?? 1,
-      dailyXp: data.dailyXp ?? 0,
-      dailyXpDate: data.dailyXpDate ?? null,
-      lastXpGrantedAt: data.lastXpGrantedAt ?? null,
-      lastRoleSyncAt: data.lastRoleSyncAt ?? null,
-    }));
+    mocks.prisma.discordCommunityProfile.update.mockResolvedValue(createProfile());
     mocks.prisma.discordCommunityProfile.updateMany.mockResolvedValue({ count: 1 });
     mocks.prisma.discordCommunityProfile.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'profile-new',
@@ -263,6 +255,57 @@ describe('discordXpService', () => {
     });
   });
 
+  it('creates a profile for a positive staff XP adjustment when none exists', async () => {
+    mocks.prisma.discordCommunityProfile.findUnique.mockResolvedValue(null);
+
+    const result = await adjustDiscordXp({
+      discordGuildId: GUILD_ID,
+      actorDiscordUserId: ACTOR_ID,
+      targetDiscordUserId: USER_ID,
+      amount: 150,
+      reason: 'event prize',
+    });
+
+    expect(mocks.prisma.discordCommunityProfile.create).toHaveBeenCalledWith({
+      data: {
+        discordGuildId: GUILD_ID,
+        discordUserId: USER_ID,
+        xp: 150,
+        level: 2,
+        dailyXp: 0,
+      },
+    });
+    expect(result).toMatchObject({
+      profileId: 'profile-new',
+      previousXp: 0,
+      newXp: 150,
+      previousLevel: 1,
+      newLevel: 2,
+    });
+  });
+
+  it('returns a zero result for a negative adjustment when no profile exists', async () => {
+    mocks.prisma.discordCommunityProfile.findUnique.mockResolvedValue(null);
+
+    const result = await adjustDiscordXp({
+      discordGuildId: GUILD_ID,
+      actorDiscordUserId: ACTOR_ID,
+      targetDiscordUserId: USER_ID,
+      amount: -50,
+      reason: 'remove mistaken credit',
+    });
+
+    expect(result).toMatchObject({
+      profileId: null,
+      previousXp: 0,
+      newXp: 0,
+      previousLevel: 1,
+      newLevel: 1,
+    });
+    expect(mocks.prisma.discordCommunityProfile.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.discordCommunityProfile.updateMany).not.toHaveBeenCalled();
+  });
+
   it('clamps a negative staff XP adjustment at zero', async () => {
     mocks.prisma.discordCommunityProfile.findUnique
       .mockResolvedValueOnce(createProfile({ xp: 90, level: 1 }))
@@ -319,6 +362,22 @@ describe('discordXpService', () => {
     expect(mocks.prisma.discordCommunityProfile.updateMany).toHaveBeenCalledWith({
       where: { id: 'profile-1', discordGuildId: GUILD_ID, discordUserId: USER_ID },
       data: { lastRoleSyncAt: NOW },
+    });
+  });
+
+  it('throws a 404 when role sync targets a missing profile', async () => {
+    mocks.prisma.discordCommunityProfile.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(markDiscordXpRoleSynced({
+      profileId: 'profile-missing',
+      discordGuildId: GUILD_ID,
+      discordUserId: USER_ID,
+      roleId: '78901234567890123',
+      level: 2,
+      syncedAt: NOW,
+    })).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'DISCORD_XP_PROFILE_NOT_FOUND',
     });
   });
 });

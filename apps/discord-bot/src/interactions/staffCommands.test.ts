@@ -168,6 +168,28 @@ describe('handleStaffCommand', () => {
     });
   });
 
+  it('replies with a failure message when the XP adjustment API call fails', async () => {
+    const api = {
+      get: vi.fn(),
+      post: vi.fn(async () => {
+        throw new Error('api unavailable');
+      }),
+    } as unknown as Pick<PocketRealmApiClient, 'get' | 'post'>;
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'xp-adjust',
+      targetUserId,
+      amount: 20,
+      reason: 'manual event credit',
+    });
+
+    await handleStaffCommand(interaction, { api, config });
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Could not adjust Discord XP right now. Try again or check bot logs.',
+    });
+  });
+
   it('calls syncLinkedRoles for staff sync-roles commands', async () => {
     const api = createApi();
     const syncLinkedRoles = vi.fn(async () => ({
