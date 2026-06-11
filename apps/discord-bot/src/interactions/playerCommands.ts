@@ -4,7 +4,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
-import { resolveRankCategory } from '../rankCategories.js';
+import { INVALID_RANK_CATEGORY_COPY, resolveRankCategory } from '../rankCategories.js';
 import { formatDiscordTimestamp } from '../utils.js';
 
 interface ProfileResponse {
@@ -48,8 +48,6 @@ type PlayerCommandConfig = Pick<BotConfig, 'guildId'>;
 const LINK_SELF_COPY = 'Link your PocketRealm account first with /link.';
 const LINK_OTHER_COPY = 'That Discord user needs to link their PocketRealm account with /link first.';
 const PLAYER_NOT_FOUND_COPY = 'Linked PocketRealm account has no active player.';
-const INVALID_RANK_CATEGORY_COPY =
-  'Unknown ranking category. Pick a category from autocomplete, or try character_level, character_xp, pvp_rating, total_skill_level, or total_kills.';
 
 export async function handleProfileCommand(
   interaction: ChatInputCommandInteraction,

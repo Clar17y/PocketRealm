@@ -43,6 +43,9 @@ export async function routeInteraction(
   if (typeof interaction.isAutocomplete === 'function' && interaction.isAutocomplete()) {
     if (interaction.commandName === 'rank') {
       await interaction.respond(getRankCategoryAutocompleteChoices(interaction.options.getFocused()));
+    } else {
+      // Discord requires every autocomplete interaction to be answered within 3s.
+      await interaction.respond([]);
     }
     return;
   }

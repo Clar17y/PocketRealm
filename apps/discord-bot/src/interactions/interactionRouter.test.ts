@@ -108,6 +108,26 @@ describe('routeInteraction', () => {
     ]));
   });
 
+  it('responds with empty choices for unhandled autocomplete commands', async () => {
+    const respond = vi.fn();
+    const interaction = {
+      isAutocomplete: () => true,
+      commandName: 'wiki',
+      options: {
+        getFocused: vi.fn(() => 'forge'),
+      },
+      respond,
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, {
+      api,
+      config: routerConfig,
+    });
+
+    expect(respond).toHaveBeenCalledWith([]);
+  });
+
   it('routes duel commands to the duel handler', async () => {
     const interaction = {
       isChatInputCommand: () => true,

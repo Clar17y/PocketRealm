@@ -1,40 +1,45 @@
+import { CROWN_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
+
 interface RankCategoryOption {
   name: string;
   value: string;
   aliases?: string[];
 }
 
-const SKILL_CATEGORY_OPTIONS: RankCategoryOption[] = [
-  { name: 'Melee', value: 'skill_melee' },
-  { name: 'Ranged', value: 'skill_ranged' },
-  { name: 'Magic', value: 'skill_magic' },
-  { name: 'Mining', value: 'skill_mining' },
-  { name: 'Foraging', value: 'skill_foraging' },
-  { name: 'Woodcutting', value: 'skill_woodcutting', aliases: ['woodcutting', 'wood cutting'] },
-  { name: 'Refining', value: 'skill_refining' },
-  { name: 'Tanning', value: 'skill_tanning' },
-  { name: 'Weaving', value: 'skill_weaving' },
-  { name: 'Weaponsmithing', value: 'skill_weaponsmithing', aliases: ['weapon smithing'] },
-  { name: 'Armorsmithing', value: 'skill_armorsmithing', aliases: ['armor smithing', 'armour smithing'] },
-  { name: 'Leatherworking', value: 'skill_leatherworking', aliases: ['leather working'] },
-  { name: 'Tailoring', value: 'skill_tailoring' },
-  { name: 'Alchemy', value: 'skill_alchemy' },
-];
+// Slugs derive from the canonical player category list (guild leaderboards excluded
+// there), so leaderboard categories added to the API surface here automatically.
+const PLAYER_CATEGORY_SLUGS: string[] = Object.values(CROWN_CONSTANTS.CATEGORY_GROUPS).flat();
 
-export const RANK_CATEGORY_OPTIONS: RankCategoryOption[] = [
-  { name: 'Character Level', value: 'character_level', aliases: ['level', 'character'] },
-  { name: 'Total XP', value: 'character_xp', aliases: ['xp', 'experience', 'character xp'] },
-  { name: 'Total Skill Level', value: 'total_skill_level', aliases: ['skills', 'skill level'] },
-  { name: 'PvP Rating', value: 'pvp_rating', aliases: ['pvp', 'rating', 'arena'] },
-  { name: 'PvP Wins', value: 'pvp_wins', aliases: ['wins'] },
-  { name: 'Best Rating', value: 'pvp_best_rating', aliases: ['best pvp rating'] },
-  { name: 'Win Streak', value: 'pvp_win_streak', aliases: ['streak'] },
-  { name: 'Total Kills', value: 'total_kills', aliases: ['kills'] },
-  { name: 'Boss Damage', value: 'boss_damage', aliases: ['boss'] },
-  { name: 'Casino Profit', value: 'casino_profit', aliases: ['profit'] },
-  { name: 'Total Wagered', value: 'casino_wagered', aliases: ['wagered'] },
-  ...SKILL_CATEGORY_OPTIONS,
-];
+const CATEGORY_DISPLAY: Record<string, { name?: string; aliases?: string[] }> = {
+  character_level: { aliases: ['level', 'character'] },
+  character_xp: { name: 'Total XP', aliases: ['xp', 'experience', 'character xp'] },
+  total_skill_level: { aliases: ['skills', 'skill level'] },
+  pvp_rating: { name: 'PvP Rating', aliases: ['pvp', 'rating', 'arena'] },
+  pvp_wins: { name: 'PvP Wins', aliases: ['wins'] },
+  pvp_best_rating: { name: 'Best Rating', aliases: ['best pvp rating'] },
+  pvp_win_streak: { name: 'Win Streak', aliases: ['streak'] },
+  total_kills: { aliases: ['kills'] },
+  boss_damage: { aliases: ['boss'] },
+  casino_profit: { aliases: ['profit'] },
+  casino_wagered: { name: 'Total Wagered', aliases: ['wagered'] },
+  skill_woodcutting: { aliases: ['wood cutting'] },
+  skill_weaponsmithing: { aliases: ['weapon smithing'] },
+  skill_armorsmithing: { aliases: ['armor smithing', 'armour smithing'] },
+  skill_leatherworking: { aliases: ['leather working'] },
+};
+
+export const RANK_CATEGORY_OPTIONS: RankCategoryOption[] = PLAYER_CATEGORY_SLUGS.map((value) => {
+  const display = CATEGORY_DISPLAY[value];
+  return {
+    name: display?.name ?? defaultCategoryName(value),
+    value,
+    aliases: display?.aliases,
+  };
+});
+
+export const INVALID_RANK_CATEGORY_COPY = `Unknown ranking category. Pick a category from autocomplete, or try ${RANK_CATEGORY_OPTIONS.slice(0, 5)
+  .map((option) => option.value)
+  .join(', ')}.`;
 
 export function resolveRankCategory(input: string): string | null {
   const normalizedInput = normalizeCategoryText(input);
@@ -57,6 +62,14 @@ export function getRankCategoryAutocompleteChoices(input: string): Array<{ name:
     .map(({ name, value }) => ({ name, value }));
 }
 
+function defaultCategoryName(slug: string): string {
+  return slug
+    .replace(/^skill_/, '')
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function categorySearchTexts(option: RankCategoryOption): string[] {
   return [
     option.name,
@@ -70,6 +83,6 @@ function normalizeCategoryText(value: string): string {
     .toLowerCase()
     .trim()
     .replace(/[_-]+/g, ' ')
-    .replace(/[^a-z0-9&\s]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, ' ');
 }
