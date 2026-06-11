@@ -86,6 +86,28 @@ describe('routeInteraction', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/turns?guildId=guild-123');
   });
 
+  it('responds to rank category autocomplete interactions', async () => {
+    const respond = vi.fn();
+    const interaction = {
+      isAutocomplete: () => true,
+      commandName: 'rank',
+      options: {
+        getFocused: vi.fn(() => 'level'),
+      },
+      respond,
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, {
+      api,
+      config: routerConfig,
+    });
+
+    expect(respond).toHaveBeenCalledWith(expect.arrayContaining([
+      { name: 'Character Level', value: 'character_level' },
+    ]));
+  });
+
   it('routes duel commands to the duel handler', async () => {
     const interaction = {
       isChatInputCommand: () => true,

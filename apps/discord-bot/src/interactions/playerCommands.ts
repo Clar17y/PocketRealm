@@ -4,6 +4,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
+import { resolveRankCategory } from '../rankCategories.js';
 import { formatDiscordTimestamp } from '../utils.js';
 
 interface ProfileResponse {
@@ -47,6 +48,8 @@ type PlayerCommandConfig = Pick<BotConfig, 'guildId'>;
 const LINK_SELF_COPY = 'Link your PocketRealm account first with /link.';
 const LINK_OTHER_COPY = 'That Discord user needs to link their PocketRealm account with /link first.';
 const PLAYER_NOT_FOUND_COPY = 'Linked PocketRealm account has no active player.';
+const INVALID_RANK_CATEGORY_COPY =
+  'Unknown ranking category. Pick a category from autocomplete, or try character_level, character_xp, pvp_rating, total_skill_level, or total_kills.';
 
 export async function handleProfileCommand(
   interaction: ChatInputCommandInteraction,
@@ -117,9 +120,15 @@ export async function handleRankCommand(
   api: PlayerApiClient,
   config: PlayerCommandConfig,
 ): Promise<void> {
-  const category = interaction.options.getString('category', true);
+  const rawCategory = interaction.options.getString('category', true);
+  const category = resolveRankCategory(rawCategory);
 
   await interaction.deferReply({ ephemeral: true });
+
+  if (!category) {
+    await interaction.editReply({ content: INVALID_RANK_CATEGORY_COPY });
+    return;
+  }
 
   let response: RankResponse;
   try {
@@ -159,6 +168,13 @@ async function editPlayerErrorReply(
     return;
   }
 
+  if (isInvalidCategoryError(error)) {
+    await interaction.editReply({
+      content: INVALID_RANK_CATEGORY_COPY,
+    });
+    return;
+  }
+
   await interaction.editReply({
     content: 'Unable to load PocketRealm player data right now. Please try again later.',
   });
@@ -172,6 +188,11 @@ function isUnlinkedError(error: unknown): boolean {
 function isPlayerNotFoundError(error: unknown): boolean {
   return error instanceof PocketRealmApiError
     && error.code === 'DISCORD_PLAYER_NOT_FOUND';
+}
+
+function isInvalidCategoryError(error: unknown): boolean {
+  return error instanceof PocketRealmApiError
+    && error.code === 'INVALID_CATEGORY';
 }
 
 function buildProfileEmbed(profile: ProfileResponse['profile']): EmbedBuilder {

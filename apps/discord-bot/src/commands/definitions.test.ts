@@ -43,6 +43,7 @@ describe('buildCommandDefinitions', () => {
         name: 'category',
         type: ApplicationCommandOptionType.String,
         required: true,
+        autocomplete: true,
       }),
     ]);
     expect(commands.find((command) => command.name === 'duel')?.options).toEqual([

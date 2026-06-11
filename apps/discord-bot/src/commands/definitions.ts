@@ -36,6 +36,7 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
         option
           .setName('category')
           .setDescription('Ranking category to view.')
+          .setAutocomplete(true)
           .setRequired(true),
       ),
     new SlashCommandBuilder()

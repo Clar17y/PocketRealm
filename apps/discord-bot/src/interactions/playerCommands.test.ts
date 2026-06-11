@@ -239,11 +239,45 @@ describe('handleRankCommand', () => {
   it('returns an ephemeral rank embed', async () => {
     const get = vi.fn(async <T>(): Promise<T> => ({
       rank: {
-        category: 'level',
+        category: 'character_level',
         rank: 8,
         score: 1234,
         totalPlayers: 250,
         lastRefreshedAt: '2026-06-04T10:00:00.000Z',
+      },
+    }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      user: { id: 'invoker-1' },
+      options: {
+        getString: vi.fn(() => 'character_level'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/character_level?guildId=guild-123');
+    expect(editReply).toHaveBeenCalledWith({
+      embeds: [
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: 'Character Level Rank',
+          }),
+        }),
+      ],
+    });
+  });
+
+  it('normalizes common rank category aliases before calling the API', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      rank: {
+        category: 'character_level',
+        rank: 8,
+        score: 12,
       },
     }) as T);
     const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
@@ -259,16 +293,50 @@ describe('handleRankCommand', () => {
 
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
-    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/level?guildId=guild-123');
+    expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/character_level?guildId=guild-123');
+  });
+
+  it('explains locally unknown rank categories without calling the API', async () => {
+    const get = vi.fn();
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      user: { id: 'invoker-1' },
+      options: {
+        getString: vi.fn(() => 'not a board'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    expect(get).not.toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith({
-      embeds: [
-        expect.objectContaining({
-          data: expect.objectContaining({
-            title: 'Level Rank',
-          }),
-        }),
-      ],
+      content: expect.stringContaining('Unknown ranking category'),
+    });
+  });
+
+  it('explains API-invalid rank categories instead of using the generic data failure copy', async () => {
+    const get = vi.fn(async (): Promise<never> => {
+      throw new PocketRealmApiError('Invalid category', 400, 'INVALID_CATEGORY', {});
+    });
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      user: { id: 'invoker-1' },
+      options: {
+        getString: vi.fn(() => 'character_level'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/character_level?guildId=guild-123');
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('Unknown ranking category'),
     });
   });
 

@@ -3,6 +3,7 @@ import type { Interaction } from 'discord.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { parseDuelButtonId, parseSupportButtonId } from '../discord/components.js';
+import { getRankCategoryAutocompleteChoices } from '../rankCategories.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { handleLinkCommand } from './linkCommand.js';
@@ -39,6 +40,13 @@ export async function routeInteraction(
   interaction: Interaction,
   options: InteractionRouterOptions,
 ): Promise<void> {
+  if (typeof interaction.isAutocomplete === 'function' && interaction.isAutocomplete()) {
+    if (interaction.commandName === 'rank') {
+      await interaction.respond(getRankCategoryAutocompleteChoices(interaction.options.getFocused()));
+    }
+    return;
+  }
+
   if (typeof interaction.isButton === 'function' && interaction.isButton()) {
     if (parseDuelButtonId(interaction.customId)) {
       await handleDuelButton(interaction, options.api);
