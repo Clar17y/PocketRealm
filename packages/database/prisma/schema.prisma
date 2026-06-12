@@ -1597,7 +1597,7 @@ model DiscordNotificationEvent {
   deliveredAt    DateTime? @map("delivered_at")
   failedAt       DateTime? @map("failed_at")
 
-  @@index([deliveredAt, createdAt])
+  @@index([deliveredAt, failedAt, createdAt])
   @@map("discord_notification_events")
 }
 

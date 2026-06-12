@@ -39,4 +39,4 @@ CREATE UNIQUE INDEX "discord_notification_preferences_discord_guild_id_discord_u
 CREATE UNIQUE INDEX "discord_notification_events_dedup_key_key" ON "discord_notification_events"("dedup_key");
 
 -- CreateIndex
-CREATE INDEX "discord_notification_events_delivered_at_created_at_idx" ON "discord_notification_events"("delivered_at", "created_at");
+CREATE INDEX "discord_notification_events_delivered_at_failed_at_created__idx" ON "discord_notification_events"("delivered_at", "failed_at", "created_at");
