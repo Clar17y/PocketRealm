@@ -78,7 +78,7 @@ Internal, bot-key authenticated, alongside existing `/api/v1/discord/*` routes. 
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/v1/discord/notifications/preferences?guildId=&discordUserId=` | All known types with enabled state, for the `/notify` UI |
-| `PUT /api/v1/discord/notifications/preferences` | Upsert one toggle `{guildId, discordUserId, type, enabled}`; 404 without an active account link |
+| `POST /api/v1/discord/notifications/preferences` | Upsert one toggle `{discordGuildId, discordUserId, type, enabled}`; 404 without an active account link. (POST not PUT: all existing internal discord mutations are POST and the bot API client implements only get/post.) |
 | `GET /api/v1/discord/notifications/pending?limit=50` | Undelivered, non-failed outbox events, oldest first |
 | `POST /api/v1/discord/notifications/ack` | `{deliveredIds: [], failedIds: []}` — batch mark `deliveredAt` / bump `attempts`; events reaching max attempts (5) get `failedAt` |
 
