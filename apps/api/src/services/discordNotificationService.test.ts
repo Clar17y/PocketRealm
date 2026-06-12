@@ -139,6 +139,16 @@ describe('discordNotificationService', () => {
         },
       });
     });
+
+    it('uses the PENDING_BATCH_LIMIT default when called with no argument', async () => {
+      mocks.prisma.discordNotificationEvent.findMany.mockResolvedValue([]);
+
+      await listPendingDiscordNotificationEvents();
+
+      expect(mocks.prisma.discordNotificationEvent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 50 }),
+      );
+    });
   });
 
   describe('ackDiscordNotificationEvents', () => {
@@ -159,6 +169,19 @@ describe('discordNotificationService', () => {
         where: { id: { in: ['event-2'] }, attempts: { gte: 5 }, failedAt: null },
         data: { failedAt: NOW },
       });
+      expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('routes failed-path updates through a single $transaction', async () => {
+      mocks.prisma.discordNotificationEvent.updateMany.mockResolvedValue({ count: 2 });
+
+      const result = await ackDiscordNotificationEvents(
+        { deliveredIds: [], failedIds: ['event-3', 'event-4'] },
+        NOW,
+      );
+
+      expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(result.failed).toBe(2);
     });
 
     it('skips empty id lists without queries', async () => {

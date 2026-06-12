@@ -72,4 +72,7 @@ export const discordNotificationPendingQuerySchema = z.object({
 export const discordNotificationAckSchema = z.object({
   deliveredIds: z.array(z.string().uuid()).max(100),
   failedIds: z.array(z.string().uuid()).max(100),
-}).strict();
+}).strict().refine(
+  (ack) => !ack.deliveredIds.some((id) => ack.failedIds.includes(id)),
+  { message: 'deliveredIds and failedIds must not overlap' },
+);

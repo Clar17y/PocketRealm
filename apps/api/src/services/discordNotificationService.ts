@@ -122,20 +122,21 @@ export async function ackDiscordNotificationEvents(
   }
 
   if (input.failedIds.length > 0) {
-    const result = await prisma.discordNotificationEvent.updateMany({
-      where: { id: { in: input.failedIds }, deliveredAt: null, failedAt: null },
-      data: { attempts: { increment: 1 } },
-    });
-    failed = result.count;
-
-    await prisma.discordNotificationEvent.updateMany({
-      where: {
-        id: { in: input.failedIds },
-        attempts: { gte: DISCORD_NOTIFICATION_CONSTANTS.MAX_DELIVERY_ATTEMPTS },
-        failedAt: null,
-      },
-      data: { failedAt: now },
-    });
+    const [incremented] = await prisma.$transaction([
+      prisma.discordNotificationEvent.updateMany({
+        where: { id: { in: input.failedIds }, deliveredAt: null, failedAt: null },
+        data: { attempts: { increment: 1 } },
+      }),
+      prisma.discordNotificationEvent.updateMany({
+        where: {
+          id: { in: input.failedIds },
+          attempts: { gte: DISCORD_NOTIFICATION_CONSTANTS.MAX_DELIVERY_ATTEMPTS },
+          failedAt: null,
+        },
+        data: { failedAt: now },
+      }),
+    ]);
+    failed = incremented.count;
   }
 
   return { delivered, failed };
