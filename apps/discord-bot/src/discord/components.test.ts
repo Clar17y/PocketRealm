@@ -6,7 +6,9 @@ import {
   duelDeclineButtonId,
   duelReplayButtonId,
   duelRematchButtonId,
+  notifyToggleButtonId,
   parseDuelButtonId,
+  parseNotifyButtonId,
   parseSupportButtonId,
   supportButtonId,
 } from './components.js';
@@ -80,5 +82,24 @@ describe('duel Discord component ids', () => {
     expect(parseDuelButtonId('duel:accept:duel-1')).toBeNull();
     expect(parseDuelButtonId('duel:accept:duel-1:')).toBeNull();
     expect(parseDuelButtonId('duel:replay:duel-1:not-a-page')).toBeNull();
+  });
+});
+
+describe('notify buttons', () => {
+  it('round-trips a toggle button id', () => {
+    const id = notifyToggleButtonId('turns_capped', true);
+
+    expect(parseNotifyButtonId(id)).toEqual({ type: 'turns_capped', nextEnabled: true });
+  });
+
+  it('round-trips a disable toggle', () => {
+    expect(parseNotifyButtonId(notifyToggleButtonId('turns_capped', false)))
+      .toEqual({ type: 'turns_capped', nextEnabled: false });
+  });
+
+  it('rejects foreign ids and unknown types', () => {
+    expect(parseNotifyButtonId('duel:accept:abc:123')).toBeNull();
+    expect(parseNotifyButtonId('notify:toggle:boss_spawned:1')).toBeNull();
+    expect(parseNotifyButtonId('notify:toggle:turns_capped')).toBeNull();
   });
 });
