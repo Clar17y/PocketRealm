@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@pocketrealm/database', () => ({ prisma: mocks.prisma }));
+vi.mock('../logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
 vi.mock('./turnBankService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./turnBankService')>()),
   getTurnConfig: mocks.getTurnConfig,
@@ -151,6 +154,22 @@ describe('runDiscordTurnsCappedSweep', () => {
     const summary = await runDiscordTurnsCappedSweep(NOW);
 
     expect(summary).toEqual({ checked: 1, fired: 0, rearmed: 0, skipped: 1 });
+  });
+
+  it('isolates per-preference errors and keeps sweeping the rest', async () => {
+    mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([
+      preference({ id: 'pref-1' }),
+      preference({ id: 'pref-2' }),
+    ]);
+    mocks.getTurnConfig
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue({ regenRate: TURN_CONSTANTS.REGEN_RATE, bankCap: CAP });
+
+    const summary = await runDiscordTurnsCappedSweep(NOW);
+
+    expect(summary.fired).toBe(1);
+    expect(summary.skipped).toBe(1);
+    expect(mocks.prisma.discordNotificationEvent.createMany).toHaveBeenCalledTimes(1);
   });
 
   it('prunes delivered events older than the retention window', async () => {

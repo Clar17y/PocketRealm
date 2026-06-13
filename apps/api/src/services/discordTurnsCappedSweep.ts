@@ -3,6 +3,7 @@ import { calculateCurrentTurns } from '@pocketrealm/game-engine';
 import { DISCORD_NOTIFICATION_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import type { DiscordTurnsCappedPayload } from '@pocketrealm/shared/discord/discordNotifications';
 import { getTurnConfig } from './turnBankService';
+import { logger } from '../logger';
 
 export interface DiscordTurnsCappedSweepSummary {
   checked: number;
@@ -43,83 +44,91 @@ export async function runDiscordTurnsCappedSweep(
   };
 
   for (const preference of preferences) {
-    const link = await prisma.discordAccountLink.findFirst({
-      where: {
-        discordGuildId: preference.discordGuildId,
-        discordUserId: preference.discordUserId,
-        unlinkedAt: null,
-      },
-      orderBy: { linkedAt: 'desc' },
-      select: {
-        account: {
-          select: {
-            activePlayer: {
-              select: {
-                id: true,
-                username: true,
-                turnBank: {
-                  select: {
-                    currentTurns: true,
-                    lastRegenAt: true,
-                    regenProgress: true,
+    try {
+      const link = await prisma.discordAccountLink.findFirst({
+        where: {
+          discordGuildId: preference.discordGuildId,
+          discordUserId: preference.discordUserId,
+          unlinkedAt: null,
+        },
+        orderBy: { linkedAt: 'desc' },
+        select: {
+          account: {
+            select: {
+              activePlayer: {
+                select: {
+                  id: true,
+                  username: true,
+                  turnBank: {
+                    select: {
+                      currentTurns: true,
+                      lastRegenAt: true,
+                      regenProgress: true,
+                    },
                   },
                 },
               },
             },
           },
         },
-      },
-    });
-
-    const player = link?.account.activePlayer;
-    if (!player?.turnBank) {
-      summary.skipped += 1;
-      continue;
-    }
-
-    const turnConfig = await getTurnConfig(prisma, player.id, now);
-    const currentTurns = calculateCurrentTurns(
-      player.turnBank.currentTurns,
-      player.turnBank.lastRegenAt,
-      now,
-      turnConfig.regenRate,
-      turnConfig.bankCap,
-      player.turnBank.regenProgress,
-    );
-    const atCap = currentTurns >= turnConfig.bankCap;
-
-    if (atCap && preference.armed) {
-      const payload: DiscordTurnsCappedPayload = {
-        currentTurns,
-        bankCap: turnConfig.bankCap,
-        username: player.username,
-      };
-
-      // skipDuplicates keeps the disarm committing even when another API
-      // instance already inserted this cap episode's event.
-      await prisma.$transaction([
-        prisma.discordNotificationEvent.createMany({
-          data: [{
-            discordGuildId: preference.discordGuildId,
-            discordUserId: preference.discordUserId,
-            type: 'turns_capped',
-            payload: payload as unknown as Prisma.InputJsonValue,
-            dedupKey: `turns_capped:${player.id}:${player.turnBank.lastRegenAt.getTime()}`,
-          }],
-          skipDuplicates: true,
-        }),
-        prisma.discordNotificationPreference.update({
-          where: { id: preference.id },
-          data: { armed: false, lastFiredAt: now },
-        }),
-      ]);
-      summary.fired += 1;
-    } else if (!atCap && !preference.armed) {
-      await prisma.discordNotificationPreference.update({
-        where: { id: preference.id },
-        data: { armed: true },
       });
-      summary.rearmed += 1;
+
+      const player = link?.account.activePlayer;
+      if (!player?.turnBank) {
+        summary.skipped += 1;
+        continue;
+      }
+
+      const turnConfig = await getTurnConfig(prisma, player.id, now);
+      const currentTurns = calculateCurrentTurns(
+        player.turnBank.currentTurns,
+        player.turnBank.lastRegenAt,
+        now,
+        turnConfig.regenRate,
+        turnConfig.bankCap,
+        player.turnBank.regenProgress,
+      );
+      const atCap = currentTurns >= turnConfig.bankCap;
+
+      if (atCap && preference.armed) {
+        const payload: DiscordTurnsCappedPayload = {
+          currentTurns,
+          bankCap: turnConfig.bankCap,
+          username: player.username,
+        };
+
+        // skipDuplicates keeps the disarm committing even when another API
+        // instance already inserted this cap episode's event.
+        await prisma.$transaction([
+          prisma.discordNotificationEvent.createMany({
+            data: [{
+              discordGuildId: preference.discordGuildId,
+              discordUserId: preference.discordUserId,
+              type: 'turns_capped',
+              payload: payload as unknown as Prisma.InputJsonValue,
+              dedupKey: `turns_capped:${player.id}:${player.turnBank.lastRegenAt.getTime()}`,
+            }],
+            skipDuplicates: true,
+          }),
+          prisma.discordNotificationPreference.update({
+            where: { id: preference.id },
+            data: { armed: false, lastFiredAt: now },
+          }),
+        ]);
+        summary.fired += 1;
+      } else if (!atCap && !preference.armed) {
+        await prisma.discordNotificationPreference.update({
+          where: { id: preference.id },
+          data: { armed: true },
+        });
+        summary.rearmed += 1;
+      }
+    } catch (err) {
+      logger.warn(
+        { err, preferenceId: preference.id },
+        'Discord turns-capped sweep skipped a preference after an error',
+      );
+      summary.skipped += 1;
     }
   }
 

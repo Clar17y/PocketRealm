@@ -91,8 +91,23 @@ describe('discordNotificationService', () => {
           type: 'turns_capped',
           enabled: true,
         },
-        update: { enabled: true },
+        update: { enabled: true, armed: true },
       });
+    });
+
+    it('re-arms on re-enable but does not touch armed when disabling', async () => {
+      mocks.prisma.discordNotificationPreference.upsert.mockResolvedValue({ type: 'turns_capped', enabled: false });
+
+      await upsertDiscordNotificationPreference({
+        discordGuildId: GUILD_ID,
+        discordUserId: USER_ID,
+        type: 'turns_capped',
+        enabled: false,
+      });
+
+      expect(mocks.prisma.discordNotificationPreference.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { enabled: false } }),
+      );
     });
 
     it('requires an active account link', async () => {

@@ -70,7 +70,7 @@ export async function upsertDiscordNotificationPreference(
       type: input.type,
       enabled: input.enabled,
     },
-    update: { enabled: input.enabled },
+    update: { enabled: input.enabled, ...(input.enabled ? { armed: true } : {}) },
   });
 
   return {
