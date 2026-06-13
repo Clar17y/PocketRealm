@@ -119,12 +119,21 @@ export async function handleNotifyToggleButton(
     } catch {
       // DMs from this server are blocked; revert so the user is not opted
       // into notifications that can never arrive.
-      enabled = false;
-      await upsert(false);
-      await interaction.followUp({
-        ephemeral: true,
-        content: 'I could not DM you, so that notification stays off. Enable "Allow direct messages from server members" in your Discord privacy settings for this server, then try again.',
-      });
+      try {
+        await upsert(false);
+        enabled = false;
+        await interaction.followUp({
+          ephemeral: true,
+          content: 'I could not DM you, so that notification stays off. Enable "Allow direct messages from server members" in your Discord privacy settings for this server, then try again.',
+        });
+      } catch {
+        // Revert failed too — the preference is still enabled but undeliverable.
+        // Surface the inconsistency rather than claiming it's off.
+        await interaction.followUp({
+          ephemeral: true,
+          content: 'I could not DM you and could not update that setting. Please run /notify again to turn it off.',
+        });
+      }
     }
   }
 

@@ -115,6 +115,22 @@ describe('handleNotifyToggleButton', () => {
     }));
   });
 
+  it('surfaces an error when the DM fails and the revert also fails', async () => {
+    const api = createApi();
+    api.post = vi.fn()
+      .mockResolvedValueOnce({ preference: { type: 'turns_capped', enabled: true } })
+      .mockRejectedValueOnce(new Error('api down'));
+    const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
+    interaction.user.send = vi.fn().mockRejectedValue(new Error('Cannot send messages to this user'));
+
+    await handleNotifyToggleButton(interaction as never, api as never);
+
+    // both upserts attempted (enable + revert)
+    expect(api.post).toHaveBeenCalledTimes(2);
+    // user is informed; no unhandled rejection (test completes)
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+  });
+
   it('disables without sending a DM', async () => {
     const api = createApi({
       post: vi.fn().mockResolvedValue({ preference: { type: 'turns_capped', enabled: false } }),
