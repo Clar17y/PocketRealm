@@ -66,12 +66,12 @@ interface TurnBankClient {
   };
 }
 
-interface TurnConfig {
+export interface TurnConfig {
   regenRate: number;
   bankCap: number;
 }
 
-async function getTurnConfig(
+export async function getTurnConfig(
   client: Pick<TurnBankClient, 'player'>,
   playerId: string,
   now: Date,
