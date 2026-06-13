@@ -50,6 +50,8 @@ describe('pollDiscordNotifications', () => {
       deliveredIds: [EVENT.id],
       failedIds: [],
     });
+    // Suppression key is retained on success so the event cannot re-send within the TTL.
+    expect(options.redis.del).not.toHaveBeenCalled();
   });
 
   it('acks failed DMs and releases the suppression key for retry', async () => {
