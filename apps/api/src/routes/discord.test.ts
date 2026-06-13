@@ -976,6 +976,18 @@ describe('discordRouter', () => {
     });
   });
 
+  it('POST /notifications/ack rejects ids present in both batches', async () => {
+    const id = '1f8e9b3c-0000-4000-8000-000000000001';
+
+    await request(app())
+      .post('/api/v1/discord/notifications/ack')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ deliveredIds: [id], failedIds: [id] })
+      .expect(400);
+
+    expect(mocks.ackDiscordNotificationEvents).not.toHaveBeenCalled();
+  });
+
   it('rejects notification requests without the bot key', async () => {
     await request(app())
       .get('/api/v1/discord/notifications/pending')
