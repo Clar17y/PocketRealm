@@ -1,4 +1,4 @@
-import { prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { calculateCurrentTurns } from '@pocketrealm/game-engine';
 import { DISCORD_NOTIFICATION_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import type { DiscordTurnsCappedPayload } from '@pocketrealm/shared/discord/discordNotifications';
@@ -103,7 +103,7 @@ export async function runDiscordTurnsCappedSweep(
             discordGuildId: preference.discordGuildId,
             discordUserId: preference.discordUserId,
             type: 'turns_capped',
-            payload,
+            payload: payload as unknown as Prisma.InputJsonValue,
             dedupKey: `turns_capped:${player.id}:${player.turnBank.lastRegenAt.getTime()}`,
           }],
           skipDuplicates: true,
