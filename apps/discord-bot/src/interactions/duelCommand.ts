@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  PermissionFlagsBits,
 } from 'discord.js';
 import type {
   ButtonInteraction,
@@ -103,6 +104,18 @@ export async function handleDuelCommand(
 
   await interaction.deferReply({ ephemeral: true });
 
+  // The public challenge is posted with channel.send(), which (unlike the previous
+  // interaction follow-up) requires the bot to hold SendMessages in this channel.
+  // isSendable() only checks the channel type, so verify the permission too, and bail
+  // before creating the duel so a misconfigured channel never leaves an orphaned record.
+  const channel = interaction.channel;
+  if (!channel?.isSendable() || !interaction.appPermissions?.has(PermissionFlagsBits.SendMessages)) {
+    await interaction.editReply({
+      content: 'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
+    });
+    return;
+  }
+
   let response: CreateDuelResponse;
   try {
     response = await api.post<CreateDuelResponse>('/api/v1/discord/duels', {
@@ -120,11 +133,6 @@ export async function handleDuelCommand(
 
   let replyResult: unknown;
   try {
-    const channel = interaction.channel;
-    if (!channel?.isSendable()) {
-      throw new Error('Duel channel unavailable');
-    }
-
     replyResult = await channel.send({
       content: `<@${opponent.id}>, ${interaction.user} challenged you to a friendly simulation.`,
       components: [buildChallengeRow(response.duel.id, opponent.id)],

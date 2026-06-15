@@ -156,7 +156,7 @@ describe('handleDuelCommand', () => {
     );
   });
 
-  it('edits the deferred reply with a failure message when the channel is unavailable', async () => {
+  it('does not create the duel when the channel is unavailable', async () => {
     const api = createApi();
     vi.mocked(api.post).mockResolvedValue(createPendingDuelResponse());
     const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
@@ -171,13 +171,34 @@ describe('handleDuelCommand', () => {
     await handleDuelCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(api.post).not.toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Could not post the public duel challenge. Please run /duel again.',
+      content: 'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
     });
-    expect(api.post).not.toHaveBeenCalledWith(
-      '/api/v1/discord/duels/duel-123/message',
-      expect.anything(),
-    );
+  });
+
+  it('does not create the duel when the bot lacks permission to post in the channel', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockResolvedValue(createPendingDuelResponse());
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const send = vi.fn(async () => ({ id: 'discord-message-1' }));
+    const interaction = createCommandInteraction({
+      opponent: createUser('333333333333333333'),
+      channel: createSendableChannel(send),
+      appPermissions: { has: () => false },
+      deferReply,
+      editReply,
+    });
+
+    await handleDuelCommand(interaction, api, config);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(api.post).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
+    });
   });
 
   it('edits the deferred command response for duel-specific create errors', async () => {
@@ -187,8 +208,10 @@ describe('handleDuelCommand', () => {
     );
     const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
     const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const send = vi.fn(async () => ({ id: 'discord-message-1' }));
     const interaction = createCommandInteraction({
       opponent: createUser('333333333333333333'),
+      channel: createSendableChannel(send),
       deferReply,
       editReply,
     });
@@ -427,6 +450,7 @@ function createUser(id: string, bot = false): User {
 function createCommandInteraction(input: {
   channelId?: string;
   channel?: ReturnType<typeof createSendableChannel> | null;
+  appPermissions?: { has: (permission: bigint) => boolean } | null;
   fetchReply?: ReturnType<typeof vi.fn>;
   guildId?: string | null;
   opponent: User;
@@ -442,6 +466,7 @@ function createCommandInteraction(input: {
     guildId: input.guildId ?? 'guild-123',
     channelId: input.channelId ?? config.duelsChannelId,
     channel: input.channel ?? null,
+    appPermissions: input.appPermissions === undefined ? { has: () => true } : input.appPermissions,
     user: createUser(userId),
     options: {
       getUser: vi.fn(() => input.opponent),
