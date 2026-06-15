@@ -35,6 +35,10 @@ import {
 } from '../services/discordProfileService';
 import {
   claimDiscordLinkCodeSchema,
+  discordNotificationAckSchema,
+  discordNotificationPendingQuerySchema,
+  discordNotificationPreferencesQuerySchema,
+  discordNotificationPreferenceUpsertSchema,
   discordDuelCreateSchema,
   discordGuildLinkSchema,
   discordLinkIdParamsSchema,
@@ -50,6 +54,12 @@ import {
   recordDiscordDuelMessage,
   resolveDiscordDuel,
 } from '../services/discordDuelService';
+import {
+  ackDiscordNotificationEvents,
+  listDiscordNotificationPreferences,
+  listPendingDiscordNotificationEvents,
+  upsertDiscordNotificationPreference,
+} from '../services/discordNotificationService';
 import { notifySupportTicketCreated } from '../services/discordSupportNotifier';
 import { createDiscordSupportTicket } from '../services/supportTicketService';
 import { createSupportTicketSchema, supportTicketPublicIdParamsSchema } from '../services/supportTicketSchemas';
@@ -354,4 +364,32 @@ discordRouter.post('/support/tickets/:publicId/archive-thread', requireInternalB
   });
 
   res.json({ ticket: result });
+}));
+
+discordRouter.get('/notifications/preferences', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const query = discordNotificationPreferencesQuerySchema.parse(req.query);
+  const preferences = await listDiscordNotificationPreferences(query);
+
+  res.json({ preferences });
+}));
+
+discordRouter.post('/notifications/preferences', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const input = discordNotificationPreferenceUpsertSchema.parse(req.body);
+  const preference = await upsertDiscordNotificationPreference(input);
+
+  res.json({ preference });
+}));
+
+discordRouter.get('/notifications/pending', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const query = discordNotificationPendingQuerySchema.parse(req.query);
+  const events = await listPendingDiscordNotificationEvents(query.limit);
+
+  res.json({ events });
+}));
+
+discordRouter.post('/notifications/ack', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const input = discordNotificationAckSchema.parse(req.body);
+  const result = await ackDiscordNotificationEvents(input);
+
+  res.json({ result });
 }));

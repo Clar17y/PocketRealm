@@ -14,6 +14,7 @@ describe('shared package exports', () => {
     expect(packageJson.exports?.['./constants/achievementDefinitions']).toBeDefined();
     expect(packageJson.exports?.['./constants/expeditionDefinitions']).toBeDefined();
     expect(packageJson.exports?.['./discord/discordXp']).toBeDefined();
+    expect(packageJson.exports?.['./discord/discordNotifications']).toBeDefined();
   });
 
   it('keeps heavy data modules out of the root barrel', () => {

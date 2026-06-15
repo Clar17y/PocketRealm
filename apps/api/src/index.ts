@@ -20,6 +20,8 @@ import { roundTimerRegistry } from './services/roundTimerRegistry';
 import { refreshSeasonCache } from './services/seasonCacheService';
 import { runWeeklyLeaderboardJob } from './jobs/weeklyLeaderboardJob';
 import { msUntilNextWeeklyLeaderboardWindow } from './jobs/weeklyLeaderboardSchedule';
+import { runDiscordTurnsCappedSweep } from './services/discordTurnsCappedSweep';
+import { DISCORD_NOTIFICATION_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 
 const PORT = process.env.PORT || 4000;
 const isAllowedCorsOrigin = createCorsOriginChecker();
@@ -31,6 +33,7 @@ let stopLatencySnapshotWriter: (() => Promise<void>) | null = null;
 let stopRealtimeBridge: (() => Promise<void>) | null = null;
 let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
 let weeklyLeaderboardTimer: ReturnType<typeof setTimeout> | null = null;
+let discordTurnsCappedSweepTimer: ReturnType<typeof setInterval> | null = null;
 
 const PREMIUM_RECONCILIATION_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -39,6 +42,17 @@ async function runPremiumReconciliation(): Promise<void> {
     await reconcileExpiredPremium();
   } catch (err) {
     logger.error({ err }, 'Premium reconciliation failed');
+  }
+}
+
+async function runDiscordNotificationSweep(): Promise<void> {
+  try {
+    const summary = await runDiscordTurnsCappedSweep();
+    if (summary.fired > 0 || summary.rearmed > 0) {
+      logger.info({ summary }, 'Discord turns-capped sweep completed');
+    }
+  } catch (err) {
+    logger.error({ err }, 'Discord turns-capped sweep failed');
   }
 }
 
@@ -72,6 +86,10 @@ async function startServer(): Promise<void> {
       void runPremiumReconciliation();
     }, PREMIUM_RECONCILIATION_INTERVAL_MS);
     scheduleWeeklyLeaderboardJob();
+    void runDiscordNotificationSweep();
+    discordTurnsCappedSweepTimer = setInterval(() => {
+      void runDiscordNotificationSweep();
+    }, DISCORD_NOTIFICATION_CONSTANTS.SWEEP_INTERVAL_MS);
     stopMetricsLogger = startMetricsLogger(getIo);
     stopLatencySnapshotWriter = startApiLatencySnapshotWriter(getIo);
   });
@@ -90,6 +108,7 @@ process.on('SIGTERM', () => {
   stopMetricsLogger?.();
   if (premiumReconciliationTimer) clearInterval(premiumReconciliationTimer);
   if (weeklyLeaderboardTimer) clearTimeout(weeklyLeaderboardTimer);
+  if (discordTurnsCappedSweepTimer) clearInterval(discordTurnsCappedSweepTimer);
   const io = getIo();
   if (io) io.close();
   server.close(() => {
