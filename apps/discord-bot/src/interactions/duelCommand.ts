@@ -120,7 +120,12 @@ export async function handleDuelCommand(
 
   let replyResult: unknown;
   try {
-    replyResult = await interaction.followUp({
+    const channel = interaction.channel;
+    if (!channel?.isSendable()) {
+      throw new Error('Duel channel unavailable');
+    }
+
+    replyResult = await channel.send({
       content: `<@${opponent.id}>, ${interaction.user} challenged you to a friendly simulation.`,
       components: [buildChallengeRow(response.duel.id, opponent.id)],
     });
@@ -132,7 +137,7 @@ export async function handleDuelCommand(
   }
 
   await interaction.editReply({ content: 'Friendly simulation challenge posted.' });
-  await recordDuelMessage(api, interaction, response.duel.id, replyResult);
+  await recordDuelMessage(api, response.duel.id, replyResult);
 }
 
 export async function handleDuelButton(
@@ -354,11 +359,10 @@ function formatReplayEntry(entry: unknown): string {
 
 async function recordDuelMessage(
   api: Pick<PocketRealmApiClient, 'post'>,
-  interaction: ChatInputCommandInteraction,
   duelId: string,
   replyResult: unknown,
 ): Promise<void> {
-  const messageId = readMessageId(replyResult) ?? (await fetchReplyMessageId(interaction));
+  const messageId = readMessageId(replyResult);
   if (!messageId) return;
 
   try {
@@ -367,18 +371,6 @@ async function recordDuelMessage(
     });
   } catch {
     // Message mapping is helpful for later sync, but the public challenge has already succeeded.
-  }
-}
-
-async function fetchReplyMessageId(interaction: ChatInputCommandInteraction): Promise<string | null> {
-  if (typeof interaction.fetchReply !== 'function') {
-    return null;
-  }
-
-  try {
-    return readMessageId(await interaction.fetchReply());
-  } catch {
-    return null;
   }
 }
 

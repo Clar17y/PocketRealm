@@ -63,26 +63,22 @@ describe('handleDuelCommand', () => {
     });
   });
 
-  it('creates a public challenge with target acceptance buttons and records the message id when available', async () => {
+  it('creates a public channel challenge with target acceptance buttons and records the message id when available', async () => {
     const api = createApi();
     vi.mocked(api.post).mockImplementation(async <T>(path: string): Promise<T> => {
       if (path.endsWith('/message')) return null as T;
 
-      return {
-        duel: {
-          id: 'duel-123',
-          status: 'pending',
-          challengerUsername: 'Astra',
-          targetUsername: 'Borin',
-          expiresAt: '2026-06-04T12:15:00.000Z',
-        },
-      } as T;
+      return createPendingDuelResponse() as T;
     });
     const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
     const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
-    const followUp = vi.fn(async () => ({ id: 'discord-message-1' }));
+    const send = vi.fn(async () => ({ id: 'discord-message-1' }));
+    const followUp = vi.fn(async () => {
+      throw new Error('followUp would keep the deferred ephemeral response private');
+    });
     const interaction = createCommandInteraction({
       opponent: createUser('333333333333333333'),
+      channel: createSendableChannel(send),
       deferReply,
       editReply,
       followUp,
@@ -97,43 +93,84 @@ describe('handleDuelCommand', () => {
       challengerDiscordUserId: '123456789012345678',
       targetDiscordUserId: '333333333333333333',
     });
-    expect(followUp).toHaveBeenCalledWith(expect.objectContaining({
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
       content: '<@333333333333333333>, <@123456789012345678> challenged you to a friendly simulation.',
       components: expect.any(Array),
     }));
+    expect(followUp).not.toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith({ content: 'Friendly simulation challenge posted.' });
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/message', {
       messageId: 'discord-message-1',
     });
   });
 
-  it('edits the deferred reply with a failure message when the public follow-up cannot be posted', async () => {
+  it('does not record the private deferred reply id when the public message id is unavailable', async () => {
     const api = createApi();
-    vi.mocked(api.post).mockResolvedValue({
-      duel: {
-        id: 'duel-123',
-        status: 'pending',
-        challengerUsername: 'Astra',
-        targetUsername: 'Borin',
-        expiresAt: '2026-06-04T12:15:00.000Z',
-      },
+    vi.mocked(api.post).mockImplementation(async <T>(path: string): Promise<T> => {
+      if (path.endsWith('/message')) return null as T;
+
+      return createPendingDuelResponse() as T;
     });
+    const send = vi.fn(async () => ({}));
+    const fetchReply = vi.fn(async () => ({ id: 'private-reply-id' }));
+    const interaction = createCommandInteraction({
+      opponent: createUser('333333333333333333'),
+      channel: createSendableChannel(send),
+      fetchReply,
+    });
+
+    await handleDuelCommand(interaction, api, config);
+
+    expect(fetchReply).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/message', {
+      messageId: 'private-reply-id',
+    });
+  });
+
+  it('edits the deferred reply with a failure message when the public channel challenge cannot be posted', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockResolvedValue(createPendingDuelResponse());
     const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
     const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
-    const followUp = vi.fn(async () => {
+    const send = vi.fn(async () => {
       throw new Error('Missing Permissions');
     });
     const interaction = createCommandInteraction({
       opponent: createUser('333333333333333333'),
+      channel: createSendableChannel(send),
       deferReply,
       editReply,
-      followUp,
     });
 
     await handleDuelCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(editReply).toHaveBeenCalledTimes(1);
+    expect(editReply).toHaveBeenCalledWith({
+      content: 'Could not post the public duel challenge. Please run /duel again.',
+    });
+    expect(send).toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalledWith(
+      '/api/v1/discord/duels/duel-123/message',
+      expect.anything(),
+    );
+  });
+
+  it('edits the deferred reply with a failure message when the channel is unavailable', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockResolvedValue(createPendingDuelResponse());
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = createCommandInteraction({
+      opponent: createUser('333333333333333333'),
+      channel: null,
+      deferReply,
+      editReply,
+    });
+
+    await handleDuelCommand(interaction, api, config);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(editReply).toHaveBeenCalledWith({
       content: 'Could not post the public duel challenge. Please run /duel again.',
     });
@@ -360,6 +397,25 @@ function createApi(): Pick<PocketRealmApiClient, 'get' | 'post'> {
   } as Pick<PocketRealmApiClient, 'get' | 'post'>;
 }
 
+function createPendingDuelResponse() {
+  return {
+    duel: {
+      id: 'duel-123',
+      status: 'pending',
+      challengerUsername: 'Astra',
+      targetUsername: 'Borin',
+      expiresAt: '2026-06-04T12:15:00.000Z',
+    },
+  };
+}
+
+function createSendableChannel(send: ReturnType<typeof vi.fn>) {
+  return {
+    isSendable: () => true,
+    send,
+  };
+}
+
 function createUser(id: string, bot = false): User {
   return {
     id,
@@ -370,6 +426,8 @@ function createUser(id: string, bot = false): User {
 
 function createCommandInteraction(input: {
   channelId?: string;
+  channel?: ReturnType<typeof createSendableChannel> | null;
+  fetchReply?: ReturnType<typeof vi.fn>;
   guildId?: string | null;
   opponent: User;
   userId?: string;
@@ -383,6 +441,7 @@ function createCommandInteraction(input: {
   return {
     guildId: input.guildId ?? 'guild-123',
     channelId: input.channelId ?? config.duelsChannelId,
+    channel: input.channel ?? null,
     user: createUser(userId),
     options: {
       getUser: vi.fn(() => input.opponent),
@@ -390,6 +449,7 @@ function createCommandInteraction(input: {
     reply: input.reply ?? vi.fn(),
     deferReply: input.deferReply ?? vi.fn(),
     editReply: input.editReply ?? vi.fn(),
+    fetchReply: input.fetchReply,
     followUp: input.followUp ?? vi.fn(),
   } as unknown as ChatInputCommandInteraction;
 }
