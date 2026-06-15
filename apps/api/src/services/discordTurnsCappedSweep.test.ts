@@ -87,7 +87,7 @@ describe('runDiscordTurnsCappedSweep', () => {
         discordGuildId: GUILD_ID,
         discordUserId: USER_ID,
         type: 'turns_capped',
-        dedupKey: `turns_capped:player-1:${new Date('2026-06-12T00:00:00.000Z').getTime()}`,
+        dedupKey: `turns_capped:player-1:${new Date('2026-06-12T00:00:00.000Z').getTime()}:new`,
         payload: { currentTurns: CAP, bankCap: CAP, username: 'Mira' },
       })],
       skipDuplicates: true,
@@ -96,6 +96,29 @@ describe('runDiscordTurnsCappedSweep', () => {
       where: { id: 'pref-1' },
       data: { armed: false, lastFiredAt: NOW },
     });
+  });
+
+  it('keys the dedup by the arming episode so a re-armed still-capped player fires a fresh event', async () => {
+    // Simulates disable+re-enable (or a cap increase) re-arming a player who
+    // already fired once: lastRegenAt is unchanged, but lastFiredAt holds the
+    // prior fire time, so the dedup key must differ from that first episode's.
+    const priorFiredAt = new Date('2026-06-12T06:00:00.000Z');
+    mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([
+      preference({ lastFiredAt: priorFiredAt }),
+    ]);
+
+    const summary = await runDiscordTurnsCappedSweep(NOW);
+
+    expect(summary.fired).toBe(1);
+    const firstEpisodeKey = `turns_capped:player-1:${new Date('2026-06-12T00:00:00.000Z').getTime()}:new`;
+    expect(mocks.prisma.discordNotificationEvent.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
+        dedupKey: `turns_capped:player-1:${new Date('2026-06-12T00:00:00.000Z').getTime()}:${priorFiredAt.getTime()}`,
+      })],
+      skipDuplicates: true,
+    });
+    const usedKey = mocks.prisma.discordNotificationEvent.createMany.mock.calls[0][0].data[0].dedupKey;
+    expect(usedKey).not.toBe(firstEpisodeKey);
   });
 
   it('does not refire while disarmed at cap', async () => {

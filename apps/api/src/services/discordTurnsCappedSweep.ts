@@ -97,8 +97,15 @@ export async function runDiscordTurnsCappedSweep(
           username: player.username,
         };
 
-        // skipDuplicates keeps the disarm committing even when another API
-        // instance already inserted this cap episode's event.
+        // The dedup key identifies one cap episode. lastRegenAt alone is not
+        // enough: a disable+re-enable (or a cap increase) can re-arm a still-
+        // capped player without lastRegenAt changing, and would collide with
+        // the retained prior event — inserting nothing while the disarm still
+        // commits, silencing the user. lastFiredAt advances on every fire, so
+        // including it makes each arming episode distinct. It is stable within
+        // an episode (the new fire hasn't committed yet), so skipDuplicates
+        // still guards concurrent API instances firing the same episode.
+        const episode = preference.lastFiredAt ? preference.lastFiredAt.getTime() : 'new';
         await prisma.$transaction([
           prisma.discordNotificationEvent.createMany({
             data: [{
@@ -106,7 +113,7 @@ export async function runDiscordTurnsCappedSweep(
               discordUserId: preference.discordUserId,
               type: 'turns_capped',
               payload: payload as unknown as Prisma.InputJsonValue,
-              dedupKey: `turns_capped:${player.id}:${player.turnBank.lastRegenAt.getTime()}`,
+              dedupKey: `turns_capped:${player.id}:${player.turnBank.lastRegenAt.getTime()}:${episode}`,
             }],
             skipDuplicates: true,
           }),
