@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.65',
+    date: '2026-06-15',
+    title: 'Discord Turn Alerts',
+    summary:
+      'You can now opt in to a Discord DM when your turn bank fills up, so banked regen stops going to waste while you are away. Link your account with /link, then run /notify in the Pocketrealm Discord to toggle alerts on or off — enabling one sends a confirmation DM, and you get nothing until you turn it on. More notification types can be added later; for now it covers turns reaching their cap.',
+  },
+  {
     version: '0.64',
     date: '2026-06-03',
     title: 'Support Links & Bug Reports',
