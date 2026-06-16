@@ -15,6 +15,9 @@ import {
   type TemplateCombatState,
 } from './templateCombatTypes';
 
+const PINNED_IMMUNITY_EFFECT_NAME = 'Pinned Immunity';
+const PINNED_IMMUNITY_STAT = 'pinnedImmunity';
+
 function snapshotEffectValues(
   effect: ActionEffect,
   damageForPercentCalc?: number,
@@ -50,12 +53,23 @@ export function applyActionEffect(
 ): Array<{ stat: string; modifier: number; duration: number; target: CombatActor }> | undefined {
   const targetKey = effect.isDebuff !== false ? opponent(actorKey) : actorKey;
 
+  if (
+    effect.stat === 'pinned'
+    && state.activeEffects.some(
+      (active) => active.target === targetKey
+        && (active.stat === 'pinned' || active.stat === PINNED_IMMUNITY_STAT)
+        && active.remainingRounds > 0,
+    )
+  ) {
+    return undefined;
+  }
+
   const newEffect: ActiveEffect = {
     name: effect.name,
     target: targetKey,
     stat: effect.stat,
     modifier: effect.modifier,
-    remainingRounds: effect.duration,
+    remainingRounds: effect.stat === 'pinned' ? effect.duration + 1 : effect.duration,
     ...(opts?.sourceScalingStat ? { sourceScalingStat: opts.sourceScalingStat } : {}),
     ...snapshotEffectValues(effect, opts?.damageForPercentCalc),
   };
@@ -76,7 +90,10 @@ export function applyActionEffect(
 
   // Buffs respect cap
   const activeBufCount = state.activeEffects.filter(
-    (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
+    (e) => e.target === actorKey
+      && e.stat !== 'potionSickness'
+      && e.stat !== PINNED_IMMUNITY_STAT
+      && e.modifier >= 0,
   ).length;
   if (activeBufCount >= COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
     return undefined;
@@ -130,6 +147,14 @@ export function tickEffects(state: TemplateCombatState): void {
     effect.remainingRounds--;
     if (effect.remainingRounds > 0) {
       remaining.push(effect);
+    } else if (effect.stat === 'pinned') {
+      remaining.push({
+        name: PINNED_IMMUNITY_EFFECT_NAME,
+        target: effect.target,
+        stat: PINNED_IMMUNITY_STAT,
+        modifier: 0,
+        remainingRounds: COMBAT_ACTION_CONSTANTS.PINNED_IMMUNITY_ROUNDS,
+      });
     }
   }
 
