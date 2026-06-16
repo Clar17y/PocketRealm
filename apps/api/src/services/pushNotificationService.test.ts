@@ -25,8 +25,13 @@ vi.mock('web-push', () => ({
   },
 }));
 
+vi.mock('./discordNotifier', () => ({
+  notifyDiscord: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { prisma } from '@pocketrealm/database';
 import webpush from 'web-push';
+import { notifyDiscord } from './discordNotifier';
 
 const PLAYER_ID = 'player-1';
 const SUBSCRIPTION = {
@@ -110,6 +115,26 @@ describe('pushNotificationService', () => {
 
       expect(prisma.pushSubscription.findMany).not.toHaveBeenCalled();
       expect(webpush.sendNotification).not.toHaveBeenCalled();
+    });
+
+    it('fans out to Discord when preference is enabled', async () => {
+      vi.mocked(prisma.player.findUnique).mockResolvedValue({ notifyPvpAttack: true } as never);
+      vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([] as never);
+
+      await sendPush(PLAYER_ID, 'pvpAttack', { title: 'Test', body: 'Hello' });
+
+      expect(notifyDiscord).toHaveBeenCalledWith(PLAYER_ID, 'pvpAttack', {
+        title: 'Test',
+        body: 'Hello',
+      });
+    });
+
+    it('does not fan out to Discord when preference is disabled', async () => {
+      vi.mocked(prisma.player.findUnique).mockResolvedValue({ notifyPvpAttack: false } as never);
+
+      await sendPush(PLAYER_ID, 'pvpAttack', { title: 'Test', body: 'Hello' });
+
+      expect(notifyDiscord).not.toHaveBeenCalled();
     });
 
     it('removes expired subscriptions on 410', async () => {

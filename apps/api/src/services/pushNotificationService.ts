@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import { prisma } from '@pocketrealm/database';
 import { logger } from '../logger';
+import { notifyDiscord } from './discordNotifier';
 
 interface PushSubscriptionInput {
   endpoint: string;
@@ -105,6 +106,9 @@ export async function sendPush(
     select: NOTIFICATION_SELECT,
   });
   if (!player || !player[prefColumn]) return;
+
+  // Fan out to Discord DM (independent of web-push subscriptions). Fire-and-forget.
+  void notifyDiscord(playerId, notificationType, { title: payload.title, body: payload.body });
 
   const subs = await prisma.pushSubscription.findMany({
     where: { playerId },
