@@ -44,17 +44,27 @@ describe('discordNotificationService', () => {
     it('returns every known type, defaulting to disabled', async () => {
       const preferences = await listDiscordNotificationPreferences({ guildId: GUILD_ID, discordUserId: USER_ID });
 
-      expect(preferences).toEqual([{ type: 'turns_capped', enabled: false }]);
+      expect(preferences).toEqual([
+        { type: 'turns_capped', enabled: false },
+        { type: 'pvp_attack', enabled: false },
+        { type: 'pvp_scout', enabled: false },
+        { type: 'boss_appeared', enabled: false },
+        { type: 'boss_defeated', enabled: false },
+        { type: 'expedition_recruiting', enabled: false },
+        { type: 'expedition_finished', enabled: false },
+      ]);
     });
 
     it('reflects stored enabled state', async () => {
       mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([
-        { type: 'turns_capped', enabled: true },
+        { type: 'pvp_attack', enabled: true },
       ]);
 
       const preferences = await listDiscordNotificationPreferences({ guildId: GUILD_ID, discordUserId: USER_ID });
 
-      expect(preferences).toEqual([{ type: 'turns_capped', enabled: true }]);
+      expect(preferences).toContainEqual({ type: 'pvp_attack', enabled: true });
+      expect(preferences).toContainEqual({ type: 'turns_capped', enabled: false });
+      expect(preferences).toHaveLength(7);
     });
 
     it('requires an active account link', async () => {
