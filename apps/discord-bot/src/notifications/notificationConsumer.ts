@@ -31,6 +31,19 @@ export interface DeliverContext {
   logger: LoggerLike;
 }
 
+/** Discord API code for "Cannot send messages to this user" (recipient has DMs closed). */
+const DM_CLOSED_CODE = 50007;
+
+/**
+ * True when the error is the expected "recipient has DMs closed" case, which is
+ * routine (many users disable DMs) and should not pollute warn/error logs.
+ */
+function isDmClosedError(err: unknown): boolean {
+  const candidate = err as { code?: unknown; message?: unknown };
+  if (candidate?.code === DM_CLOSED_CODE) return true;
+  return typeof candidate?.message === 'string' && candidate.message.includes('Cannot send messages to this user');
+}
+
 /** Fetches the target user and sends the DM. Never throws. */
 export async function deliverNotification(
   notification: DiscordNotification,
@@ -40,10 +53,14 @@ export async function deliverNotification(
     const user = await ctx.client.users.fetch(notification.discordUserId);
     await user.send({ content: `${notification.title}\n${notification.body}` });
   } catch (err) {
-    ctx.logger.debug(
-      { err, discordUserId: notification.discordUserId, type: notification.type },
-      'Failed to deliver Discord notification DM',
-    );
+    const meta = { err, discordUserId: notification.discordUserId, type: notification.type };
+    // DMs-closed is expected and noisy; anything else (rate limits, 5xx, network)
+    // is a real failure that operators should see.
+    if (isDmClosedError(err)) {
+      ctx.logger.debug(meta, 'Skipped Discord notification DM (recipient has DMs closed)');
+    } else {
+      ctx.logger.warn(meta, 'Failed to deliver Discord notification DM');
+    }
   }
 }
 

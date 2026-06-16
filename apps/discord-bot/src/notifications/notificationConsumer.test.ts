@@ -30,13 +30,24 @@ describe('notificationConsumer', () => {
       expect(send).toHaveBeenCalledWith({ content: 'PvP Attack!\nYou are under attack' });
     });
 
-    it('swallows a DM-closed error without throwing', async () => {
+    it('swallows a DM-closed error at debug level without throwing', async () => {
       const send = vi.fn().mockRejectedValue(new Error('Cannot send messages to this user'));
       const client = { users: { fetch: vi.fn().mockResolvedValue({ send }) } };
       const logger = makeLogger();
 
       await expect(deliverNotification(NOTIFICATION, { client, logger })).resolves.toBeUndefined();
       expect(logger.debug).toHaveBeenCalled();
+      expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    it('logs an unexpected delivery error at warn level without throwing', async () => {
+      const send = vi.fn().mockRejectedValue(new Error('Service Unavailable'));
+      const client = { users: { fetch: vi.fn().mockResolvedValue({ send }) } };
+      const logger = makeLogger();
+
+      await expect(deliverNotification(NOTIFICATION, { client, logger })).resolves.toBeUndefined();
+      expect(logger.warn).toHaveBeenCalled();
+      expect(logger.debug).not.toHaveBeenCalled();
     });
   });
 
