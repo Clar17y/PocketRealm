@@ -4,7 +4,7 @@
 
 **Goal:** Mirror the 7 existing web-push notifications to Discord DMs for players who have linked their Discord account and opted in, without adding new event triggers or a new opt-in surface.
 
-**Architecture:** Hook the single existing chokepoint `sendPush()` in the API. After it confirms the player's `notify*` preference is on, it resolves the player's linked Discord user and `LPUSH`es a JSON message onto a durable Redis list queue. The Discord bot runs a dedicated `BRPOP` loop that pops messages and sends DMs. The API is the only component that touches the database; the bot is the only component that holds the Discord token. They meet at the already-shared Redis (`REDIS_URL`).
+**Architecture:** Hook the single existing chokepoint `sendPush()` in the API. After it confirms the player's `notify*` preference is on, it resolves the player's linked Discord user and queues a JSON message with Redis `MULTI`/`EXEC` (`LPUSH` + `LTRIM`) onto a durable list. The Discord bot runs a dedicated `BRPOP` loop that pops messages and sends DMs. The API is the only component that touches the database; the bot is the only component that holds the Discord token. They meet at the already-shared Redis (`REDIS_URL`).
 
 **Tech Stack:** TypeScript, Express 4, Prisma 6, ioredis, discord.js, Vitest. Spec: `docs/superpowers/specs/2026-06-16-discord-notification-fanout-design.md`.
 
@@ -27,10 +27,12 @@
 
 **Queue contract (shared by both apps, defined independently in each — no `@pocketrealm/shared` export):**
 - Redis key: `discord:notifications`
-- Message JSON: `{ "discordUserId": string, "type": string, "title": string, "body": string }`
+- Message JSON: `{ "discordUserId": string, "type": string, "title": string, "body": string }` (API writes `type` as `NotificationType`; bot validates it as a non-empty string so future `sendPush` types do not require a bot deploy just to parse.)
 - Max queue length: `1000` (oldest trimmed via `LTRIM` after each push).
 
 > **Decision:** The message contract is duplicated as a small constant + Zod schema in the bot and a plain interface in the API rather than shared via `@pocketrealm/shared`. This avoids the package-export + per-app vitest-alias friction for a 4-field message. The bot treats the queue as untrusted input and validates with Zod.
+
+> **Current-code caveat:** On this branch, `turnBankFull` is defined in `NotificationType` and player preferences, but local grep does not show an active `sendPush(..., 'turnBankFull')` caller. This plan intentionally does **not** add a new trigger; it fans out every notification that reaches `sendPush`, so `turnBankFull` is covered automatically if an existing/future caller emits it.
 
 ---
 
@@ -47,15 +49,31 @@ Create `apps/api/src/services/discordNotifier.test.ts`:
 ```typescript
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const mocks = vi.hoisted(() => {
+  const redisTransaction = {
+    lpush: vi.fn().mockReturnThis(),
+    ltrim: vi.fn().mockReturnThis(),
+    exec: vi.fn(),
+  };
+
+  return {
+    prisma: {
+      player: { findUnique: vi.fn() },
+      discordAccountLink: { findFirst: vi.fn() },
+    },
+    redis: {
+      multi: vi.fn(() => redisTransaction),
+    },
+    redisTransaction,
+  };
+});
+
 vi.mock('@pocketrealm/database', () => ({
-  prisma: {
-    player: { findUnique: vi.fn() },
-    discordAccountLink: { findFirst: vi.fn() },
-  },
+  prisma: mocks.prisma,
 }));
 
 vi.mock('../redis', () => ({
-  redis: { lpush: vi.fn(), ltrim: vi.fn() },
+  redis: mocks.redis,
 }));
 
 import { prisma } from '@pocketrealm/database';
@@ -66,6 +84,7 @@ const PLAYER_ID = 'player-1';
 describe('discordNotifier', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.redisTransaction.exec.mockResolvedValue([]);
   });
 
   describe('resolveDiscordTarget', () => {
@@ -170,11 +189,10 @@ git commit -m "feat(api): resolve player to linked Discord target"
 
 Append these `describe` blocks inside the top-level `describe('discordNotifier', ...)` in `apps/api/src/services/discordNotifier.test.ts` (after the `resolveDiscordTarget` block). Also add the import update at the top: change the import line to
 `import { resolveDiscordTarget, publishDiscordNotification, notifyDiscord, DISCORD_NOTIFICATION_QUEUE } from './discordNotifier';`
-and add `import { redis } from '../redis';` after the `prisma` import.
 
 ```typescript
   describe('publishDiscordNotification', () => {
-    it('LPUSHes the JSON message then trims the queue', async () => {
+    it('LPUSHes the JSON message and trims the queue in one transaction', async () => {
       await publishDiscordNotification({
         discordUserId: 'discord-99',
         type: 'pvpAttack',
@@ -182,7 +200,8 @@ and add `import { redis } from '../redis';` after the `prisma` import.
         body: 'You are under attack',
       });
 
-      expect(redis.lpush).toHaveBeenCalledWith(
+      expect(mocks.redis.multi).toHaveBeenCalledTimes(1);
+      expect(mocks.redisTransaction.lpush).toHaveBeenCalledWith(
         DISCORD_NOTIFICATION_QUEUE,
         JSON.stringify({
           discordUserId: 'discord-99',
@@ -191,7 +210,8 @@ and add `import { redis } from '../redis';` after the `prisma` import.
           body: 'You are under attack',
         }),
       );
-      expect(redis.ltrim).toHaveBeenCalledWith(DISCORD_NOTIFICATION_QUEUE, 0, 999);
+      expect(mocks.redisTransaction.ltrim).toHaveBeenCalledWith(DISCORD_NOTIFICATION_QUEUE, 0, 999);
+      expect(mocks.redisTransaction.exec).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -205,7 +225,7 @@ and add `import { redis } from '../redis';` after the `prisma` import.
 
       await notifyDiscord(PLAYER_ID, 'bossKilled', { title: 'Boss Defeated!', body: 'Slain' });
 
-      expect(redis.lpush).toHaveBeenCalledTimes(1);
+      expect(mocks.redisTransaction.lpush).toHaveBeenCalledTimes(1);
     });
 
     it('does not publish when the player is unlinked', async () => {
@@ -213,7 +233,7 @@ and add `import { redis } from '../redis';` after the `prisma` import.
 
       await notifyDiscord(PLAYER_ID, 'bossKilled', { title: 'Boss Defeated!', body: 'Slain' });
 
-      expect(redis.lpush).not.toHaveBeenCalled();
+      expect(mocks.redisTransaction.lpush).not.toHaveBeenCalled();
     });
 
     it('never throws when Redis publish fails', async () => {
@@ -222,7 +242,7 @@ and add `import { redis } from '../redis';` after the `prisma` import.
         discordUserId: 'discord-99',
         discordGuildId: 'guild-1',
       } as never);
-      vi.mocked(redis.lpush).mockRejectedValueOnce(new Error('redis down'));
+      mocks.redisTransaction.exec.mockRejectedValueOnce(new Error('redis down'));
 
       await expect(
         notifyDiscord(PLAYER_ID, 'bossKilled', { title: 'Boss Defeated!', body: 'Slain' }),
@@ -243,6 +263,7 @@ Add to the top of `apps/api/src/services/discordNotifier.ts` (after the existing
 ```typescript
 import { redis } from '../redis';
 import { logger } from '../logger';
+import type { NotificationType } from './pushNotificationService';
 ```
 
 Append to `apps/api/src/services/discordNotifier.ts`:
@@ -258,13 +279,15 @@ export interface DiscordNotificationContent {
 
 export interface DiscordNotificationMessage extends DiscordNotificationContent {
   discordUserId: string;
-  type: string;
+  type: NotificationType;
 }
 
 /** Pushes a notification onto the durable Redis queue and caps its length. */
 export async function publishDiscordNotification(message: DiscordNotificationMessage): Promise<void> {
-  await redis.lpush(DISCORD_NOTIFICATION_QUEUE, JSON.stringify(message));
-  await redis.ltrim(DISCORD_NOTIFICATION_QUEUE, 0, MAX_QUEUE_LENGTH - 1);
+  const transaction = redis.multi();
+  transaction.lpush(DISCORD_NOTIFICATION_QUEUE, JSON.stringify(message));
+  transaction.ltrim(DISCORD_NOTIFICATION_QUEUE, 0, MAX_QUEUE_LENGTH - 1);
+  await transaction.exec();
 }
 
 /**
@@ -273,7 +296,7 @@ export async function publishDiscordNotification(message: DiscordNotificationMes
  */
 export async function notifyDiscord(
   playerId: string,
-  type: string,
+  type: NotificationType,
   content: DiscordNotificationContent,
 ): Promise<void> {
   try {
@@ -443,7 +466,7 @@ describe('notificationContract', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm run test -- notificationContract` (from `apps/discord-bot`, or use the repo test runner that targets the bot package)
+Run: `npm run test -w apps/discord-bot -- notificationContract`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -480,7 +503,7 @@ export function parseNotification(raw: string): DiscordNotification | null {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm run test -- notificationContract`
+Run: `npm run test -w apps/discord-bot -- notificationContract`
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
@@ -595,7 +618,7 @@ describe('notificationConsumer', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm run test -- notificationConsumer`
+Run: `npm run test -w apps/discord-bot -- notificationConsumer`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -607,6 +630,10 @@ import { DISCORD_NOTIFICATION_QUEUE, parseNotification, type DiscordNotification
 
 const BRPOP_TIMEOUT_SECONDS = 5;
 const DEFAULT_THROTTLE_MS = 250;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface LoggerLike {
   error(...args: unknown[]): void;
@@ -675,21 +702,26 @@ export function createNotificationConsumer(options: NotificationConsumerOptions)
       try {
         result = await options.redis.brpop(DISCORD_NOTIFICATION_QUEUE, BRPOP_TIMEOUT_SECONDS);
       } catch (err) {
-        options.logger.warn({ err }, 'Discord notification BRPOP failed');
+        if (running) {
+          options.logger.warn({ err }, 'Discord notification BRPOP failed');
+          await sleep(throttleMs);
+        }
         continue;
       }
-      if (!result) continue;
+      if (!result) {
+        await sleep(throttleMs);
+        continue;
+      }
 
       const notification = parseNotification(result[1]);
       if (!notification) {
         options.logger.warn({ raw: result[1] }, 'Discarded invalid Discord notification payload');
+        await sleep(throttleMs);
         continue;
       }
 
       await deliverNotification(notification, { client: options.client, logger: options.logger });
-      if (throttleMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, throttleMs));
-      }
+      await sleep(throttleMs);
     }
   };
 
@@ -712,7 +744,7 @@ export function createNotificationConsumer(options: NotificationConsumerOptions)
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm run test -- notificationConsumer`
+Run: `npm run test -w apps/discord-bot -- notificationConsumer`
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
@@ -749,6 +781,7 @@ A blocking `BRPOP` monopolizes its connection, so the consumer needs its **own**
     logger.warn({ error }, 'Discord notification Redis connection error');
   });
   let notificationConsumer: NotificationConsumer | undefined;
+  let isShuttingDown = false;
 ```
 
 - [ ] **Step 3: Start the consumer on ClientReady**
@@ -767,19 +800,41 @@ Inside the `client.once(Events.ClientReady, ...)` handler, after the `void runSu
 
 - [ ] **Step 4: Stop the consumer + disconnect on shutdown**
 
-In the `shutdown` function, after the `clearInterval(supportTriageInterval);` block (around line 206) and before `redis.disconnect();`, add:
+Replace the existing synchronous `shutdown` function with this guarded async wrapper. It calls `stop()` first (which flips the consumer's `running` flag), then disconnects the dedicated Redis connection to unblock any pending `BRPOP`, then awaits the consumer loop before destroying the bot:
 
 ```typescript
-    if (notificationConsumer) {
-      void notificationConsumer.stop();
-    }
-    notificationRedis.disconnect();
+  const shutdown = (signal: NodeJS.Signals): void => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    void (async () => {
+      logger.info({ signal }, 'Shutting down Discord bot');
+      if (roleSyncInterval) {
+        clearInterval(roleSyncInterval);
+      }
+      if (supportTriageInterval) {
+        clearInterval(supportTriageInterval);
+      }
+
+      const notificationStop = notificationConsumer?.stop().catch((error: unknown) => {
+        logger.warn({ error }, 'Discord notification consumer failed to stop cleanly');
+      });
+      notificationRedis.disconnect();
+      if (notificationStop) {
+        await notificationStop;
+      }
+
+      redis.disconnect();
+      client.destroy();
+      process.exit(0);
+    })();
+  };
 ```
 
 - [ ] **Step 5: Typecheck the bot**
 
-Run: `npm run typecheck`
-Expected: PASS — no type errors.
+Run: `npm run build:discord-bot`
+Expected: PASS — no type errors and the bot package builds.
 
 > If `readyClient` does not structurally satisfy `ClientLike`, confirm `readyClient.users.fetch` exists (discord.js `Client#users` is a `UserManager` with `fetch(id)`); the structural interface should match without a cast.
 
@@ -806,33 +861,39 @@ Expected: succeeds.
 Run: `npm run build:api`
 Expected: PASS — no type errors. (Per project memory, `tsc -b` alone can miss issues; the build is the source of truth here.)
 
-- [ ] **Step 3: Run the API test suite**
+- [ ] **Step 3: Build the Discord bot**
+
+Run: `npm run build:discord-bot`
+Expected: PASS — no bot type errors.
+
+- [ ] **Step 4: Run the API test suite**
 
 Run: `npm run test:api`
 Expected: PASS, including `discordNotifier` (7) and the updated `pushNotificationService` tests.
 
 > Requires Redis running for the API suite (start the `pocketrealm-redis` container if tests time out — per project memory).
 
-- [ ] **Step 4: Run the bot tests + typecheck**
+- [ ] **Step 5: Run the bot notification tests**
 
-Run: `npm run typecheck && npm run test -- notification`
+Run: `npm run test -w apps/discord-bot -- notification`
 Expected: PASS — `notificationContract` (4) and `notificationConsumer` (4).
 
-- [ ] **Step 5: Final commit (if any artifacts changed, e.g. regenerated client)**
+- [ ] **Step 6: Inspect final git status**
 
-```bash
-git add -A
-git commit -m "chore: regenerate Prisma client for Discord notifications" || echo "nothing to commit"
+```powershell
+git status --short
 ```
+
+Expected: only intentional implementation files are changed. Do **not** use `git add -A`; if `db:generate` unexpectedly changed tracked source, inspect those paths and stage them explicitly.
 
 ---
 
 ## Self-Review Notes
 
 **Spec coverage:**
-- Mirror 7 push types → Tasks 1–3 (hook `sendPush`, covers all types via the single chokepoint). ✓
+- Mirror push notifications via the `sendPush` chokepoint → Tasks 1–3 (covers all emitted current/future `NotificationType` values; this branch currently has no `turnBankFull` caller to add without violating the no-new-trigger constraint). ✓
 - API resolves `playerId → discordUserId` via `discordAccountLink` → Task 1. ✓
-- Durable Redis list queue (`LPUSH` + cap; `BRPOP`) → Task 2 (`lpush`/`ltrim`), Task 5 (`brpop`). ✓
+- Durable Redis list queue (`LPUSH` + cap; `BRPOP`) → Task 2 (`multi` with `lpush`/`ltrim`), Task 5 (`brpop`). ✓
 - Discord fan-out independent of web-push subscriptions → Task 3 (test sets `findMany` → `[]`). ✓
 - Reuse existing `notify*` pref (gated by `sendPush`'s pref check) → Task 3. ✓
 - Bot consumer: fetch user + DM, swallow DM-closed errors, throttle, graceful stop → Task 5. ✓
@@ -840,6 +901,6 @@ git commit -m "chore: regenerate Prisma client for Discord notifications" || ech
 - Dedicated blocking Redis connection → Task 6 (`redis.duplicate()`). ✓
 - Bot down → durable queue + max-length cap → Task 2 (`ltrim`). ✓
 
-**Type consistency:** `DISCORD_NOTIFICATION_QUEUE` (`'discord:notifications'`) defined in both apps and asserted equal in Task 4. Message shape `{ discordUserId, type, title, body }` matches between API (`DiscordNotificationMessage`) and bot (`notificationSchema`). DM content format `"${title}\n${body}"` consistent between Task 5 impl and tests.
+**Type consistency:** `DISCORD_NOTIFICATION_QUEUE` (`'discord:notifications'`) defined in both apps and asserted equal in Task 4. Message shape `{ discordUserId, type, title, body }` matches between API (`DiscordNotificationMessage`, with `type: NotificationType`) and bot (`notificationSchema`, with non-empty string `type` for forward-compatible parsing). DM content format `"${title}\n${body}"` consistent between Task 5 impl and tests.
 
 **Out of scope (deferred per spec):** per-channel opt-in controls, daily digest, new personal triggers, channel posts. The `docs/Discord.txt` secret rotation is an operational follow-up, not part of this code change.
