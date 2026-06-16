@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "support_tickets_discord_reporter_guild_id_discord_reporter_user" RENAME TO "support_tickets_discord_reporter_guild_id_discord_reporter__idx";

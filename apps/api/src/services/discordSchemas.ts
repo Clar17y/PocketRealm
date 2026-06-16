@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DISCORD_SNOWFLAKE_REGEX } from '@pocketrealm/shared/discord/discordIds';
+import { DISCORD_NOTIFICATION_TYPES } from '@pocketrealm/shared/discord/discordNotifications';
 
 export const discordSnowflakeSchema = z.string().regex(DISCORD_SNOWFLAKE_REGEX);
 
@@ -51,3 +52,27 @@ export const discordUnsyncedLinksQuerySchema = z.object({
 export const discordLinkIdParamsSchema = z.object({
   id: z.string().uuid(),
 }).strict();
+
+export const discordNotificationPreferencesQuerySchema = z.object({
+  guildId: discordSnowflakeSchema,
+  discordUserId: discordSnowflakeSchema,
+}).strict();
+
+export const discordNotificationPreferenceUpsertSchema = z.object({
+  discordGuildId: discordSnowflakeSchema,
+  discordUserId: discordSnowflakeSchema,
+  type: z.enum(DISCORD_NOTIFICATION_TYPES),
+  enabled: z.boolean(),
+}).strict();
+
+export const discordNotificationPendingQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+}).strict();
+
+export const discordNotificationAckSchema = z.object({
+  deliveredIds: z.array(z.string().uuid()).max(100),
+  failedIds: z.array(z.string().uuid()).max(100),
+}).strict().refine(
+  (ack) => !ack.deliveredIds.some((id) => ack.failedIds.includes(id)),
+  { message: 'deliveredIds and failedIds must not overlap' },
+);

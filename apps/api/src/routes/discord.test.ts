@@ -31,6 +31,10 @@ const mocks = vi.hoisted(() => ({
   getDiscordDuelReplay: vi.fn(),
   notifySupportTicketCreated: vi.fn(),
   emitAchievementNotifications: vi.fn(),
+  listDiscordNotificationPreferences: vi.fn(),
+  upsertDiscordNotificationPreference: vi.fn(),
+  listPendingDiscordNotificationEvents: vi.fn(),
+  ackDiscordNotificationEvents: vi.fn(),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -110,6 +114,13 @@ vi.mock('../services/discordSupportNotifier', () => ({
 
 vi.mock('../services/achievementService', () => ({
   emitAchievementNotifications: mocks.emitAchievementNotifications,
+}));
+
+vi.mock('../services/discordNotificationService', () => ({
+  listDiscordNotificationPreferences: mocks.listDiscordNotificationPreferences,
+  upsertDiscordNotificationPreference: mocks.upsertDiscordNotificationPreference,
+  listPendingDiscordNotificationEvents: mocks.listPendingDiscordNotificationEvents,
+  ackDiscordNotificationEvents: mocks.ackDiscordNotificationEvents,
 }));
 
 import { discordRouter } from './discord';
@@ -886,5 +897,102 @@ describe('discordRouter', () => {
       .expect(401);
 
     expect(mocks.createPendingDiscordDuel).not.toHaveBeenCalled();
+  });
+
+  it('GET /notifications/preferences returns toggles', async () => {
+    mocks.listDiscordNotificationPreferences.mockResolvedValue([{ type: 'turns_capped', enabled: true }]);
+
+    const res = await request(app())
+      .get('/api/v1/discord/notifications/preferences')
+      .query({ guildId: DISCORD_GUILD_ID, discordUserId: DISCORD_CHANNEL_ID })
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body).toEqual({ preferences: [{ type: 'turns_capped', enabled: true }] });
+    expect(mocks.listDiscordNotificationPreferences).toHaveBeenCalledWith({
+      guildId: DISCORD_GUILD_ID,
+      discordUserId: DISCORD_CHANNEL_ID,
+    });
+  });
+
+  it('POST /notifications/preferences upserts a toggle', async () => {
+    mocks.upsertDiscordNotificationPreference.mockResolvedValue({ type: 'turns_capped', enabled: true });
+
+    const res = await request(app())
+      .post('/api/v1/discord/notifications/preferences')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        discordGuildId: DISCORD_GUILD_ID,
+        discordUserId: DISCORD_CHANNEL_ID,
+        type: 'turns_capped',
+        enabled: true,
+      })
+      .expect(200);
+
+    expect(res.body).toEqual({ preference: { type: 'turns_capped', enabled: true } });
+  });
+
+  it('POST /notifications/preferences rejects unknown types', async () => {
+    await request(app())
+      .post('/api/v1/discord/notifications/preferences')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({
+        discordGuildId: DISCORD_GUILD_ID,
+        discordUserId: DISCORD_CHANNEL_ID,
+        type: 'boss_spawned',
+        enabled: true,
+      })
+      .expect(400);
+
+    expect(mocks.upsertDiscordNotificationPreference).not.toHaveBeenCalled();
+  });
+
+  it('GET /notifications/pending returns events', async () => {
+    mocks.listPendingDiscordNotificationEvents.mockResolvedValue([{ id: 'event-1' }]);
+
+    const res = await request(app())
+      .get('/api/v1/discord/notifications/pending')
+      .query({ limit: 10 })
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body).toEqual({ events: [{ id: 'event-1' }] });
+    expect(mocks.listPendingDiscordNotificationEvents).toHaveBeenCalledWith(10);
+  });
+
+  it('POST /notifications/ack acknowledges batches', async () => {
+    mocks.ackDiscordNotificationEvents.mockResolvedValue({ delivered: 1, failed: 0 });
+
+    const res = await request(app())
+      .post('/api/v1/discord/notifications/ack')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ deliveredIds: ['1f8e9b3c-0000-4000-8000-000000000001'], failedIds: [] })
+      .expect(200);
+
+    expect(res.body).toEqual({ result: { delivered: 1, failed: 0 } });
+    expect(mocks.ackDiscordNotificationEvents).toHaveBeenCalledWith({
+      deliveredIds: ['1f8e9b3c-0000-4000-8000-000000000001'],
+      failedIds: [],
+    });
+  });
+
+  it('POST /notifications/ack rejects ids present in both batches', async () => {
+    const id = '1f8e9b3c-0000-4000-8000-000000000001';
+
+    await request(app())
+      .post('/api/v1/discord/notifications/ack')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .send({ deliveredIds: [id], failedIds: [id] })
+      .expect(400);
+
+    expect(mocks.ackDiscordNotificationEvents).not.toHaveBeenCalled();
+  });
+
+  it('rejects notification requests without the bot key', async () => {
+    await request(app())
+      .get('/api/v1/discord/notifications/pending')
+      .expect(401);
+
+    expect(mocks.listPendingDiscordNotificationEvents).not.toHaveBeenCalled();
   });
 });

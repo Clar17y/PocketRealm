@@ -1,3 +1,8 @@
+import {
+  isDiscordNotificationType,
+  type DiscordNotificationType,
+} from '@pocketrealm/shared/discord/discordNotifications';
+
 export interface ParsedSupportButtonId {
   action: string;
   publicId: string;
@@ -97,4 +102,31 @@ function duelTargetButtonId(
   targetDiscordUserId: string,
 ): string {
   return `duel:${action}:${duelId}:${targetDiscordUserId}`;
+}
+
+export interface ParsedNotifyButtonId {
+  type: DiscordNotificationType;
+  nextEnabled: boolean;
+}
+
+export function notifyToggleButtonId(type: DiscordNotificationType, nextEnabled: boolean): string {
+  return `notify:toggle:${type}:${nextEnabled ? '1' : '0'}`;
+}
+
+export function parseNotifyButtonId(customId: string): ParsedNotifyButtonId | null {
+  const parts = customId.split(':');
+  if (parts.length !== 4) {
+    return null;
+  }
+
+  const [scope, action, type, nextEnabled] = parts;
+  if (scope !== 'notify' || action !== 'toggle' || !isDiscordNotificationType(type)) {
+    return null;
+  }
+
+  if (nextEnabled !== '0' && nextEnabled !== '1') {
+    return null;
+  }
+
+  return { type, nextEnabled: nextEnabled === '1' };
 }

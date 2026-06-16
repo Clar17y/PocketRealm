@@ -1762,3 +1762,18 @@ export const DISCORD_DUEL_CONSTANTS = {
   /** Maximum requestable replay page */
   REPLAY_MAX_PAGE: 100,
 } as const;
+
+export const DISCORD_NOTIFICATION_CONSTANTS = {
+  /** ms between API-side turns-capped sweep runs */
+  SWEEP_INTERVAL_MS: 5 * 60 * 1000,
+  /** ms between bot delivery poll runs */
+  POLL_INTERVAL_MS: 30_000,
+  /** Delivery attempts before an outbox event is marked failed */
+  MAX_DELIVERY_ATTEMPTS: 5,
+  /** Max events served per pending poll */
+  PENDING_BATCH_LIMIT: 50,
+  /** Seconds a bot-side delivery suppression key persists */
+  SUPPRESSION_TTL_SECONDS: 60 * 60,
+  /** Days delivered outbox events are retained before the sweep prunes them */
+  DELIVERED_RETENTION_DAYS: 30,
+} as const;

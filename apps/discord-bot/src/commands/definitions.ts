@@ -52,6 +52,9 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
       .setName('report')
       .setDescription('Report a Pocketrealm support issue.'),
     new SlashCommandBuilder()
+      .setName('notify')
+      .setDescription('Manage your Pocketrealm notification DMs.'),
+    new SlashCommandBuilder()
       .setName('staff')
       .setDescription('Pocketrealm staff support commands.')
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)

@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.66',
+    date: '2026-06-16',
+    title: 'Discord DMs for Every Alert',
+    summary:
+      'Discord DM alerts now mirror every push notification Pocketrealm already sends, so linking once and opting in covers all of them. If you have linked your account with /link and enabled an alert, you will now also receive a Discord DM for each of these: a PvP attack against you, a PvP scout on you, a boss appearing, a boss being defeated, your turn bank filling up, an expedition starting, and an expedition finishing. The Discord DMs reuse the same per-notification toggles that control your in-app push alerts, so there is nothing new to configure and you still receive nothing until you opt in.',
+  },
+  {
+    version: '0.65',
+    date: '2026-06-15',
+    title: 'Discord Turn Alerts',
+    summary:
+      'You can now opt in to a Discord DM when your turn bank fills up, so banked regen stops going to waste while you are away. Link your account with /link, then run /notify in the Pocketrealm Discord to toggle alerts on or off — enabling one sends a confirmation DM, and you get nothing until you turn it on. More notification types can be added later; for now it covers turns reaching their cap.',
+  },
+  {
     version: '0.64',
     date: '2026-06-03',
     title: 'Support Links & Bug Reports',

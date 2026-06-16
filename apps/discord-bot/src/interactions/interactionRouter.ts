@@ -2,11 +2,12 @@ import type { Interaction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
-import { parseDuelButtonId, parseSupportButtonId } from '../discord/components.js';
+import { parseDuelButtonId, parseNotifyButtonId, parseSupportButtonId } from '../discord/components.js';
 import { getRankCategoryAutocompleteChoices } from '../rankCategories.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { handleLinkCommand } from './linkCommand.js';
+import { handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
 import {
   handleProfileCommand,
   handleRankCommand,
@@ -53,6 +54,11 @@ export async function routeInteraction(
   if (typeof interaction.isButton === 'function' && interaction.isButton()) {
     if (parseDuelButtonId(interaction.customId)) {
       await handleDuelButton(interaction, options.api);
+      return;
+    }
+
+    if (parseNotifyButtonId(interaction.customId)) {
+      await handleNotifyToggleButton(interaction, options.api);
       return;
     }
 
@@ -117,6 +123,11 @@ export async function routeInteraction(
 
   if (interaction.commandName === 'duel') {
     await handleDuelCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'notify') {
+    await handleNotifyCommand(interaction, options.api);
     return;
   }
 

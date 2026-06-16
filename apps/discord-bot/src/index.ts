@@ -1,5 +1,6 @@
 import 'dotenv/config';
 
+import { DISCORD_NOTIFICATION_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import { Client, Events, GatewayIntentBits, type GuildMember } from 'discord.js';
 import { Redis } from 'ioredis';
 import pino from 'pino';
@@ -9,6 +10,7 @@ import { loadBotConfig } from './config.js';
 import { syncLinkedRoles } from './discord/roleSync.js';
 import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './discord/welcome.js';
 import { routeInteraction } from './interactions/interactionRouter.js';
+import { pollDiscordNotifications } from './notifications/notificationPoll.js';
 import { pollSupportTriageTickets } from './support/triagePoll.js';
 import { createMessageXpService } from './xp/messageXp.js';
 import { createNotificationConsumer, type NotificationConsumer } from './notifications/notificationConsumer.js';
@@ -40,8 +42,10 @@ async function main(): Promise<void> {
   });
   let roleSyncInterval: NodeJS.Timeout | undefined;
   let supportTriageInterval: NodeJS.Timeout | undefined;
+  let notificationInterval: NodeJS.Timeout | undefined;
   let isRoleSyncRunning = false;
   let isSupportTriageRunning = false;
+  let isNotificationPollRunning = false;
 
   const notificationRedis = redis.duplicate();
   notificationRedis.on('error', (error: unknown) => {
@@ -210,6 +214,32 @@ async function main(): Promise<void> {
     });
     void notificationConsumer.start();
     logger.info('Discord notification consumer started');
+
+    const runNotificationPoll = async (): Promise<void> => {
+      if (isNotificationPollRunning) {
+        logger.debug('Discord notification poll skipped because a previous run is still active');
+        return;
+      }
+
+      isNotificationPollRunning = true;
+      try {
+        await pollDiscordNotifications({
+          api,
+          logger,
+          readyClient,
+          redis,
+        });
+      } catch (error) {
+        logger.warn({ error }, 'Discord notification poll failed');
+      } finally {
+        isNotificationPollRunning = false;
+      }
+    };
+
+    void runNotificationPoll();
+    notificationInterval = setInterval(() => {
+      void runNotificationPoll();
+    }, DISCORD_NOTIFICATION_CONSTANTS.POLL_INTERVAL_MS);
   });
 
   const shutdown = (signal: NodeJS.Signals): void => {
@@ -223,6 +253,9 @@ async function main(): Promise<void> {
       }
       if (supportTriageInterval) {
         clearInterval(supportTriageInterval);
+      }
+      if (notificationInterval) {
+        clearInterval(notificationInterval);
       }
 
       // stop() flips the consumer's `running` flag but cannot interrupt an
