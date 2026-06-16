@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DISCORD_NOTIFICATION_TYPES,
   DISCORD_NOTIFICATION_TYPE_LABELS,
+  WEB_TO_DISCORD_NOTIFICATION_TYPE,
   isDiscordNotificationType,
 } from './discordNotifications';
 
@@ -19,5 +20,42 @@ describe('discordNotifications', () => {
   it('narrows arbitrary strings to notification types', () => {
     expect(isDiscordNotificationType('turns_capped')).toBe(true);
     expect(isDiscordNotificationType('boss_spawned')).toBe(false);
+  });
+});
+
+describe('extended discord notification registry', () => {
+  it('includes the six event-driven types plus turns_capped', () => {
+    expect(DISCORD_NOTIFICATION_TYPES).toEqual([
+      'turns_capped',
+      'pvp_attack',
+      'pvp_scout',
+      'boss_appeared',
+      'boss_defeated',
+      'expedition_recruiting',
+      'expedition_finished',
+    ]);
+  });
+
+  it('has a label for every type', () => {
+    for (const type of DISCORD_NOTIFICATION_TYPES) {
+      expect(DISCORD_NOTIFICATION_TYPE_LABELS[type]).toBeTruthy();
+    }
+  });
+
+  it('maps every web event type to a distinct discord slug and excludes turnBankFull', () => {
+    expect(WEB_TO_DISCORD_NOTIFICATION_TYPE).toEqual({
+      pvpAttack: 'pvp_attack',
+      pvpScout: 'pvp_scout',
+      bossAppeared: 'boss_appeared',
+      bossKilled: 'boss_defeated',
+      expeditionStarted: 'expedition_recruiting',
+      expeditionFinished: 'expedition_finished',
+    });
+    expect(Object.values(WEB_TO_DISCORD_NOTIFICATION_TYPE)).not.toContain('turns_capped');
+  });
+
+  it('recognises a new slug as a valid type', () => {
+    expect(isDiscordNotificationType('boss_defeated')).toBe(true);
+    expect(isDiscordNotificationType('not_a_type')).toBe(false);
   });
 });
