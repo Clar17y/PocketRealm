@@ -11,6 +11,7 @@ import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './discord/we
 import { routeInteraction } from './interactions/interactionRouter.js';
 import { pollSupportTriageTickets } from './support/triagePoll.js';
 import { createMessageXpService } from './xp/messageXp.js';
+import { createNotificationConsumer, type NotificationConsumer } from './notifications/notificationConsumer.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
@@ -41,6 +42,13 @@ async function main(): Promise<void> {
   let supportTriageInterval: NodeJS.Timeout | undefined;
   let isRoleSyncRunning = false;
   let isSupportTriageRunning = false;
+
+  const notificationRedis = redis.duplicate();
+  notificationRedis.on('error', (error: unknown) => {
+    logger.warn({ error }, 'Discord notification Redis connection error');
+  });
+  let notificationConsumer: NotificationConsumer | undefined;
+  let isShuttingDown = false;
 
   redis.on('error', (error: unknown) => {
     logger.warn({ error }, 'Discord XP Redis connection error');
@@ -194,19 +202,41 @@ async function main(): Promise<void> {
     supportTriageInterval = setInterval(() => {
       void runSupportTriagePoll();
     }, 30_000);
+
+    notificationConsumer = createNotificationConsumer({
+      redis: notificationRedis,
+      client: readyClient,
+      logger,
+    });
+    void notificationConsumer.start();
+    logger.info('Discord notification consumer started');
   });
 
   const shutdown = (signal: NodeJS.Signals): void => {
-    logger.info({ signal }, 'Shutting down Discord bot');
-    if (roleSyncInterval) {
-      clearInterval(roleSyncInterval);
-    }
-    if (supportTriageInterval) {
-      clearInterval(supportTriageInterval);
-    }
-    redis.disconnect();
-    client.destroy();
-    process.exit(0);
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    void (async () => {
+      logger.info({ signal }, 'Shutting down Discord bot');
+      if (roleSyncInterval) {
+        clearInterval(roleSyncInterval);
+      }
+      if (supportTriageInterval) {
+        clearInterval(supportTriageInterval);
+      }
+
+      const notificationStop = notificationConsumer?.stop().catch((error: unknown) => {
+        logger.warn({ error }, 'Discord notification consumer failed to stop cleanly');
+      });
+      notificationRedis.disconnect();
+      if (notificationStop) {
+        await notificationStop;
+      }
+
+      redis.disconnect();
+      client.destroy();
+      process.exit(0);
+    })();
   };
 
   process.once('SIGINT', shutdown);
