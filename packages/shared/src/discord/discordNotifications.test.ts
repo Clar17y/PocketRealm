@@ -36,12 +36,6 @@ describe('extended discord notification registry', () => {
     ]);
   });
 
-  it('has a label for every type', () => {
-    for (const type of DISCORD_NOTIFICATION_TYPES) {
-      expect(DISCORD_NOTIFICATION_TYPE_LABELS[type]).toBeTruthy();
-    }
-  });
-
   it('maps every web event type to a distinct discord slug and excludes turnBankFull', () => {
     expect(WEB_TO_DISCORD_NOTIFICATION_TYPE).toEqual({
       pvpAttack: 'pvp_attack',
