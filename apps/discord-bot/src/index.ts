@@ -225,6 +225,11 @@ async function main(): Promise<void> {
         clearInterval(supportTriageInterval);
       }
 
+      // stop() flips the consumer's `running` flag but cannot interrupt an
+      // in-flight blocking BRPOP. Disconnecting the dedicated connection forces
+      // that BRPOP to reject immediately (caught and ignored since running is
+      // already false), so the loop exits without waiting out the 5s timeout.
+      // Hence the order: call stop(), disconnect, THEN await the loop's exit.
       const notificationStop = notificationConsumer?.stop().catch((error: unknown) => {
         logger.warn({ error }, 'Discord notification consumer failed to stop cleanly');
       });

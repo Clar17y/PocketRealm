@@ -5,30 +5,28 @@ import type { NotificationType } from './pushNotificationService';
 
 export interface DiscordTarget {
   discordUserId: string;
-  guildId: string;
 }
 
 /**
  * Resolves a player to their active linked Discord user, or null when the
- * player is unlinked. Mirrors the lookup shape in discordLinkedPlayer.ts.
+ * player has no active link. Single query via the Account → players relation
+ * (mirrors the active-link predicate in discordLinkedPlayer.ts).
  */
 export async function resolveDiscordTarget(playerId: string): Promise<DiscordTarget | null> {
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { accountId: true },
-  });
-  if (!player) return null;
-
   const link = await prisma.discordAccountLink.findFirst({
-    where: { accountId: player.accountId, unlinkedAt: null },
+    where: {
+      account: { players: { some: { id: playerId } } },
+      unlinkedAt: null,
+    },
     orderBy: { linkedAt: 'desc' },
-    select: { discordUserId: true, discordGuildId: true },
+    select: { discordUserId: true },
   });
   if (!link) return null;
 
-  return { discordUserId: link.discordUserId, guildId: link.discordGuildId };
+  return { discordUserId: link.discordUserId };
 }
 
+/** Redis list key shared with the bot (apps/discord-bot/src/notifications/notificationContract.ts). */
 export const DISCORD_NOTIFICATION_QUEUE = 'discord:notifications';
 const MAX_QUEUE_LENGTH = 1000;
 

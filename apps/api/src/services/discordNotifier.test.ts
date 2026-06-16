@@ -40,33 +40,24 @@ describe('discordNotifier', () => {
 
   describe('resolveDiscordTarget', () => {
     it('returns the linked target when an active link exists', async () => {
-      vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: 'acc-1' } as never);
       vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue({
         discordUserId: 'discord-99',
-        discordGuildId: 'guild-1',
       } as never);
 
       const target = await resolveDiscordTarget(PLAYER_ID);
 
-      expect(target).toEqual({ discordUserId: 'discord-99', guildId: 'guild-1' });
+      expect(target).toEqual({ discordUserId: 'discord-99' });
       expect(prisma.discordAccountLink.findFirst).toHaveBeenCalledWith({
-        where: { accountId: 'acc-1', unlinkedAt: null },
+        where: {
+          account: { players: { some: { id: PLAYER_ID } } },
+          unlinkedAt: null,
+        },
         orderBy: { linkedAt: 'desc' },
-        select: { discordUserId: true, discordGuildId: true },
+        select: { discordUserId: true },
       });
     });
 
-    it('returns null when the player has no account', async () => {
-      vi.mocked(prisma.player.findUnique).mockResolvedValue(null);
-
-      const target = await resolveDiscordTarget(PLAYER_ID);
-
-      expect(target).toBeNull();
-      expect(prisma.discordAccountLink.findFirst).not.toHaveBeenCalled();
-    });
-
-    it('returns null when the account has no active link', async () => {
-      vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: 'acc-1' } as never);
+    it('returns null when the player has no active link', async () => {
       vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue(null);
 
       const target = await resolveDiscordTarget(PLAYER_ID);
@@ -101,10 +92,8 @@ describe('discordNotifier', () => {
 
   describe('notifyDiscord', () => {
     it('publishes when the player is linked', async () => {
-      vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: 'acc-1' } as never);
       vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue({
         discordUserId: 'discord-99',
-        discordGuildId: 'guild-1',
       } as never);
 
       await notifyDiscord(PLAYER_ID, 'bossKilled', { title: 'Boss Defeated!', body: 'Slain' });
@@ -113,7 +102,7 @@ describe('discordNotifier', () => {
     });
 
     it('does not publish when the player is unlinked', async () => {
-      vi.mocked(prisma.player.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue(null);
 
       await notifyDiscord(PLAYER_ID, 'bossKilled', { title: 'Boss Defeated!', body: 'Slain' });
 
@@ -121,10 +110,8 @@ describe('discordNotifier', () => {
     });
 
     it('never throws when Redis publish fails', async () => {
-      vi.mocked(prisma.player.findUnique).mockResolvedValue({ accountId: 'acc-1' } as never);
       vi.mocked(prisma.discordAccountLink.findFirst).mockResolvedValue({
         discordUserId: 'discord-99',
-        discordGuildId: 'guild-1',
       } as never);
       mocks.redisTransaction.exec.mockRejectedValueOnce(new Error('redis down'));
 
