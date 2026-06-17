@@ -64,3 +64,31 @@ Unit tests (vitest) for `actionIcon` precedence (each rule + the default), miss
 derivation, and `isKnockout`; plus a `buildReplayCard` assertion that a crit
 killing-blow line carries both the crit and KO icons. No behaviour change to any
 non-replay path.
+
+## Update (2026-06-17): custom art + full taxonomy
+
+Codex delivered a pixel-art emoji pack (`docs/assets/discord-duel-emojis/`),
+which is richer than the original outcomes-only set, so the classifier was
+expanded (still renderer-only, no API change):
+
+- **Attacks split into `physical` / `magic`** — magic when `action === 'spell'`,
+  a `spellName` is present, or `targetMagicDefence` is set without
+  `targetDefence`; physical otherwise.
+- **Heal split by resource** into `heal_hp` / `heal_sta` / `heal_mp` via
+  `healResourceType`.
+- **`counter` and `ward` are distinct** from `defend`.
+
+Icon kinds now: physical, magic, crit, miss, heal_hp, heal_sta, heal_mp, defend,
+counter, ward, potion, cleanse, ko (matching the asset filenames), plus the
+result-card victory/draw icons.
+
+**Custom-emoji pipeline.** Every duel emoji resolves through
+`customEmoji(name, fallback)` (duelEmoji.ts): it returns the uploaded
+application emoji `<:name:id>` when present in `duelCustomEmoji.ts`, else the
+Unicode fallback — so the bot works identically with or without the art
+uploaded. `npm run upload-duel-emojis` (src/scripts/uploadDuelEmojis.ts) uploads
+the PNG pack as **application-owned** emoji using the bot token + client id,
+skips ones already uploaded, and regenerates `duelCustomEmoji.ts` with the
+name→id map to commit. Run it locally (the token stays on the operator's
+machine); pass the asset dir as an argument when running from a worktree where
+`docs/assets/` is absent.

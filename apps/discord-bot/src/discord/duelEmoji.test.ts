@@ -16,8 +16,12 @@ describe('DEFAULT_DUEL_RESULT_ICONS', () => {
 });
 
 describe('DEFAULT_DUEL_ACTION_ICONS', () => {
-  it('provides a non-empty icon for every outcome kind', () => {
-    const kinds = ['attack', 'crit', 'miss', 'heal', 'defend', 'potion', 'cleanse', 'spell', 'ko'] as const;
+  it('provides a non-empty icon for every action kind', () => {
+    const kinds = [
+      'physical', 'magic', 'crit', 'miss',
+      'heal_hp', 'heal_sta', 'heal_mp',
+      'defend', 'counter', 'ward', 'potion', 'cleanse', 'ko',
+    ] as const;
     for (const kind of kinds) {
       expect(DEFAULT_DUEL_ACTION_ICONS[kind]).toBeTruthy();
     }

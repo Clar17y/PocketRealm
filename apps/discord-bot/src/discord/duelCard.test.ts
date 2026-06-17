@@ -18,14 +18,17 @@ import {
 describe('actionIcon', () => {
   const I = DEFAULT_DUEL_ACTION_ICONS;
 
-  it('returns the heal icon when the action healed, even on a crit', () => {
-    expect(actionIcon({ action: 'heal', healAmount: 12, isCritical: true })).toBe(I.heal);
+  it('returns a heal icon by resource type, even on a crit', () => {
+    expect(actionIcon({ action: 'heal', healAmount: 12, isCritical: true })).toBe(I.heal_hp);
+    expect(actionIcon({ action: 'heal', healAmount: 12, healResourceType: 'hp' })).toBe(I.heal_hp);
+    expect(actionIcon({ action: 'heal', healAmount: 12, healResourceType: 'stamina' })).toBe(I.heal_sta);
+    expect(actionIcon({ action: 'heal', healAmount: 12, healResourceType: 'mana' })).toBe(I.heal_mp);
   });
 
-  it('returns the defend icon for defend, counter, ward, and forced-pinned', () => {
+  it('distinguishes defend, counter, ward, and forced-pinned', () => {
     expect(actionIcon({ action: 'defend' })).toBe(I.defend);
-    expect(actionIcon({ action: 'counter' })).toBe(I.defend);
-    expect(actionIcon({ action: 'ward' })).toBe(I.defend);
+    expect(actionIcon({ action: 'counter' })).toBe(I.counter);
+    expect(actionIcon({ action: 'ward' })).toBe(I.ward);
     expect(actionIcon({ action: 'attack', forcedActionReason: 'pinned' })).toBe(I.defend);
   });
 
@@ -42,12 +45,14 @@ describe('actionIcon', () => {
     expect(actionIcon({ action: 'attack', hitChance: 0.6, hitRollValue: 0.9 })).toBe(I.miss);
   });
 
-  it('returns the spell icon for a non-damaging spell', () => {
-    expect(actionIcon({ action: 'spell' })).toBe(I.spell);
+  it('returns the magic icon for spells and magic-typed attacks', () => {
+    expect(actionIcon({ action: 'spell' })).toBe(I.magic);
+    expect(actionIcon({ action: 'attack', spellName: 'Firebolt', hitChance: 0.8, hitRollValue: 0.1 })).toBe(I.magic);
+    expect(actionIcon({ action: 'attack', targetMagicDefence: 5, hitChance: 0.8, hitRollValue: 0.1 })).toBe(I.magic);
   });
 
-  it('defaults to the attack icon for a normal landed hit', () => {
-    expect(actionIcon({ action: 'attack', hitChance: 0.8, hitRollValue: 0.1, damage: 10 })).toBe(I.attack);
+  it('defaults to the physical icon for a normal landed melee hit', () => {
+    expect(actionIcon({ action: 'attack', targetDefence: 5, hitChance: 0.8, hitRollValue: 0.1, damage: 10 })).toBe(I.physical);
   });
 });
 

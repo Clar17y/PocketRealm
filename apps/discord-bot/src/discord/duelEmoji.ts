@@ -1,11 +1,20 @@
+import { DUEL_CUSTOM_EMOJI } from './duelCustomEmoji.js';
+
 /**
- * Emoji used to render duel resource bars in Discord messages.
- *
- * The defaults below are Unicode squares so the bars render on every platform
- * (including mobile) without any server setup. To switch to custom server art,
- * upload emoji to the guild and replace the `full`/`empty` strings with the
- * `<:name:id>` (or `<a:name:id>` for animated) custom-emoji form — that is the
- * only change required; all rendering flows through this map.
+ * Resolve a duel emoji by name to its custom application-emoji form
+ * (`<:name:id>`), falling back to a Unicode placeholder when the custom emoji
+ * has not been uploaded yet (see duelCustomEmoji.ts). This is the single seam
+ * that turns Codex's PNG pack into rendered emoji once uploaded.
+ */
+export function customEmoji(name: string, fallback: string): string {
+  const id = DUEL_CUSTOM_EMOJI[name];
+  return id ? `<:${name}:${id}>` : fallback;
+}
+
+/**
+ * Emoji used to render duel resource bars in Discord messages. Each cell is a
+ * named custom emoji with a Unicode fallback, so the bars render on every
+ * platform with or without the uploaded art.
  */
 export interface DuelBarStyle {
   full: string;
@@ -19,29 +28,31 @@ export interface DuelEmojiSet {
 }
 
 export const DEFAULT_DUEL_EMOJI: DuelEmojiSet = {
-  hp: { full: '🟩', empty: '⬛' },
-  mp: { full: '🟦', empty: '⬛' },
-  sta: { full: '🟨', empty: '⬛' },
+  hp: { full: customEmoji('hp_full', '🟩'), empty: customEmoji('bar_empty', '⬛') },
+  mp: { full: customEmoji('mp_full', '🟦'), empty: customEmoji('bar_empty', '⬛') },
+  sta: { full: customEmoji('sta_full', '🟨'), empty: customEmoji('bar_empty', '⬛') },
 };
 
 export const DEFAULT_DUEL_BAR_WIDTH = 10;
 
 /**
- * Icons shown at the start of each replay log line, by action outcome.
- *
- * Like the bar emoji above, these are Unicode placeholders that render
- * everywhere. Swapping to a custom game-themed set is a one-place edit:
- * replace each value with its `<:name:id>` (or `<a:name:id>`) custom emoji.
+ * Icons shown at the start of each replay log line, by action kind. Each is a
+ * named custom emoji with a Unicode fallback (see `customEmoji`). Names match
+ * the asset pack in docs/assets/discord-duel-emojis/icons.
  */
 export interface DuelActionIcons {
-  attack: string;
+  physical: string;
+  magic: string;
   crit: string;
   miss: string;
-  heal: string;
+  heal_hp: string;
+  heal_sta: string;
+  heal_mp: string;
   defend: string;
+  counter: string;
+  ward: string;
   potion: string;
   cleanse: string;
-  spell: string;
   ko: string;
 }
 
@@ -52,20 +63,24 @@ export interface DuelResultIcons {
 }
 
 export const DEFAULT_DUEL_RESULT_ICONS: DuelResultIcons = {
-  victory: '🏆',
-  draw: '🤝',
+  victory: customEmoji('victory', '🏆'),
+  draw: customEmoji('draw', '🤝'),
 };
 
 export const DEFAULT_DUEL_ACTION_ICONS: DuelActionIcons = {
-  attack: '⚔️',
-  crit: '💥',
-  miss: '💨',
-  heal: '💚',
-  defend: '🛡️',
-  potion: '🧪',
-  cleanse: '🫧',
-  spell: '✨',
-  ko: '💀',
+  physical: customEmoji('physical', '⚔️'),
+  magic: customEmoji('magic', '🔮'),
+  crit: customEmoji('crit', '💥'),
+  miss: customEmoji('miss', '💨'),
+  heal_hp: customEmoji('heal_hp', '💚'),
+  heal_sta: customEmoji('heal_sta', '💛'),
+  heal_mp: customEmoji('heal_mp', '💙'),
+  defend: customEmoji('defend', '🛡️'),
+  counter: customEmoji('counter', '↩️'),
+  ward: customEmoji('ward', '🔰'),
+  potion: customEmoji('potion', '🧪'),
+  cleanse: customEmoji('cleanse', '🫧'),
+  ko: customEmoji('ko', '💀'),
 };
 
 /** Round a (possibly floating-point regen) resource value for display. */

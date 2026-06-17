@@ -420,40 +420,65 @@ function formatMeter(
   return `${icon} ${renderResourceBar(current, max, style)} ${value}/${max}`;
 }
 
-/** Pick the leading log-line icon for an entry, by action outcome. */
+/** Pick the leading log-line icon for an entry, by action kind. */
 export function actionIcon(
   entry: unknown,
   icons: DuelActionIcons = DEFAULT_DUEL_ACTION_ICONS,
 ): string {
+  return icons[classifyActionKind(entry)];
+}
+
+function classifyActionKind(entry: unknown): keyof DuelActionIcons {
   if (!isRecord(entry)) {
-    return icons.attack;
+    return 'physical';
   }
 
   const action = typeof entry.action === 'string' ? entry.action : null;
 
   if (readNumber(entry, 'healAmount') !== null || action === 'heal') {
-    return icons.heal;
+    const resource = entry.healResourceType;
+    if (resource === 'stamina') return 'heal_sta';
+    if (resource === 'mana') return 'heal_mp';
+    return 'heal_hp';
   }
-  if (action === 'defend' || action === 'counter' || action === 'ward' || entry.forcedActionReason === 'pinned') {
-    return icons.defend;
+  if (action === 'defend' || entry.forcedActionReason === 'pinned') {
+    return 'defend';
+  }
+  if (action === 'counter') {
+    return 'counter';
+  }
+  if (action === 'ward') {
+    return 'ward';
   }
   if (action === 'potion') {
-    return icons.potion;
+    return 'potion';
   }
   if (action === 'cleanse') {
-    return icons.cleanse;
+    return 'cleanse';
   }
   if (entry.isCritical === true) {
-    return icons.crit;
+    return 'crit';
   }
   if (action === 'attack' && isMiss(entry)) {
-    return icons.miss;
+    return 'miss';
   }
-  if (action === 'spell') {
-    return icons.spell;
+  if (isMagicAction(entry, action)) {
+    return 'magic';
   }
 
-  return icons.attack;
+  return 'physical';
+}
+
+function isMagicAction(entry: Record<string, unknown>, action: string | null): boolean {
+  if (action === 'spell') {
+    return true;
+  }
+  if (typeof entry.spellName === 'string') {
+    return true;
+  }
+  // Damage resolution records magic defence only for magic hits, physical
+  // defence only for physical hits — use that to tell the two apart.
+  return readNumber(entry, 'targetMagicDefence') !== null && readNumber(entry, 'targetDefence') === null;
 }
 
 function isMiss(entry: Record<string, unknown>): boolean {
