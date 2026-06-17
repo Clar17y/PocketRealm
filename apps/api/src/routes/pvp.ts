@@ -16,7 +16,7 @@ import {
   markScoutNotificationsRead,
 } from '../services/pvpService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
-import { sendPush } from '../services/pushNotificationService';
+import { notifyPlayer } from '../services/playerNotifier';
 import { paginationSchema } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
@@ -88,12 +88,12 @@ pvpRouter.post('/scout', requireActiveSeason, asyncHandler(async (req, res) => {
   const result = await scoutOpponent(playerId, body.targetId);
 
   // Fire-and-forget push notification to scouted player
-  void sendPush(body.targetId, 'pvpScout', {
+  void notifyPlayer(body.targetId, 'pvpScout', {
     title: 'PvP Scout',
     body: `${req.player!.username} is sizing you up in the arena!`,
     tag: 'pvp-scout',
     data: { type: 'pvp' },
-  });
+  }, { scouterName: req.player!.username });
 
   const stateUpdates = await buildStateUpdates(playerId, ['resources']);
   res.json({ ...result, stateUpdates });
@@ -136,12 +136,12 @@ pvpRouter.post('/challenge', requireActiveSeason, asyncHandler(async (req, res) 
   }
 
   // Fire-and-forget push notification to defender
-  void sendPush(result.defenderId, 'pvpAttack', {
+  void notifyPlayer(result.defenderId, 'pvpAttack', {
     title: 'PvP Attack!',
     body: `${result.attackerName} challenged you in the arena!`,
     tag: 'pvp-attack',
     data: { type: 'pvp', matchId: result.matchId },
-  });
+  }, { attackerName: result.attackerName });
 
   const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'skills', 'characterProgression']);
   res.json({ ...result, stateUpdates });

@@ -15,7 +15,7 @@ import { getHpState } from './hpService';
 import { getEquipmentStats } from './equipmentService';
 import { getSkillLevel } from './combatStatsService';
 import { getPlayerProgressionState } from './attributesService';
-import { sendPush } from './pushNotificationService';
+import { notifyPlayer } from './playerNotifier';
 import { clearRoomSnapshots } from './expeditionCombatCache';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
 import { getIo } from '../socket';
@@ -180,12 +180,12 @@ export async function launchExpedition(
     select: { playerId: true },
   });
   for (const { playerId: memberId } of guildMembers) {
-    void sendPush(memberId, 'expeditionStarted', {
+    void notifyPlayer(memberId, 'expeditionStarted', {
       title: 'Expedition Launched!',
       body: `A Tier ${tier} guild expedition is recruiting — sign up now!`,
       tag: 'expedition-recruiting',
       data: { type: 'expedition', expeditionId: expedition.id },
-    });
+    }, { tier });
   }
 
   return toExpeditionData(expedition);
