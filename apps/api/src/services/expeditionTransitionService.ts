@@ -8,7 +8,7 @@ import { awardRoomTokens, awardCompletionBonus, distributeRoomLoot } from './exp
 import type { ExpeditionContributor } from './expeditionLootService';
 import { AppError } from '../middleware/errorHandler';
 import { addGuildLog } from './guildService';
-import { sendPush } from './pushNotificationService';
+import { notifyPlayer } from './playerNotifier';
 import { clearRoomSnapshots } from './expeditionCombatCache';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
 import { getIo } from '../socket';
@@ -160,12 +160,12 @@ export async function handleWipe(expeditionId: string): Promise<void> {
 
     // Notify expedition members of failure
     for (const member of expedition.members) {
-      void sendPush(member.playerId, 'expeditionFinished', {
+      void notifyPlayer(member.playerId, 'expeditionFinished', {
         title: 'Expedition Failed',
         body: `Your Tier ${expedition.tier} expedition failed after ${newWipeCount} attempts.`,
         tag: 'expedition-finished',
         data: { type: 'expedition', expeditionId },
-      });
+      }, { tier: expedition.tier, outcome: 'failed', attempts: newWipeCount });
     }
 
     await cleanupExpeditionBots(expeditionId);
@@ -277,12 +277,12 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
 
   // Notify expedition members
   for (const member of expedition.members) {
-    void sendPush(member.playerId, 'expeditionFinished', {
+    void notifyPlayer(member.playerId, 'expeditionFinished', {
       title: 'Expedition Complete!',
       body: `Your Tier ${expedition.tier} expedition was victorious!`,
       tag: 'expedition-finished',
       data: { type: 'expedition', expeditionId },
-    });
+    }, { tier: expedition.tier, outcome: 'victory' });
   }
 
   await cleanupExpeditionBots(expeditionId);

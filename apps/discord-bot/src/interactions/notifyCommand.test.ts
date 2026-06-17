@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DISCORD_NOTIFICATION_TYPES } from '@pocketrealm/shared/discord/discordNotifications';
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import { notifyToggleButtonId } from '../discord/components.js';
-import { handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
+import { buildPreferenceComponents, handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
 
 const GUILD_ID = '23456789012345678';
 const USER_ID = '34567890123456789';
@@ -140,5 +141,40 @@ describe('handleNotifyToggleButton', () => {
     await handleNotifyToggleButton(interaction as never, api as never);
 
     expect(interaction.user.send).not.toHaveBeenCalled();
+  });
+
+  it('re-renders all notification types after a toggle', async () => {
+    const allPrefs = DISCORD_NOTIFICATION_TYPES.map((type) => ({ type, enabled: false }));
+    const api = createApi({
+      get: vi.fn().mockResolvedValue({ preferences: allPrefs }),
+    });
+    const interaction = createButtonInteraction(notifyToggleButtonId('pvp_attack', true));
+
+    await handleNotifyToggleButton(interaction as never, api as never);
+
+    // After toggling, the menu re-fetches the full list and re-renders every type.
+    expect(api.get).toHaveBeenCalledWith(
+      `/api/v1/discord/notifications/preferences?guildId=${GUILD_ID}&discordUserId=${USER_ID}`,
+    );
+    const payload = interaction.editReply.mock.calls.at(-1)![0];
+    const totalButtons = payload.components.reduce(
+      (sum: number, row: { components: unknown[] }) => sum + row.components.length,
+      0,
+    );
+    expect(totalButtons).toBe(DISCORD_NOTIFICATION_TYPES.length);
+  });
+});
+
+describe('buildPreferenceComponents', () => {
+  it('splits all toggles into rows of at most five buttons', () => {
+    const prefs = DISCORD_NOTIFICATION_TYPES.map((type) => ({ type, enabled: false }));
+    const rows = buildPreferenceComponents(prefs);
+
+    const total = rows.reduce((sum, row) => sum + row.components.length, 0);
+    expect(total).toBe(DISCORD_NOTIFICATION_TYPES.length);
+    for (const row of rows) {
+      expect(row.components.length).toBeLessThanOrEqual(5);
+    }
+    expect(rows.length).toBe(Math.ceil(DISCORD_NOTIFICATION_TYPES.length / 5));
   });
 });

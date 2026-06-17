@@ -29,7 +29,7 @@ import { getHpState, enterRecoveringState, setHp } from '../hpService';
 import { getMainHandAttackSkill, getSkillLevel } from '../combatStatsService';
 import { distributeBossLoot } from '../bossLootService';
 import { redis } from '../../redis';
-import { sendPush } from '../pushNotificationService';
+import { notifyPlayer } from '../playerNotifier';
 import { addGuildXp } from '../guildService';
 import { roundTimerRegistry } from '../roundTimerRegistry';
 import { getIo } from '../../socket';
@@ -543,12 +543,12 @@ async function resolveBossRoundInner(
     });
 
     for (const playerId of contributorMap.keys()) {
-      void sendPush(playerId, 'bossKilled', {
+      void notifyPlayer(playerId, 'bossKilled', {
         title: 'Boss Defeated!',
         body: `${encounter.mobTemplate.name} has been slain!`,
         tag: 'boss-killed',
         data: { type: 'boss', encounterId },
-      });
+      }, { bossName: encounter.mobTemplate.name });
     }
   } else {
     const hpPercent = Math.round((result.bossHpAfter / encounter.maxHp) * 100);

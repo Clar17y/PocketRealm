@@ -7,7 +7,7 @@ interface PushSubscriptionInput {
   keys: { p256dh: string; auth: string };
 }
 
-interface PushPayload {
+export interface PushPayload {
   title: string;
   body: string;
   icon?: string;

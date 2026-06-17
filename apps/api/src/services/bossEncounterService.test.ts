@@ -56,6 +56,9 @@ vi.mock('./roundTimerRegistry', () => ({
 vi.mock('../socket', () => ({
   getIo: vi.fn(() => null),
 }));
+vi.mock('./playerNotifier', () => ({
+  notifyPlayer: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@pocketrealm/game-engine', () => ({
   resolveBossRound: vi.fn().mockReturnValue({

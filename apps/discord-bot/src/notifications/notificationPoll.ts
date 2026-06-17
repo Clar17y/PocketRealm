@@ -1,5 +1,14 @@
 import { DISCORD_NOTIFICATION_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
-import type { DiscordNotificationEventView } from '@pocketrealm/shared/discord/discordNotifications';
+import type {
+  DiscordBossAppearedPayload,
+  DiscordBossDefeatedPayload,
+  DiscordExpeditionFinishedPayload,
+  DiscordExpeditionRecruitingPayload,
+  DiscordNotificationEventView,
+  DiscordPvpAttackPayload,
+  DiscordPvpScoutPayload,
+  DiscordTurnsCappedPayload,
+} from '@pocketrealm/shared/discord/discordNotifications';
 
 interface NotificationApi {
   get<T>(path: string): Promise<T>;
@@ -37,6 +46,7 @@ export interface DiscordNotificationPollOptions {
   api: NotificationApi;
   logger: LoggerLike;
   readyClient: ReadyClientLike;
+  webBaseUrl: string;
   redis?: DeliverySuppressionStore;
 }
 
@@ -44,11 +54,49 @@ interface PendingNotificationsResponse {
   events: DiscordNotificationEventView[];
 }
 
-export function formatNotificationMessage(event: DiscordNotificationEventView): string {
-  const turns = event.payload.currentTurns.toLocaleString('en-US');
-  const cap = event.payload.bankCap.toLocaleString('en-US');
+function gameLink(webBaseUrl: string, path: string): string {
+  return `${webBaseUrl.replace(/\/$/, '')}${path}`;
+}
 
-  return `⚡ ${event.payload.username}, your turns are full (${turns}/${cap})! Regen is going to waste — time for an adventure.`;
+export function formatNotificationMessage(event: DiscordNotificationEventView, webBaseUrl: string): string {
+  switch (event.type) {
+    case 'pvp_attack': {
+      const p = event.payload as DiscordPvpAttackPayload;
+      return `⚔️ **${p.attackerName}** challenged you in the arena! [Fight back →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
+    }
+    case 'pvp_scout': {
+      const p = event.payload as DiscordPvpScoutPayload;
+      return `🔍 **${p.scouterName}** is sizing you up in the arena. [Check the arena →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
+    }
+    case 'boss_appeared': {
+      const p = event.payload as DiscordBossAppearedPayload;
+      return `🐉 **${p.bossName}** has appeared in **${p.zoneName}**! [Join the fight →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
+    }
+    case 'boss_defeated': {
+      const p = event.payload as DiscordBossDefeatedPayload;
+      return `🏆 **${p.bossName}** has been slain! [Claim your spoils →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
+    }
+    case 'expedition_recruiting': {
+      const p = event.payload as DiscordExpeditionRecruitingPayload;
+      return `🧭 A Tier ${p.tier} guild expedition is recruiting — [sign up →](${gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions')})`;
+    }
+    case 'expedition_finished': {
+      const p = event.payload as DiscordExpeditionFinishedPayload;
+      const expeditions = gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions');
+      return p.outcome === 'victory'
+        ? `🎉 Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
+        : `💀 Your Tier ${p.tier} expedition failed after ${p.attempts} attempts. [View expeditions →](${expeditions})`;
+    }
+    case 'turns_capped': {
+      const p = event.payload as DiscordTurnsCappedPayload;
+      const turns = p.currentTurns.toLocaleString('en-US');
+      const cap = p.bankCap.toLocaleString('en-US');
+      return `⚡ ${p.username}, your turns are full (${turns}/${cap})! Regen is going to waste — time for an adventure.`;
+    }
+    default: {
+      return `📢 You have a new Pocketrealm notification! ${gameLink(webBaseUrl, '/game')}`;
+    }
+  }
 }
 
 export async function pollDiscordNotifications(options: DiscordNotificationPollOptions): Promise<void> {
@@ -75,7 +123,7 @@ export async function pollDiscordNotifications(options: DiscordNotificationPollO
 
     try {
       const user = await options.readyClient.users.fetch(event.discordUserId);
-      await user.send({ content: formatNotificationMessage(event) });
+      await user.send({ content: formatNotificationMessage(event, options.webBaseUrl) });
       deliveredIds.push(event.id);
     } catch (error) {
       failedIds.push(event.id);

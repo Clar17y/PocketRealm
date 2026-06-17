@@ -64,8 +64,8 @@ vi.mock('./combatStatsService', () => ({
 vi.mock('./combatTemplateService', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'normal_attack' }]),
 }));
-vi.mock('./pushNotificationService', () => ({
-  sendPush: vi.fn().mockResolvedValue(undefined),
+vi.mock('./playerNotifier', () => ({
+  notifyPlayer: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('./roundTimerRegistry', () => ({
   roundTimerRegistry: {

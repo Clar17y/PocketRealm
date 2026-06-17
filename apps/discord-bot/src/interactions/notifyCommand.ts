@@ -11,6 +11,9 @@ import {
 } from '@pocketrealm/shared/discord/discordNotifications';
 
 import { PocketRealmApiError, type PocketRealmApiClient } from '../api/pocketRealmApi.js';
+
+// Discord allows at most five buttons per action row.
+const MAX_BUTTONS_PER_ROW = 5;
 import { notifyToggleButtonId, parseNotifyButtonId } from '../discord/components.js';
 
 type NotifyApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
@@ -21,7 +24,7 @@ interface PreferencesResponse {
 
 const NOTIFY_INTRO = 'Choose which Pocketrealm events DM you. Everything is off until you turn it on.';
 
-function buildPreferenceComponents(
+export function buildPreferenceComponents(
   preferences: DiscordNotificationPreferenceView[],
 ): ActionRowBuilder<ButtonBuilder>[] {
   const buttons = preferences.map((preference) =>
@@ -31,7 +34,11 @@ function buildPreferenceComponents(
       .setStyle(preference.enabled ? ButtonStyle.Success : ButtonStyle.Secondary),
   );
 
-  return [new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)];
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < buttons.length; i += MAX_BUTTONS_PER_ROW) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + MAX_BUTTONS_PER_ROW)));
+  }
+  return rows;
 }
 
 function isLinkRequiredError(error: unknown): boolean {
@@ -137,9 +144,20 @@ export async function handleNotifyToggleButton(
     }
   }
 
-  const preferences: DiscordNotificationPreferenceView[] = [{ type: parsed.type, enabled }];
-  await interaction.editReply({
-    content: NOTIFY_INTRO,
-    components: buildPreferenceComponents(preferences),
-  });
+  try {
+    const { preferences } = await api.get<PreferencesResponse>(
+      `/api/v1/discord/notifications/preferences?guildId=${interaction.guildId}&discordUserId=${interaction.user.id}`,
+    );
+    await interaction.editReply({
+      content: NOTIFY_INTRO,
+      components: buildPreferenceComponents(preferences),
+    });
+  } catch {
+    // Could not reload the full menu — the toggle still applied. Leave the
+    // existing buttons in place and confirm the change out of band.
+    await interaction.followUp({
+      ephemeral: true,
+      content: `Saved — "${DISCORD_NOTIFICATION_TYPE_LABELS[parsed.type]}" is now ${enabled ? 'ON' : 'OFF'}. Run /notify again to refresh the menu.`,
+    });
+  }
 }
