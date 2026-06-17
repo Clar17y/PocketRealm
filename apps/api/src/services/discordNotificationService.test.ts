@@ -2,13 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   prisma: {
+    discordAccountLink: {
+      findFirst: vi.fn(),
+    },
     discordNotificationPreference: {
       findMany: vi.fn(),
       upsert: vi.fn(),
+      findUnique: vi.fn(),
     },
     discordNotificationEvent: {
       findMany: vi.fn(),
       updateMany: vi.fn(),
+      create: vi.fn(),
+      createMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -23,8 +29,11 @@ vi.mock('./discordLinkedPlayer', async (importOriginal) => ({
 
 import {
   ackDiscordNotificationEvents,
+  broadcastDiscordNotification,
+  enqueueDiscordNotificationEvent,
   listDiscordNotificationPreferences,
   listPendingDiscordNotificationEvents,
+  resolveDiscordTarget,
   upsertDiscordNotificationPreference,
 } from './discordNotificationService';
 
@@ -214,5 +223,116 @@ describe('discordNotificationService', () => {
 
       expect(mocks.prisma.discordNotificationEvent.updateMany).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('resolveDiscordTarget', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the active link target for a player', async () => {
+    mocks.prisma.discordAccountLink.findFirst.mockResolvedValue({
+      discordUserId: USER_ID,
+      discordGuildId: GUILD_ID,
+    });
+
+    const target = await resolveDiscordTarget('player-1');
+
+    expect(target).toEqual({ discordUserId: USER_ID, discordGuildId: GUILD_ID });
+    expect(mocks.prisma.discordAccountLink.findFirst).toHaveBeenCalledWith({
+      where: { account: { players: { some: { id: 'player-1' } } }, unlinkedAt: null },
+      orderBy: { linkedAt: 'desc' },
+      select: { discordUserId: true, discordGuildId: true },
+    });
+  });
+
+  it('returns null when the player has no active link', async () => {
+    mocks.prisma.discordAccountLink.findFirst.mockResolvedValue(null);
+    expect(await resolveDiscordTarget('player-1')).toBeNull();
+  });
+});
+
+describe('enqueueDiscordNotificationEvent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.prisma.discordAccountLink.findFirst.mockResolvedValue({
+      discordUserId: USER_ID,
+      discordGuildId: GUILD_ID,
+    });
+  });
+
+  it('inserts an outbox row when linked and the pref is enabled', async () => {
+    mocks.prisma.discordNotificationPreference.findUnique.mockResolvedValue({ enabled: true });
+
+    await enqueueDiscordNotificationEvent('player-1', 'pvp_attack', { attackerName: 'Rook' });
+
+    expect(mocks.prisma.discordNotificationEvent.create).toHaveBeenCalledWith({
+      data: {
+        discordGuildId: GUILD_ID,
+        discordUserId: USER_ID,
+        type: 'pvp_attack',
+        payload: { attackerName: 'Rook' },
+      },
+    });
+  });
+
+  it('does nothing when the pref is missing or disabled', async () => {
+    mocks.prisma.discordNotificationPreference.findUnique.mockResolvedValue(null);
+
+    await enqueueDiscordNotificationEvent('player-1', 'pvp_attack', { attackerName: 'Rook' });
+
+    expect(mocks.prisma.discordNotificationEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the player is unlinked', async () => {
+    mocks.prisma.discordAccountLink.findFirst.mockResolvedValue(null);
+
+    await enqueueDiscordNotificationEvent('player-1', 'pvp_attack', { attackerName: 'Rook' });
+
+    expect(mocks.prisma.discordNotificationPreference.findUnique).not.toHaveBeenCalled();
+    expect(mocks.prisma.discordNotificationEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('swallows errors so callers are never affected', async () => {
+    mocks.prisma.discordNotificationPreference.findUnique.mockRejectedValue(new Error('db down'));
+
+    await expect(
+      enqueueDiscordNotificationEvent('player-1', 'pvp_attack', { attackerName: 'Rook' }),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('broadcastDiscordNotification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('inserts one row per opted-in user', async () => {
+    mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([
+      { discordGuildId: GUILD_ID, discordUserId: 'u1' },
+      { discordGuildId: GUILD_ID, discordUserId: 'u2' },
+    ]);
+
+    await broadcastDiscordNotification('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' });
+
+    expect(mocks.prisma.discordNotificationPreference.findMany).toHaveBeenCalledWith({
+      where: { type: 'boss_appeared', enabled: true },
+      select: { discordGuildId: true, discordUserId: true },
+    });
+    expect(mocks.prisma.discordNotificationEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        { discordGuildId: GUILD_ID, discordUserId: 'u1', type: 'boss_appeared', payload: { bossName: 'Ymir', zoneName: 'Tundra' } },
+        { discordGuildId: GUILD_ID, discordUserId: 'u2', type: 'boss_appeared', payload: { bossName: 'Ymir', zoneName: 'Tundra' } },
+      ],
+    });
+  });
+
+  it('does not query inserts when nobody opted in', async () => {
+    mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([]);
+
+    await broadcastDiscordNotification('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' });
+
+    expect(mocks.prisma.discordNotificationEvent.createMany).not.toHaveBeenCalled();
   });
 });

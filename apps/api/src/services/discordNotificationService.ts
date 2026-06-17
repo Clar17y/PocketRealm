@@ -1,8 +1,10 @@
-import { prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
+import { logger } from '../logger';
 import { DISCORD_NOTIFICATION_CONSTANTS } from '@pocketrealm/shared/constants/gameConstants';
 import {
   DISCORD_NOTIFICATION_TYPES,
   type DiscordNotificationEventView,
+  type DiscordNotificationPayload,
   type DiscordNotificationPreferenceView,
   type DiscordNotificationType,
   type DiscordTurnsCappedPayload,
@@ -140,4 +142,89 @@ export async function ackDiscordNotificationEvents(
   }
 
   return { delivered, failed };
+}
+
+export interface DiscordTarget {
+  discordUserId: string;
+  discordGuildId: string;
+}
+
+/**
+ * Resolves a player to their active linked Discord user + guild, or null when
+ * the player has no active link. Newest active link wins.
+ */
+export async function resolveDiscordTarget(playerId: string): Promise<DiscordTarget | null> {
+  const link = await prisma.discordAccountLink.findFirst({
+    where: { account: { players: { some: { id: playerId } } }, unlinkedAt: null },
+    orderBy: { linkedAt: 'desc' },
+    select: { discordUserId: true, discordGuildId: true },
+  });
+  if (!link) return null;
+  return { discordUserId: link.discordUserId, discordGuildId: link.discordGuildId };
+}
+
+/**
+ * Targeted Discord DM: enqueue an outbox event for one player, gated on their
+ * per-type `/notify` preference. Fire-and-forget — never throws to the caller.
+ */
+export async function enqueueDiscordNotificationEvent(
+  playerId: string,
+  type: DiscordNotificationType,
+  payload: DiscordNotificationPayload,
+): Promise<void> {
+  try {
+    const target = await resolveDiscordTarget(playerId);
+    if (!target) return;
+
+    const preference = await prisma.discordNotificationPreference.findUnique({
+      where: {
+        discordGuildId_discordUserId_type: {
+          discordGuildId: target.discordGuildId,
+          discordUserId: target.discordUserId,
+          type,
+        },
+      },
+      select: { enabled: true },
+    });
+    if (!preference?.enabled) return;
+
+    await prisma.discordNotificationEvent.create({
+      data: {
+        discordGuildId: target.discordGuildId,
+        discordUserId: target.discordUserId,
+        type,
+        payload: payload as unknown as Prisma.InputJsonValue,
+      },
+    });
+  } catch (err) {
+    logger.error({ err, playerId, type }, 'Failed to enqueue Discord notification event');
+  }
+}
+
+/**
+ * Broadcast Discord DM: enqueue one outbox event per user opted into `type`.
+ * Used for global events (boss appeared). Fire-and-forget.
+ */
+export async function broadcastDiscordNotification(
+  type: DiscordNotificationType,
+  payload: DiscordNotificationPayload,
+): Promise<void> {
+  try {
+    const recipients = await prisma.discordNotificationPreference.findMany({
+      where: { type, enabled: true },
+      select: { discordGuildId: true, discordUserId: true },
+    });
+    if (recipients.length === 0) return;
+
+    await prisma.discordNotificationEvent.createMany({
+      data: recipients.map((recipient) => ({
+        discordGuildId: recipient.discordGuildId,
+        discordUserId: recipient.discordUserId,
+        type,
+        payload: payload as unknown as Prisma.InputJsonValue,
+      })),
+    });
+  } catch (err) {
+    logger.error({ err, type }, 'Failed to broadcast Discord notification');
+  }
 }
