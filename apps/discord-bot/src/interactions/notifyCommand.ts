@@ -21,7 +21,7 @@ interface PreferencesResponse {
 
 const NOTIFY_INTRO = 'Choose which Pocketrealm events DM you. Everything is off until you turn it on.';
 
-function buildPreferenceComponents(
+export function buildPreferenceComponents(
   preferences: DiscordNotificationPreferenceView[],
 ): ActionRowBuilder<ButtonBuilder>[] {
   const buttons = preferences.map((preference) =>
@@ -31,7 +31,11 @@ function buildPreferenceComponents(
       .setStyle(preference.enabled ? ButtonStyle.Success : ButtonStyle.Secondary),
   );
 
-  return [new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)];
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+  }
+  return rows;
 }
 
 function isLinkRequiredError(error: unknown): boolean {

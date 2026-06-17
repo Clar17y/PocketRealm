@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DISCORD_NOTIFICATION_TYPES } from '@pocketrealm/shared/discord/discordNotifications';
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import { notifyToggleButtonId } from '../discord/components.js';
-import { handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
+import { buildPreferenceComponents, handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
 
 const GUILD_ID = '23456789012345678';
 const USER_ID = '34567890123456789';
@@ -140,5 +141,19 @@ describe('handleNotifyToggleButton', () => {
     await handleNotifyToggleButton(interaction as never, api as never);
 
     expect(interaction.user.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildPreferenceComponents', () => {
+  it('splits all toggles into rows of at most five buttons', () => {
+    const prefs = DISCORD_NOTIFICATION_TYPES.map((type) => ({ type, enabled: false }));
+    const rows = buildPreferenceComponents(prefs);
+
+    const total = rows.reduce((sum, row) => sum + row.components.length, 0);
+    expect(total).toBe(DISCORD_NOTIFICATION_TYPES.length);
+    for (const row of rows) {
+      expect(row.components.length).toBeLessThanOrEqual(5);
+    }
+    expect(rows.length).toBeLessThanOrEqual(5);
   });
 });
