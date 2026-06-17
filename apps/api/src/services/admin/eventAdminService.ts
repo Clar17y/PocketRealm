@@ -1,6 +1,7 @@
 import { prisma } from '@pocketrealm/database';
 import { WORLD_EVENT_TEMPLATES } from '@pocketrealm/shared/constants/worldEventTemplates';
 import { createBossEncounter } from '../bossEncounterService';
+import { broadcastDiscordNotification } from '../discordNotificationService';
 import { sendPush } from '../pushNotificationService';
 import { roundTimerRegistry } from '../roundTimerRegistry';
 import { getEventById, spawnWorldEvent } from '../worldEventService';
@@ -216,6 +217,7 @@ export async function spawnAdminBoss(
       data: { type: 'boss' },
     });
   }
+  void broadcastDiscordNotification('boss_appeared', { bossName: mob.name, zoneName });
 
   return {
     ok: true as const,

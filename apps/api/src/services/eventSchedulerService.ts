@@ -7,6 +7,7 @@ import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { getCachedZones, getCachedBossMobTemplates, getCachedZoneMobFamilies } from './staticDataCacheService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';
+import { broadcastDiscordNotification } from './discordNotificationService';
 import { sendPush } from './pushNotificationService';
 import { pickWeighted } from '../utils/pickWeighted.js';
 
@@ -256,6 +257,7 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
       data: { type: 'boss' },
     });
   }
+  void broadcastDiscordNotification('boss_appeared', { bossName: bossMob.name, zoneName });
 
   return true;
 }
