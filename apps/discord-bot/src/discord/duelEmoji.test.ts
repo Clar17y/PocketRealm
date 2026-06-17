@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_DUEL_ACTION_ICONS,
   DEFAULT_DUEL_EMOJI,
   renderResourceBar,
   roundResourceValue,
 } from './duelEmoji.js';
+
+describe('DEFAULT_DUEL_ACTION_ICONS', () => {
+  it('provides a non-empty icon for every outcome kind', () => {
+    const kinds = ['attack', 'crit', 'miss', 'heal', 'defend', 'potion', 'cleanse', 'spell', 'ko'] as const;
+    for (const kind of kinds) {
+      expect(DEFAULT_DUEL_ACTION_ICONS[kind]).toBeTruthy();
+    }
+  });
+});
 
 describe('roundResourceValue', () => {
   it('rounds floating point regen values to whole numbers for display', () => {

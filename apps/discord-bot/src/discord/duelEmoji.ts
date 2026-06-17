@@ -26,6 +26,37 @@ export const DEFAULT_DUEL_EMOJI: DuelEmojiSet = {
 
 export const DEFAULT_DUEL_BAR_WIDTH = 10;
 
+/**
+ * Icons shown at the start of each replay log line, by action outcome.
+ *
+ * Like the bar emoji above, these are Unicode placeholders that render
+ * everywhere. Swapping to a custom game-themed set is a one-place edit:
+ * replace each value with its `<:name:id>` (or `<a:name:id>`) custom emoji.
+ */
+export interface DuelActionIcons {
+  attack: string;
+  crit: string;
+  miss: string;
+  heal: string;
+  defend: string;
+  potion: string;
+  cleanse: string;
+  spell: string;
+  ko: string;
+}
+
+export const DEFAULT_DUEL_ACTION_ICONS: DuelActionIcons = {
+  attack: '⚔️',
+  crit: '💥',
+  miss: '💨',
+  heal: '💚',
+  defend: '🛡️',
+  potion: '🧪',
+  cleanse: '🫧',
+  spell: '✨',
+  ko: '💀',
+};
+
 /** Round a (possibly floating-point regen) resource value for display. */
 export function roundResourceValue(value: number): number {
   return Math.round(value);

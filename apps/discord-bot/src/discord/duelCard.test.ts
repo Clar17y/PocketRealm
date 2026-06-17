@@ -2,12 +2,62 @@ import { MessageFlags } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 
 import {
+  actionIcon,
   buildChallengeCard,
   buildDeclineCard,
   buildReplayCard,
   buildResultCard,
+  isKnockout,
 } from './duelCard.js';
-import { DEFAULT_DUEL_EMOJI } from './duelEmoji.js';
+import { DEFAULT_DUEL_ACTION_ICONS, DEFAULT_DUEL_EMOJI } from './duelEmoji.js';
+
+describe('actionIcon', () => {
+  const I = DEFAULT_DUEL_ACTION_ICONS;
+
+  it('returns the heal icon when the action healed, even on a crit', () => {
+    expect(actionIcon({ action: 'heal', healAmount: 12, isCritical: true })).toBe(I.heal);
+  });
+
+  it('returns the defend icon for defend, counter, ward, and forced-pinned', () => {
+    expect(actionIcon({ action: 'defend' })).toBe(I.defend);
+    expect(actionIcon({ action: 'counter' })).toBe(I.defend);
+    expect(actionIcon({ action: 'ward' })).toBe(I.defend);
+    expect(actionIcon({ action: 'attack', forcedActionReason: 'pinned' })).toBe(I.defend);
+  });
+
+  it('returns potion and cleanse icons', () => {
+    expect(actionIcon({ action: 'potion' })).toBe(I.potion);
+    expect(actionIcon({ action: 'cleanse' })).toBe(I.cleanse);
+  });
+
+  it('returns the crit icon for a critical attack', () => {
+    expect(actionIcon({ action: 'attack', isCritical: true, hitChance: 0.8, hitRollValue: 0.1 })).toBe(I.crit);
+  });
+
+  it('returns the miss icon when an attack roll fails to beat the hit chance', () => {
+    expect(actionIcon({ action: 'attack', hitChance: 0.6, hitRollValue: 0.9 })).toBe(I.miss);
+  });
+
+  it('returns the spell icon for a non-damaging spell', () => {
+    expect(actionIcon({ action: 'spell' })).toBe(I.spell);
+  });
+
+  it('defaults to the attack icon for a normal landed hit', () => {
+    expect(actionIcon({ action: 'attack', hitChance: 0.8, hitRollValue: 0.1, damage: 10 })).toBe(I.attack);
+  });
+});
+
+describe('isKnockout', () => {
+  it('detects when the entry brings either fighter to 0 HP', () => {
+    expect(isKnockout({ combatantAHpAfter: 0, combatantBHpAfter: 40 })).toBe(true);
+    expect(isKnockout({ combatantAHpAfter: 40, combatantBHpAfter: 0 })).toBe(true);
+  });
+
+  it('is false while both fighters are still standing', () => {
+    expect(isKnockout({ combatantAHpAfter: 40, combatantBHpAfter: 10 })).toBe(false);
+    expect(isKnockout({})).toBe(false);
+  });
+});
 
 function componentJson(card: { components: Array<{ toJSON: () => unknown }> }): string {
   return JSON.stringify(card.components.map((component) => component.toJSON()));
@@ -192,5 +242,34 @@ describe('buildReplayCard', () => {
     expect(json).toContain('No replay entries are available.');
     expect(json).toContain('duel:replay:duel-123:1');
     expect(json).toContain('duel:replay:duel-123:3');
+  });
+
+  it('marks a critical killing blow with both the crit and KO icons', () => {
+    const card = buildReplayCard({
+      id: 'duel-123',
+      status: 'resolved',
+      page: 1,
+      pageSize: 3,
+      hasMore: false,
+      summary: { challengerUsername: 'Astra', targetUsername: 'Borin' },
+      entries: [
+        {
+          round: 5,
+          actor: 'combatantA',
+          actorName: 'Astra',
+          action: 'attack',
+          actionName: 'Power Strike',
+          damage: 40,
+          isCritical: true,
+          hitChance: 0.9,
+          hitRollValue: 0.1,
+          combatantAHpAfter: 60,
+          combatantBHpAfter: 0,
+        },
+      ],
+    });
+    const json = componentJson(card);
+    expect(json).toContain(DEFAULT_DUEL_ACTION_ICONS.crit);
+    expect(json).toContain(DEFAULT_DUEL_ACTION_ICONS.ko);
   });
 });

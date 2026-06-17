@@ -25,9 +25,11 @@ import {
   duelReplayButtonId,
 } from './components.js';
 import {
+  DEFAULT_DUEL_ACTION_ICONS,
   DEFAULT_DUEL_EMOJI,
   renderResourceBar,
   roundResourceValue,
+  type DuelActionIcons,
   type DuelBarStyle,
   type DuelEmojiSet,
 } from './duelEmoji.js';
@@ -171,7 +173,8 @@ export function buildReplayCard(
   const logLines: string[] = [];
   for (const { entry, index } of entries) {
     const replayIndex = (replay.page - 1) * replay.pageSize + index + 1;
-    const line = `**#${replayIndex}** ${formatReplayEntry(entry)}`;
+    const ko = isKnockout(entry) ? ` ${DEFAULT_DUEL_ACTION_ICONS.ko}` : '';
+    const line = `${actionIcon(entry)} **#${replayIndex}** ${formatReplayEntry(entry)}${ko}`;
     if (usedLength + line.length > MAX_REPLAY_CONTENT_LENGTH) {
       logLines.push('_Replay page truncated for Discord._');
       break;
@@ -414,6 +417,57 @@ function formatMeter(
   }
 
   return `${icon} ${renderResourceBar(current, max, style)} ${value}/${max}`;
+}
+
+/** Pick the leading log-line icon for an entry, by action outcome. */
+export function actionIcon(
+  entry: unknown,
+  icons: DuelActionIcons = DEFAULT_DUEL_ACTION_ICONS,
+): string {
+  if (!isRecord(entry)) {
+    return icons.attack;
+  }
+
+  const action = typeof entry.action === 'string' ? entry.action : null;
+
+  if (readNumber(entry, 'healAmount') !== null || action === 'heal') {
+    return icons.heal;
+  }
+  if (action === 'defend' || action === 'counter' || action === 'ward' || entry.forcedActionReason === 'pinned') {
+    return icons.defend;
+  }
+  if (action === 'potion') {
+    return icons.potion;
+  }
+  if (action === 'cleanse') {
+    return icons.cleanse;
+  }
+  if (entry.isCritical === true) {
+    return icons.crit;
+  }
+  if (action === 'attack' && isMiss(entry)) {
+    return icons.miss;
+  }
+  if (action === 'spell') {
+    return icons.spell;
+  }
+
+  return icons.attack;
+}
+
+function isMiss(entry: Record<string, unknown>): boolean {
+  const hitChance = readNumber(entry, 'hitChance');
+  const hitRollValue = readNumber(entry, 'hitRollValue');
+  return hitChance !== null && hitRollValue !== null && hitRollValue >= hitChance;
+}
+
+/** True when this entry brings either fighter to 0 HP (a knockout blow). */
+export function isKnockout(entry: unknown): boolean {
+  if (!isRecord(entry)) {
+    return false;
+  }
+
+  return readNumber(entry, 'combatantAHpAfter') === 0 || readNumber(entry, 'combatantBHpAfter') === 0;
 }
 
 function isRedundantRegenEntry(entry: unknown): boolean {
