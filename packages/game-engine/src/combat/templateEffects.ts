@@ -42,7 +42,9 @@ function snapshotEffectValues(
 
 /**
  * Apply an action's effect (buff/debuff/DOT/HOT) to the state.
- * Same-name effects refresh rather than stack. Buffs respect the cap; debuffs always apply.
+ * Same-name effects refresh rather than stack. Buffs respect the cap; debuffs always apply,
+ * except `pinned`, which is suppressed while the target already has an active `pinned` or
+ * `pinnedImmunity` effect (prevents pin-locking).
  * Returns the list of applied effects (for log display), or undefined if none.
  */
 export function applyActionEffect(

@@ -20,7 +20,14 @@ import {
   duelReplayButtonId,
   parseDuelButtonId,
 } from '../discord/components.js';
-import { isRecord, truncateText } from '../utils.js';
+import {
+  compactStrings,
+  formatPercent,
+  isRecord,
+  readNumber,
+  readString,
+  truncateText,
+} from '../utils.js';
 
 type DuelApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
 type DuelCommandConfig = Pick<BotConfig, 'duelsChannelId'>;
@@ -523,10 +530,6 @@ function formatBar(current: number, max: number): string {
   return `${'#'.repeat(filled)}${'-'.repeat(width - filled)}`;
 }
 
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
 function isRedundantRegenEntry(entry: unknown): boolean {
   if (!isRecord(entry)) {
     return false;
@@ -537,20 +540,6 @@ function isRedundantRegenEntry(entry: unknown): boolean {
     && readNumber(entry, 'damage') === null
     && readNumber(entry, 'healAmount') === null
     && !hasEffects;
-}
-
-function readNumber(record: Record<string, unknown>, key: string): number | null {
-  const value = record[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function readString(record: Record<string, unknown>, key: string): string | null {
-  const value = record[key];
-  return typeof value === 'string' && value.trim() ? value : null;
-}
-
-function compactStrings(parts: Array<string | null>): string[] {
-  return parts.filter((part): part is string => Boolean(part));
 }
 
 async function recordDuelMessage(
