@@ -17,6 +17,7 @@ export interface ResolvedAction {
   intendedActionId?: string;
   intendedAction?: ActionDefinition;
   exhaustedReason?: ExhaustedActionReason;
+  forcedActionReason?: 'pinned';
   /** The other branch's action (else when condition matched, then when it didn't) */
   alternateAction?: ActionDefinition;
 }
@@ -62,6 +63,14 @@ function getExhaustedReason(
   return 'invalid_action';
 }
 
+function isPinned(activeEffects: ActiveEffect[], actorKey: CombatActor): boolean {
+  return activeEffects.some(
+    (effect) => effect.target === actorKey
+      && effect.stat === 'pinned'
+      && effect.remainingRounds > 0,
+  );
+}
+
 // --- Public API ---
 
 /**
@@ -92,6 +101,16 @@ export function resolveAction(
 
   const actionId = conditionMet && slot.thenActionId ? slot.thenActionId : slot.actionId;
   const definition = actionDefinitions[actionId];
+
+  if (isPinned(activeEffects, actorKey)) {
+    return {
+      action: DEFEND_FALLBACK,
+      wasExhausted: false,
+      intendedActionId: actionId,
+      intendedAction: definition,
+      forcedActionReason: 'pinned',
+    };
+  }
 
   // Resolve the other branch's action (for potion fallback in engine)
   const altId = slot.condition && slot.thenActionId

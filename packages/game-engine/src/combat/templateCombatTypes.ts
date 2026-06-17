@@ -40,6 +40,7 @@ export interface TemplateCombatLogEntry extends CombatLogEntry {
   combatantBManaAfter: number;
   wasExhausted?: boolean;
   interactionResult?: string;
+  forcedActionReason?: 'pinned';
   tickType?: 'dot_tick' | 'hot_tick';
 }
 
@@ -72,6 +73,7 @@ export interface RoundContext {
   combatantBAction: string;
   wasExhausted: boolean;
   interactionResult: string;
+  forcedActionReason?: 'pinned';
 }
 
 // --- Helpers ---
@@ -100,6 +102,7 @@ export function buildLogEntry(
     combatantBAction: ctx?.combatantBAction ?? '',
     wasExhausted: ctx?.wasExhausted,
     interactionResult: ctx?.interactionResult,
+    forcedActionReason: ctx?.forcedActionReason,
     ...fields,
   };
 }

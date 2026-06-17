@@ -415,6 +415,55 @@ describe('runTemplateCombat', () => {
     });
   });
 
+  describe('pinned effect', () => {
+    it('forces the target to defend next round and grants two rounds of pin immunity', () => {
+      mockCombatRandom();
+
+      const attacker = makeCombatant('Archer', {
+        template: templateOf('crippling_shot'),
+        stamina: 1000,
+        maxStamina: 1000,
+        staminaRegenPerRound: 0,
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 10, damageMax: 10, accuracy: 100 }),
+      });
+      const defender = makeCombatant('Bruiser', {
+        template: templateOf('normal_attack'),
+        stamina: 1000,
+        maxStamina: 1000,
+        staminaRegenPerRound: 0,
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, accuracy: 100 }),
+      });
+
+      const result = runTemplateCombat(attacker, defender, { combatMode: 'pvp' });
+
+      const forcedDefends = result.log.filter(
+        (entry) => entry.actor === 'combatantB' && entry.forcedActionReason === 'pinned',
+      );
+      expect(forcedDefends.map((entry) => entry.round).slice(0, 2)).toEqual([2, 6]);
+
+      const round2Defend = forcedDefends.find((entry) => entry.round === 2);
+      expect(round2Defend).toMatchObject({
+        action: 'defend',
+        combatantBAction: 'defend',
+        message: 'Bruiser is pinned and forced to defend!',
+      });
+
+      for (const immuneRound of [3, 4]) {
+        expect(result.log).toContainEqual(expect.objectContaining({
+          round: immuneRound,
+          actor: 'combatantB',
+          action: 'attack',
+        }));
+      }
+
+      expect(result.log).toContainEqual(expect.objectContaining({
+        round: 5,
+        actor: 'combatantA',
+        effectsApplied: [expect.objectContaining({ stat: 'pinned', target: 'combatantB' })],
+      }));
+    });
+  });
+
   describe('combat outcomes', () => {
     it('Combat ends on death (victory outcome)', () => {
       mockCombatRandom();

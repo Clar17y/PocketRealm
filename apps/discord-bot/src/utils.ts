@@ -29,3 +29,25 @@ export function formatDiscordTimestamp(
 
   return `<t:${timestamp}:${style}>`;
 }
+
+/** Format a 0-1 ratio as a whole-number percentage string (e.g. 0.75 -> "75%"). */
+export function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+/** Drop null/empty entries, narrowing to a string array. */
+export function compactStrings(parts: Array<string | null>): string[] {
+  return parts.filter((part): part is string => Boolean(part));
+}
+
+/** Read a finite number from a record key, or null when missing/invalid. */
+export function readNumber(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** Read a non-empty trimmed string from a record key, or null when missing/blank. */
+export function readString(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === 'string' && value.trim() ? value : null;
+}

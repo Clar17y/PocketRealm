@@ -66,6 +66,7 @@ export interface DiscordDuelReplayDto {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  summary: Prisma.JsonValue | null;
   entries: unknown[];
 }
 
@@ -83,7 +84,26 @@ function winnerUsernameFor(duel: DiscordDuelRecord): string | null {
   return null;
 }
 
-function safeReplayPage(duel: Pick<DiscordDuelRecord, 'id' | 'status' | 'combatLog'>, page: number): DiscordDuelReplayDto {
+type JsonObject = Record<string, Prisma.JsonValue>;
+
+function isJsonObject(value: Prisma.JsonValue | null): value is JsonObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function replaySummaryFor(
+  duel: Pick<DiscordDuelRecord, 'summary' | 'challenger' | 'target'>,
+): Prisma.JsonValue {
+  return {
+    ...(isJsonObject(duel.summary) ? duel.summary : {}),
+    challengerUsername: duel.challenger.username,
+    targetUsername: duel.target.username,
+  };
+}
+
+function safeReplayPage(
+  duel: Pick<DiscordDuelRecord, 'id' | 'status' | 'combatLog' | 'summary' | 'challenger' | 'target'>,
+  page: number,
+): DiscordDuelReplayDto {
   const entries = Array.isArray(duel.combatLog) ? duel.combatLog : [];
   const start = (page - 1) * DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE;
   const pageEntries = entries.slice(start, start + DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE);
@@ -94,6 +114,7 @@ function safeReplayPage(duel: Pick<DiscordDuelRecord, 'id' | 'status' | 'combatL
     page,
     pageSize: DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE,
     hasMore: start + DISCORD_DUEL_CONSTANTS.REPLAY_PAGE_SIZE < entries.length,
+    summary: replaySummaryFor(duel),
     entries: pageEntries,
   };
 }
@@ -339,6 +360,16 @@ export async function resolveDiscordDuel(
       isDraw,
       challengerHpRemaining: combatResult.combatantAHpRemaining,
       targetHpRemaining: combatResult.combatantBHpRemaining,
+      challengerMaxHp: combatResult.combatantAMaxHp,
+      targetMaxHp: combatResult.combatantBMaxHp,
+      challengerMaxStamina: combatResult.combatantAMaxStamina,
+      targetMaxStamina: combatResult.combatantBMaxStamina,
+      challengerStaminaRemaining: combatResult.combatantAStaminaRemaining,
+      targetStaminaRemaining: combatResult.combatantBStaminaRemaining,
+      challengerMaxMana: combatResult.combatantAMaxMana,
+      targetMaxMana: combatResult.combatantBMaxMana,
+      challengerManaRemaining: combatResult.combatantAManaRemaining,
+      targetManaRemaining: combatResult.combatantBManaRemaining,
     };
 
     const completion = await prisma.discordDuel.updateMany({

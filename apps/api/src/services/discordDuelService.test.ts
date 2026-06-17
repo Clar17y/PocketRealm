@@ -35,6 +35,14 @@ const TARGET_DISCORD_ID = '45678901234567890';
 const DUEL_ID = '11111111-1111-4111-8111-111111111111';
 const MESSAGE_ID = '56789012345678901';
 const NOW = new Date('2026-06-04T12:00:00.000Z');
+const REPLAY_RESOURCE_SUMMARY = {
+  challengerMaxHp: 100,
+  targetMaxHp: 100,
+  challengerMaxStamina: 100,
+  targetMaxStamina: 100,
+  challengerMaxMana: 50,
+  targetMaxMana: 50,
+} as const;
 
 function mockModel() {
   return {
@@ -306,7 +314,11 @@ describe('discordDuelService', () => {
         status: 'completed',
         winnerPlayerId: 'player-1',
         isDraw: false,
-        summary: { outcome: 'victory', totalRounds: 3 },
+        summary: {
+          outcome: 'victory',
+          totalRounds: 3,
+          ...REPLAY_RESOURCE_SUMMARY,
+        },
         combatLog: [{ round: 1, message: 'Mira hits Theo.' }],
         completedAt: NOW,
         acceptedAt: NOW,
@@ -357,8 +369,21 @@ describe('discordDuelService', () => {
       status: 'completed',
       winnerUsername: 'Mira',
       isDraw: false,
-      summary: expect.objectContaining({ outcome: 'victory', totalRounds: 3 }),
-      replay: expect.objectContaining({ page: 1, hasMore: false }),
+      summary: expect.objectContaining({
+        outcome: 'victory',
+        totalRounds: 3,
+        ...REPLAY_RESOURCE_SUMMARY,
+      }),
+      replay: expect.objectContaining({
+        page: 1,
+        hasMore: false,
+        summary: expect.objectContaining({
+          challengerUsername: 'Mira',
+          targetUsername: 'Theo',
+          challengerMaxHp: 100,
+          targetMaxHp: 100,
+        }),
+      }),
     }));
   });
 
@@ -468,6 +493,7 @@ describe('discordDuelService', () => {
     mockPrisma.discordDuel.findUnique.mockResolvedValue(pendingDuel({
       status: 'completed',
       combatLog,
+      summary: REPLAY_RESOURCE_SUMMARY,
       winnerPlayerId: 'player-1',
       winner: { username: 'Mira' },
     }));
@@ -480,6 +506,12 @@ describe('discordDuelService', () => {
       page: 2,
       pageSize: 10,
       hasMore: true,
+      summary: expect.objectContaining({
+        challengerUsername: 'Mira',
+        targetUsername: 'Theo',
+        challengerMaxHp: 100,
+        targetMaxHp: 100,
+      }),
       entries: combatLog.slice(10, 20),
     });
   });
