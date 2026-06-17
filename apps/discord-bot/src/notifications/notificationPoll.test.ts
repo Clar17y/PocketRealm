@@ -145,4 +145,22 @@ describe('formatNotificationMessage', () => {
     expect(content).toContain('Tier 2');
     expect(content).toContain('4 attempts');
   });
+
+  it('formats a pvp_scout DM with a bold name and arena deep link', () => {
+    const content = formatNotificationMessage(evt('pvp_scout', { scouterName: 'Mira' }), WEB_BASE_URL);
+    expect(content).toContain('**Mira**');
+    expect(content).toContain(`${WEB_BASE_URL}/game?screen=arena`);
+  });
+
+  it('formats a boss_defeated DM with a bold boss name and worldEvents deep link', () => {
+    const content = formatNotificationMessage(evt('boss_defeated', { bossName: 'Ymir' }), WEB_BASE_URL);
+    expect(content).toContain('**Ymir**');
+    expect(content).toContain(`${WEB_BASE_URL}/game?screen=worldEvents`);
+  });
+
+  it('formats an expedition_recruiting DM with the tier and guild expeditions deep link', () => {
+    const content = formatNotificationMessage(evt('expedition_recruiting', { tier: 5 }), WEB_BASE_URL);
+    expect(content).toContain('Tier 5');
+    expect(content).toContain(`${WEB_BASE_URL}/game?screen=guild&tab=expeditions`);
+  });
 });

@@ -90,12 +90,14 @@ export function formatNotificationMessage(event: DiscordNotificationEventView, w
         ? `🎉 Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
         : `💀 Your Tier ${p.tier} expedition failed after ${p.attempts ?? 0} attempts. [View expeditions →](${expeditions})`;
     }
-    case 'turns_capped':
-    default: {
+    case 'turns_capped': {
       const p = event.payload as DiscordTurnsCappedPayload;
       const turns = p.currentTurns.toLocaleString('en-US');
       const cap = p.bankCap.toLocaleString('en-US');
       return `⚡ ${p.username}, your turns are full (${turns}/${cap})! Regen is going to waste — time for an adventure.`;
+    }
+    default: {
+      return `📢 You have a new Pocketrealm notification! ${gameLink(webBaseUrl, '/game')}`;
     }
   }
 }
