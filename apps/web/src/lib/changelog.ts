@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.66',
+    date: '2026-06-17',
+    title: 'More Discord Alerts',
+    summary:
+      'You can now opt into Discord DMs for far more than turn alerts. Run /notify in the Pocketrealm Discord to toggle DMs for PvP attacks, PvP scouts, bosses appearing, bosses being defeated, expeditions recruiting, and expeditions finishing — each one off until you switch it on. Every alert links straight to the right screen in-game. Link your account with /link first if you have not already.',
+  },
+  {
     version: '0.65',
     date: '2026-06-15',
     title: 'Discord Turn Alerts',
