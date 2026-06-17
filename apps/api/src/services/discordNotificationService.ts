@@ -214,8 +214,29 @@ export async function broadcastDiscordNotification(
     });
     if (recipients.length === 0) return;
 
+    // Preferences are not removed when an account unlinks (unlinkDiscordAccount only
+    // stamps discordAccountLink.unlinkedAt), so re-check that each opted-in user still
+    // has an active link before enqueuing — mirrors resolveDiscordTarget and the
+    // turns-capped sweep. Without this, an unlinked user keeps receiving broadcast DMs.
+    const activeLinks = await prisma.discordAccountLink.findMany({
+      where: {
+        unlinkedAt: null,
+        discordGuildId: { in: recipients.map((recipient) => recipient.discordGuildId) },
+        discordUserId: { in: recipients.map((recipient) => recipient.discordUserId) },
+      },
+      select: { discordGuildId: true, discordUserId: true },
+    });
+    const activeKeys = new Set(
+      activeLinks.map((link) => `${link.discordGuildId}:${link.discordUserId}`),
+    );
+
+    const deliverable = recipients.filter((recipient) =>
+      activeKeys.has(`${recipient.discordGuildId}:${recipient.discordUserId}`),
+    );
+    if (deliverable.length === 0) return;
+
     await prisma.discordNotificationEvent.createMany({
-      data: recipients.map((recipient) => ({
+      data: deliverable.map((recipient) => ({
         discordGuildId: recipient.discordGuildId,
         discordUserId: recipient.discordUserId,
         type,

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     discordAccountLink: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     discordNotificationPreference: {
       findMany: vi.fn(),
@@ -309,8 +310,12 @@ describe('broadcastDiscordNotification', () => {
     vi.clearAllMocks();
   });
 
-  it('inserts one row per opted-in user', async () => {
+  it('inserts one row per opted-in user with an active link', async () => {
     mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([
+      { discordGuildId: GUILD_ID, discordUserId: 'u1' },
+      { discordGuildId: GUILD_ID, discordUserId: 'u2' },
+    ]);
+    mocks.prisma.discordAccountLink.findMany.mockResolvedValue([
       { discordGuildId: GUILD_ID, discordUserId: 'u1' },
       { discordGuildId: GUILD_ID, discordUserId: 'u2' },
     ]);
@@ -321,6 +326,14 @@ describe('broadcastDiscordNotification', () => {
       where: { type: 'boss_appeared', enabled: true },
       select: { discordGuildId: true, discordUserId: true },
     });
+    expect(mocks.prisma.discordAccountLink.findMany).toHaveBeenCalledWith({
+      where: {
+        unlinkedAt: null,
+        discordGuildId: { in: [GUILD_ID, GUILD_ID] },
+        discordUserId: { in: ['u1', 'u2'] },
+      },
+      select: { discordGuildId: true, discordUserId: true },
+    });
     expect(mocks.prisma.discordNotificationEvent.createMany).toHaveBeenCalledWith({
       data: [
         { discordGuildId: GUILD_ID, discordUserId: 'u1', type: 'boss_appeared', payload: { bossName: 'Ymir', zoneName: 'Tundra' } },
@@ -329,11 +342,42 @@ describe('broadcastDiscordNotification', () => {
     });
   });
 
+  it('skips opted-in users whose Discord account is no longer linked', async () => {
+    mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([
+      { discordGuildId: GUILD_ID, discordUserId: 'linked' },
+      { discordGuildId: GUILD_ID, discordUserId: 'unlinked' },
+    ]);
+    // Only the still-linked user has an active discordAccountLink row.
+    mocks.prisma.discordAccountLink.findMany.mockResolvedValue([
+      { discordGuildId: GUILD_ID, discordUserId: 'linked' },
+    ]);
+
+    await broadcastDiscordNotification('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' });
+
+    expect(mocks.prisma.discordNotificationEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        { discordGuildId: GUILD_ID, discordUserId: 'linked', type: 'boss_appeared', payload: { bossName: 'Ymir', zoneName: 'Tundra' } },
+      ],
+    });
+  });
+
+  it('does not insert when every opted-in user has unlinked', async () => {
+    mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([
+      { discordGuildId: GUILD_ID, discordUserId: 'u1' },
+    ]);
+    mocks.prisma.discordAccountLink.findMany.mockResolvedValue([]);
+
+    await broadcastDiscordNotification('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' });
+
+    expect(mocks.prisma.discordNotificationEvent.createMany).not.toHaveBeenCalled();
+  });
+
   it('does not query inserts when nobody opted in', async () => {
     mocks.prisma.discordNotificationPreference.findMany.mockResolvedValue([]);
 
     await broadcastDiscordNotification('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' });
 
+    expect(mocks.prisma.discordAccountLink.findMany).not.toHaveBeenCalled();
     expect(mocks.prisma.discordNotificationEvent.createMany).not.toHaveBeenCalled();
   });
 });
