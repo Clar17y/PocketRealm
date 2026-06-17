@@ -7,7 +7,6 @@ import {
   type DiscordNotificationPayload,
   type DiscordNotificationPreferenceView,
   type DiscordNotificationType,
-  type DiscordTurnsCappedPayload,
 } from '@pocketrealm/shared/discord/discordNotifications';
 import {
   DISCORD_LINK_REQUIRED_ERROR,
@@ -103,7 +102,7 @@ export async function listPendingDiscordNotificationEvents(
     discordGuildId: event.discordGuildId,
     discordUserId: event.discordUserId,
     type: event.type as DiscordNotificationType,
-    payload: event.payload as unknown as DiscordTurnsCappedPayload,
+    payload: event.payload as unknown as DiscordNotificationPayload,
     createdAt: event.createdAt.toISOString(),
   }));
 }
