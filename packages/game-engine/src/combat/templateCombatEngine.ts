@@ -3,11 +3,12 @@ import type {
   PotionConsumed,
   CombatOptions,
 } from '@pocketrealm/shared';
-import { resolveAction, resolveInteraction, DEFEND_FALLBACK } from './actionResolver';
+import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type ResolvedAction } from './actionResolver';
 import { rollInitiative } from './damageCalculator';
 import {
   MAX_ROUNDS,
   buildLogEntry,
+  type RoundContext,
   type TemplateCombatState,
   type TemplateCombatLogEntry,
   type TemplateCombatant,
@@ -49,6 +50,21 @@ export { isStatDebuff, isMagicDot } from './templateEffects';
 export type { CombatantState, TemplateCombatState, RoundContext } from './templateCombatTypes';
 
 // --- Main Engine ---
+
+function buildRoundContext(
+  resolvedAction: ResolvedAction,
+  combatantAAction: string,
+  combatantBAction: string,
+  interactionResult: string,
+): RoundContext {
+  return {
+    combatantAAction,
+    combatantBAction,
+    wasExhausted: resolvedAction.wasExhausted,
+    interactionResult,
+    forcedActionReason: resolvedAction.forcedActionReason,
+  };
+}
 
 export function runTemplateCombat(
   combatantA: TemplateCombatant,
@@ -182,7 +198,7 @@ export function runTemplateCombat(
         state, 'combatantA', effectiveA, effectiveB,
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
-        { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
+        buildRoundContext(resolvedA, combatantAAction, combatantBAction, interactionResult),
         combatMode,
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
@@ -194,7 +210,7 @@ export function runTemplateCombat(
         state, 'combatantB', effectiveB, effectiveA,
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
-        { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
+        buildRoundContext(resolvedB, combatantAAction, combatantBAction, interactionResult),
         combatMode,
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
@@ -206,7 +222,7 @@ export function runTemplateCombat(
         state, 'combatantB', effectiveB, effectiveA,
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
-        { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
+        buildRoundContext(resolvedB, combatantAAction, combatantBAction, interactionResult),
         combatMode,
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
@@ -218,7 +234,7 @@ export function runTemplateCombat(
         state, 'combatantA', effectiveA, effectiveB,
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
-        { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
+        buildRoundContext(resolvedA, combatantAAction, combatantBAction, interactionResult),
         combatMode,
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,

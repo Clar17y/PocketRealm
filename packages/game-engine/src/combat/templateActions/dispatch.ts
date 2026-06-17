@@ -24,12 +24,16 @@ export function executeDefensiveAction(
   actorName: string,
   ctx: RoundContext,
 ): void {
+  const message = ctx.forcedActionReason === 'pinned'
+    ? `${actorName} is pinned and forced to defend!`
+    : `${actorName} uses ${action.name}!`;
+
   state.log.push(buildLogEntry(state, ctx, {
     round: state.round,
     actor: actorKey,
     actorName,
     action: 'defend',
-    message: `${actorName} uses ${action.name}!`,
+    message,
   }));
 }
 

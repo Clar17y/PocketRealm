@@ -569,6 +569,8 @@ export const COMBAT_ACTION_CONSTANTS = {
   MAX_ACTIVE_BUFFS: 3,
   /** Potion sickness duration (rounds) — shared across HP/Stam/Mana potions */
   POTION_SICKNESS_ROUNDS: 4,
+  /** Pinned immunity duration after a pin expires */
+  PINNED_IMMUNITY_ROUNDS: 2,
 
   // Melee talent actions
   POWER_STRIKE_STAMINA: 15,

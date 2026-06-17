@@ -316,7 +316,7 @@ describe('handleDuelButton', () => {
     });
   });
 
-  it('loads replay pages ephemerally from the replay route', async () => {
+  it('updates the existing message with replay details from the replay route', async () => {
     const api = createApi();
     vi.mocked(api.get).mockResolvedValue({
       replay: {
@@ -325,36 +325,80 @@ describe('handleDuelButton', () => {
         page: 1,
         pageSize: 3,
         hasMore: true,
+        summary: {
+          challengerUsername: 'Astra',
+          targetUsername: 'Borin',
+          challengerMaxHp: 100,
+          targetMaxHp: 100,
+          challengerMaxStamina: 100,
+          targetMaxStamina: 100,
+          challengerMaxMana: 50,
+          targetMaxMana: 50,
+        },
         entries: [
-          { round: 1, message: 'Astra opens with a careful strike.' },
-          { round: 2, actionName: 'Counter', damageDealt: 7 },
+          {
+            round: 1,
+            actor: 'combatantA',
+            actorName: 'Astra',
+            actionName: 'Crippling Shot',
+            damage: 12,
+            hitChance: 0.75,
+            hitRollValue: 0.1,
+            attackerHitScore: 55,
+            defenderAvoidScore: 20,
+            combatantAHpAfter: 80,
+            combatantBHpAfter: 88,
+            combatantAStaminaAfter: 65,
+            combatantBStaminaAfter: 20,
+            combatantAManaAfter: 35,
+            combatantBManaAfter: 15,
+          },
+          {
+            round: 2,
+            actor: 'combatantA',
+            actorName: 'Astra',
+            action: 'regen',
+            message: 'Resources regenerate.',
+            combatantAHpAfter: 80,
+            combatantBHpAfter: 88,
+            combatantAStaminaAfter: 75,
+            combatantBStaminaAfter: 30,
+            combatantAManaAfter: 40,
+            combatantBManaAfter: 20,
+          },
         ],
       },
     });
     const deferReply = vi.fn<ButtonInteraction['deferReply']>();
+    const deferUpdate = vi.fn<ButtonInteraction['deferUpdate']>();
     const editReply = vi.fn<ButtonInteraction['editReply']>();
     const interaction = createButtonInteraction({
       customId: 'duel:replay:duel-123:1',
+      deferUpdate,
       deferReply,
       editReply,
     });
 
     await handleDuelButton(interaction, api);
 
-    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(deferUpdate).toHaveBeenCalled();
+    expect(deferReply).not.toHaveBeenCalled();
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=1');
     expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
-      content: expect.stringContaining('Astra opens with a careful strike.'),
+      content: expect.stringContaining('Astra HP [########--] 80/100 MP [#######---] 35/50 STA [#######---] 65/100'),
       components: expect.any(Array),
     }));
     expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
-      content: expect.stringContaining('Round 2 · Counter · 7 damage'),
+      content: expect.stringContaining('#1 R1 Astra Crippling Shot: 12 damage HIT 75% (roll 10%, 55 hit vs 20 avoid)'),
+    }));
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.not.stringContaining('Resources regenerate.'),
     }));
     const replayPayload = editReply.mock.calls[0]?.[0] as { components: Array<{ toJSON: () => unknown }> };
     expect(JSON.stringify(replayPayload.components[0]?.toJSON())).toContain('duel:replay:duel-123:2');
   });
 
-  it('loads later replay pages from replay pagination buttons', async () => {
+  it('keeps replay pagination in the same message with previous and next buttons', async () => {
     const api = createApi();
     vi.mocked(api.get).mockResolvedValue({
       replay: {
@@ -362,24 +406,89 @@ describe('handleDuelButton', () => {
         status: 'resolved',
         page: 2,
         pageSize: 3,
-        hasMore: false,
+        hasMore: true,
         entries: [{ round: 4, message: 'Borin makes a final stand.' }],
       },
     });
-    const deferReply = vi.fn<ButtonInteraction['deferReply']>();
+    const deferUpdate = vi.fn<ButtonInteraction['deferUpdate']>();
     const editReply = vi.fn<ButtonInteraction['editReply']>();
     const interaction = createButtonInteraction({
       customId: 'duel:replay:duel-123:2',
-      deferReply,
+      deferUpdate,
       editReply,
     });
 
     await handleDuelButton(interaction, api);
 
+    expect(deferUpdate).toHaveBeenCalled();
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=2');
     expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('Friendly simulation replay page 2'),
-      components: [],
+      components: expect.any(Array),
+    }));
+    const replayPayload = editReply.mock.calls[0]?.[0] as { components: Array<{ toJSON: () => unknown }> };
+    const componentJson = JSON.stringify(replayPayload.components[0]?.toJSON());
+    expect(componentJson).toContain('duel:replay:duel-123:1');
+    expect(componentJson).toContain('duel:replay:duel-123:3');
+  });
+
+  it('keeps the public duel message intact when replay loading fails', async () => {
+    const api = createApi();
+    vi.mocked(api.get).mockRejectedValue(new Error('api unavailable'));
+    const deferUpdate = vi.fn<ButtonInteraction['deferUpdate']>();
+    const editReply = vi.fn<ButtonInteraction['editReply']>();
+    const followUp = vi.fn<ButtonInteraction['followUp']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:replay:duel-123:1',
+      deferUpdate,
+      editReply,
+      followUp,
+    });
+
+    await handleDuelButton(interaction, api);
+
+    expect(deferUpdate).toHaveBeenCalled();
+    expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=1');
+    expect(editReply).not.toHaveBeenCalled();
+    expect(followUp).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'Unable to load the friendly simulation replay right now.',
+    });
+  });
+
+  it('preserves meaningful replay messages when structured fields lack outcome details', async () => {
+    const api = createApi();
+    vi.mocked(api.get).mockResolvedValue({
+      replay: {
+        id: 'duel-123',
+        status: 'resolved',
+        page: 1,
+        pageSize: 3,
+        hasMore: false,
+        entries: [
+          {
+            round: 3,
+            actor: 'combatantA',
+            actorName: 'Astra',
+            actionName: 'Crippling Shot',
+            message: 'Borin falls defeated!',
+          },
+        ],
+      },
+    });
+    const editReply = vi.fn<ButtonInteraction['editReply']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:replay:duel-123:1',
+      editReply,
+    });
+
+    await handleDuelButton(interaction, api);
+
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('Borin falls defeated!'),
+    }));
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.not.stringContaining('#1 R3 Astra Crippling Shot\n'),
     }));
   });
 
