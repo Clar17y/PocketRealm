@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type {
+  DiscordNotificationEventView,
+  DiscordNotificationPayload,
+} from '@pocketrealm/shared/discord/discordNotifications';
+
 import { formatNotificationMessage, pollDiscordNotifications } from './notificationPoll.js';
 
 const EVENT = {
@@ -10,6 +15,13 @@ const EVENT = {
   payload: { currentTurns: 64800, bankCap: 64800, username: 'Mira' },
   createdAt: '2026-06-12T12:00:00.000Z',
 };
+
+const WEB_BASE_URL = 'https://play.pocketrealm.test';
+
+// Typed builder so overriding `type`/`payload` stays assignable to the view.
+function evt(type: DiscordNotificationEventView['type'], payload: DiscordNotificationPayload): DiscordNotificationEventView {
+  return { ...EVENT, type, payload };
+}
 
 function createOptions(overrides: Record<string, unknown> = {}) {
   const send = vi.fn().mockResolvedValue(undefined);
@@ -28,6 +40,7 @@ function createOptions(overrides: Record<string, unknown> = {}) {
       set: vi.fn().mockResolvedValue('OK'),
       del: vi.fn().mockResolvedValue(1),
     },
+    webBaseUrl: WEB_BASE_URL,
     ...overrides,
   };
   return { options, send };
@@ -45,7 +58,7 @@ describe('pollDiscordNotifications', () => {
 
     expect(options.api.get).toHaveBeenCalledWith('/api/v1/discord/notifications/pending?limit=50');
     expect(options.readyClient.users.fetch).toHaveBeenCalledWith(EVENT.discordUserId);
-    expect(send).toHaveBeenCalledWith({ content: formatNotificationMessage(EVENT) });
+    expect(send).toHaveBeenCalledWith({ content: formatNotificationMessage(EVENT, WEB_BASE_URL) });
     expect(options.api.post).toHaveBeenCalledWith('/api/v1/discord/notifications/ack', {
       deliveredIds: [EVENT.id],
       failedIds: [],
@@ -102,9 +115,34 @@ describe('pollDiscordNotifications', () => {
 
 describe('formatNotificationMessage', () => {
   it('formats turns-capped events', () => {
-    const content = formatNotificationMessage(EVENT);
-
+    const content = formatNotificationMessage(EVENT, WEB_BASE_URL);
     expect(content).toContain('64,800');
     expect(content.toLowerCase()).toContain('turns are full');
+  });
+
+  it('formats a pvp_attack DM with a bold name and arena deep link', () => {
+    const content = formatNotificationMessage(evt('pvp_attack', { attackerName: 'Rook' }), WEB_BASE_URL);
+    expect(content).toContain('**Rook**');
+    expect(content).toContain(`${WEB_BASE_URL}/game?screen=arena`);
+  });
+
+  it('formats a boss_appeared DM with the boss, zone, and worldEvents deep link', () => {
+    const content = formatNotificationMessage(evt('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' }), WEB_BASE_URL);
+    expect(content).toContain('**Ymir**');
+    expect(content).toContain('**Tundra**');
+    expect(content).toContain(`${WEB_BASE_URL}/game?screen=worldEvents`);
+  });
+
+  it('formats a victorious expedition_finished DM with the guild expeditions deep link', () => {
+    const content = formatNotificationMessage(evt('expedition_finished', { tier: 3, outcome: 'victory' }), WEB_BASE_URL);
+    expect(content).toContain('Tier 3');
+    expect(content.toLowerCase()).toContain('victorious');
+    expect(content).toContain(`${WEB_BASE_URL}/game?screen=guild&tab=expeditions`);
+  });
+
+  it('formats a failed expedition_finished DM with the attempt count', () => {
+    const content = formatNotificationMessage(evt('expedition_finished', { tier: 2, outcome: 'failed', attempts: 4 }), WEB_BASE_URL);
+    expect(content).toContain('Tier 2');
+    expect(content).toContain('4 attempts');
   });
 });

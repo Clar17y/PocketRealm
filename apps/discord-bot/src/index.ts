@@ -212,6 +212,7 @@ async function main(): Promise<void> {
           logger,
           readyClient,
           redis,
+          webBaseUrl: config.webBaseUrl,
         });
       } catch (error) {
         logger.warn({ error }, 'Discord notification poll failed');
