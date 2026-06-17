@@ -40,7 +40,6 @@ describe('extended discord notification registry', () => {
     expect(WEB_TO_DISCORD_NOTIFICATION_TYPE).toEqual({
       pvpAttack: 'pvp_attack',
       pvpScout: 'pvp_scout',
-      bossAppeared: 'boss_appeared',
       bossKilled: 'boss_defeated',
       expeditionStarted: 'expedition_recruiting',
       expeditionFinished: 'expedition_finished',

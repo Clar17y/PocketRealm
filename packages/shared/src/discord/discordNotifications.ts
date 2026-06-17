@@ -26,14 +26,14 @@ export const DISCORD_NOTIFICATION_TYPE_LABELS: Record<DiscordNotificationType, s
 };
 
 /**
- * Maps an API-side push NotificationType (camelCase) to its Discord slug.
- * `turnBankFull` is intentionally absent — turns-capped DMs are produced by the
- * API sweep, not by the per-event chokepoint.
+ * Maps an API-side targeted push NotificationType (camelCase) to its Discord
+ * slug, for the `notifyPlayer` chokepoint. `turnBankFull` is absent (turns-capped
+ * DMs come from the API sweep) and `bossAppeared` is absent (boss-appeared DMs are
+ * a broadcast via broadcastDiscordNotification, not a targeted notifyPlayer event).
  */
 export const WEB_TO_DISCORD_NOTIFICATION_TYPE = {
   pvpAttack: 'pvp_attack',
   pvpScout: 'pvp_scout',
-  bossAppeared: 'boss_appeared',
   bossKilled: 'boss_defeated',
   expeditionStarted: 'expedition_recruiting',
   expeditionFinished: 'expedition_finished',
@@ -66,11 +66,9 @@ export interface DiscordExpeditionRecruitingPayload {
   tier: number;
 }
 
-export interface DiscordExpeditionFinishedPayload {
-  tier: number;
-  outcome: 'victory' | 'failed';
-  attempts?: number;
-}
+export type DiscordExpeditionFinishedPayload =
+  | { tier: number; outcome: 'victory' }
+  | { tier: number; outcome: 'failed'; attempts: number };
 
 export type DiscordNotificationPayload =
   | DiscordTurnsCappedPayload

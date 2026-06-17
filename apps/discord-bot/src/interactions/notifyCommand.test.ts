@@ -175,6 +175,6 @@ describe('buildPreferenceComponents', () => {
     for (const row of rows) {
       expect(row.components.length).toBeLessThanOrEqual(5);
     }
-    expect(rows.length).toBeLessThanOrEqual(5);
+    expect(rows.length).toBe(Math.ceil(DISCORD_NOTIFICATION_TYPES.length / 5));
   });
 });

@@ -163,4 +163,13 @@ describe('formatNotificationMessage', () => {
     expect(content).toContain('Tier 5');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=guild&tab=expeditions`);
   });
+
+  it('falls back to a generic message for an unknown type', () => {
+    const content = formatNotificationMessage(
+      evt('mystery_type' as DiscordNotificationEventView['type'], {} as DiscordNotificationPayload),
+      WEB_BASE_URL,
+    );
+    expect(content).toContain('Pocketrealm notification');
+    expect(content).toContain(`${WEB_BASE_URL}/game`);
+  });
 });

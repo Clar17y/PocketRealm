@@ -88,7 +88,7 @@ export function formatNotificationMessage(event: DiscordNotificationEventView, w
       const p = event.payload as DiscordExpeditionFinishedPayload;
       return p.outcome === 'victory'
         ? `🎉 Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
-        : `💀 Your Tier ${p.tier} expedition failed after ${p.attempts ?? 0} attempts. [View expeditions →](${expeditions})`;
+        : `💀 Your Tier ${p.tier} expedition failed after ${p.attempts} attempts. [View expeditions →](${expeditions})`;
     }
     case 'turns_capped': {
       const p = event.payload as DiscordTurnsCappedPayload;
