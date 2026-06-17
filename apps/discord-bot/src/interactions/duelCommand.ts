@@ -12,6 +12,7 @@ import {
   buildDeclineCard,
   buildReplayCard,
   buildResultCard,
+  type DuelCardPayload,
 } from '../discord/duelCard.js';
 import { parseDuelButtonId } from '../discord/components.js';
 import { isRecord } from '../utils.js';
@@ -158,9 +159,11 @@ export async function handleDuelButton(
     }
 
     if (parsed.action === 'decline') {
-      await interaction.update(buildDeclineCard({
-        declinerMention: `<@${interaction.user.id}>`,
-      }));
+      await applyDuelCardOrNotice(
+        interaction,
+        buildDeclineCard({ declinerMention: `<@${interaction.user.id}>` }),
+        'update',
+      );
       return;
     }
 
@@ -207,7 +210,48 @@ async function acceptDuel(
     return;
   }
 
-  await interaction.editReply(buildResultCard(response.duel));
+  await applyDuelCardOrNotice(interaction, buildResultCard(response.duel), 'editReply');
+}
+
+const STALE_DUEL_NOTICE = 'This duel was started before a bot update and can no longer be updated here. Run /duel to start a fresh one.';
+
+// How a duel card reaches the message: a fresh `update` response (interaction
+// not yet acknowledged) or an `editReply` after deferUpdate (acknowledged).
+// The delivery mode also dictates the correct stale-message fallback, so the
+// two can never drift out of sync.
+type DuelCardDelivery = 'update' | 'editReply';
+
+async function applyDuelCardOrNotice(
+  interaction: ButtonInteraction,
+  card: DuelCardPayload,
+  delivery: DuelCardDelivery,
+): Promise<void> {
+  try {
+    if (delivery === 'update') {
+      await interaction.update(card);
+    } else {
+      await interaction.editReply(card);
+    }
+  } catch {
+    // The message predates Components V2 and cannot be edited into it.
+    await sendStaleDuelNotice(interaction, delivery);
+  }
+}
+
+async function sendStaleDuelNotice(
+  interaction: ButtonInteraction,
+  delivery: DuelCardDelivery,
+): Promise<void> {
+  const payload = { ephemeral: true, content: STALE_DUEL_NOTICE } as const;
+  try {
+    if (delivery === 'update') {
+      await interaction.reply(payload);
+    } else {
+      await interaction.followUp(payload);
+    }
+  } catch {
+    // Nothing more we can safely do if the fallback delivery also fails.
+  }
 }
 
 async function showReplay(

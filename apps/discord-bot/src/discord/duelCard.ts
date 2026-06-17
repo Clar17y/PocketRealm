@@ -7,6 +7,7 @@ import {
   SeparatorBuilder,
   TextDisplayBuilder,
 } from 'discord.js';
+import type { MessageMentionOptions } from 'discord.js';
 
 import {
   compactStrings,
@@ -47,7 +48,18 @@ const ACCENT_COLOR = {
 export interface DuelCardPayload {
   flags: MessageFlags.IsComponentsV2;
   components: ContainerBuilder[];
-  allowedMentions?: { users: string[] };
+  allowedMentions?: MessageMentionOptions;
+}
+
+// Cards that are not a fresh challenge must never ping: usernames are
+// interpolated into text, so suppress all mention parsing defensively.
+const SUPPRESS_MENTIONS: MessageMentionOptions = { parse: [] };
+
+function v2Card(
+  container: ContainerBuilder,
+  allowedMentions: MessageMentionOptions = SUPPRESS_MENTIONS,
+): DuelCardPayload {
+  return { flags: MessageFlags.IsComponentsV2, components: [container], allowedMentions };
 }
 
 export interface DuelResultData {
@@ -95,11 +107,7 @@ export function buildChallengeCard(input: {
       ),
     );
 
-  return {
-    flags: MessageFlags.IsComponentsV2,
-    components: [container],
-    allowedMentions: { users: [input.opponentDiscordUserId] },
-  };
+  return v2Card(container, { users: [input.opponentDiscordUserId] });
 }
 
 export function buildDeclineCard(input: { declinerMention: string }): DuelCardPayload {
@@ -109,7 +117,7 @@ export function buildDeclineCard(input: { declinerMention: string }): DuelCardPa
       new TextDisplayBuilder().setContent(`🚫 Friendly simulation declined by ${input.declinerMention}.`),
     );
 
-  return { flags: MessageFlags.IsComponentsV2, components: [container] };
+  return v2Card(container);
 }
 
 export function buildResultCard(duel: DuelResultData): DuelCardPayload {
@@ -124,7 +132,7 @@ export function buildResultCard(duel: DuelResultData): DuelCardPayload {
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
     .addActionRowComponents(buildResultRow(duel.id));
 
-  return { flags: MessageFlags.IsComponentsV2, components: [container] };
+  return v2Card(container);
 }
 
 export function buildReplayCard(
@@ -144,7 +152,12 @@ export function buildReplayCard(
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent('No replay entries are available.'),
     );
-    return { flags: MessageFlags.IsComponentsV2, components: [container] };
+    // Keep pagination so an all-filtered page can never strand the viewer.
+    const emptyRow = buildReplayRow(replay);
+    if (emptyRow) {
+      container.addActionRowComponents(emptyRow);
+    }
+    return v2Card(container);
   }
 
   const fighters = formatFighterResources(entries[entries.length - 1]?.entry, replay.summary, emoji);
@@ -165,7 +178,7 @@ export function buildReplayCard(
     }
 
     logLines.push(line);
-    usedLength += line.length + 1;
+    usedLength += line.length;
   }
   if (replay.hasMore) {
     logLines.push('_More replay pages are available._');
@@ -177,7 +190,7 @@ export function buildReplayCard(
     container.addActionRowComponents(row);
   }
 
-  return { flags: MessageFlags.IsComponentsV2, components: [container] };
+  return v2Card(container);
 }
 
 function buildResultRow(duelId: string): ActionRowBuilder<ButtonBuilder> {

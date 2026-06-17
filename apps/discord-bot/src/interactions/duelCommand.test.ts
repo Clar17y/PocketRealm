@@ -307,6 +307,59 @@ describe('handleDuelButton', () => {
     expect(resultJson).toContain('duel:replay:duel-123:1');
   });
 
+  it('falls back to an ephemeral notice when the resolved result cannot render on a pre-update message', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockResolvedValue({
+      duel: {
+        id: 'duel-123',
+        status: 'resolved',
+        challengerUsername: 'Astra',
+        targetUsername: 'Borin',
+        winnerUsername: 'Astra',
+        isDraw: false,
+        expiresAt: '2026-06-04T12:15:00.000Z',
+        summary: { totalRounds: 3 },
+        replay: { id: 'duel-123', status: 'resolved', page: 1, pageSize: 10, hasMore: false, entries: [] },
+      },
+    });
+    const deferUpdate = vi.fn<ButtonInteraction['deferUpdate']>();
+    const editReply = vi.fn(async () => {
+      throw new Error('Cannot change a message to/from being a Components V2 message');
+    });
+    const followUp = vi.fn<ButtonInteraction['followUp']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:accept:duel-123:333333333333333333',
+      userId: '333333333333333333',
+      deferUpdate,
+      editReply,
+      followUp,
+    });
+
+    await handleDuelButton(interaction, api);
+
+    expect(editReply).toHaveBeenCalled();
+    expect(followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+  });
+
+  it('falls back to an ephemeral notice when declining a pre-update duel message', async () => {
+    const api = createApi();
+    const update = vi.fn(async () => {
+      throw new Error('Cannot change a message to/from being a Components V2 message');
+    });
+    const reply = vi.fn<ButtonInteraction['reply']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:decline:duel-123:333333333333333333',
+      userId: '333333333333333333',
+      update,
+      reply,
+    });
+
+    await handleDuelButton(interaction, api);
+
+    expect(update).toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+  });
+
   it('rejects non-target accept clicks ephemerally', async () => {
     const api = createApi();
     const reply = vi.fn<ButtonInteraction['reply']>();

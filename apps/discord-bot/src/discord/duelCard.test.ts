@@ -47,6 +47,11 @@ describe('buildDeclineCard', () => {
     expect(card.flags).toBe(MessageFlags.IsComponentsV2);
     expect(componentJson(card)).toContain('declined by <@444444444444444444>');
   });
+
+  it('suppresses mentions so the decline notice never pings', () => {
+    const card = buildDeclineCard({ declinerMention: '<@444444444444444444>' });
+    expect(card.allowedMentions).toEqual({ parse: [] });
+  });
 });
 
 describe('buildResultCard', () => {
@@ -71,6 +76,10 @@ describe('buildResultCard', () => {
     expect(json).toContain('duel:replay:duel-123:1');
     expect(json).toContain('duel:builds:duel-123');
     expect(json).toContain('duel:rematch:duel-123');
+  });
+
+  it('suppresses mentions so interpolated usernames never ping', () => {
+    expect(card.allowedMentions).toEqual({ parse: [] });
   });
 });
 
@@ -164,6 +173,23 @@ describe('buildReplayCard', () => {
       entries: [{ round: 4, message: 'Borin makes a final stand.' }],
     });
     const json = componentJson(middle);
+    expect(json).toContain('duel:replay:duel-123:1');
+    expect(json).toContain('duel:replay:duel-123:3');
+  });
+
+  it('keeps pagination buttons when every entry on the page is filtered out', () => {
+    const allFiltered = buildReplayCard({
+      id: 'duel-123',
+      status: 'resolved',
+      page: 2,
+      pageSize: 3,
+      hasMore: true,
+      summary: {},
+      // A regen tick with no damage/heal/effects is filtered as redundant.
+      entries: [{ round: 4, action: 'regen' }],
+    });
+    const json = componentJson(allFiltered);
+    expect(json).toContain('No replay entries are available.');
     expect(json).toContain('duel:replay:duel-123:1');
     expect(json).toContain('duel:replay:duel-123:3');
   });
