@@ -45,6 +45,17 @@ export interface DuelActionIcons {
   ko: string;
 }
 
+/** Icons for the duel result card outcome line. Same swap-point convention. */
+export interface DuelResultIcons {
+  victory: string;
+  draw: string;
+}
+
+export const DEFAULT_DUEL_RESULT_ICONS: DuelResultIcons = {
+  victory: '🏆',
+  draw: '🤝',
+};
+
 export const DEFAULT_DUEL_ACTION_ICONS: DuelActionIcons = {
   attack: '⚔️',
   crit: '💥',

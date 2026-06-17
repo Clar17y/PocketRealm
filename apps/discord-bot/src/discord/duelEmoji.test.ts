@@ -3,9 +3,17 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DUEL_ACTION_ICONS,
   DEFAULT_DUEL_EMOJI,
+  DEFAULT_DUEL_RESULT_ICONS,
   renderResourceBar,
   roundResourceValue,
 } from './duelEmoji.js';
+
+describe('DEFAULT_DUEL_RESULT_ICONS', () => {
+  it('provides a non-empty icon for victory and draw', () => {
+    expect(DEFAULT_DUEL_RESULT_ICONS.victory).toBeTruthy();
+    expect(DEFAULT_DUEL_RESULT_ICONS.draw).toBeTruthy();
+  });
+});
 
 describe('DEFAULT_DUEL_ACTION_ICONS', () => {
   it('provides a non-empty icon for every outcome kind', () => {

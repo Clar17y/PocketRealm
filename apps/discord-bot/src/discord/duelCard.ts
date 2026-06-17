@@ -27,6 +27,7 @@ import {
 import {
   DEFAULT_DUEL_ACTION_ICONS,
   DEFAULT_DUEL_EMOJI,
+  DEFAULT_DUEL_RESULT_ICONS,
   renderResourceBar,
   roundResourceValue,
   type DuelActionIcons,
@@ -124,10 +125,10 @@ export function buildDeclineCard(input: { declinerMention: string }): DuelCardPa
 
 export function buildResultCard(duel: DuelResultData): DuelCardPayload {
   const outcome = duel.isDraw
-    ? `${duel.challengerUsername} and ${duel.targetUsername} fought to a draw.`
-    : `${duel.winnerUsername ?? 'A player'} won the simulation.`;
+    ? `${DEFAULT_DUEL_RESULT_ICONS.draw} ${duel.challengerUsername} and ${duel.targetUsername} fought to a draw.`
+    : `${DEFAULT_DUEL_RESULT_ICONS.victory} **${duel.winnerUsername ?? 'A player'}** won the simulation.`;
   const summary = formatSummary(duel.summary);
-  const lines = compactStrings(['🏆 **Friendly Simulation Complete**', outcome, summary]);
+  const lines = compactStrings(['⚔️ **Friendly Simulation Complete**', outcome, summary]);
 
   const container = new ContainerBuilder()
     .setAccentColor(ACCENT_COLOR.result)

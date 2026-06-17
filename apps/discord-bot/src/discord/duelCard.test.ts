@@ -9,7 +9,11 @@ import {
   buildResultCard,
   isKnockout,
 } from './duelCard.js';
-import { DEFAULT_DUEL_ACTION_ICONS, DEFAULT_DUEL_EMOJI } from './duelEmoji.js';
+import {
+  DEFAULT_DUEL_ACTION_ICONS,
+  DEFAULT_DUEL_EMOJI,
+  DEFAULT_DUEL_RESULT_ICONS,
+} from './duelEmoji.js';
 
 describe('actionIcon', () => {
   const I = DEFAULT_DUEL_ACTION_ICONS;
@@ -130,6 +134,24 @@ describe('buildResultCard', () => {
 
   it('suppresses mentions so interpolated usernames never ping', () => {
     expect(card.allowedMentions).toEqual({ parse: [] });
+  });
+
+  it('marks the winner with the victory icon', () => {
+    expect(componentJson(card)).toContain(DEFAULT_DUEL_RESULT_ICONS.victory);
+  });
+
+  it('marks a draw with the draw icon and no victory icon', () => {
+    const draw = buildResultCard({
+      id: 'duel-123',
+      challengerUsername: 'Astra',
+      targetUsername: 'Borin',
+      winnerUsername: null,
+      isDraw: true,
+      summary: { totalRounds: 5 },
+    });
+    const json = componentJson(draw);
+    expect(json).toContain(DEFAULT_DUEL_RESULT_ICONS.draw);
+    expect(json).not.toContain(DEFAULT_DUEL_RESULT_ICONS.victory);
   });
 });
 
