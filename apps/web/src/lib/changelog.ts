@@ -7,11 +7,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: '0.65',
+    version: '0.66',
     date: '2026-06-17',
     title: 'Discord Duel Replay Clarity',
     summary:
       'Discord friendly duel replays are easier to follow and audit. Replay pages now update in the same message with previous and next controls, show compact HP, mana, and stamina bars for both fighters, include hit chance and roll breakdowns, and hide redundant regeneration-only entries. Crippling Shot now pins players in PvP by forcing the target to defend, then grants two rounds of pin immunity after the effect wears off so it cannot be chained forever.',
+  },
+  {
+    version: '0.65',
+    date: '2026-06-15',
+    title: 'Discord Turn Alerts',
+    summary:
+      'You can now opt in to a Discord DM when your turn bank fills up, so banked regen stops going to waste while you are away. Link your account with /link, then run /notify in the Pocketrealm Discord to toggle alerts on or off — enabling one sends a confirmation DM, and you get nothing until you turn it on. More notification types can be added later; for now it covers turns reaching their cap.',
   },
   {
     version: '0.64',

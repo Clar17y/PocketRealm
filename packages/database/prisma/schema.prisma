@@ -1569,6 +1569,38 @@ model DiscordBotAuditEvent {
   @@map("discord_bot_audit_events")
 }
 
+model DiscordNotificationPreference {
+  id             String    @id @default(uuid())
+  discordUserId  String    @map("discord_user_id") @db.VarChar(32)
+  discordGuildId String    @map("discord_guild_id") @db.VarChar(32)
+  type           String    @db.VarChar(32)
+  enabled        Boolean   @default(false)
+  armed          Boolean   @default(true)
+  lastFiredAt    DateTime? @map("last_fired_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([discordGuildId, discordUserId, type])
+  @@index([type, enabled])
+  @@map("discord_notification_preferences")
+}
+
+model DiscordNotificationEvent {
+  id             String    @id @default(uuid())
+  discordGuildId String    @map("discord_guild_id") @db.VarChar(32)
+  discordUserId  String?   @map("discord_user_id") @db.VarChar(32)
+  type           String    @db.VarChar(32)
+  payload        Json
+  dedupKey       String?   @unique @map("dedup_key") @db.VarChar(128)
+  attempts       Int       @default(0)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deliveredAt    DateTime? @map("delivered_at")
+  failedAt       DateTime? @map("failed_at")
+
+  @@index([deliveredAt, failedAt, createdAt])
+  @@map("discord_notification_events")
+}
+
 // =============================================================================
 // PUSH NOTIFICATIONS
 // =============================================================================

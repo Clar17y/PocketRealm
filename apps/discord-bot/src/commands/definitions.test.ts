@@ -17,9 +17,10 @@ describe('buildCommandDefinitions', () => {
       'rank',
       'duel',
       'report',
+      'notify',
       'staff',
     ]);
-    expect(commands).toHaveLength(9);
+    expect(commands).toHaveLength(10);
   });
 
   it('builds public command options with the expected schema', () => {

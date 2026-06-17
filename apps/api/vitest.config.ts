@@ -19,6 +19,7 @@ export default defineConfig({
       '@pocketrealm/shared/support/supportTickets': resolve(__dirname, '../../packages/shared/src/support/supportTickets.ts'),
       '@pocketrealm/shared/discord/discordIds': resolve(__dirname, '../../packages/shared/src/discord/discordIds.ts'),
       '@pocketrealm/shared/discord/discordXp': resolve(__dirname, '../../packages/shared/src/discord/discordXp.ts'),
+      '@pocketrealm/shared/discord/discordNotifications': resolve(__dirname, '../../packages/shared/src/discord/discordNotifications.ts'),
       '@pocketrealm/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
       '@pocketrealm/game-engine': resolve(__dirname, '../../packages/game-engine/src/index.ts'),
       '@pocketrealm/database': resolve(__dirname, '../../packages/database/src/index.ts'),

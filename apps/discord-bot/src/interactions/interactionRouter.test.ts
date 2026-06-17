@@ -5,6 +5,7 @@ import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { routeInteraction } from './interactionRouter.js';
+import { handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
 import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
 import { handleStaffCommand } from './staffCommands.js';
 
@@ -15,6 +16,11 @@ vi.mock('../support/threadActions.js', () => ({
 vi.mock('./duelCommand.js', () => ({
   handleDuelButton: vi.fn(),
   handleDuelCommand: vi.fn(),
+}));
+
+vi.mock('./notifyCommand.js', () => ({
+  handleNotifyCommand: vi.fn(),
+  handleNotifyToggleButton: vi.fn(),
 }));
 
 vi.mock('./reportCommand.js', () => ({
@@ -155,6 +161,31 @@ describe('routeInteraction', () => {
       api,
       config: routerConfig,
     });
+  });
+
+  it('routes notify commands to the notify command handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'notify',
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleNotifyCommand).toHaveBeenCalledWith(interaction, api);
+  });
+
+  it('routes notify toggle buttons to the toggle handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => false,
+      isButton: () => true,
+      customId: 'notify:toggle:turns_capped:1',
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleNotifyToggleButton).toHaveBeenCalledWith(interaction, api);
   });
 
   it('routes report commands to the report modal handler', async () => {
