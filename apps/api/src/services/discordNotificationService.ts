@@ -158,8 +158,7 @@ export async function resolveDiscordTarget(playerId: string): Promise<DiscordTar
     orderBy: { linkedAt: 'desc' },
     select: { discordUserId: true, discordGuildId: true },
   });
-  if (!link) return null;
-  return { discordUserId: link.discordUserId, discordGuildId: link.discordGuildId };
+  return link;
 }
 
 /**

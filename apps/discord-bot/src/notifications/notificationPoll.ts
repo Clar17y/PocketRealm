@@ -59,33 +59,30 @@ function gameLink(webBaseUrl: string, path: string): string {
 }
 
 export function formatNotificationMessage(event: DiscordNotificationEventView, webBaseUrl: string): string {
-  const arena = gameLink(webBaseUrl, '/game?screen=arena');
-  const worldEvents = gameLink(webBaseUrl, '/game?screen=worldEvents');
-  const expeditions = gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions');
-
   switch (event.type) {
     case 'pvp_attack': {
       const p = event.payload as DiscordPvpAttackPayload;
-      return `⚔️ **${p.attackerName}** challenged you in the arena! [Fight back →](${arena})`;
+      return `⚔️ **${p.attackerName}** challenged you in the arena! [Fight back →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
     }
     case 'pvp_scout': {
       const p = event.payload as DiscordPvpScoutPayload;
-      return `🔍 **${p.scouterName}** is sizing you up in the arena. [Check the arena →](${arena})`;
+      return `🔍 **${p.scouterName}** is sizing you up in the arena. [Check the arena →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
     }
     case 'boss_appeared': {
       const p = event.payload as DiscordBossAppearedPayload;
-      return `🐉 **${p.bossName}** has appeared in **${p.zoneName}**! [Join the fight →](${worldEvents})`;
+      return `🐉 **${p.bossName}** has appeared in **${p.zoneName}**! [Join the fight →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
     }
     case 'boss_defeated': {
       const p = event.payload as DiscordBossDefeatedPayload;
-      return `🏆 **${p.bossName}** has been slain! [Claim your spoils →](${worldEvents})`;
+      return `🏆 **${p.bossName}** has been slain! [Claim your spoils →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
     }
     case 'expedition_recruiting': {
       const p = event.payload as DiscordExpeditionRecruitingPayload;
-      return `🧭 A Tier ${p.tier} guild expedition is recruiting — [sign up →](${expeditions})`;
+      return `🧭 A Tier ${p.tier} guild expedition is recruiting — [sign up →](${gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions')})`;
     }
     case 'expedition_finished': {
       const p = event.payload as DiscordExpeditionFinishedPayload;
+      const expeditions = gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions');
       return p.outcome === 'victory'
         ? `🎉 Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
         : `💀 Your Tier ${p.tier} expedition failed after ${p.attempts} attempts. [View expeditions →](${expeditions})`;

@@ -1,5 +1,8 @@
-import { WEB_TO_DISCORD_NOTIFICATION_TYPE } from '@pocketrealm/shared/discord/discordNotifications';
-import type { DiscordNotificationPayload } from '@pocketrealm/shared/discord/discordNotifications';
+import {
+  WEB_TO_DISCORD_NOTIFICATION_TYPE,
+  type DiscordNotificationPayload,
+  type DiscordNotificationType,
+} from '@pocketrealm/shared/discord/discordNotifications';
 import { enqueueDiscordNotificationEvent } from './discordNotificationService';
 import { sendPush, type NotificationType, type PushPayload } from './pushNotificationService';
 
@@ -19,9 +22,7 @@ export function notifyPlayer(
 ): void {
   void sendPush(playerId, type, push);
 
-  const discordType = WEB_TO_DISCORD_NOTIFICATION_TYPE[type as WebTypeWithDiscord] as
-    | (typeof WEB_TO_DISCORD_NOTIFICATION_TYPE)[WebTypeWithDiscord]
-    | undefined;
+  const discordType = WEB_TO_DISCORD_NOTIFICATION_TYPE[type as WebTypeWithDiscord] as DiscordNotificationType | undefined;
   if (discordType && discordPayload) {
     void enqueueDiscordNotificationEvent(playerId, discordType, discordPayload);
   }

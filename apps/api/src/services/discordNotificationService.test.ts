@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DISCORD_NOTIFICATION_TYPES } from '@pocketrealm/shared/discord/discordNotifications';
 
 const mocks = vi.hoisted(() => ({
   prisma: {
@@ -73,7 +74,7 @@ describe('discordNotificationService', () => {
 
       expect(preferences).toContainEqual({ type: 'pvp_attack', enabled: true });
       expect(preferences).toContainEqual({ type: 'turns_capped', enabled: false });
-      expect(preferences).toHaveLength(7);
+      expect(preferences).toHaveLength(DISCORD_NOTIFICATION_TYPES.length);
     });
 
     it('requires an active account link', async () => {

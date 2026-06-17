@@ -11,6 +11,9 @@ import {
 } from '@pocketrealm/shared/discord/discordNotifications';
 
 import { PocketRealmApiError, type PocketRealmApiClient } from '../api/pocketRealmApi.js';
+
+// Discord allows at most five buttons per action row.
+const MAX_BUTTONS_PER_ROW = 5;
 import { notifyToggleButtonId, parseNotifyButtonId } from '../discord/components.js';
 
 type NotifyApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
@@ -32,8 +35,8 @@ export function buildPreferenceComponents(
   );
 
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let i = 0; i < buttons.length; i += 5) {
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+  for (let i = 0; i < buttons.length; i += MAX_BUTTONS_PER_ROW) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + MAX_BUTTONS_PER_ROW)));
   }
   return rows;
 }
