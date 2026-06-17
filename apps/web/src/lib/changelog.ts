@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.65',
+    date: '2026-06-17',
+    title: 'Discord Duel Replay Clarity',
+    summary:
+      'Discord friendly duel replays are easier to follow and audit. Replay pages now update in the same message with previous and next controls, show compact HP, mana, and stamina bars for both fighters, include hit chance and roll breakdowns, and hide redundant regeneration-only entries. Crippling Shot now pins players in PvP by forcing the target to defend, then grants two rounds of pin immunity after the effect wears off so it cannot be chained forever.',
+  },
+  {
     version: '0.64',
     date: '2026-06-03',
     title: 'Support Links & Bug Reports',
