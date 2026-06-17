@@ -142,6 +142,27 @@ describe('handleNotifyToggleButton', () => {
 
     expect(interaction.user.send).not.toHaveBeenCalled();
   });
+
+  it('re-renders all notification types after a toggle', async () => {
+    const allPrefs = DISCORD_NOTIFICATION_TYPES.map((type) => ({ type, enabled: false }));
+    const api = createApi({
+      get: vi.fn().mockResolvedValue({ preferences: allPrefs }),
+    });
+    const interaction = createButtonInteraction(notifyToggleButtonId('pvp_attack', true));
+
+    await handleNotifyToggleButton(interaction as never, api as never);
+
+    // After toggling, the menu re-fetches the full list and re-renders every type.
+    expect(api.get).toHaveBeenCalledWith(
+      `/api/v1/discord/notifications/preferences?guildId=${GUILD_ID}&discordUserId=${USER_ID}`,
+    );
+    const payload = interaction.editReply.mock.calls.at(-1)![0];
+    const totalButtons = payload.components.reduce(
+      (sum: number, row: { components: unknown[] }) => sum + row.components.length,
+      0,
+    );
+    expect(totalButtons).toBe(DISCORD_NOTIFICATION_TYPES.length);
+  });
 });
 
 describe('buildPreferenceComponents', () => {

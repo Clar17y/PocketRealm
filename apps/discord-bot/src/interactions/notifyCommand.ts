@@ -141,9 +141,20 @@ export async function handleNotifyToggleButton(
     }
   }
 
-  const preferences: DiscordNotificationPreferenceView[] = [{ type: parsed.type, enabled }];
-  await interaction.editReply({
-    content: NOTIFY_INTRO,
-    components: buildPreferenceComponents(preferences),
-  });
+  try {
+    const { preferences } = await api.get<PreferencesResponse>(
+      `/api/v1/discord/notifications/preferences?guildId=${interaction.guildId}&discordUserId=${interaction.user.id}`,
+    );
+    await interaction.editReply({
+      content: NOTIFY_INTRO,
+      components: buildPreferenceComponents(preferences),
+    });
+  } catch {
+    // Could not reload the full menu — the toggle still applied. Leave the
+    // existing buttons in place and confirm the change out of band.
+    await interaction.followUp({
+      ephemeral: true,
+      content: `Saved — "${DISCORD_NOTIFICATION_TYPE_LABELS[parsed.type]}" is now ${enabled ? 'ON' : 'OFF'}. Run /notify again to refresh the menu.`,
+    });
+  }
 }
