@@ -141,11 +141,15 @@ describe('buildResultCard', () => {
     expect(card.allowedMentions).toEqual({ parse: [] });
   });
 
-  it('marks the winner with the victory icon', () => {
-    expect(componentJson(card)).toContain(DEFAULT_DUEL_RESULT_ICONS.victory);
+  it('marks the winner with the victory icon and the loser with the loss icon', () => {
+    const json = componentJson(card);
+    expect(json).toContain(DEFAULT_DUEL_RESULT_ICONS.victory);
+    expect(json).toContain(DEFAULT_DUEL_RESULT_ICONS.loss);
+    // Loser (the non-winner) is named on its own line.
+    expect(json).toContain('Borin');
   });
 
-  it('marks a draw with the draw icon and no victory icon', () => {
+  it('marks a draw with the draw icon on both fighters and no victory/loss icon', () => {
     const draw = buildResultCard({
       id: 'duel-123',
       challengerUsername: 'Astra',
@@ -156,7 +160,10 @@ describe('buildResultCard', () => {
     });
     const json = componentJson(draw);
     expect(json).toContain(DEFAULT_DUEL_RESULT_ICONS.draw);
+    expect(json).toContain('Astra');
+    expect(json).toContain('Borin');
     expect(json).not.toContain(DEFAULT_DUEL_RESULT_ICONS.victory);
+    expect(json).not.toContain(DEFAULT_DUEL_RESULT_ICONS.loss);
   });
 });
 

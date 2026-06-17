@@ -124,11 +124,18 @@ export function buildDeclineCard(input: { declinerMention: string }): DuelCardPa
 }
 
 export function buildResultCard(duel: DuelResultData): DuelCardPayload {
-  const outcome = duel.isDraw
-    ? `${DEFAULT_DUEL_RESULT_ICONS.draw} ${duel.challengerUsername} and ${duel.targetUsername} fought to a draw.`
-    : `${DEFAULT_DUEL_RESULT_ICONS.victory} **${duel.winnerUsername ?? 'A player'}** won the simulation.`;
+  const icons = DEFAULT_DUEL_RESULT_ICONS;
+  const scoreboard = duel.isDraw
+    ? [
+      `${icons.draw} **${duel.challengerUsername}**`,
+      `${icons.draw} **${duel.targetUsername}**`,
+    ]
+    : compactStrings([
+      `${icons.victory} **${duel.winnerUsername ?? 'A player'}**`,
+      loserName(duel) !== null ? `${icons.loss} ${loserName(duel)}` : null,
+    ]);
   const summary = formatSummary(duel.summary);
-  const lines = compactStrings(['⚔️ **Friendly Simulation Complete**', outcome, summary]);
+  const lines = compactStrings(['⚔️ **Friendly Simulation Complete**', ...scoreboard, summary]);
 
   const container = new ContainerBuilder()
     .setAccentColor(ACCENT_COLOR.result)
@@ -136,6 +143,17 @@ export function buildResultCard(duel: DuelResultData): DuelCardPayload {
     .addActionRowComponents(buildResultRow(duel.id));
 
   return v2Card(container);
+}
+
+/** The non-winning fighter on a decisive result, or null if it can't be told. */
+function loserName(duel: DuelResultData): string | null {
+  if (duel.winnerUsername === duel.challengerUsername) {
+    return duel.targetUsername;
+  }
+  if (duel.winnerUsername === duel.targetUsername) {
+    return duel.challengerUsername;
+  }
+  return null;
 }
 
 export function buildReplayCard(

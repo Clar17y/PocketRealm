@@ -60,11 +60,13 @@ export interface DuelActionIcons {
 export interface DuelResultIcons {
   victory: string;
   draw: string;
+  loss: string;
 }
 
 export const DEFAULT_DUEL_RESULT_ICONS: DuelResultIcons = {
   victory: customEmoji('victory', '🏆'),
   draw: customEmoji('draw', '🤝'),
+  loss: customEmoji('loss', '☠️'),
 };
 
 export const DEFAULT_DUEL_ACTION_ICONS: DuelActionIcons = {

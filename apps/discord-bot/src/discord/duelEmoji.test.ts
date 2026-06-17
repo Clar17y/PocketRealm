@@ -9,9 +9,10 @@ import {
 } from './duelEmoji.js';
 
 describe('DEFAULT_DUEL_RESULT_ICONS', () => {
-  it('provides a non-empty icon for victory and draw', () => {
+  it('provides a non-empty icon for victory, draw, and loss', () => {
     expect(DEFAULT_DUEL_RESULT_ICONS.victory).toBeTruthy();
     expect(DEFAULT_DUEL_RESULT_ICONS.draw).toBeTruthy();
+    expect(DEFAULT_DUEL_RESULT_ICONS.loss).toBeTruthy();
   });
 });
 
