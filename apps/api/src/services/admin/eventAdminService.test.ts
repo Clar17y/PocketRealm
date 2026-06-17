@@ -18,6 +18,9 @@ vi.mock('../roundTimerRegistry', () => ({
     keys: vi.fn().mockReturnValue([]),
   },
 }));
+vi.mock('../discordNotificationService', () => ({
+  broadcastDiscordNotification: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { mockPrisma } from '../../__test__/setup';
 import { getEventById, spawnWorldEvent } from '../worldEventService';

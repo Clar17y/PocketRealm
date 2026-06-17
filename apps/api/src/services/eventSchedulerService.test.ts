@@ -17,6 +17,9 @@ vi.mock('./systemMessageService', () => ({
 vi.mock('./pushNotificationService', () => ({
   sendPush: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('./discordNotificationService', () => ({
+  broadcastDiscordNotification: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('./staticDataCacheService', () => ({
   getCachedZones: vi.fn().mockResolvedValue([]),
   getCachedZoneConnections: vi.fn().mockResolvedValue([]),
