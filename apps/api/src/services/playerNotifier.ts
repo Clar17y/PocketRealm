@@ -1,15 +1,7 @@
 import { WEB_TO_DISCORD_NOTIFICATION_TYPE } from '@pocketrealm/shared/discord/discordNotifications';
 import type { DiscordNotificationPayload } from '@pocketrealm/shared/discord/discordNotifications';
 import { enqueueDiscordNotificationEvent } from './discordNotificationService';
-import { sendPush, type NotificationType } from './pushNotificationService';
-
-interface PushPayload {
-  title: string;
-  body: string;
-  icon?: string;
-  tag?: string;
-  data?: Record<string, unknown>;
-}
+import { sendPush, type NotificationType, type PushPayload } from './pushNotificationService';
 
 type WebTypeWithDiscord = keyof typeof WEB_TO_DISCORD_NOTIFICATION_TYPE;
 
