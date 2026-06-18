@@ -49,6 +49,7 @@ describe('handleReportCommand', () => {
       ephemeral: true,
       content: expect.stringContaining('⚠️ **Link required**'),
     });
+    expect(replyContent(reply.mock.calls[0]?.[0])).toContain('or use the in-game report flow');
   });
 
   it('fails open and shows the modal when the link pre-check errors', async () => {
@@ -190,6 +191,7 @@ describe('handleReportModalSubmit', () => {
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('⚠️ **Link required**'),
     });
+    expect(replyContent(editReply.mock.calls[0]?.[0])).toContain('or use the in-game report flow');
   });
 
   it('uses safe retry copy for generic API failures', async () => {

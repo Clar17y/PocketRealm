@@ -83,6 +83,7 @@ describe('handleProfileCommand', () => {
 
     const content = replyContent(editReply.mock.calls[0]?.[0]);
     expect(content).toContain('⚠️ **Link required**');
+    expect(content).toContain('That Discord user');
     expect(content).toContain('/link');
   });
 
