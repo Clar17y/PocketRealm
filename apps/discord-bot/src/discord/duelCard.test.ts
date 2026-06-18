@@ -278,6 +278,50 @@ describe('buildReplayCard', () => {
     expect(json).toContain('duel:replay:duel-123:3');
   });
 
+  it('keeps the action log when full custom-emoji resource bars are present', () => {
+    // Custom-emoji bars are ~30 chars per cell, so a full HP/MP/STA block for
+    // both fighters is large; the log budget must still leave room for entries.
+    const entry = (round: number) => ({
+      actor: 'combatantA',
+      actorName: 'ZuKii',
+      action: 'attack',
+      actionName: `Strike ${round}`,
+      round,
+      damage: 10,
+      targetDefence: 5,
+      hitChance: 0.8,
+      hitRollValue: 0.2,
+      combatantAHpAfter: 80,
+      combatantBHpAfter: 50,
+      combatantAManaAfter: 40,
+      combatantBManaAfter: 30,
+      combatantAStaminaAfter: 60,
+      combatantBStaminaAfter: 55,
+    });
+    const card = buildReplayCard({
+      id: 'duel-123',
+      status: 'resolved',
+      page: 1,
+      pageSize: 5,
+      hasMore: false,
+      summary: {
+        challengerUsername: 'ZuKii',
+        targetUsername: 'LuckyStar',
+        challengerMaxHp: 132,
+        targetMaxHp: 137,
+        challengerMaxStamina: 121,
+        targetMaxStamina: 103,
+        challengerMaxMana: 89,
+        targetMaxMana: 89,
+      },
+      entries: [1, 2, 3, 4, 5].map(entry),
+    });
+    const json = componentJson(card);
+    expect(json).toContain('Strike 1');
+    expect(json).toContain('Strike 5');
+    expect(json).not.toContain('truncated');
+  });
+
   it('marks a critical killing blow with both the crit and KO icons', () => {
     const card = buildReplayCard({
       id: 'duel-123',

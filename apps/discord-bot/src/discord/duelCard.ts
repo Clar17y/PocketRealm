@@ -36,9 +36,11 @@ import {
 } from './duelEmoji.js';
 
 const MAX_REPLAY_ENTRY_LENGTH = 240;
-// Components V2 caps total text at 4000 chars across a message; stay well under
-// so fighter resources, the action log, and pagination always fit.
-const MAX_REPLAY_CONTENT_LENGTH = 1_800;
+// Components V2 caps total text at 4000 chars across a message. Custom-emoji
+// bars are ~30 chars per cell, so a full fighter block alone is ~2000 chars;
+// this budget (header + fighters + log) stays under 4000 with a safety margin
+// while still leaving ample room for the action log.
+const MAX_REPLAY_CONTENT_LENGTH = 3_800;
 
 const ACCENT_COLOR = {
   challenge: 0xd4af37,
