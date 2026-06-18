@@ -28,6 +28,11 @@ describe('welcomeGuildMember', () => {
     expect(client.channels.fetch).toHaveBeenCalledWith(WELCOME_CHANNEL_ID);
     const payload = send.mock.calls[0][0];
     expect(payload.content).toContain('👋 **Welcome to PocketRealm');
+    expect(payload.content).toContain('/link');
+    expect(payload.content).toContain('/wiki');
+    expect(payload.content).toContain('/report');
+    expect(payload.content).toContain(`<#${DUELS_CHANNEL_ID}>`);
+    expect(payload.content).toContain('Play: https://pocketrealm.test');
     expect(payload).toEqual(expect.objectContaining({
       allowedMentions: { users: [USER_ID], roles: [], parse: [] },
     }));

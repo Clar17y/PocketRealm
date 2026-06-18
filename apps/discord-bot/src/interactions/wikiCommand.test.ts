@@ -30,9 +30,11 @@ describe('handleWikiCommand', () => {
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
     const payload = editReply.mock.calls[0]?.[0];
-    expect(payload.content).toContain('📖 **Wiki results for "forge"**');
-    expect(payload.content).toContain('[Forge Guide 1 - Crafting]');
-    const content = typeof payload === 'object' && 'content' in payload ? payload.content : '';
+    const content = typeof payload === 'object' && 'content' in payload && typeof payload.content === 'string'
+      ? payload.content
+      : '';
+    expect(content).toContain('📖 **Wiki results for "forge"**');
+    expect(content).toContain('[Forge Guide 1 - Crafting]');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-1');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-5');
     expect(content).not.toContain('Forge Guide 6');
@@ -87,6 +89,36 @@ describe('handleWikiCommand', () => {
     expect(content).not.toContain('evil.example');
     expect(content).not.toContain('javascript:');
     expect(content).not.toContain('https://[bad-url');
+  });
+
+  it('escapes wiki result labels before rendering markdown links', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      results: [
+        {
+          title: 'Guide](https://evil.example) [',
+          section: 'Crafting](https://bad.example) [',
+          snippet: 'Safe snippet',
+          url: '/wiki/safe-guide',
+        },
+      ],
+    }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => 'forge'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
+
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).toContain('https://pocketrealm.app/wiki/safe-guide');
+    expect(content).not.toContain('https://evil.example');
+    expect(content).not.toContain('https://bad.example');
   });
 
   it('uses the configured web origin for wiki result URLs', async () => {

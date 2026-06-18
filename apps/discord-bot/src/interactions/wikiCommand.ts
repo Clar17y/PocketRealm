@@ -74,9 +74,14 @@ function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
   }
 
   const title = result.section ? `${result.title} - ${result.section}` : result.title;
+  const label = escapeMarkdownLinkLabel(title);
   const snippet = result.snippet ? ` - ${result.snippet}` : '';
 
-  return `- [${title}](${url})${snippet}`;
+  return `- [${label}](${url})${snippet}`;
+}
+
+function escapeMarkdownLinkLabel(value: string): string {
+  return value.replace(/([\\`*_{}\[\]()#+.!|>])/g, '\\$1');
 }
 
 function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {

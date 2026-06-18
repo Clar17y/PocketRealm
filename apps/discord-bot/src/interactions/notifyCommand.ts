@@ -33,6 +33,15 @@ function notifyIntro(emojiMap: DiscordEmojiMap): string {
   ].join('\n');
 }
 
+function notifyLinkRequiredStatus(emojiMap: DiscordEmojiMap): string {
+  return botStatus(
+    'warning',
+    'Link required',
+    'Link your PocketRealm account first with /link, then run /notify again.',
+    emojiMap,
+  );
+}
+
 export function buildPreferenceComponents(
   preferences: DiscordNotificationPreferenceView[],
 ): ActionRowBuilder<ButtonBuilder>[] {
@@ -62,7 +71,12 @@ export async function handleNotifyCommand(
   if (!interaction.guildId) {
     await interaction.reply({
       ephemeral: true,
-      content: '/notify only works in the PocketRealm Discord server.',
+      content: botStatus(
+        'warning',
+        'Server only',
+        '/notify only works in the PocketRealm Discord server.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -77,13 +91,18 @@ export async function handleNotifyCommand(
   } catch (error) {
     if (isLinkRequiredError(error)) {
       await interaction.editReply({
-        content: 'Link your PocketRealm account first with /link, then run /notify again.',
+        content: notifyLinkRequiredStatus(config.emojiMap),
       });
       return;
     }
 
     await interaction.editReply({
-      content: 'Unable to load your notification settings right now. Please try again later.',
+      content: botStatus(
+        'error',
+        'Load failed',
+        'Unable to load your notification settings right now. Please try again later.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -121,7 +140,7 @@ export async function handleNotifyToggleButton(
     await upsert(parsed.nextEnabled);
   } catch (error) {
     const content = isLinkRequiredError(error)
-      ? 'Link your PocketRealm account first with /link, then run /notify again.'
+      ? notifyLinkRequiredStatus(config.emojiMap)
       : botStatus(
         'error',
         'Update failed',
@@ -164,7 +183,12 @@ export async function handleNotifyToggleButton(
         // Surface the inconsistency rather than claiming it's off.
         await interaction.followUp({
           ephemeral: true,
-          content: 'I could not DM you and could not update that setting. Please run /notify again to turn it off.',
+          content: botStatus(
+            'error',
+            'Update failed',
+            'I could not DM you and could not update that setting. Please run /notify again to turn it off.',
+            config.emojiMap,
+          ),
         });
       }
     }

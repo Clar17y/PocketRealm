@@ -68,7 +68,21 @@ describe('handleNotifyCommand', () => {
     await handleNotifyCommand(interaction as never, api as never, config);
 
     const payload = interaction.editReply.mock.calls[0][0];
+    expect(payload.content).toContain('⚠️ **Link required**');
     expect(payload.content).toContain('/link');
+  });
+
+  it('surfaces a formatted load error when preferences cannot be loaded', async () => {
+    const api = createApi({
+      get: vi.fn().mockRejectedValue(new Error('api unavailable')),
+    });
+    const interaction = createCommandInteraction();
+
+    await handleNotifyCommand(interaction as never, api as never, config);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('❌ **Load failed**'),
+    });
   });
 
   it('rejects use outside the guild', async () => {
@@ -76,7 +90,10 @@ describe('handleNotifyCommand', () => {
 
     await handleNotifyCommand(interaction as never, createApi() as never, config);
 
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({
+      ephemeral: true,
+      content: expect.stringContaining('⚠️ **Server only**'),
+    }));
   });
 });
 
@@ -133,7 +150,10 @@ describe('handleNotifyToggleButton', () => {
     // both upserts attempted (enable + revert)
     expect(api.post).toHaveBeenCalledTimes(2);
     // user is informed; no unhandled rejection (test completes)
-    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
+      ephemeral: true,
+      content: expect.stringContaining('❌ **Update failed**'),
+    }));
   });
 
   it('disables without sending a DM', async () => {

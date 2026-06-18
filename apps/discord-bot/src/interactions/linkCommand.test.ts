@@ -31,9 +31,12 @@ describe('handleLinkCommand', () => {
       discordGuildId: '234567890123456789',
     });
     const payload = editReply.mock.calls[0][0];
-    expect(payload.content).toContain('🔗 **Link PocketRealm**');
-    expect(payload.content).toContain('`ABC12345`');
-    expect(payload.content).toContain('<t:1780574400:F>');
+    const content = typeof payload === 'object' && 'content' in payload && typeof payload.content === 'string'
+      ? payload.content
+      : '';
+    expect(content).toContain('🔗 **Link PocketRealm**');
+    expect(content).toContain('`ABC12345`');
+    expect(content).toContain('<t:1780574400:F>');
   });
 
   it('edits the deferred reply with safe copy when the API fails', async () => {
