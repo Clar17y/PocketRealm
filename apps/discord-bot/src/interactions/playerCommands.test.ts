@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import {
   handleProfileCommand,
   handleRankCommand,
@@ -37,9 +38,9 @@ describe('handleProfileCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/users/selected-2/profile?guildId=guild-123');
-    const title = firstEmbedTitle(editReply.mock.calls[0]?.[0]);
-    expect(title).toContain('🧙');
-    expect(title).toContain('Astra');
+    const text = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(text).toContain('🧙 **Astra**');
+    expect(text).toContain('Level 12');
   });
 
   it('tells the user to run /link when their profile is unlinked', async () => {
@@ -250,9 +251,9 @@ describe('handleRankCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/character_level?guildId=guild-123');
-    const title = firstEmbedTitle(editReply.mock.calls[0]?.[0]);
-    expect(title).toContain('🏆');
-    expect(title).toContain('Character Level Rank');
+    const text = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(text).toContain('🏆 **Character Level Rank**');
+    expect(text).toContain('Rank: #8 of 250');
   });
 
   it('normalizes common rank category aliases before calling the API', async () => {
@@ -295,9 +296,7 @@ describe('handleRankCommand', () => {
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(get).not.toHaveBeenCalled();
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Unknown ranking category'),
-    });
+    expect(replyContent(editReply.mock.calls[0]?.[0])).toContain('Unknown ranking category');
   });
 
   it('explains API-invalid rank categories instead of using the generic data failure copy', async () => {
@@ -318,9 +317,7 @@ describe('handleRankCommand', () => {
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/character_level?guildId=guild-123');
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Unknown ranking category'),
-    });
+    expect(replyContent(editReply.mock.calls[0]?.[0])).toContain('Unknown ranking category');
   });
 
   it('formats null rank and score as unranked', async () => {
@@ -345,13 +342,7 @@ describe('handleRankCommand', () => {
 
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
-    const reply = editReply.mock.calls[0]?.[0];
-    const embed = typeof reply === 'object' && 'embeds' in reply ? reply.embeds?.[0] : undefined;
-    expect(embed).toEqual(expect.objectContaining({
-      data: expect.objectContaining({
-        description: 'Rank: Unranked',
-      }),
-    }));
+    expect(replyContent(editReply.mock.calls[0]?.[0])).toContain('Rank: Unranked');
   });
 
   it('tells unlinked users to run /link ephemerally', async () => {
@@ -379,14 +370,6 @@ describe('handleRankCommand', () => {
 });
 
 function replyContent(reply: unknown): string {
-  if (typeof reply !== 'object' || reply === null || !('content' in reply)) return '';
-  return typeof reply.content === 'string' ? reply.content : '';
-}
-
-function firstEmbedTitle(reply: unknown): string | undefined {
-  if (typeof reply !== 'object' || reply === null || !('embeds' in reply)) return undefined;
-  const embeds = reply.embeds;
-  if (!Array.isArray(embeds)) return undefined;
-  const firstEmbed = embeds[0] as { data?: { title?: string } } | undefined;
-  return firstEmbed?.data?.title;
+  expectV2Card(reply);
+  return cardText(reply);
 }

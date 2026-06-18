@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleLinkCommand } from './linkCommand.js';
 
 const config = { emojiMap: {} };
@@ -31,9 +32,8 @@ describe('handleLinkCommand', () => {
       discordGuildId: '234567890123456789',
     });
     const payload = editReply.mock.calls[0][0];
-    const content = typeof payload === 'object' && 'content' in payload && typeof payload.content === 'string'
-      ? payload.content
-      : '';
+    expectV2Card(payload);
+    const content = cardText(payload);
     expect(content).toContain('🔗 **Link PocketRealm**');
     expect(content).toContain('`ABC12345`');
     expect(content).toContain('<t:1780574400:F>');
@@ -56,9 +56,9 @@ describe('handleLinkCommand', () => {
     await handleLinkCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('❌ **Link failed**'),
-    });
+    const payload = editReply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('❌ **Link failed**');
   });
 
   it('responds immediately without calling the API when used outside a guild', async () => {
@@ -75,9 +75,9 @@ describe('handleLinkCommand', () => {
     await handleLinkCommand(interaction, api, config);
 
     expect(postMock).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: expect.stringContaining('⚠️ **Server only**'),
-    });
+    const payload = reply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(payload).toEqual(expect.objectContaining({ ephemeral: true }));
+    expect(cardText(payload)).toContain('⚠️ **Server only**');
   });
 });

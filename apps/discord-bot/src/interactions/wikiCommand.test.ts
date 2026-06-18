@@ -2,10 +2,11 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleWikiCommand } from './wikiCommand.js';
 
 const wikiConfig = { webBaseUrl: 'https://pocketrealm.app', emojiMap: {} };
-const disabledMentions = { allowedMentions: { parse: [] } } as const;
+const disabledMentions = { parse: [] } as const;
 const unsafeWikiText = '@everyone **bad** [x](https://evil.example)';
 const escapedUnsafeWikiText = '@\u200Beveryone \\*\\*bad\\*\\* \\[x\\]\\(https://evil\\.example\\)';
 
@@ -33,15 +34,14 @@ describe('handleWikiCommand', () => {
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
     const payload = editReply.mock.calls[0]?.[0];
-    const content = typeof payload === 'object' && 'content' in payload && typeof payload.content === 'string'
-      ? payload.content
-      : '';
+    expectV2Card(payload);
+    const content = cardText(payload);
     expect(content).toContain('📖 **Wiki results for "forge"**');
     expect(content).toContain('[Forge Guide 1 - Crafting]');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-1');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-5');
     expect(content).not.toContain('Forge Guide 6');
-    expect(payload).toMatchObject(disabledMentions);
+    expect(payload).toEqual(expect.objectContaining({ allowedMentions: disabledMentions }));
   });
 
   it('responds safely when no wiki results are found', async () => {
@@ -58,10 +58,10 @@ describe('handleWikiCommand', () => {
 
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('ℹ️ **No wiki results**'),
-      ...disabledMentions,
-    });
+    const payload = editReply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('ℹ️ **No wiki results**');
+    expect(payload).toEqual(expect.objectContaining({ allowedMentions: disabledMentions }));
   });
 
   it('disables mentions when wiki search is unavailable', async () => {
@@ -80,10 +80,10 @@ describe('handleWikiCommand', () => {
 
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('❌ **Wiki unavailable**'),
-      ...disabledMentions,
-    });
+    const payload = editReply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('❌ **Wiki unavailable**');
+    expect(payload).toEqual(expect.objectContaining({ allowedMentions: disabledMentions }));
   });
 
   it('escapes unsafe query text in public no-results replies and disables mentions', async () => {
@@ -100,12 +100,11 @@ describe('handleWikiCommand', () => {
 
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining(`No wiki results found for "${escapedUnsafeWikiText}".`),
-      ...disabledMentions,
-    });
     const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expectV2Card(reply);
+    expect(reply).toEqual(expect.objectContaining({ allowedMentions: disabledMentions }));
+    const content = cardText(reply);
+    expect(content).toContain(`No wiki results found for "${escapedUnsafeWikiText}".`);
     expect(content).not.toContain('@everyone');
     expect(content).not.toContain('**bad**');
     expect(content).not.toContain('[x](https://evil.example)');
@@ -135,7 +134,8 @@ describe('handleWikiCommand', () => {
 
     expect(editReply).toHaveBeenCalledOnce();
     const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expectV2Card(reply);
+    const content = cardText(reply);
     expect(content).toContain('https://pocketrealm.app/wiki/forge');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-tools');
     expect(content).not.toContain('evil.example');
@@ -167,7 +167,8 @@ describe('handleWikiCommand', () => {
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
     const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expectV2Card(reply);
+    const content = cardText(reply);
     expect(content).toContain(
       String.raw`[Guide\]\(https://evil\.example\) \[ - Crafting\]\(https://bad\.example\) \[]`,
     );
@@ -198,12 +199,11 @@ describe('handleWikiCommand', () => {
 
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining(`📖 **Wiki results for "${escapedUnsafeWikiText}"**`),
-      ...disabledMentions,
-    });
     const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expectV2Card(reply);
+    expect(reply).toEqual(expect.objectContaining({ allowedMentions: disabledMentions }));
+    const content = cardText(reply);
+    expect(content).toContain(`📖 **Wiki results for "${escapedUnsafeWikiText}"**`);
     expect(content).not.toContain('@everyone');
     expect(content).not.toContain('**bad**');
     expect(content).not.toContain('[x](https://evil.example)');
@@ -231,14 +231,11 @@ describe('handleWikiCommand', () => {
 
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining(
-        `- [Safe Guide](https://pocketrealm.app/wiki/safe-guide) - ${escapedUnsafeWikiText}`,
-      ),
-      ...disabledMentions,
-    });
     const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expectV2Card(reply);
+    expect(reply).toEqual(expect.objectContaining({ allowedMentions: disabledMentions }));
+    const content = cardText(reply);
+    expect(content).toContain(`- [Safe Guide](https://pocketrealm.app/wiki/safe-guide) - ${escapedUnsafeWikiText}`);
     expect(content).toContain('[Safe Guide](https://pocketrealm.app/wiki/safe-guide)');
     expect(content).not.toContain('@everyone');
     expect(content).not.toContain('[x](https://evil.example)');
@@ -267,7 +264,8 @@ describe('handleWikiCommand', () => {
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
     const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expectV2Card(reply);
+    const content = cardText(reply);
     expect(content).toContain('https://pocketrealm.app/wiki/a%29%20%5Bevil%5D%28https%3A//evil.example%29');
     expect(content).not.toContain('https://evil.example');
     expect(content).not.toContain('[evil](https://evil.example)');
@@ -299,7 +297,8 @@ describe('handleWikiCommand', () => {
 
     expect(editReply).toHaveBeenCalledOnce();
     const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expectV2Card(reply);
+    const content = cardText(reply);
     expect(content).toContain('https://pocketrealm.example/wiki/forge');
     expect(content).toContain('https://pocketrealm.example/wiki/forge-tools');
     expect(content).not.toContain('https://pocketrealm.app/wiki/forge');

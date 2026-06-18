@@ -5,6 +5,7 @@ import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { syncLinkedRoles as defaultSyncLinkedRoles } from '../discord/roleSync.js';
 import type { RoleSyncSummary, SyncLinkedRolesOptions } from '../discord/roleSync.js';
+import { statusCard } from '../discord/v2Card.js';
 import {
   cleanupSupportTriageMessages as defaultCleanupSupportTriageMessages,
   isTriageCleanupChannel,
@@ -15,7 +16,13 @@ import { isStaffMember } from '../support/threadActions.js';
 
 type StaffConfig = Pick<
   BotConfig,
-  'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportTriageChannelId' | 'supportStaffRoleIds' | 'levelRoleMap'
+  'guildId'
+  | 'playerRoleId'
+  | 'verifiedRoleId'
+  | 'supportTriageChannelId'
+  | 'supportStaffRoleIds'
+  | 'levelRoleMap'
+  | 'emojiMap'
 >;
 
 interface XpAdjustmentResult {
@@ -49,8 +56,13 @@ export async function handleStaffCommand(
 ): Promise<void> {
   if (!interaction.guildId) {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Staff commands only work in the PocketRealm Discord server.',
+      ...statusCard(
+        'warning',
+        'Server only',
+        'Staff commands only work in the PocketRealm Discord server.',
+        options.config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
@@ -58,16 +70,26 @@ export async function handleStaffCommand(
   const staffRoleIds = new Set(options.config.supportStaffRoleIds);
   if (staffRoleIds.size === 0) {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Staff commands are not configured. Ask an administrator to set support staff roles.',
+      ...statusCard(
+        'warning',
+        'Staff not configured',
+        'Staff commands are not configured. Ask an administrator to set support staff roles.',
+        options.config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
 
   if (!isStaffMember(interaction.member, staffRoleIds)) {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Only support staff can use staff commands.',
+      ...statusCard(
+        'warning',
+        'Staff only',
+        'Only support staff can use staff commands.',
+        options.config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
@@ -91,7 +113,12 @@ export async function handleStaffCommand(
   }
 
   await interaction.editReply({
-    content: `The /staff ${subcommand} command is not available yet.`,
+    ...statusCard(
+      'warning',
+      'Command unavailable',
+      `The /staff ${subcommand} command is not available yet.`,
+      options.config.emojiMap,
+    ),
   });
 }
 
@@ -101,7 +128,12 @@ async function handleCleanupTriage(
 ): Promise<void> {
   const channel = await interaction.client.channels.fetch(options.config.supportTriageChannelId).catch(() => null);
   if (!isTriageCleanupChannel(channel)) {
-    await interaction.editReply({ content: 'Could not clean up support triage because the channel is unavailable.' });
+    await interaction.editReply(statusCard(
+      'error',
+      'Triage unavailable',
+      'Could not clean up support triage because the channel is unavailable.',
+      options.config.emojiMap,
+    ));
     return;
   }
 
@@ -118,9 +150,19 @@ async function handleCleanupTriage(
       scanLimit,
       confirm,
     });
-    await interaction.editReply({ content: formatTriageCleanupSummary(summary) });
+    await interaction.editReply(statusCard(
+      summary.confirmed ? 'success' : 'info',
+      'Triage cleanup',
+      formatTriageCleanupSummary(summary),
+      options.config.emojiMap,
+    ));
   } catch {
-    await interaction.editReply({ content: 'Could not clean up support triage right now. Try again or check bot logs.' });
+    await interaction.editReply(statusCard(
+      'error',
+      'Cleanup failed',
+      'Could not clean up support triage right now. Try again or check bot logs.',
+      options.config.emojiMap,
+    ));
   }
 }
 
@@ -149,7 +191,12 @@ async function handleSyncRoles(
   options: StaffCommandOptions,
 ): Promise<void> {
   if (!interaction.guild) {
-    await interaction.editReply({ content: 'Could not sync roles because the guild is unavailable.' });
+    await interaction.editReply(statusCard(
+      'error',
+      'Guild unavailable',
+      'Could not sync roles because the guild is unavailable.',
+      options.config.emojiMap,
+    ));
     return;
   }
 
@@ -162,13 +209,21 @@ async function handleSyncRoles(
       config: options.config,
     });
   } catch {
-    await interaction.editReply({ content: 'Could not sync roles right now. Try again or check bot logs.' });
+    await interaction.editReply(statusCard(
+      'error',
+      'Role sync failed',
+      'Could not sync roles right now. Try again or check bot logs.',
+      options.config.emojiMap,
+    ));
     return;
   }
 
-  await interaction.editReply({
-    content: `Role sync complete: ${summary.roleSynced} synced, ${summary.missingMembers} missing, ${summary.failed} failed out of ${summary.fetched} linked players.`,
-  });
+  await interaction.editReply(statusCard(
+    'success',
+    'Role sync complete',
+    `Role sync complete: ${summary.roleSynced} synced, ${summary.missingMembers} missing, ${summary.failed} failed out of ${summary.fetched} linked players.`,
+    options.config.emojiMap,
+  ));
 }
 
 async function handleXpAdjust(
@@ -191,13 +246,19 @@ async function handleXpAdjust(
 
     await syncAdjustedLevelRole(interaction.guild, options.api, options.config, adjustment, options.now?.() ?? new Date());
 
-    await interaction.editReply({
-      content: `Adjusted <@${target.id}> by ${amount} XP. New total: ${adjustment.newXp} XP (level ${adjustment.newLevel}).`,
-    });
+    await interaction.editReply(statusCard(
+      'success',
+      'XP adjusted',
+      `Adjusted <@${target.id}> by ${amount} XP. New total: ${adjustment.newXp} XP (level ${adjustment.newLevel}).`,
+      options.config.emojiMap,
+    ));
   } catch {
-    await interaction.editReply({
-      content: 'Could not adjust Discord XP right now. Try again or check bot logs.',
-    });
+    await interaction.editReply(statusCard(
+      'error',
+      'XP adjustment failed',
+      'Could not adjust Discord XP right now. Try again or check bot logs.',
+      options.config.emojiMap,
+    ));
   }
 }
 

@@ -3,6 +3,7 @@ import type { Interaction } from 'discord.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { parseDuelButtonId, parseNotifyButtonId, parseSupportButtonId } from '../discord/components.js';
+import { statusCard } from '../discord/v2Card.js';
 import { getRankCategoryAutocompleteChoices } from '../rankCategories.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
@@ -140,11 +141,15 @@ async function replyUnhandledInteraction(interaction: Interaction): Promise<void
     return;
   }
 
-  const content = 'This interaction is no longer supported. Try the command again.';
+  const payload = statusCard(
+    'info',
+    'Unsupported interaction',
+    'This interaction is no longer supported. Try the command again.',
+  );
   if (interaction.deferred) {
-    await interaction.editReply({ content });
+    await interaction.editReply(payload);
     return;
   }
 
-  await interaction.reply({ ephemeral: true, content });
+  await interaction.reply({ ...payload, ephemeral: true });
 }

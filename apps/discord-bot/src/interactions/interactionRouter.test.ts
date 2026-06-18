@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction, Interaction, ModalSubmitInteraction }
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { routeInteraction } from './interactionRouter.js';
@@ -71,14 +72,10 @@ describe('routeInteraction', () => {
     });
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('ℹ️ **No wiki results**'),
-      allowedMentions: { parse: [] },
-    });
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('"forge"'),
-      allowedMentions: { parse: [] },
-    });
+    const payload = editReply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('ℹ️ **No wiki results**');
+    expect(cardText(payload)).toContain('"forge"');
   });
 
   it('routes player commands with guild config', async () => {
@@ -266,10 +263,10 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: 'This interaction is no longer supported. Try the command again.',
-    });
+    const payload = reply.mock.calls[0]?.[0];
+    expect(payload).toEqual(expect.objectContaining({ ephemeral: true }));
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('This interaction is no longer supported. Try the command again.');
   });
 
   it('replies ephemerally to unknown button interactions', async () => {
@@ -287,10 +284,10 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: 'This interaction is no longer supported. Try the command again.',
-    });
+    const payload = reply.mock.calls[0]?.[0];
+    expect(payload).toEqual(expect.objectContaining({ ephemeral: true }));
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('This interaction is no longer supported. Try the command again.');
   });
 
   it('routes support button interactions to the support thread action handler', async () => {

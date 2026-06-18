@@ -5,7 +5,8 @@ import type {
   DiscordNotificationPayload,
 } from '@pocketrealm/shared/discord/discordNotifications';
 
-import { formatNotificationMessage, pollDiscordNotifications } from './notificationPoll.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
+import { buildNotificationCard, pollDiscordNotifications } from './notificationPoll.js';
 
 const EVENT = {
   id: 'event-1',
@@ -59,9 +60,10 @@ describe('pollDiscordNotifications', () => {
 
     expect(options.api.get).toHaveBeenCalledWith('/api/v1/discord/notifications/pending?limit=50');
     expect(options.readyClient.users.fetch).toHaveBeenCalledWith(EVENT.discordUserId);
-    expect(send).toHaveBeenCalledWith({
-      content: formatNotificationMessage(EVENT, WEB_BASE_URL, options.emojiMap),
-    });
+    const payload = send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('Mira');
+    expect(cardText(payload).toLowerCase()).toContain('turns are full');
     expect(options.api.post).toHaveBeenCalledWith('/api/v1/discord/notifications/ack', {
       deliveredIds: [EVENT.id],
       failedIds: [],
@@ -116,19 +118,19 @@ describe('pollDiscordNotifications', () => {
   });
 });
 
-describe('formatNotificationMessage', () => {
+describe('buildNotificationCard', () => {
   it('formats turns-capped events', () => {
-    const content = formatNotificationMessage(EVENT, WEB_BASE_URL);
+    const content = cardText(buildNotificationCard(EVENT, WEB_BASE_URL));
     expect(content).toContain('64,800');
     expect(content.toLowerCase()).toContain('turns are full');
   });
 
   it('uses configured custom emoji overrides', () => {
-    const content = formatNotificationMessage(
+    const content = cardText(buildNotificationCard(
       evt('pvp_attack', { attackerName: 'Rook' }),
       WEB_BASE_URL,
       { duel: '<:pr_duel:123456789012345678>' },
-    );
+    ));
 
     expect(content.startsWith('<:pr_duel:123456789012345678>')).toBe(true);
   });
@@ -140,76 +142,76 @@ describe('formatNotificationMessage', () => {
       info: '<:pr_info:123456789012345678>',
     };
 
-    expect(formatNotificationMessage(
+    expect(cardText(buildNotificationCard(
       evt('expedition_finished', { tier: 3, outcome: 'victory' }),
       WEB_BASE_URL,
       emojiMap,
-    ).startsWith('<:pr_success:123456789012345678>')).toBe(true);
-    expect(formatNotificationMessage(
+    )).startsWith('<:pr_success:123456789012345678>')).toBe(true);
+    expect(cardText(buildNotificationCard(
       evt('expedition_finished', { tier: 2, outcome: 'failed', attempts: 4 }),
       WEB_BASE_URL,
       emojiMap,
-    ).startsWith('<:pr_warning:123456789012345678>')).toBe(true);
-    expect(formatNotificationMessage(
+    )).startsWith('<:pr_warning:123456789012345678>')).toBe(true);
+    expect(cardText(buildNotificationCard(
       evt('mystery_type' as DiscordNotificationEventView['type'], {} as DiscordNotificationPayload),
       WEB_BASE_URL,
       emojiMap,
-    ).startsWith('<:pr_info:123456789012345678>')).toBe(true);
+    )).startsWith('<:pr_info:123456789012345678>')).toBe(true);
   });
 
   it('formats a pvp_attack DM with a bold name and arena deep link', () => {
-    const content = formatNotificationMessage(evt('pvp_attack', { attackerName: 'Rook' }), WEB_BASE_URL);
+    const content = cardText(buildNotificationCard(evt('pvp_attack', { attackerName: 'Rook' }), WEB_BASE_URL));
     expect(content).toContain('**Rook**');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=arena`);
   });
 
   it('formats a boss_appeared DM with the boss, zone, and worldEvents deep link', () => {
-    const content = formatNotificationMessage(evt('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' }), WEB_BASE_URL);
+    const content = cardText(buildNotificationCard(evt('boss_appeared', { bossName: 'Ymir', zoneName: 'Tundra' }), WEB_BASE_URL));
     expect(content).toContain('**Ymir**');
     expect(content).toContain('**Tundra**');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=worldEvents`);
   });
 
   it('formats a victorious expedition_finished DM with the guild expeditions deep link', () => {
-    const content = formatNotificationMessage(evt('expedition_finished', { tier: 3, outcome: 'victory' }), WEB_BASE_URL);
-    expect(content.startsWith('🎉')).toBe(true);
+    const content = cardText(buildNotificationCard(evt('expedition_finished', { tier: 3, outcome: 'victory' }), WEB_BASE_URL));
+    expect(content.startsWith('✅')).toBe(true);
     expect(content).toContain('Tier 3');
     expect(content.toLowerCase()).toContain('victorious');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=guild&tab=expeditions`);
   });
 
   it('formats a failed expedition_finished DM with the attempt count', () => {
-    const content = formatNotificationMessage(evt('expedition_finished', { tier: 2, outcome: 'failed', attempts: 4 }), WEB_BASE_URL);
-    expect(content.startsWith('💀')).toBe(true);
+    const content = cardText(buildNotificationCard(evt('expedition_finished', { tier: 2, outcome: 'failed', attempts: 4 }), WEB_BASE_URL));
+    expect(content.startsWith('⚠️')).toBe(true);
     expect(content).toContain('Tier 2');
     expect(content).toContain('4 attempts');
   });
 
   it('formats a pvp_scout DM with a bold name and arena deep link', () => {
-    const content = formatNotificationMessage(evt('pvp_scout', { scouterName: 'Mira' }), WEB_BASE_URL);
+    const content = cardText(buildNotificationCard(evt('pvp_scout', { scouterName: 'Mira' }), WEB_BASE_URL));
     expect(content).toContain('**Mira**');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=arena`);
   });
 
   it('formats a boss_defeated DM with a bold boss name and worldEvents deep link', () => {
-    const content = formatNotificationMessage(evt('boss_defeated', { bossName: 'Ymir' }), WEB_BASE_URL);
+    const content = cardText(buildNotificationCard(evt('boss_defeated', { bossName: 'Ymir' }), WEB_BASE_URL));
     expect(content).toContain('**Ymir**');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=worldEvents`);
   });
 
   it('formats an expedition_recruiting DM with the tier and guild expeditions deep link', () => {
-    const content = formatNotificationMessage(evt('expedition_recruiting', { tier: 5 }), WEB_BASE_URL);
+    const content = cardText(buildNotificationCard(evt('expedition_recruiting', { tier: 5 }), WEB_BASE_URL));
     expect(content).toContain('Tier 5');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=guild&tab=expeditions`);
   });
 
   it('falls back to a generic message for an unknown type', () => {
-    const content = formatNotificationMessage(
+    const content = cardText(buildNotificationCard(
       evt('mystery_type' as DiscordNotificationEventView['type'], {} as DiscordNotificationPayload),
       WEB_BASE_URL,
-    );
-    expect(content.startsWith('📢')).toBe(true);
-    expect(content).toContain('Pocketrealm notification');
+    ));
+    expect(content.startsWith('ℹ️')).toBe(true);
+    expect(content).toContain('PocketRealm notification');
     expect(content).toContain(`${WEB_BASE_URL}/game`);
   });
 });

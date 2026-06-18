@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { expectV2Card } from '../test/v2CardAssertions.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 
 const config = {
@@ -48,10 +49,7 @@ describe('handleDuelCommand', () => {
     await handleDuelCommand(interaction, api, config);
 
     expect(api.post).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '⚠️ **Wrong channel** - Use /duel in <#111111111111111111>.',
-    });
+    expectStatusCard(reply.mock.calls[0]?.[0], '⚠️ **Wrong channel**', 'Use /duel in <#111111111111111111>.');
   });
 
   it('rejects duel commands outside a server ephemerally', async () => {
@@ -66,10 +64,7 @@ describe('handleDuelCommand', () => {
     await handleDuelCommand(interaction, api, config);
 
     expect(api.post).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '⚠️ **Server only** - /duel only works in the PocketRealm Discord server.',
-    });
+    expectStatusCard(reply.mock.calls[0]?.[0], '⚠️ **Server only**', '/duel only works in the PocketRealm Discord server.');
   });
 
   it('rejects self challenges before calling the API', async () => {
@@ -84,10 +79,7 @@ describe('handleDuelCommand', () => {
     await handleDuelCommand(interaction, api, config);
 
     expect(api.post).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '⚠️ **Choose an opponent** - Challenge another player, not yourself.',
-    });
+    expectStatusCard(reply.mock.calls[0]?.[0], '⚠️ **Choose an opponent**', 'Challenge another player, not yourself.');
   });
 
   it('rejects bot users before calling the API', async () => {
@@ -101,10 +93,7 @@ describe('handleDuelCommand', () => {
     await handleDuelCommand(interaction, api, config);
 
     expect(api.post).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '⚠️ **Choose a player** - Challenge a player, not a bot.',
-    });
+    expectStatusCard(reply.mock.calls[0]?.[0], '⚠️ **Choose a player**', 'Challenge a player, not a bot.');
   });
 
   it('creates a public channel challenge with target acceptance buttons and records the message id when available', async () => {
@@ -149,9 +138,7 @@ describe('handleDuelCommand', () => {
     expect(sendJson).toContain('challenged you to a friendly simulation');
     expect(sendJson).toContain('duel:accept:duel-123:333333333333333333');
     expect(followUp).not.toHaveBeenCalled();
-    expect(editReply).toHaveBeenCalledWith({
-      content: '✅ **Posted** - Friendly simulation challenge posted.',
-    });
+    expectStatusCard(editReply.mock.calls[0]?.[0], '✅ **Posted**', 'Friendly simulation challenge posted.');
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/message', {
       messageId: 'discord-message-1',
     });
@@ -199,9 +186,11 @@ describe('handleDuelCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(editReply).toHaveBeenCalledTimes(1);
-    expect(editReply).toHaveBeenCalledWith({
-      content: '⚠️ **Post failed** - Could not post the public duel challenge. Please run /duel again.',
-    });
+    expectStatusCard(
+      editReply.mock.calls[0]?.[0],
+      '⚠️ **Post failed**',
+      'Could not post the public duel challenge. Please run /duel again.',
+    );
     expect(send).toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalledWith(
       '/api/v1/discord/duels/duel-123/message',
@@ -225,9 +214,11 @@ describe('handleDuelCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.post).not.toHaveBeenCalled();
-    expect(editReply).toHaveBeenCalledWith({
-      content: '⚠️ **Post failed** - Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
-    });
+    expectStatusCard(
+      editReply.mock.calls[0]?.[0],
+      '⚠️ **Post failed**',
+      'Make sure the bot can send messages in this channel',
+    );
   });
 
   it('does not create the duel when the bot lacks permission to post in the channel', async () => {
@@ -249,9 +240,11 @@ describe('handleDuelCommand', () => {
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.post).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
-    expect(editReply).toHaveBeenCalledWith({
-      content: '⚠️ **Post failed** - Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
-    });
+    expectStatusCard(
+      editReply.mock.calls[0]?.[0],
+      '⚠️ **Post failed**',
+      'Make sure the bot can send messages in this channel',
+    );
   });
 
   it('edits the deferred command response for duel-specific create errors', async () => {
@@ -272,9 +265,7 @@ describe('handleDuelCommand', () => {
     await handleDuelCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(editReply).toHaveBeenCalledWith({
-      content: '⚠️ **Link required** - Both players need linked PocketRealm accounts before dueling.',
-    });
+    expectStatusCard(editReply.mock.calls[0]?.[0], '⚠️ **Link required**', 'Both players need linked PocketRealm accounts');
   });
 });
 
@@ -414,8 +405,8 @@ describe('handleDuelButton', () => {
     expect(update).toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({
       ephemeral: true,
-      content: expect.stringContaining('⚠️ **Duel unavailable**'),
     }));
+    expectStatusCard(reply.mock.calls[0]?.[0], '⚠️ **Duel unavailable**', 'Run /duel to start a fresh one.');
   });
 
   it('updates the public duel message when the target declines', async () => {
@@ -454,10 +445,7 @@ describe('handleDuelButton', () => {
 
     expect(api.post).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '⚠️ **Wrong player** - Only the challenged player can use this duel button.',
-    });
+    expectStatusCard(reply.mock.calls[0]?.[0], '⚠️ **Wrong player**', 'Only the challenged player can use this duel button.');
   });
 
   it('sends an ephemeral follow-up for expired accepted duels after deferring update', async () => {
@@ -477,10 +465,7 @@ describe('handleDuelButton', () => {
     await handleDuelButton(interaction, api, config);
 
     expect(deferUpdate).toHaveBeenCalled();
-    expect(followUp).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '⚠️ **Duel unavailable** - That friendly duel is no longer available. Start a new /duel.',
-    });
+    expectStatusCard(followUp.mock.calls[0]?.[0], '⚠️ **Duel unavailable**', 'Start a new /duel.');
   });
 
   it('replies that build previews are unavailable for friendly simulations', async () => {
@@ -494,10 +479,7 @@ describe('handleDuelButton', () => {
     await handleDuelButton(interaction, api, config);
 
     expect(api.post).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: 'ℹ️ **Builds unavailable** - Build previews are not available for friendly simulations yet.',
-    });
+    expectStatusCard(reply.mock.calls[0]?.[0], 'ℹ️ **Builds unavailable**', 'Build previews are not available');
   });
 
   it('replies with the rematch instruction for rematch buttons', async () => {
@@ -511,10 +493,7 @@ describe('handleDuelButton', () => {
     await handleDuelButton(interaction, api, config);
 
     expect(api.post).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: 'ℹ️ **Rematch** - Use /duel to start a rematch for now.',
-    });
+    expectStatusCard(reply.mock.calls[0]?.[0], 'ℹ️ **Rematch**', 'Use /duel to start a rematch for now.');
   });
 
   it('updates the existing message with replay details from the replay route', async () => {
@@ -645,10 +624,7 @@ describe('handleDuelButton', () => {
     expect(deferUpdate).toHaveBeenCalled();
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=1');
     expect(editReply).not.toHaveBeenCalled();
-    expect(followUp).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '❌ **Replay unavailable** - Unable to load the friendly simulation replay right now.',
-    });
+    expectStatusCard(followUp.mock.calls[0]?.[0], '❌ **Replay unavailable**', 'Unable to load the friendly simulation replay');
   });
 
   it('preserves meaningful replay messages when structured fields lack outcome details', async () => {
@@ -720,6 +696,14 @@ function createApi(): Pick<PocketRealmApiClient, 'get' | 'post'> {
     get: vi.fn(),
     post: vi.fn(),
   } as Pick<PocketRealmApiClient, 'get' | 'post'>;
+}
+
+function expectStatusCard(payload: unknown, ...expectedText: string[]): void {
+  expectV2Card(payload);
+  const text = cardText(payload);
+  for (const expected of expectedText) {
+    expect(text).toContain(expected);
+  }
 }
 
 function createPendingDuelResponse() {

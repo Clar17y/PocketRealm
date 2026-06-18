@@ -2,6 +2,7 @@ import type { Client, GuildMember, MessageCreateOptions } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { BotConfig } from '../config.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './welcome.js';
 
 const GUILD_ID = '234567890123456789';
@@ -27,12 +28,13 @@ describe('welcomeGuildMember', () => {
     expect(result).toEqual({ sent: true });
     expect(client.channels.fetch).toHaveBeenCalledWith(WELCOME_CHANNEL_ID);
     const payload = send.mock.calls[0][0];
-    expect(payload.content).toContain('👋 **Welcome to PocketRealm');
-    expect(payload.content).toContain('/link');
-    expect(payload.content).toContain('/wiki');
-    expect(payload.content).toContain('/report');
-    expect(payload.content).toContain(`<#${DUELS_CHANNEL_ID}>`);
-    expect(payload.content).toContain('Play: https://pocketrealm.test');
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('👋 **Welcome to PocketRealm');
+    expect(cardText(payload)).toContain('/link');
+    expect(cardText(payload)).toContain('/wiki');
+    expect(cardText(payload)).toContain('/report');
+    expect(cardText(payload)).toContain(`<#${DUELS_CHANNEL_ID}>`);
+    expect(cardText(payload)).toContain('Play: https://pocketrealm.test');
     expect(payload).toEqual(expect.objectContaining({
       allowedMentions: { users: [USER_ID], roles: [], parse: [] },
     }));

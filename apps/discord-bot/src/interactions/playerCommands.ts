@@ -1,11 +1,10 @@
-import { EmbedBuilder } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
 
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
-import { formatDiscordEmoji, type DiscordEmojiMap } from '../discord/emojis.js';
-import { botHeadline, botStatus } from '../discord/messageFormat.js';
+import type { DiscordEmojiMap } from '../discord/emojis.js';
+import { statusCard, textCard, type V2CardPayload } from '../discord/v2Card.js';
 import { INVALID_RANK_CATEGORY_COPY, resolveRankCategory } from '../rankCategories.js';
 import { formatDiscordTimestamp } from '../utils.js';
 
@@ -70,9 +69,7 @@ export async function handleProfileCommand(
     return;
   }
 
-  await interaction.editReply({
-    embeds: [buildProfileEmbed(response.profile, config.emojiMap)],
-  });
+  await interaction.editReply(buildProfileCard(response.profile, config.emojiMap));
 }
 
 export async function handleTurnsCommand(
@@ -90,9 +87,7 @@ export async function handleTurnsCommand(
     return;
   }
 
-  await interaction.editReply({
-    content: formatTurns(response.turns, config.emojiMap),
-  });
+  await interaction.editReply(buildTurnsCard(response.turns, config.emojiMap));
 }
 
 export async function handleSkillsCommand(
@@ -110,9 +105,7 @@ export async function handleSkillsCommand(
     return;
   }
 
-  await interaction.editReply({
-    content: formatSkills(response.skills, config.emojiMap),
-  });
+  await interaction.editReply(buildSkillsCard(response.skills, config.emojiMap));
 }
 
 export async function handleRankCommand(
@@ -126,9 +119,7 @@ export async function handleRankCommand(
   await interaction.deferReply({ ephemeral: true });
 
   if (!category) {
-    await interaction.editReply({
-      content: botStatus('warning', 'Unknown rank', INVALID_RANK_CATEGORY_COPY, config.emojiMap),
-    });
+    await interaction.editReply(statusCard('warning', 'Unknown rank', INVALID_RANK_CATEGORY_COPY, config.emojiMap));
     return;
   }
 
@@ -142,9 +133,7 @@ export async function handleRankCommand(
     return;
   }
 
-  await interaction.editReply({
-    embeds: [buildRankEmbed(response.rank, config.emojiMap)],
-  });
+  await interaction.editReply(buildRankCard(response.rank, config.emojiMap));
 }
 
 function playerPath(discordUserId: string, resource: string, guildId: string): string {
@@ -158,34 +147,30 @@ async function editPlayerErrorReply(
   emojiMap: DiscordEmojiMap,
 ): Promise<void> {
   if (isUnlinkedError(error)) {
-    await interaction.editReply({
-      content: botStatus('warning', 'Link required', isSelectedUser ? LINK_OTHER_COPY : LINK_SELF_COPY, emojiMap),
-    });
+    await interaction.editReply(
+      statusCard('warning', 'Link required', isSelectedUser ? LINK_OTHER_COPY : LINK_SELF_COPY, emojiMap),
+    );
     return;
   }
 
   if (isPlayerNotFoundError(error)) {
-    await interaction.editReply({
-      content: botStatus('warning', 'Character missing', PLAYER_NOT_FOUND_COPY, emojiMap),
-    });
+    await interaction.editReply(statusCard('warning', 'Character missing', PLAYER_NOT_FOUND_COPY, emojiMap));
     return;
   }
 
   if (isInvalidCategoryError(error)) {
-    await interaction.editReply({
-      content: botStatus('warning', 'Unknown rank', INVALID_RANK_CATEGORY_COPY, emojiMap),
-    });
+    await interaction.editReply(statusCard('warning', 'Unknown rank', INVALID_RANK_CATEGORY_COPY, emojiMap));
     return;
   }
 
-  await interaction.editReply({
-    content: botStatus(
+  await interaction.editReply(
+    statusCard(
       'error',
       'Player data unavailable',
       'Unable to load PocketRealm player data right now. Please try again later.',
       emojiMap,
     ),
-  });
+  );
 }
 
 function isUnlinkedError(error: unknown): boolean {
@@ -203,20 +188,23 @@ function isInvalidCategoryError(error: unknown): boolean {
     && error.code === 'INVALID_CATEGORY';
 }
 
-function buildProfileEmbed(profile: ProfileResponse['profile'], emojiMap: DiscordEmojiMap): EmbedBuilder {
+function buildProfileCard(profile: ProfileResponse['profile'], emojiMap: DiscordEmojiMap): V2CardPayload {
   const details = [
     `Level ${profile.characterLevel}`,
     profile.activeTitle,
     profile.realmLabel,
   ].filter((value): value is string => Boolean(value));
 
-  return new EmbedBuilder()
-    .setTitle(`${formatDiscordEmoji('profile', emojiMap)} ${profile.username}`)
-    .setDescription(details.join(' | '));
+  return textCard({
+    emojiKey: 'profile',
+    title: profile.username,
+    emojiMap,
+    lines: [details.join(' | ')],
+  });
 }
 
-function formatTurns(turns: TurnsResponse['turns'], emojiMap: DiscordEmojiMap): string {
-  const lines = [botHeadline('turns', 'Turns', emojiMap), `${turns.currentTurns} turns available.`];
+function buildTurnsCard(turns: TurnsResponse['turns'], emojiMap: DiscordEmojiMap): V2CardPayload {
+  const lines = [`${turns.currentTurns} turns available.`];
 
   if (typeof turns.timeToCapMs === 'number') {
     lines.push(`Time to cap: ${formatDuration(turns.timeToCapMs)}.`);
@@ -226,21 +214,28 @@ function formatTurns(turns: TurnsResponse['turns'], emojiMap: DiscordEmojiMap): 
     lines.push(`Last regenerated: ${formatDiscordTimestamp(turns.lastRegenAt, 'R', 'unknown')}.`);
   }
 
-  return lines.join('\n');
+  return textCard({
+    emojiKey: 'turns',
+    title: 'Turns',
+    emojiMap,
+    lines,
+  });
 }
 
-function formatSkills(skills: SkillsResponse['skills'], emojiMap: DiscordEmojiMap): string {
+function buildSkillsCard(skills: SkillsResponse['skills'], emojiMap: DiscordEmojiMap): V2CardPayload {
   if (skills.length === 0) {
-    return botStatus('info', 'Skills', 'No PocketRealm skills found yet.', emojiMap);
+    return statusCard('info', 'Skills', 'No PocketRealm skills found yet.', emojiMap);
   }
 
-  return [
-    botHeadline('skills', 'Skills', emojiMap),
-    ...skills.map((skill) => `${formatLabel(skill.skillType)} Lv ${skill.level} (${skill.xp} XP)`),
-  ].join('\n');
+  return textCard({
+    emojiKey: 'skills',
+    title: 'Skills',
+    emojiMap,
+    lines: skills.map((skill) => `${formatLabel(skill.skillType)} Lv ${skill.level} (${skill.xp} XP)`),
+  });
 }
 
-function buildRankEmbed(rank: RankResponse['rank'], emojiMap: DiscordEmojiMap): EmbedBuilder {
+function buildRankCard(rank: RankResponse['rank'], emojiMap: DiscordEmojiMap): V2CardPayload {
   const lines: string[] = [];
 
   if (rank.rank === null) {
@@ -257,9 +252,12 @@ function buildRankEmbed(rank: RankResponse['rank'], emojiMap: DiscordEmojiMap): 
     lines.push(`Updated: ${formatDiscordTimestamp(rank.lastRefreshedAt, 'R', 'unknown')}`);
   }
 
-  return new EmbedBuilder()
-    .setTitle(`${formatDiscordEmoji('victory', emojiMap)} ${formatLabel(rank.category)} Rank`)
-    .setDescription(lines.join('\n'));
+  return textCard({
+    emojiKey: 'victory',
+    title: `${formatLabel(rank.category)} Rank`,
+    emojiMap,
+    lines,
+  });
 }
 
 function formatLabel(value: string): string {

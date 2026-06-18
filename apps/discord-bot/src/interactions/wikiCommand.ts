@@ -2,7 +2,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
-import { botHeadline, botStatus } from '../discord/messageFormat.js';
+import { statusCard, textCard } from '../discord/v2Card.js';
 
 const MAX_WIKI_RESULTS = 5;
 const PUBLIC_REPLY_OPTIONS = {
@@ -39,13 +39,13 @@ export async function handleWikiCommand(
     );
   } catch {
     await interaction.editReply({
-      content: botStatus(
+      ...statusCard(
         'error',
         'Wiki unavailable',
         'Unable to search the PocketRealm wiki right now. Please try again later.',
         config.emojiMap,
+        PUBLIC_REPLY_OPTIONS,
       ),
-      ...PUBLIC_REPLY_OPTIONS,
     });
     return;
   }
@@ -65,19 +65,24 @@ export async function handleWikiCommand(
 
   if (results.length === 0) {
     await interaction.editReply({
-      content: botStatus('info', 'No wiki results', `No wiki results found for "${escapedQuery}".`, config.emojiMap),
-      ...PUBLIC_REPLY_OPTIONS,
+      ...statusCard(
+        'info',
+        'No wiki results',
+        `No wiki results found for "${escapedQuery}".`,
+        config.emojiMap,
+        PUBLIC_REPLY_OPTIONS,
+      ),
     });
     return;
   }
 
-  await interaction.editReply({
-    content: [
-      botHeadline('wiki', `Wiki results for "${escapedQuery}"`, config.emojiMap),
-      ...results,
-    ].join('\n'),
+  await interaction.editReply(textCard({
+    emojiKey: 'wiki',
+    title: `Wiki results for "${escapedQuery}"`,
+    emojiMap: config.emojiMap,
+    lines: results,
     ...PUBLIC_REPLY_OPTIONS,
-  });
+  }));
 }
 
 function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {

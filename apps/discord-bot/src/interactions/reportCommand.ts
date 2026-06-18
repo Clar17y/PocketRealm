@@ -21,7 +21,7 @@ import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import type { DiscordEmojiMap } from '../discord/emojis.js';
-import { botStatus } from '../discord/messageFormat.js';
+import { statusCard } from '../discord/v2Card.js';
 
 type ReportApiClient = Pick<PocketRealmApiClient, 'post'>;
 type ReportLinkCheckApiClient = Pick<PocketRealmApiClient, 'get'>;
@@ -58,16 +58,14 @@ export async function handleReportCommand(
 ): Promise<void> {
   if (!interaction.guildId) {
     await interaction.reply({
-      ephemeral: true,
-      content: botStatus('warning', 'Server only', SERVER_ONLY_COPY, config.emojiMap),
+      ...statusCard('warning', 'Server only', SERVER_ONLY_COPY, config.emojiMap, { ephemeral: true }),
     });
     return;
   }
 
   if (!(await isLinkedPocketRealmUser(api, interaction.user.id, config.guildId))) {
     await interaction.reply({
-      ephemeral: true,
-      content: botStatus('warning', 'Link required', LINK_REQUIRED_COPY, config.emojiMap),
+      ...statusCard('warning', 'Link required', LINK_REQUIRED_COPY, config.emojiMap, { ephemeral: true }),
     });
     return;
   }
@@ -106,8 +104,7 @@ export async function handleReportModalSubmit(
 ): Promise<void> {
   if (!interaction.guildId) {
     await interaction.reply({
-      ephemeral: true,
-      content: botStatus('warning', 'Server only', SERVER_ONLY_COPY, config.emojiMap),
+      ...statusCard('warning', 'Server only', SERVER_ONLY_COPY, config.emojiMap, { ephemeral: true }),
     });
     return;
   }
@@ -126,18 +123,16 @@ export async function handleReportModalSubmit(
       ...optionalSteps(interaction.fields.getTextInputValue(REPORT_STEPS_FIELD)),
     });
 
-    await interaction.editReply({
-      content: botStatus(
+    await interaction.editReply(
+      statusCard(
         'support',
         'Report created',
         `Report \`${response.ticket.publicId}\` created with status \`${response.ticket.status}\`.`,
         config.emojiMap,
       ),
-    });
+    );
   } catch (error) {
-    await interaction.editReply({
-      content: reportErrorCopy(error, config.emojiMap),
-    });
+    await interaction.editReply(reportErrorCopy(error, config.emojiMap));
   }
 }
 
@@ -218,10 +213,10 @@ function optionalSteps(value: string): { reproductionSteps?: string } {
   return trimmed ? { reproductionSteps: trimmed } : {};
 }
 
-function reportErrorCopy(error: unknown, emojiMap: DiscordEmojiMap): string {
+function reportErrorCopy(error: unknown, emojiMap: DiscordEmojiMap) {
   if (error instanceof PocketRealmApiError && error.code === 'DISCORD_LINK_REQUIRED') {
-    return botStatus('warning', 'Link required', LINK_REQUIRED_COPY, emojiMap);
+    return statusCard('warning', 'Link required', LINK_REQUIRED_COPY, emojiMap);
   }
 
-  return botStatus('error', 'Report failed', 'Unable to create a report right now. Please try again later.', emojiMap);
+  return statusCard('error', 'Report failed', 'Unable to create a report right now. Please try again later.', emojiMap);
 }

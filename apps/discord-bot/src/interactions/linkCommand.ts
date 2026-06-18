@@ -2,7 +2,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
-import { botHeadline, botStatus } from '../discord/messageFormat.js';
+import { statusCard, textCard } from '../discord/v2Card.js';
 import { formatDiscordTimestamp } from '../utils.js';
 
 interface LinkCodeResponse {
@@ -20,12 +20,12 @@ export async function handleLinkCommand(
 ): Promise<void> {
   if (!interaction.guildId) {
     await interaction.reply({
-      ephemeral: true,
-      content: botStatus(
+      ...statusCard(
         'warning',
         'Server only',
         '/link only works in the PocketRealm Discord server.',
         config.emojiMap,
+        { ephemeral: true },
       ),
     });
     return;
@@ -40,22 +40,24 @@ export async function handleLinkCommand(
       discordGuildId: interaction.guildId,
     });
   } catch {
-    await interaction.editReply({
-      content: botStatus(
+    await interaction.editReply(
+      statusCard(
         'error',
         'Link failed',
         'Unable to create a PocketRealm link code right now. Please try again later.',
         config.emojiMap,
       ),
-    });
+    );
     return;
   }
 
-  await interaction.editReply({
-    content: [
-      botHeadline('link', 'Link PocketRealm', config.emojiMap),
+  await interaction.editReply(textCard({
+    emojiKey: 'link',
+    title: 'Link PocketRealm',
+    emojiMap: config.emojiMap,
+    lines: [
       `Enter this code in PocketRealm Settings: \`${response.code}\``,
       `Expires ${formatDiscordTimestamp(response.expiresAt, 'F', 'the listed expiry time')}.`,
-    ].join('\n'),
-  });
+    ],
+  }));
 }

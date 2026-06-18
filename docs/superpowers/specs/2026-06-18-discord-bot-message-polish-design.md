@@ -1,160 +1,167 @@
-# Discord Bot Message Polish - Design
+# Discord Bot Components V2 Message Design
 
-**Date:** 2026-06-18
-**Status:** Approved direction; pending implementation
+**Date:** 2026-06-19
+**Status:** Implementation target
 **Branch:** `codex/discord-bot-message-polish`
 
 ## Summary
 
-Standardize the Discord bot's player-facing messages around the richer style
-introduced by the improved duel and notification work: a clear semantic emoji,
-bold primary subject, compact outcome copy, and an obvious next action when one
-exists.
+Convert the Discord bot's outbound messages to Discord Components V2 cards.
+Every bot-authored message payload should use `MessageFlags.IsComponentsV2`
+with `ContainerBuilder`/`TextDisplayBuilder` content instead of plain
+`content` strings or legacy embeds, except Discord protocol interactions that
+are not messages, such as autocomplete responses and modal display calls.
 
-The scope is the Discord bot only. This does not change in-game chat, web UI
-copy, API errors, staff command summaries, support triage cards, bot health
-pings, or internal logs.
+This supersedes the earlier "message polish" direction. Emoji-backed status
+copy remains useful, but the delivery structure must be Components V2 cards.
 
 ## Goals
 
-- Give all player-facing Discord bot messages a consistent PocketRealm voice.
-- Use uploaded custom Discord emoji where configured, with Unicode fallbacks so
-  local tests and non-production servers keep working.
-- Keep simple messages simple: content strings and existing embeds remain the
-  default unless an embed already fits the information shape.
-- Preserve Discord limits, ephemeral/public behavior, button behavior, and
-  current routing.
-- Keep formatting testable with pure unit tests.
+- Use Components V2 cards for command replies, deferred edits, follow-ups,
+  channel sends, DMs, welcome messages, staff messages, support triage cards,
+  support thread messages, notification DMs, and bot operational ready pings.
+- Remove legacy embeds from bot-authored message payloads by converting profile,
+  rank, and support triage views into V2 containers.
+- Preserve existing visibility and routing: public wiki replies stay public,
+  private command replies stay ephemeral, notification messages still DM users,
+  and support/staff flows keep their current permissions.
+- Preserve interactive behavior by nesting existing action rows inside V2
+  containers for notify menus, duel cards, and support triage cards.
+- Keep semantic custom emoji support through `DISCORD_EMOJI_MAP`, with Unicode
+  fallbacks for local development and tests.
+- Suppress accidental mentions by default. Explicit mentions are allowed only
+  where the current behavior intentionally pings a user, such as duel
+  challenges, welcome messages, and support follow-up thread updates.
 
-## Non-goals
+## Non-Goals
 
-- No new game features or notification types.
-- No image generation in this pass.
-- No broad support/staff rewrite. Staff and triage workflows keep dense
-  operational summaries, with only obvious status prefixes considered later.
-- No runtime Discord emoji lookup. Message formatting should not depend on
-  cached guild state or client readiness.
+- No new command functionality, notification type, support workflow, or game
+  feature.
+- No runtime guild emoji discovery. Custom emoji IDs still come from config.
+- No visual asset generation.
+- No conversion of non-message Discord protocol calls: autocomplete
+  `respond(...)`, modal `showModal(...)`, and role/member mutations are not
+  message payloads.
 
-## Message Structure
+## Components V2 Card Contract
 
-Player-facing content should use this pattern where it helps comprehension:
+Shared bot cards should produce payloads shaped like:
 
-```text
-{emoji} **{primary subject}**
-{short outcome or instruction}
-{optional action/link}
+```ts
+{
+  flags: MessageFlags.IsComponentsV2,
+  components: [new ContainerBuilder()],
+  allowedMentions: { parse: [] },
+}
 ```
 
-Examples:
+Cards that need private interaction delivery may additionally include
+`ephemeral: true` for existing call sites that already use that option. Cards
+that intentionally ping users must pass a narrower `allowedMentions`, for
+example `{ users: [targetDiscordUserId] }`.
 
-```text
-🔗 **Link PocketRealm**
-Enter this code in PocketRealm Settings: `ABC12345`
-Expires <t:1780574400:F>.
-```
+Cards must not include top-level `content` or `embeds`. Text belongs in
+`TextDisplayBuilder` components. Buttons belong in action rows added to the
+container with `addActionRowComponents(...)`.
 
-```text
-📖 **Wiki results for "forge"**
-- [Forge Guide](https://pocketrealm.test/wiki/forge) - Craft stronger weapons.
-```
+## Shared Card Helpers
 
-Short one-line confirmations may stay one line:
+Add a bot-local V2 helper module:
 
-```text
-✅ **Saved** - Boss defeated notifications are now ON.
-```
+- `apps/discord-bot/src/discord/v2Card.ts`
+
+Responsibilities:
+
+- Build generic status cards from semantic emoji, title, and detail copy.
+- Build text cards from a headline and body lines.
+- Build cards with optional action rows for menus and support triage.
+- Provide a default mention policy of `{ parse: [] }`.
+- Provide test helpers or pure extraction functions only if production code
+  benefits from them; tests may keep local extraction helpers.
+
+Keep duel-specific visual logic in `discord/duelCard.ts`. That file already
+uses Components V2 and should continue to own duel challenge/result/replay card
+layout. Shared helpers may be used for duel fallback/status notices.
 
 ## Emoji Model
 
-Create a semantic emoji catalog in the bot package. Call sites request keys such
-as `duel`, `turns`, `wiki`, `support`, `success`, or `error`; they never hardcode
-custom emoji IDs.
+Continue using the semantic emoji catalog added by this branch:
 
-Each key has a Unicode fallback. Production can override keys with custom emoji
-mentions through an optional env var.
+| Key | Fallback | Used for |
+| --- | --- | --- |
+| `duel` | ⚔️ | Duel and PvP challenge cards |
+| `scout` | 🔍 | Scout notifications |
+| `boss` | 🐉 | Boss notifications |
+| `victory` | 🏆 | Wins, ranks, successful outcomes |
+| `expedition` | 🧭 | Expedition notifications |
+| `turns` | ⚡ | Turns command and capped-turn notifications |
+| `link` | 🔗 | Account linking |
+| `notify` | 🔔 | Notification preferences |
+| `wiki` | 📖 | Wiki search |
+| `profile` | 🧙 | Profile cards |
+| `skills` | ✨ | Skill cards |
+| `support` | 🛟 | Reports and support cards |
+| `welcome` | 👋 | Welcome cards |
+| `success` | ✅ | Completed action status |
+| `warning` | ⚠️ | Recoverable user action needed |
+| `error` | ❌ | Failed action status |
+| `info` | ℹ️ | Neutral information |
 
-Recommended env shape:
+`DISCORD_EMOJI_MAP` remains optional and keeps this shape:
 
 ```text
 DISCORD_EMOJI_MAP=duel=<:pr_duel:123456789012345678>,success=<:pr_success:234567890123456789>
 ```
 
-Rules:
+## In-Scope Bot Message Surfaces
 
-- Unknown keys are rejected during config parsing.
-- Values must be valid static or animated custom emoji mentions:
-  `<:name:snowflake>` or `<a:name:snowflake>`.
-- Missing keys fall back to Unicode.
-- The plan inventories code wiring only. If the live server lacks an important
-  reusable concept after implementation, create new custom emoji for repeated
-  concepts only, not for every status line.
+All of these must emit Components V2 payloads with no top-level `content` or
+`embeds`:
 
-Initial semantic keys:
-
-| Key | Fallback | Used for |
-| --- | --- | --- |
-| `duel` | ⚔️ | Duel challenge, duel result, arena actions |
-| `scout` | 🔍 | PvP scout DMs |
-| `boss` | 🐉 | Boss appeared |
-| `victory` | 🏆 | Boss defeated, wins, ranks |
-| `expedition` | 🧭 | Expedition recruiting and completion |
-| `turns` | ⚡ | Turns capped and `/turns` |
-| `link` | 🔗 | `/link` |
-| `notify` | 🔔 | `/notify` |
-| `wiki` | 📖 | `/wiki` |
-| `profile` | 🧙 | `/profile` |
-| `skills` | ✨ | `/skills` |
-| `support` | 🛟 | `/report` player flow |
-| `welcome` | 👋 | Welcome message |
-| `success` | ✅ | Successful save/create/posted state |
-| `warning` | ⚠️ | Recoverable user action needed |
-| `error` | ❌ | Failed command/action |
-| `info` | ℹ️ | Neutral fallback or unsupported action |
-
-## Bot Surfaces In Scope
-
-Player-facing:
-
-- `apps/discord-bot/src/notifications/notificationPoll.ts`
+- `apps/discord-bot/src/index.ts` ready-channel ping
 - `apps/discord-bot/src/discord/welcome.ts`
+- `apps/discord-bot/src/notifications/notificationPoll.ts`
+- `apps/discord-bot/src/interactions/interactionRouter.ts`
 - `apps/discord-bot/src/interactions/linkCommand.ts`
 - `apps/discord-bot/src/interactions/notifyCommand.ts`
 - `apps/discord-bot/src/interactions/wikiCommand.ts`
 - `apps/discord-bot/src/interactions/playerCommands.ts`
 - `apps/discord-bot/src/interactions/reportCommand.ts`
 - `apps/discord-bot/src/interactions/duelCommand.ts`
-- `apps/discord-bot/src/interactions/interactionRouter.ts` where config must be
-  threaded into handlers.
-
-Out of scope for this pass:
-
 - `apps/discord-bot/src/interactions/staffCommands.ts`
 - `apps/discord-bot/src/support/triageCards.ts`
 - `apps/discord-bot/src/support/threadActions.ts`
 - `apps/discord-bot/src/support/triagePoll.ts`
-- Bot health "ready" ping in `index.ts`
-- XP internals and logs in `xp/messageXp.ts`
 
-## Architecture
+`apps/discord-bot/src/xp/messageXp.ts` analyzes user message text and does not
+send bot messages; it is out of scope.
 
-Add two small bot-local modules:
+## Testing Requirements
 
-- `discord/emojis.ts`: semantic keys, Unicode fallbacks, custom emoji parser,
-  and formatter.
-- `discord/messageFormat.ts`: tiny helpers for headlines and status lines so
-  handlers do not repeat punctuation and bolding rules.
+- Add tests for the shared V2 helper proving:
+  - cards set `MessageFlags.IsComponentsV2`;
+  - default allowed mentions suppress parsing;
+  - custom emoji overrides render in card text;
+  - action rows are nested inside the container;
+  - status cards do not expose top-level `content` or `embeds`.
+- Update command, notification, support, staff, and welcome tests to inspect
+  V2 card text/components instead of top-level `content` or embeds.
+- Keep behavior assertions for API calls, permission checks, defer/reply mode,
+  public versus ephemeral delivery, buttons, and mention policy.
+- Add a guard test or static unit assertion that representative bot-authored
+  payload factories do not return `content` or `embeds`.
+- Before completion, run:
+  - `rtk npm run test -w apps/discord-bot`
+  - `rtk npm run build:discord-bot`
+  - `git diff --check`
 
-Extend `BotConfig` with `emojiMap` parsed from `DISCORD_EMOJI_MAP`. Thread the
-config or `emojiMap` into player-facing handlers that need it. Keep formatter
-functions pure so unit tests can assert exact strings without a Discord client.
+## Completion Criteria
 
-## Testing
-
-- Add unit tests for emoji parsing, fallback lookup, custom override lookup, and
-  invalid config rejection.
-- Update existing command tests to assert the new structure for representative
-  success, warning, and error states.
-- Keep existing behavior assertions for API paths, ephemeral replies, buttons,
-  embeds, and acknowledgements.
-- Run `npm run test -w apps/discord-bot` and `npm run build:discord-bot` before
-  implementation handoff is considered complete.
+- `rg "content:|embeds:" apps/discord-bot/src` shows no bot-authored outbound
+  message payloads using top-level content or embeds. Remaining matches must be
+  non-outbound types, tests, cleanup logic reading historical messages, or
+  Discord API inputs that are not messages.
+- Every command or button response that sends a message uses a V2 card payload.
+- Every DM and channel send initiated by the bot uses a V2 card payload.
+- Every legacy embed payload owned by the bot is converted to a V2 container.
+- Full Discord bot tests and build pass.

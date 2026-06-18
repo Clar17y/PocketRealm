@@ -1,6 +1,6 @@
-import { ComponentType } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 
+import { cardJson, cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { buildTriageCard, type SupportTriageTicketDto } from './triageCards.js';
 
 const ticket: SupportTriageTicketDto = {
@@ -18,52 +18,49 @@ const ticket: SupportTriageTicketDto = {
 
 describe('buildTriageCard', () => {
   it('builds a support triage card from sanitized ticket fields', () => {
-    const payload = serializeCard(buildTriageCard(ticket));
+    const payload = buildTriageCard(ticket);
+    const text = cardText(payload);
+    const createdTimestamp = Math.floor(new Date(ticket.createdAt).getTime() / 1000);
 
-    expect(payload.content).toBe('New support ticket `SUP-1`');
-    expect(payload.embeds).toHaveLength(1);
-    expect(payload.embeds?.[0]).toMatchObject({
-      title: 'SUP-1 - Forge failed after upgrade',
-      description: 'Private report body withheld. Review in staff support tools.',
-      fields: expect.arrayContaining([
-        { name: 'Status', value: 'new', inline: true },
-        { name: 'Privacy', value: 'private', inline: true },
-        { name: 'Category', value: 'bug', inline: true },
-        { name: 'Area', value: 'crafting', inline: true },
-        { name: 'Realm', value: 'Spring Realm', inline: true },
-        { name: 'Sensitivity', value: 'personal_data, security', inline: false },
-      ]),
-    });
+    expectV2Card(payload);
+    expect(text).toContain('SUP-1 - Forge failed after upgrade');
+    expect(text).toContain('Private report body withheld. Review in staff support tools.');
+    expect(text).toContain('Status: `new`');
+    expect(text).toContain('Privacy: `private`');
+    expect(text).toContain('Category: `bug`');
+    expect(text).toContain('Area: `crafting`');
+    expect(text).toContain('Realm: Spring Realm');
+    expect(text).toContain('Sensitivity: personal_data, security');
+    expect(text).toContain(`Created: <t:${createdTimestamp}:f>`);
     expect(JSON.stringify(payload)).not.toContain('Mira');
     expect(JSON.stringify(payload)).not.toContain('Raw private body');
     expect(JSON.stringify(payload)).not.toContain('player@example.com');
   });
 
   it('includes the required support action button ids', () => {
-    const payload = serializeCard(buildTriageCard(ticket));
-    const customIds = payload.components
-      ?.flatMap((row) => row.components)
-      .filter((component) => component.type === ComponentType.Button)
-      .map((component) => component.custom_id);
+    const json = cardJson(buildTriageCard(ticket));
 
-    expect(customIds).toEqual(expect.arrayContaining([
-      'support:ask_reporter:SUP-1',
-      'support:needs_info:SUP-1',
-      'support:accepted:SUP-1',
-      'support:rejected:SUP-1',
-      'support:security:SUP-1',
-      'support:closed:SUP-1',
-      'support:archive_thread:SUP-1',
-    ]));
+    expect(json).toContain('support:ask_reporter:SUP-1');
+    expect(json).toContain('support:needs_info:SUP-1');
+    expect(json).toContain('support:accepted:SUP-1');
+    expect(json).toContain('support:rejected:SUP-1');
+    expect(json).toContain('support:security:SUP-1');
+    expect(json).toContain('support:closed:SUP-1');
+    expect(json).toContain('support:archive_thread:SUP-1');
+  });
+
+  it('uses the fallback summary and realm values when optional ticket details are absent', () => {
+    const payload = buildTriageCard({
+      ...ticket,
+      summary: '',
+      realmLabel: null,
+      sensitivityFlags: [],
+    });
+    const text = cardText(payload);
+
+    expectV2Card(payload);
+    expect(text).toContain('No summary provided.');
+    expect(text).toContain('Realm: Unknown');
+    expect(text).toContain('Sensitivity: none');
   });
 });
-
-function serializeCard(card: ReturnType<typeof buildTriageCard>) {
-  return {
-    content: card.content,
-    embeds: card.embeds.map((embed) => embed.toJSON()),
-    components: card.components.map((row) => row.toJSON()) as Array<{
-      components: Array<{ type: ComponentType; custom_id?: string }>;
-    }>,
-  };
-}
