@@ -187,7 +187,10 @@ describe('handleDuelCommand', () => {
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(editReply).toHaveBeenCalledTimes(1);
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Could not post the public duel challenge. Please run /duel again.',
+      content: expect.stringContaining('⚠️ **Post failed**'),
+    });
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('Could not post the public duel challenge. Please run /duel again.'),
     });
     expect(send).toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalledWith(
@@ -213,7 +216,10 @@ describe('handleDuelCommand', () => {
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.post).not.toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
+      content: expect.stringContaining('⚠️ **Post failed**'),
+    });
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.'),
     });
   });
 
@@ -237,7 +243,10 @@ describe('handleDuelCommand', () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
+      content: expect.stringContaining('⚠️ **Post failed**'),
+    });
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.'),
     });
   });
 
@@ -636,6 +645,35 @@ describe('handleDuelButton', () => {
     expect(payload.content.length).toBeLessThanOrEqual(1_800);
     expect(payload.content).toContain('Replay event details unavailable.');
     expect(payload.content).not.toContain('internalState');
+  });
+
+  it('reserves replay space for the more-pages hint', async () => {
+    const api = createApi();
+    vi.mocked(api.get).mockResolvedValue({
+      replay: {
+        id: 'duel-123',
+        status: 'resolved',
+        page: 1,
+        pageSize: 8,
+        hasMore: true,
+        entries: Array.from({ length: 8 }, (_, index) => ({
+          round: index + 1,
+          message: 'A'.repeat(2_500),
+        })),
+      },
+    });
+    const editReply = vi.fn<ButtonInteraction['editReply']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:replay:duel-123:1',
+      editReply,
+    });
+
+    await handleDuelButton(interaction, api, buttonConfig);
+
+    const payload = editReply.mock.calls[0]?.[0] as { content: string };
+    expect(payload.content.length).toBeLessThanOrEqual(1_800);
+    expect(payload.content).toContain('Replay page truncated for Discord.');
+    expect(payload.content).toContain('More replay pages are available.');
   });
 });
 

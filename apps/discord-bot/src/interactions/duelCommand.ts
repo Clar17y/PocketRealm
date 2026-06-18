@@ -38,6 +38,8 @@ type DuelButtonConfig = Pick<BotConfig, 'emojiMap'>;
 
 const MAX_REPLAY_CONTENT_LENGTH = 1_800;
 const MAX_REPLAY_ENTRY_LENGTH = 240;
+const REPLAY_HAS_MORE_COPY = 'More replay pages are available.';
+const REPLAY_TRUNCATED_COPY = 'Replay page truncated for Discord.';
 
 interface CreateDuelResponse {
   duel: {
@@ -122,7 +124,10 @@ export async function handleDuelCommand(
   const channel = interaction.channel;
   if (!channel?.isSendable() || !interaction.appPermissions?.has(PermissionFlagsBits.SendMessages)) {
     await interaction.editReply({
-      content: 'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
+      content: formatDuelPostFailure(
+        'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -153,7 +158,10 @@ export async function handleDuelCommand(
     });
   } catch {
     await interaction.editReply({
-      content: 'Could not post the public duel challenge. Please run /duel again.',
+      content: formatDuelPostFailure(
+        'Could not post the public duel challenge. Please run /duel again.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -350,6 +358,7 @@ function formatReplay(replay: DuelReplayResponse['replay'], emojiMap: DiscordEmo
   }
 
   const lines: string[] = [];
+  const reservedTailLines = replay.hasMore ? [REPLAY_HAS_MORE_COPY] : [];
   const resourceLines = formatReplayResourceLines(entries[entries.length - 1]?.entry, replay.summary);
   lines.push(...resourceLines);
   if (resourceLines.length > 0) {
@@ -359,17 +368,34 @@ function formatReplay(replay: DuelReplayResponse['replay'], emojiMap: DiscordEmo
   for (const { entry, index } of entries) {
     const replayIndex = (replay.page - 1) * replay.pageSize + index + 1;
     const line = `#${replayIndex} ${formatReplayEntry(entry)}`;
-    if (`${header}\n${[...lines, line].join('\n')}`.length > MAX_REPLAY_CONTENT_LENGTH) {
-      lines.push('Replay page truncated for Discord.');
+    if (!fitsReplayContent(header, [...lines, line, ...reservedTailLines])) {
+      while (
+        lines.length > 0
+        && !fitsReplayContent(header, [...lines, REPLAY_TRUNCATED_COPY, ...reservedTailLines])
+      ) {
+        lines.pop();
+      }
+
+      if (fitsReplayContent(header, [...lines, REPLAY_TRUNCATED_COPY, ...reservedTailLines])) {
+        lines.push(REPLAY_TRUNCATED_COPY);
+      }
       break;
     }
 
     lines.push(line);
   }
   if (replay.hasMore) {
-    lines.push('More replay pages are available.');
+    lines.push(REPLAY_HAS_MORE_COPY);
   }
 
+  return formatReplayContent(header, lines);
+}
+
+function fitsReplayContent(header: string, lines: string[]): boolean {
+  return formatReplayContent(header, lines).length <= MAX_REPLAY_CONTENT_LENGTH;
+}
+
+function formatReplayContent(header: string, lines: string[]): string {
   return `${header}\n${lines.join('\n')}`;
 }
 
@@ -621,6 +647,10 @@ function readMessageId(value: unknown): string | null {
   }
 
   return null;
+}
+
+function formatDuelPostFailure(detail: string, emojiMap: DiscordEmojiMap): string {
+  return botStatus('warning', 'Post failed', detail, emojiMap);
 }
 
 function createDuelErrorCopy(error: unknown, emojiMap: DiscordEmojiMap): string {
