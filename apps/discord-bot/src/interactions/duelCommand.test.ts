@@ -7,6 +7,7 @@ import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 
 const config = {
   duelsChannelId: '111111111111111111',
+  emojiMap: {},
 };
 const buttonConfig = { emojiMap: {} };
 
@@ -25,7 +26,33 @@ describe('handleDuelCommand', () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Use /duel in <#111111111111111111>.',
+      content: expect.stringContaining('⚠️ **Wrong channel**'),
+    });
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('Use /duel in <#111111111111111111>.'),
+    });
+  });
+
+  it('rejects duel commands outside a server ephemerally', async () => {
+    const api = createApi();
+    const reply = vi.fn<ChatInputCommandInteraction['reply']>();
+    const interaction = createCommandInteraction({
+      guildId: null,
+      opponent: createUser('333333333333333333'),
+      reply,
+    });
+
+    await handleDuelCommand(interaction, api, config);
+
+    expect(api.post).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('⚠️ **Server only**'),
+    });
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('/duel only works in the PocketRealm Discord server.'),
     });
   });
 
@@ -43,7 +70,11 @@ describe('handleDuelCommand', () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Challenge another player, not yourself.',
+      content: expect.stringContaining('⚠️ **Choose an opponent**'),
+    });
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('Challenge another player, not yourself.'),
     });
   });
 
@@ -60,7 +91,11 @@ describe('handleDuelCommand', () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Challenge a player, not a bot.',
+      content: expect.stringContaining('⚠️ **Choose a player**'),
+    });
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('Challenge a player, not a bot.'),
     });
   });
 
@@ -95,11 +130,15 @@ describe('handleDuelCommand', () => {
       targetDiscordUserId: '333333333333333333',
     });
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
-      content: '<@333333333333333333>, <@123456789012345678> challenged you to a friendly simulation.',
+      content: expect.stringContaining('⚔️ **Friendly simulation challenge**'),
+      components: expect.any(Array),
+    }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@333333333333333333>, <@123456789012345678> challenged you to a friendly simulation.'),
       components: expect.any(Array),
     }));
     expect(followUp).not.toHaveBeenCalled();
-    expect(editReply).toHaveBeenCalledWith({ content: 'Friendly simulation challenge posted.' });
+    expect(editReply).toHaveBeenCalledWith({ content: '✅ **Posted** - Friendly simulation challenge posted.' });
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/message', {
       messageId: 'discord-message-1',
     });
@@ -221,7 +260,10 @@ describe('handleDuelCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Both players need linked PocketRealm accounts before dueling.',
+      content: expect.stringContaining('⚠️ **Link required**'),
+    });
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('Both players need linked PocketRealm accounts before dueling.'),
     });
   });
 });
@@ -269,7 +311,7 @@ describe('handleDuelButton', () => {
       acceptedByDiscordUserId: '333333333333333333',
     });
     expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
-      content: expect.stringContaining('Friendly simulation'),
+      content: expect.stringContaining('🏆 **Friendly simulation complete**'),
     }));
   });
 
@@ -290,7 +332,33 @@ describe('handleDuelButton', () => {
     expect(update).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Only the challenged player can use this duel button.',
+      content: expect.stringContaining('⚠️ **Wrong player**'),
+    });
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('Only the challenged player can use this duel button.'),
+    });
+  });
+
+  it('updates the public duel message when the target declines', async () => {
+    const api = createApi();
+    const update = vi.fn<ButtonInteraction['update']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:decline:duel-123:333333333333333333',
+      userId: '333333333333333333',
+      update,
+    });
+
+    await handleDuelButton(interaction, api, buttonConfig);
+
+    expect(api.post).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith({
+      content: expect.stringContaining('⚠️ **Declined**'),
+      components: [],
+    });
+    expect(update).toHaveBeenCalledWith({
+      content: expect.stringContaining('Friendly simulation declined by <@333333333333333333>.'),
+      components: [],
     });
   });
 
@@ -313,7 +381,51 @@ describe('handleDuelButton', () => {
     expect(deferUpdate).toHaveBeenCalled();
     expect(followUp).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'That friendly duel is no longer available. Start a new /duel.',
+      content: expect.stringContaining('⚠️ **Duel unavailable**'),
+    });
+    expect(followUp).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('That friendly duel is no longer available. Start a new /duel.'),
+    });
+  });
+
+  it('replies that build previews are unavailable for friendly simulations', async () => {
+    const api = createApi();
+    const reply = vi.fn<ButtonInteraction['reply']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:builds:duel-123',
+      reply,
+    });
+
+    await handleDuelButton(interaction, api, buttonConfig);
+
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('ℹ️ **Builds unavailable**'),
+    });
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('Build previews are not available for friendly simulations yet.'),
+    });
+  });
+
+  it('replies with the rematch instruction for rematch buttons', async () => {
+    const api = createApi();
+    const reply = vi.fn<ButtonInteraction['reply']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:rematch:duel-123',
+      reply,
+    });
+
+    await handleDuelButton(interaction, api, buttonConfig);
+
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('ℹ️ **Rematch**'),
+    });
+    expect(reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('Use /duel to start a rematch for now.'),
     });
   });
 
@@ -424,7 +536,7 @@ describe('handleDuelButton', () => {
     expect(deferUpdate).toHaveBeenCalled();
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=2');
     expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
-      content: expect.stringContaining('Friendly simulation replay page 2'),
+      content: expect.stringContaining('⚔️ **Friendly simulation replay - page 2**'),
       components: expect.any(Array),
     }));
     const replayPayload = editReply.mock.calls[0]?.[0] as { components: Array<{ toJSON: () => unknown }> };
@@ -453,7 +565,11 @@ describe('handleDuelButton', () => {
     expect(editReply).not.toHaveBeenCalled();
     expect(followUp).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Unable to load the friendly simulation replay right now.',
+      content: expect.stringContaining('❌ **Replay unavailable**'),
+    });
+    expect(followUp).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: expect.stringContaining('Unable to load the friendly simulation replay right now.'),
     });
   });
 
@@ -573,7 +689,7 @@ function createCommandInteraction(input: {
   const userId = input.userId ?? '123456789012345678';
 
   return {
-    guildId: input.guildId ?? 'guild-123',
+    guildId: input.guildId === undefined ? 'guild-123' : input.guildId,
     channelId: input.channelId ?? config.duelsChannelId,
     channel: input.channel ?? null,
     appPermissions: input.appPermissions === undefined ? { has: () => true } : input.appPermissions,
