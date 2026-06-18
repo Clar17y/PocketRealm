@@ -116,9 +116,40 @@ describe('handleWikiCommand', () => {
 
     const reply = editReply.mock.calls[0]?.[0];
     const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).toContain(
+      String.raw`[Guide\]\(https://evil\.example\) \[ - Crafting\]\(https://bad\.example\) \[]`,
+    );
     expect(content).toContain('https://pocketrealm.app/wiki/safe-guide');
     expect(content).not.toContain('https://evil.example');
     expect(content).not.toContain('https://bad.example');
+  });
+
+  it('escapes wiki result destinations before rendering markdown links', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      results: [
+        {
+          title: 'Safe Guide',
+          url: '/wiki/a) [evil](https://evil.example)',
+        },
+      ],
+    }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => 'forge'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
+
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).toContain('https://pocketrealm.app/wiki/a%29%20%5Bevil%5D%28https%3A//evil.example%29');
+    expect(content).not.toContain('https://evil.example');
+    expect(content).not.toContain('[evil](https://evil.example)');
   });
 
   it('uses the configured web origin for wiki result URLs', async () => {

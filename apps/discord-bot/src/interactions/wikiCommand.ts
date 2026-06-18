@@ -100,5 +100,14 @@ function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {
     return null;
   }
 
-  return parsedUrl.toString();
+  const pathWithQueryAndHash = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  return `${parsedUrl.origin}${escapeMarkdownLinkDestination(pathWithQueryAndHash)}`;
+}
+
+function escapeMarkdownLinkDestination(value: string): string {
+  return value.replace(/[()[\]<>:]/g, encodeMarkdownDestinationCharacter);
+}
+
+function encodeMarkdownDestinationCharacter(character: string): string {
+  return `%${character.charCodeAt(0).toString(16).toUpperCase()}`;
 }
