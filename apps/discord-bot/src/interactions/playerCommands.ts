@@ -4,6 +4,8 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
+import { formatDiscordEmoji, type DiscordEmojiMap } from '../discord/emojis.js';
+import { botHeadline, botStatus } from '../discord/messageFormat.js';
 import { INVALID_RANK_CATEGORY_COPY, resolveRankCategory } from '../rankCategories.js';
 import { formatDiscordTimestamp } from '../utils.js';
 
@@ -43,7 +45,7 @@ interface RankResponse {
 }
 
 type PlayerApiClient = Pick<PocketRealmApiClient, 'get'>;
-type PlayerCommandConfig = Pick<BotConfig, 'guildId'>;
+type PlayerCommandConfig = Pick<BotConfig, 'guildId' | 'emojiMap'>;
 
 const LINK_SELF_COPY = 'Link your PocketRealm account first with /link.';
 const LINK_OTHER_COPY = 'That Discord user needs to link their PocketRealm account with /link first.';
@@ -64,12 +66,12 @@ export async function handleProfileCommand(
   try {
     response = await api.get<ProfileResponse>(playerPath(targetUser.id, 'profile', config.guildId));
   } catch (error) {
-    await editPlayerErrorReply(interaction, error, isSelectedUser);
+    await editPlayerErrorReply(interaction, error, isSelectedUser, config.emojiMap);
     return;
   }
 
   await interaction.editReply({
-    embeds: [buildProfileEmbed(response.profile)],
+    embeds: [buildProfileEmbed(response.profile, config.emojiMap)],
   });
 }
 
@@ -84,12 +86,12 @@ export async function handleTurnsCommand(
   try {
     response = await api.get<TurnsResponse>(playerPath(interaction.user.id, 'turns', config.guildId));
   } catch (error) {
-    await editPlayerErrorReply(interaction, error, false);
+    await editPlayerErrorReply(interaction, error, false, config.emojiMap);
     return;
   }
 
   await interaction.editReply({
-    content: formatTurns(response.turns),
+    content: formatTurns(response.turns, config.emojiMap),
   });
 }
 
@@ -104,12 +106,12 @@ export async function handleSkillsCommand(
   try {
     response = await api.get<SkillsResponse>(playerPath(interaction.user.id, 'skills', config.guildId));
   } catch (error) {
-    await editPlayerErrorReply(interaction, error, false);
+    await editPlayerErrorReply(interaction, error, false, config.emojiMap);
     return;
   }
 
   await interaction.editReply({
-    content: formatSkills(response.skills),
+    content: formatSkills(response.skills, config.emojiMap),
   });
 }
 
@@ -124,7 +126,9 @@ export async function handleRankCommand(
   await interaction.deferReply({ ephemeral: true });
 
   if (!category) {
-    await interaction.editReply({ content: INVALID_RANK_CATEGORY_COPY });
+    await interaction.editReply({
+      content: botStatus('warning', 'Unknown rank', INVALID_RANK_CATEGORY_COPY, config.emojiMap),
+    });
     return;
   }
 
@@ -134,12 +138,12 @@ export async function handleRankCommand(
       `/api/v1/discord/users/${encodeURIComponent(interaction.user.id)}/rank/${encodeURIComponent(category)}?guildId=${encodeURIComponent(config.guildId)}`,
     );
   } catch (error) {
-    await editPlayerErrorReply(interaction, error, false);
+    await editPlayerErrorReply(interaction, error, false, config.emojiMap);
     return;
   }
 
   await interaction.editReply({
-    embeds: [buildRankEmbed(response.rank)],
+    embeds: [buildRankEmbed(response.rank, config.emojiMap)],
   });
 }
 
@@ -151,30 +155,36 @@ async function editPlayerErrorReply(
   interaction: ChatInputCommandInteraction,
   error: unknown,
   isSelectedUser: boolean,
+  emojiMap: DiscordEmojiMap,
 ): Promise<void> {
   if (isUnlinkedError(error)) {
     await interaction.editReply({
-      content: isSelectedUser ? LINK_OTHER_COPY : LINK_SELF_COPY,
+      content: botStatus('warning', 'Link required', isSelectedUser ? LINK_OTHER_COPY : LINK_SELF_COPY, emojiMap),
     });
     return;
   }
 
   if (isPlayerNotFoundError(error)) {
     await interaction.editReply({
-      content: PLAYER_NOT_FOUND_COPY,
+      content: botStatus('warning', 'Character missing', PLAYER_NOT_FOUND_COPY, emojiMap),
     });
     return;
   }
 
   if (isInvalidCategoryError(error)) {
     await interaction.editReply({
-      content: INVALID_RANK_CATEGORY_COPY,
+      content: botStatus('warning', 'Unknown rank', INVALID_RANK_CATEGORY_COPY, emojiMap),
     });
     return;
   }
 
   await interaction.editReply({
-    content: 'Unable to load PocketRealm player data right now. Please try again later.',
+    content: botStatus(
+      'error',
+      'Player data unavailable',
+      'Unable to load PocketRealm player data right now. Please try again later.',
+      emojiMap,
+    ),
   });
 }
 
@@ -193,7 +203,7 @@ function isInvalidCategoryError(error: unknown): boolean {
     && error.code === 'INVALID_CATEGORY';
 }
 
-function buildProfileEmbed(profile: ProfileResponse['profile']): EmbedBuilder {
+function buildProfileEmbed(profile: ProfileResponse['profile'], emojiMap: DiscordEmojiMap): EmbedBuilder {
   const details = [
     `Level ${profile.characterLevel}`,
     profile.activeTitle,
@@ -201,12 +211,12 @@ function buildProfileEmbed(profile: ProfileResponse['profile']): EmbedBuilder {
   ].filter((value): value is string => Boolean(value));
 
   return new EmbedBuilder()
-    .setTitle(profile.username)
+    .setTitle(`${formatDiscordEmoji('profile', emojiMap)} ${profile.username}`)
     .setDescription(details.join(' | '));
 }
 
-function formatTurns(turns: TurnsResponse['turns']): string {
-  const lines = [`${turns.currentTurns} turns available.`];
+function formatTurns(turns: TurnsResponse['turns'], emojiMap: DiscordEmojiMap): string {
+  const lines = [botHeadline('turns', 'Turns', emojiMap), `${turns.currentTurns} turns available.`];
 
   if (typeof turns.timeToCapMs === 'number') {
     lines.push(`Time to cap: ${formatDuration(turns.timeToCapMs)}.`);
@@ -219,17 +229,18 @@ function formatTurns(turns: TurnsResponse['turns']): string {
   return lines.join('\n');
 }
 
-function formatSkills(skills: SkillsResponse['skills']): string {
+function formatSkills(skills: SkillsResponse['skills'], emojiMap: DiscordEmojiMap): string {
   if (skills.length === 0) {
-    return 'No PocketRealm skills found yet.';
+    return botStatus('info', 'Skills', 'No PocketRealm skills found yet.', emojiMap);
   }
 
-  return skills
-    .map((skill) => `${formatLabel(skill.skillType)} Lv ${skill.level} (${skill.xp} XP)`)
-    .join('\n');
+  return [
+    botHeadline('skills', 'Skills', emojiMap),
+    ...skills.map((skill) => `${formatLabel(skill.skillType)} Lv ${skill.level} (${skill.xp} XP)`),
+  ].join('\n');
 }
 
-function buildRankEmbed(rank: RankResponse['rank']): EmbedBuilder {
+function buildRankEmbed(rank: RankResponse['rank'], emojiMap: DiscordEmojiMap): EmbedBuilder {
   const lines: string[] = [];
 
   if (rank.rank === null) {
@@ -247,7 +258,7 @@ function buildRankEmbed(rank: RankResponse['rank']): EmbedBuilder {
   }
 
   return new EmbedBuilder()
-    .setTitle(`${formatLabel(rank.category)} Rank`)
+    .setTitle(`${formatDiscordEmoji('victory', emojiMap)} ${formatLabel(rank.category)} Rank`)
     .setDescription(lines.join('\n'));
 }
 

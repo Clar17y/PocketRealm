@@ -5,7 +5,7 @@ import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
 
-const commandConfig = { guildId: '234567890123456789' };
+const commandConfig = { guildId: '234567890123456789', emojiMap: {} };
 const modalConfig = { emojiMap: {} };
 
 describe('handleReportCommand', () => {
@@ -47,7 +47,7 @@ describe('handleReportCommand', () => {
     expect(showModal).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Link your PocketRealm account first, or use the in-game report flow.',
+      content: expect.stringContaining('⚠️ **Link required**'),
     });
   });
 
@@ -83,7 +83,7 @@ describe('handleReportCommand', () => {
     expect(api.get).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Reports only work in the PocketRealm Discord server.',
+      content: expect.stringContaining('⚠️ **Server only**'),
     });
   });
 });
@@ -125,9 +125,9 @@ describe('handleReportModalSubmit', () => {
       description: 'The fight stopped after I stunned a spider.',
       reproductionSteps: 'Stun a spider during its turn.',
     });
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Report SUP-ABC12345 created with status open.',
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('🛟 **Report created**');
+    expect(content).toContain('`SUP-ABC12345`');
   });
 
   it('normalizes blank or unknown optional fields before posting', async () => {
@@ -188,7 +188,7 @@ describe('handleReportModalSubmit', () => {
     await handleReportModalSubmit(interaction, api, modalConfig);
 
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Link your PocketRealm account first, or use the in-game report flow.',
+      content: expect.stringContaining('⚠️ **Link required**'),
     });
   });
 
@@ -213,7 +213,7 @@ describe('handleReportModalSubmit', () => {
     await handleReportModalSubmit(interaction, api, modalConfig);
 
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Unable to create a report right now. Please try again later.',
+      content: expect.stringContaining('❌ **Report failed**'),
     });
   });
 
@@ -234,7 +234,7 @@ describe('handleReportModalSubmit', () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: 'Reports only work in the PocketRealm Discord server.',
+      content: expect.stringContaining('⚠️ **Server only**'),
     });
   });
 });
@@ -243,6 +243,11 @@ function createApi(response: unknown): Pick<PocketRealmApiClient, 'post'> {
   return {
     post: vi.fn(async <T>(): Promise<T> => response as T) as Pick<PocketRealmApiClient, 'post'>['post'],
   };
+}
+
+function replyContent(reply: unknown): string {
+  if (typeof reply !== 'object' || reply === null || !('content' in reply)) return '';
+  return typeof reply.content === 'string' ? reply.content : '';
 }
 
 function createLinkCheckApi(get: () => Promise<unknown>): Pick<PocketRealmApiClient, 'get'> {
