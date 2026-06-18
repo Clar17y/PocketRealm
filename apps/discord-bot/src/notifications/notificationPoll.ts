@@ -10,7 +10,7 @@ import type {
   DiscordTurnsCappedPayload,
 } from '@pocketrealm/shared/discord/discordNotifications';
 
-import { formatDiscordEmoji, type DiscordEmojiMap } from '../discord/emojis.js';
+import { formatDiscordEmoji, type DiscordEmojiKey, type DiscordEmojiMap } from '../discord/emojis.js';
 
 interface NotificationApi {
   get<T>(path: string): Promise<T>;
@@ -61,6 +61,14 @@ function gameLink(webBaseUrl: string, path: string): string {
   return `${webBaseUrl.replace(/\/$/, '')}${path}`;
 }
 
+function notificationEmoji(
+  key: DiscordEmojiKey,
+  legacyFallback: string,
+  emojiMap: DiscordEmojiMap,
+): string {
+  return emojiMap[key] ?? legacyFallback;
+}
+
 export function formatNotificationMessage(
   event: DiscordNotificationEventView,
   webBaseUrl: string,
@@ -91,8 +99,8 @@ export function formatNotificationMessage(
       const p = event.payload as DiscordExpeditionFinishedPayload;
       const expeditions = gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions');
       return p.outcome === 'victory'
-        ? `${formatDiscordEmoji('success', emojiMap)} Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
-        : `${formatDiscordEmoji('warning', emojiMap)} Your Tier ${p.tier} expedition failed after ${p.attempts} attempts. [View expeditions →](${expeditions})`;
+        ? `${notificationEmoji('success', '🎉', emojiMap)} Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
+        : `${notificationEmoji('warning', '💀', emojiMap)} Your Tier ${p.tier} expedition failed after ${p.attempts} attempts. [View expeditions →](${expeditions})`;
     }
     case 'turns_capped': {
       const p = event.payload as DiscordTurnsCappedPayload;
@@ -101,7 +109,7 @@ export function formatNotificationMessage(
       return `${formatDiscordEmoji('turns', emojiMap)} ${p.username}, your turns are full (${turns}/${cap})! Regen is going to waste — time for an adventure.`;
     }
     default: {
-      return `${formatDiscordEmoji('info', emojiMap)} You have a new Pocketrealm notification! ${gameLink(webBaseUrl, '/game')}`;
+      return `${notificationEmoji('info', '📢', emojiMap)} You have a new Pocketrealm notification! ${gameLink(webBaseUrl, '/game')}`;
     }
   }
 }

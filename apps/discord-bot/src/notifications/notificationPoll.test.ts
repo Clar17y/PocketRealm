@@ -133,6 +133,30 @@ describe('formatNotificationMessage', () => {
     expect(content.startsWith('<:pr_duel:123456789012345678>')).toBe(true);
   });
 
+  it('uses semantic custom emoji overrides for legacy default branches', () => {
+    const emojiMap = {
+      success: '<:pr_success:123456789012345678>',
+      warning: '<:pr_warning:123456789012345678>',
+      info: '<:pr_info:123456789012345678>',
+    };
+
+    expect(formatNotificationMessage(
+      evt('expedition_finished', { tier: 3, outcome: 'victory' }),
+      WEB_BASE_URL,
+      emojiMap,
+    ).startsWith('<:pr_success:123456789012345678>')).toBe(true);
+    expect(formatNotificationMessage(
+      evt('expedition_finished', { tier: 2, outcome: 'failed', attempts: 4 }),
+      WEB_BASE_URL,
+      emojiMap,
+    ).startsWith('<:pr_warning:123456789012345678>')).toBe(true);
+    expect(formatNotificationMessage(
+      evt('mystery_type' as DiscordNotificationEventView['type'], {} as DiscordNotificationPayload),
+      WEB_BASE_URL,
+      emojiMap,
+    ).startsWith('<:pr_info:123456789012345678>')).toBe(true);
+  });
+
   it('formats a pvp_attack DM with a bold name and arena deep link', () => {
     const content = formatNotificationMessage(evt('pvp_attack', { attackerName: 'Rook' }), WEB_BASE_URL);
     expect(content).toContain('**Rook**');
@@ -148,6 +172,7 @@ describe('formatNotificationMessage', () => {
 
   it('formats a victorious expedition_finished DM with the guild expeditions deep link', () => {
     const content = formatNotificationMessage(evt('expedition_finished', { tier: 3, outcome: 'victory' }), WEB_BASE_URL);
+    expect(content.startsWith('🎉')).toBe(true);
     expect(content).toContain('Tier 3');
     expect(content.toLowerCase()).toContain('victorious');
     expect(content).toContain(`${WEB_BASE_URL}/game?screen=guild&tab=expeditions`);
@@ -155,6 +180,7 @@ describe('formatNotificationMessage', () => {
 
   it('formats a failed expedition_finished DM with the attempt count', () => {
     const content = formatNotificationMessage(evt('expedition_finished', { tier: 2, outcome: 'failed', attempts: 4 }), WEB_BASE_URL);
+    expect(content.startsWith('💀')).toBe(true);
     expect(content).toContain('Tier 2');
     expect(content).toContain('4 attempts');
   });
@@ -182,6 +208,7 @@ describe('formatNotificationMessage', () => {
       evt('mystery_type' as DiscordNotificationEventView['type'], {} as DiscordNotificationPayload),
       WEB_BASE_URL,
     );
+    expect(content.startsWith('📢')).toBe(true);
     expect(content).toContain('Pocketrealm notification');
     expect(content).toContain(`${WEB_BASE_URL}/game`);
   });

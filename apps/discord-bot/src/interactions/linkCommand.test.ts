@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleLinkCommand } from './linkCommand.js';
 
+const config = { emojiMap: {} };
+
 describe('handleLinkCommand', () => {
   it('defers ephemerally, creates a link code, and edits the reply with the code', async () => {
     const linkCodeResponse = {
@@ -21,7 +23,7 @@ describe('handleLinkCommand', () => {
       editReply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleLinkCommand(interaction, api);
+    await handleLinkCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(post).toHaveBeenCalledWith('/api/v1/discord/link-codes', {
@@ -50,7 +52,7 @@ describe('handleLinkCommand', () => {
       editReply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleLinkCommand(interaction, api);
+    await handleLinkCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(editReply).toHaveBeenCalledWith({
@@ -69,7 +71,7 @@ describe('handleLinkCommand', () => {
       reply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleLinkCommand(interaction, api);
+    await handleLinkCommand(interaction, api, config);
 
     expect(postMock).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({

@@ -7,6 +7,7 @@ import { buildPreferenceComponents, handleNotifyCommand, handleNotifyToggleButto
 
 const GUILD_ID = '23456789012345678';
 const USER_ID = '34567890123456789';
+const config = { emojiMap: {} };
 
 function createApi(overrides: Record<string, unknown> = {}) {
   return {
@@ -46,7 +47,7 @@ describe('handleNotifyCommand', () => {
     const api = createApi();
     const interaction = createCommandInteraction();
 
-    await handleNotifyCommand(interaction as never, api as never);
+    await handleNotifyCommand(interaction as never, api as never, config);
 
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.get).toHaveBeenCalledWith(
@@ -63,7 +64,7 @@ describe('handleNotifyCommand', () => {
     });
     const interaction = createCommandInteraction();
 
-    await handleNotifyCommand(interaction as never, api as never);
+    await handleNotifyCommand(interaction as never, api as never, config);
 
     const payload = interaction.editReply.mock.calls[0][0];
     expect(payload.content).toContain('/link');
@@ -72,7 +73,7 @@ describe('handleNotifyCommand', () => {
   it('rejects use outside the guild', async () => {
     const interaction = createCommandInteraction({ guildId: null });
 
-    await handleNotifyCommand(interaction as never, createApi() as never);
+    await handleNotifyCommand(interaction as never, createApi() as never, config);
 
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
   });
@@ -85,7 +86,7 @@ describe('handleNotifyToggleButton', () => {
     const api = createApi();
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/notifications/preferences', {
       discordGuildId: GUILD_ID,
@@ -102,7 +103,7 @@ describe('handleNotifyToggleButton', () => {
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
     interaction.user.send = vi.fn().mockRejectedValue(new Error('Cannot send messages to this user'));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/notifications/preferences', {
       discordGuildId: GUILD_ID,
@@ -124,7 +125,7 @@ describe('handleNotifyToggleButton', () => {
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
     interaction.user.send = vi.fn().mockRejectedValue(new Error('Cannot send messages to this user'));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     // both upserts attempted (enable + revert)
     expect(api.post).toHaveBeenCalledTimes(2);
@@ -138,7 +139,7 @@ describe('handleNotifyToggleButton', () => {
     });
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', false));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     expect(interaction.user.send).not.toHaveBeenCalled();
   });
@@ -150,7 +151,7 @@ describe('handleNotifyToggleButton', () => {
     });
     const interaction = createButtonInteraction(notifyToggleButtonId('pvp_attack', true));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     // After toggling, the menu re-fetches the full list and re-renders every type.
     expect(api.get).toHaveBeenCalledWith(

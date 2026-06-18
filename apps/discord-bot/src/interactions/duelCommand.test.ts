@@ -8,6 +8,7 @@ import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 const config = {
   duelsChannelId: '111111111111111111',
 };
+const buttonConfig = { emojiMap: {} };
 
 describe('handleDuelCommand', () => {
   it('rejects duel commands outside the configured duels channel ephemerally', async () => {
@@ -261,7 +262,7 @@ describe('handleDuelButton', () => {
       editReply,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     expect(deferUpdate).toHaveBeenCalled();
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/resolve', {
@@ -283,7 +284,7 @@ describe('handleDuelButton', () => {
       update,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     expect(api.post).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
@@ -307,7 +308,7 @@ describe('handleDuelButton', () => {
       followUp,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     expect(deferUpdate).toHaveBeenCalled();
     expect(followUp).toHaveBeenCalledWith({
@@ -379,7 +380,7 @@ describe('handleDuelButton', () => {
       editReply,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     expect(deferUpdate).toHaveBeenCalled();
     expect(deferReply).not.toHaveBeenCalled();
@@ -418,7 +419,7 @@ describe('handleDuelButton', () => {
       editReply,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     expect(deferUpdate).toHaveBeenCalled();
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=2');
@@ -445,7 +446,7 @@ describe('handleDuelButton', () => {
       followUp,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     expect(deferUpdate).toHaveBeenCalled();
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/duels/duel-123/replay?page=1');
@@ -482,7 +483,7 @@ describe('handleDuelButton', () => {
       editReply,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     expect(editReply).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('Borin falls defeated!'),
@@ -513,7 +514,7 @@ describe('handleDuelButton', () => {
       editReply,
     });
 
-    await handleDuelButton(interaction, api);
+    await handleDuelButton(interaction, api, buttonConfig);
 
     const payload = editReply.mock.calls[0]?.[0] as { content: string };
     expect(payload.content.length).toBeLessThanOrEqual(1_800);
