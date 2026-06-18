@@ -73,9 +73,10 @@ function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
     return null;
   }
 
+  const title = result.section ? `${result.title} - ${result.section}` : result.title;
   const snippet = result.snippet ? ` - ${result.snippet}` : '';
 
-  return `- [${result.title}](${url})${snippet}`;
+  return `- [${title}](${url})${snippet}`;
 }
 
 function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {

@@ -31,7 +31,7 @@ describe('handleWikiCommand', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
     const payload = editReply.mock.calls[0]?.[0];
     expect(payload.content).toContain('📖 **Wiki results for "forge"**');
-    expect(payload.content).toContain('[Forge Guide 1]');
+    expect(payload.content).toContain('[Forge Guide 1 - Crafting]');
     const content = typeof payload === 'object' && 'content' in payload ? payload.content : '';
     expect(content).toContain('https://pocketrealm.app/wiki/forge-1');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-5');
