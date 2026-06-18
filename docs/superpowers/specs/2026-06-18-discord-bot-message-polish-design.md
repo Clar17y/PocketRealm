@@ -158,4 +158,3 @@ functions pure so unit tests can assert exact strings without a Discord client.
   embeds, and acknowledgements.
 - Run `npm run test -w apps/discord-bot` and `npm run build:discord-bot` before
   implementation handoff is considered complete.
-
