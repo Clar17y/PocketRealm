@@ -117,6 +117,9 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error) => {
-  logger.error({ error }, 'Failed to upload duel emojis');
+  logger.error(
+    { err: error instanceof Error ? error.message : error },
+    'Failed to upload duel emojis',
+  );
   process.exit(1);
 });

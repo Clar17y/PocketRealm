@@ -119,6 +119,9 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error) => {
-  logger.error({ error }, 'Failed to post duel preview cards');
+  logger.error(
+    { err: error instanceof Error ? error.message : error },
+    'Failed to post duel preview cards',
+  );
   process.exit(1);
 });
