@@ -1,45 +1,27 @@
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  PermissionFlagsBits,
-} from 'discord.js';
+import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 import type {
   ButtonInteraction,
   ChatInputCommandInteraction,
-  InteractionUpdateOptions,
 } from 'discord.js';
 
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import {
-  duelAcceptButtonId,
-  duelBuildsButtonId,
-  duelDeclineButtonId,
-  duelRematchButtonId,
-  duelReplayButtonId,
-  parseDuelButtonId,
-} from '../discord/components.js';
+  buildChallengeCard,
+  buildDeclineCard,
+  buildReplayCard,
+  buildResultCard,
+  type DuelCardPayload,
+} from '../discord/duelCard.js';
+import { parseDuelButtonId } from '../discord/components.js';
 import type { DiscordEmojiMap } from '../discord/emojis.js';
-import { botHeadline, botStatus, compactLines } from '../discord/messageFormat.js';
-import {
-  compactStrings,
-  formatPercent,
-  isRecord,
-  readNumber,
-  readString,
-  truncateText,
-} from '../utils.js';
+import { botStatus } from '../discord/messageFormat.js';
+import { isRecord } from '../utils.js';
 
 type DuelApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
 type DuelCommandConfig = Pick<BotConfig, 'duelsChannelId' | 'emojiMap'>;
 type DuelButtonConfig = Pick<BotConfig, 'emojiMap'>;
-
-const MAX_REPLAY_CONTENT_LENGTH = 1_800;
-const MAX_REPLAY_ENTRY_LENGTH = 240;
-const REPLAY_HAS_MORE_COPY = 'More replay pages are available.';
-const REPLAY_TRUNCATED_COPY = 'Replay page truncated for Discord.';
 
 interface CreateDuelResponse {
   duel: {
@@ -85,7 +67,12 @@ export async function handleDuelCommand(
   if (interaction.channelId !== config.duelsChannelId) {
     await interaction.reply({
       ephemeral: true,
-      content: botStatus('warning', 'Wrong channel', `Use /duel in <#${config.duelsChannelId}>.`, config.emojiMap),
+      content: botStatus(
+        'warning',
+        'Wrong channel',
+        `Use /duel in <#${config.duelsChannelId}>.`,
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -93,7 +80,12 @@ export async function handleDuelCommand(
   if (!interaction.guildId) {
     await interaction.reply({
       ephemeral: true,
-      content: botStatus('warning', 'Server only', '/duel only works in the PocketRealm Discord server.', config.emojiMap),
+      content: botStatus(
+        'warning',
+        'Server only',
+        '/duel only works in the PocketRealm Discord server.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -102,7 +94,12 @@ export async function handleDuelCommand(
   if (opponent.id === interaction.user.id) {
     await interaction.reply({
       ephemeral: true,
-      content: botStatus('warning', 'Choose an opponent', 'Challenge another player, not yourself.', config.emojiMap),
+      content: botStatus(
+        'warning',
+        'Choose an opponent',
+        'Challenge another player, not yourself.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -110,7 +107,12 @@ export async function handleDuelCommand(
   if (opponent.bot) {
     await interaction.reply({
       ephemeral: true,
-      content: botStatus('warning', 'Choose a player', 'Challenge a player, not a bot.', config.emojiMap),
+      content: botStatus(
+        'warning',
+        'Choose a player',
+        'Challenge a player, not a bot.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -149,13 +151,12 @@ export async function handleDuelCommand(
 
   let replyResult: unknown;
   try {
-    replyResult = await channel.send({
-      content: [
-        botHeadline('duel', 'Friendly simulation challenge', config.emojiMap),
-        `<@${opponent.id}>, ${interaction.user} challenged you to a friendly simulation.`,
-      ].join('\n'),
-      components: [buildChallengeRow(response.duel.id, opponent.id)],
-    });
+    replyResult = await channel.send(buildChallengeCard({
+      duelId: response.duel.id,
+      challengerMention: `${interaction.user}`,
+      opponentMention: `<@${opponent.id}>`,
+      opponentDiscordUserId: opponent.id,
+    }));
   } catch {
     await interaction.editReply({
       content: formatDuelPostFailure(
@@ -195,15 +196,12 @@ export async function handleDuelButton(
     }
 
     if (parsed.action === 'decline') {
-      await interaction.update({
-        content: botStatus(
-          'warning',
-          'Declined',
-          `Friendly simulation declined by <@${interaction.user.id}>.`,
-          config.emojiMap,
-        ),
-        components: [],
-      });
+      await applyDuelCardOrNotice(
+        interaction,
+        buildDeclineCard({ declinerMention: `<@${interaction.user.id}>` }),
+        'update',
+        config.emojiMap,
+      );
       return;
     }
 
@@ -235,36 +233,6 @@ export async function handleDuelButton(
   });
 }
 
-function buildChallengeRow(duelId: string, targetDiscordUserId: string): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(duelAcceptButtonId(duelId, targetDiscordUserId))
-      .setLabel('Accept')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(duelDeclineButtonId(duelId, targetDiscordUserId))
-      .setLabel('Decline')
-      .setStyle(ButtonStyle.Secondary),
-  );
-}
-
-function buildResultRow(duelId: string): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(duelReplayButtonId(duelId, 1))
-      .setLabel('Show Replay')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(duelBuildsButtonId(duelId))
-      .setLabel('Show Builds')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(duelRematchButtonId(duelId))
-      .setLabel('Rematch')
-      .setStyle(ButtonStyle.Primary),
-  );
-}
-
 async function acceptDuel(
   interaction: ButtonInteraction,
   api: Pick<PocketRealmApiClient, 'post'>,
@@ -286,27 +254,62 @@ async function acceptDuel(
     return;
   }
 
-  await interaction.editReply(buildDuelResultMessage(response, emojiMap));
+  await applyDuelCardOrNotice(interaction, buildResultCard(response.duel), 'editReply', emojiMap);
 }
 
-function buildDuelResultMessage(
-  response: DuelResultResponse,
-  emojiMap: DiscordEmojiMap,
-): InteractionUpdateOptions {
-  const duel = response.duel;
-  const outcome = duel.isDraw
-    ? `${duel.challengerUsername} and ${duel.targetUsername} fought to a draw.`
-    : `${duel.winnerUsername ?? 'A player'} won the simulation.`;
-  const summary = formatSummary(duel.summary);
+const STALE_DUEL_NOTICE =
+  'This duel was started before a bot update and can no longer be updated here. Run /duel to start a fresh one.';
 
-  return {
-    content: compactLines([
-      botHeadline(duel.isDraw ? 'duel' : 'victory', 'Friendly simulation complete', emojiMap),
-      outcome,
-      summary,
-    ]),
-    components: [buildResultRow(duel.id)],
-  };
+// How a duel card reaches the message: a fresh `update` response (interaction
+// not yet acknowledged) or an `editReply` after deferUpdate (acknowledged).
+// The delivery mode also dictates the correct stale-message fallback, so the
+// two can never drift out of sync.
+type DuelCardDelivery = 'update' | 'editReply';
+
+async function applyDuelCardOrNotice(
+  interaction: ButtonInteraction,
+  card: DuelCardPayload,
+  delivery: DuelCardDelivery,
+  emojiMap: DiscordEmojiMap,
+): Promise<void> {
+  try {
+    if (delivery === 'update') {
+      await interaction.update(card);
+    } else {
+      await interaction.editReply(card);
+    }
+  } catch (error) {
+    // A message created before Components V2 shipped cannot be edited into a
+    // V2 card (the flag is fixed at creation) — that is the only failure we
+    // turn into a stale notice. If the message is already V2, the edit should
+    // have worked, so any failure is transient (Discord outage, rate limit);
+    // re-throw it to the top-level handler, which logs it, rather than telling
+    // the user their healthy duel is stale.
+    if (interaction.message.flags.has(MessageFlags.IsComponentsV2)) {
+      throw error;
+    }
+    await sendStaleDuelNotice(interaction, delivery, emojiMap);
+  }
+}
+
+async function sendStaleDuelNotice(
+  interaction: ButtonInteraction,
+  delivery: DuelCardDelivery,
+  emojiMap: DiscordEmojiMap,
+): Promise<void> {
+  const payload = {
+    ephemeral: true,
+    content: botStatus('warning', 'Duel unavailable', STALE_DUEL_NOTICE, emojiMap),
+  } as const;
+  try {
+    if (delivery === 'update') {
+      await interaction.reply(payload);
+    } else {
+      await interaction.followUp(payload);
+    }
+  } catch {
+    // Nothing more we can safely do if the fallback delivery also fails.
+  }
 }
 
 async function showReplay(
@@ -322,10 +325,7 @@ async function showReplay(
     const response = await api.get<DuelReplayResponse>(
       `/api/v1/discord/duels/${encodeURIComponent(duelId)}/replay?page=${page}`,
     );
-    await interaction.editReply({
-      content: formatReplay(response.replay, emojiMap),
-      components: buildReplayRows(response.replay),
-    });
+    await interaction.editReply(buildReplayCard(response.replay));
   } catch {
     await sendReplayLoadError(interaction, emojiMap);
   }
@@ -345,276 +345,6 @@ async function sendReplayLoadError(interaction: ButtonInteraction, emojiMap: Dis
   } catch {
     // The public duel message is already preserved; there is no safe fallback if follow-up delivery fails.
   }
-}
-
-function formatReplay(replay: DuelReplayResponse['replay'], emojiMap: DiscordEmojiMap): string {
-  const header = botHeadline('duel', `Friendly simulation replay - page ${replay.page}`, emojiMap);
-  const entries = replay.entries
-    .slice(0, replay.pageSize)
-    .map((entry, index) => ({ entry, index }))
-    .filter(({ entry }) => !isRedundantRegenEntry(entry));
-  if (entries.length === 0) {
-    return compactLines([header, 'No replay entries are available.']);
-  }
-
-  const lines: string[] = [];
-  const reservedTailLines = replay.hasMore ? [REPLAY_HAS_MORE_COPY] : [];
-  const resourceLines = formatReplayResourceLines(entries[entries.length - 1]?.entry, replay.summary);
-  lines.push(...resourceLines);
-  if (resourceLines.length > 0) {
-    lines.push('');
-  }
-
-  for (const { entry, index } of entries) {
-    const replayIndex = (replay.page - 1) * replay.pageSize + index + 1;
-    const line = `#${replayIndex} ${formatReplayEntry(entry)}`;
-    if (!fitsReplayContent(header, [...lines, line, ...reservedTailLines])) {
-      while (
-        lines.length > 0
-        && !fitsReplayContent(header, [...lines, REPLAY_TRUNCATED_COPY, ...reservedTailLines])
-      ) {
-        lines.pop();
-      }
-
-      if (fitsReplayContent(header, [...lines, REPLAY_TRUNCATED_COPY, ...reservedTailLines])) {
-        lines.push(REPLAY_TRUNCATED_COPY);
-      }
-      break;
-    }
-
-    lines.push(line);
-  }
-  if (replay.hasMore) {
-    lines.push(REPLAY_HAS_MORE_COPY);
-  }
-
-  return formatReplayContent(header, lines);
-}
-
-function fitsReplayContent(header: string, lines: string[]): boolean {
-  return formatReplayContent(header, lines).length <= MAX_REPLAY_CONTENT_LENGTH;
-}
-
-function formatReplayContent(header: string, lines: string[]): string {
-  return `${header}\n${lines.join('\n')}`;
-}
-
-function buildReplayRows(replay: DuelReplayResponse['replay']): ActionRowBuilder<ButtonBuilder>[] {
-  const buttons: ButtonBuilder[] = [];
-
-  if (replay.page > 1) {
-    buttons.push(
-      new ButtonBuilder()
-        .setCustomId(duelReplayButtonId(replay.id, replay.page - 1))
-        .setLabel('Previous Replay Page')
-        .setStyle(ButtonStyle.Secondary),
-    );
-  }
-
-  if (replay.hasMore) {
-    buttons.push(
-      new ButtonBuilder()
-        .setCustomId(duelReplayButtonId(replay.id, replay.page + 1))
-        .setLabel('Next Replay Page')
-        .setStyle(ButtonStyle.Secondary),
-    );
-  }
-
-  if (buttons.length === 0) {
-    return [];
-  }
-
-  return [
-    new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons),
-  ];
-}
-
-function formatSummary(summary: unknown): string | null {
-  if (typeof summary === 'string') {
-    return summary.trim() || null;
-  }
-
-  if (!isRecord(summary)) {
-    return null;
-  }
-
-  const parts = compactStrings([
-    typeof summary.totalRounds === 'number' ? `${summary.totalRounds} rounds` : null,
-    typeof summary.challengerHpRemaining === 'number' ? `${summary.challengerHpRemaining} challenger HP left` : null,
-    typeof summary.targetHpRemaining === 'number' ? `${summary.targetHpRemaining} target HP left` : null,
-  ]);
-
-  return parts.length > 0 ? parts.join(' · ') : null;
-}
-
-function formatReplayEntry(entry: unknown): string {
-  if (typeof entry === 'string') {
-    return truncateText(entry, MAX_REPLAY_ENTRY_LENGTH);
-  }
-
-  if (!isRecord(entry)) {
-    return truncateText(JSON.stringify(entry), MAX_REPLAY_ENTRY_LENGTH);
-  }
-
-  const message = typeof entry.message === 'string' ? entry.message : null;
-  const structured = formatStructuredReplayEntry(entry);
-  if (structured) {
-    return truncateText(structured, MAX_REPLAY_ENTRY_LENGTH);
-  }
-
-  if (message) {
-    return truncateText(message, MAX_REPLAY_ENTRY_LENGTH);
-  }
-
-  const round = typeof entry.round === 'number' ? `Round ${entry.round}` : null;
-  const actionName = typeof entry.actionName === 'string' ? entry.actionName : null;
-  const damage = typeof entry.damageDealt === 'number' ? `${entry.damageDealt} damage` : null;
-  const parts = compactStrings([round, actionName, damage]);
-
-  return parts.length > 0 ? parts.join(' · ') : 'Replay event details unavailable.';
-}
-
-function formatStructuredReplayEntry(entry: Record<string, unknown>): string | null {
-  const round = typeof entry.round === 'number' ? `R${entry.round}` : null;
-  const actorName = typeof entry.actorName === 'string' ? entry.actorName : null;
-  const actionName = typeof entry.actionName === 'string'
-    ? entry.actionName
-    : typeof entry.spellName === 'string'
-      ? entry.spellName
-      : null;
-
-  if (!round && !actorName && !actionName) {
-    return null;
-  }
-
-  const damage = readNumber(entry, 'damage') ?? readNumber(entry, 'damageDealt');
-  const healAmount = readNumber(entry, 'healAmount');
-  const outcomeParts = compactStrings([
-    damage !== null ? `${damage} damage` : null,
-    healAmount !== null ? `+${healAmount} HP` : null,
-    formatHitBreakdown(entry),
-    entry.isCritical === true ? 'CRIT' : null,
-    formatForcedAction(entry),
-    formatEffectsApplied(entry),
-  ]);
-
-  const label = compactStrings([round, actorName, actionName]).join(' ');
-  return outcomeParts.length > 0 ? `${label}: ${outcomeParts.join(' ')}` : null;
-}
-
-function formatForcedAction(entry: Record<string, unknown>): string | null {
-  return entry.forcedActionReason === 'pinned' ? 'Pinned -> Defend' : null;
-}
-
-function formatEffectsApplied(entry: Record<string, unknown>): string | null {
-  if (!Array.isArray(entry.effectsApplied) || entry.effectsApplied.length === 0) {
-    return null;
-  }
-
-  const effectNames = entry.effectsApplied
-    .map((effect) => {
-      if (!isRecord(effect)) return null;
-      return typeof effect.stat === 'string' ? effect.stat : null;
-    });
-  const displayNames = compactStrings(effectNames);
-
-  return displayNames.length > 0 ? `applies ${displayNames.join(', ')}` : null;
-}
-
-function formatHitBreakdown(entry: Record<string, unknown>): string | null {
-  const hitChance = readNumber(entry, 'hitChance');
-  const hitRollValue = readNumber(entry, 'hitRollValue');
-  const attackerHitScore = readNumber(entry, 'attackerHitScore');
-  const defenderAvoidScore = readNumber(entry, 'defenderAvoidScore');
-  if (
-    hitChance === null
-    || hitRollValue === null
-    || attackerHitScore === null
-    || defenderAvoidScore === null
-  ) {
-    return null;
-  }
-
-  const result = hitRollValue < hitChance ? 'HIT' : 'MISS';
-  return `${result} ${formatPercent(hitChance)} (roll ${formatPercent(hitRollValue)}, ${attackerHitScore} hit vs ${defenderAvoidScore} avoid)`;
-}
-
-function formatReplayResourceLines(entry: unknown, summary: unknown): string[] {
-  if (!isRecord(entry)) {
-    return [];
-  }
-
-  const summaryRecord = isRecord(summary) ? summary : {};
-  const challengerName = readString(summaryRecord, 'challengerUsername') ?? 'Challenger';
-  const targetName = readString(summaryRecord, 'targetUsername') ?? 'Target';
-  const challengerLine = formatFighterResources(challengerName, {
-    hp: readNumber(entry, 'combatantAHpAfter'),
-    maxHp: readNumber(summaryRecord, 'challengerMaxHp'),
-    mana: readNumber(entry, 'combatantAManaAfter'),
-    maxMana: readNumber(summaryRecord, 'challengerMaxMana'),
-    stamina: readNumber(entry, 'combatantAStaminaAfter'),
-    maxStamina: readNumber(summaryRecord, 'challengerMaxStamina'),
-  });
-  const targetLine = formatFighterResources(targetName, {
-    hp: readNumber(entry, 'combatantBHpAfter'),
-    maxHp: readNumber(summaryRecord, 'targetMaxHp'),
-    mana: readNumber(entry, 'combatantBManaAfter'),
-    maxMana: readNumber(summaryRecord, 'targetMaxMana'),
-    stamina: readNumber(entry, 'combatantBStaminaAfter'),
-    maxStamina: readNumber(summaryRecord, 'targetMaxStamina'),
-  });
-
-  return compactStrings([challengerLine, targetLine]);
-}
-
-function formatFighterResources(
-  name: string,
-  resources: {
-    hp: number | null;
-    maxHp: number | null;
-    mana: number | null;
-    maxMana: number | null;
-    stamina: number | null;
-    maxStamina: number | null;
-  },
-): string | null {
-  const parts = compactStrings([
-    formatMeter('HP', resources.hp, resources.maxHp),
-    formatMeter('MP', resources.mana, resources.maxMana),
-    formatMeter('STA', resources.stamina, resources.maxStamina),
-  ]);
-
-  return parts.length > 0 ? `${name} ${parts.join(' ')}` : null;
-}
-
-function formatMeter(label: string, current: number | null, max: number | null): string | null {
-  if (current === null) {
-    return null;
-  }
-
-  if (max === null || max <= 0) {
-    return `${label} ${current}`;
-  }
-
-  return `${label} [${formatBar(current, max)}] ${current}/${max}`;
-}
-
-function formatBar(current: number, max: number): string {
-  const width = 10;
-  const filled = Math.max(0, Math.min(width, Math.round((current / max) * width)));
-  return `${'#'.repeat(filled)}${'-'.repeat(width - filled)}`;
-}
-
-function isRedundantRegenEntry(entry: unknown): boolean {
-  if (!isRecord(entry)) {
-    return false;
-  }
-
-  const hasEffects = Array.isArray(entry.effectsApplied) && entry.effectsApplied.length > 0;
-  return entry.action === 'regen'
-    && readNumber(entry, 'damage') === null
-    && readNumber(entry, 'healAmount') === null
-    && !hasEffects;
 }
 
 async function recordDuelMessage(
@@ -682,7 +412,12 @@ function createDuelErrorCopy(error: unknown, emojiMap: DiscordEmojiMap): string 
     }
 
     if (error.code === 'DISCORD_SELF_CHALLENGE' || error.code === 'DISCORD_DUEL_SELF_CHALLENGE') {
-      return botStatus('warning', 'Choose an opponent', 'Challenge another player, not yourself.', emojiMap);
+      return botStatus(
+        'warning',
+        'Choose an opponent',
+        'Challenge another player, not yourself.',
+        emojiMap,
+      );
     }
   }
 
@@ -701,7 +436,12 @@ function resolveDuelErrorCopy(error: unknown, emojiMap: DiscordEmojiMap): string
       || error.code === 'DISCORD_DUEL_CHALLENGER_LINK_REQUIRED'
       || error.code === 'DISCORD_DUEL_TARGET_LINK_REQUIRED'
     ) {
-      return botStatus('warning', 'Link required', 'Link your PocketRealm account first with /link.', emojiMap);
+      return botStatus(
+        'warning',
+        'Link required',
+        'Link your PocketRealm account first with /link.',
+        emojiMap,
+      );
     }
 
     if (
