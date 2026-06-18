@@ -479,6 +479,10 @@ function classifyActionKind(entry: unknown): keyof DuelActionIcons {
   if (entry.isCritical === true) {
     return 'crit';
   }
+  // Only `attack` entries carry a hit roll (offensive spells also use the
+  // `attack` action). `spell` is reserved for supportive casts that never roll
+  // to hit, so gating the miss icon on `attack` is safe today; revisit this
+  // precedence if supportive casts ever gain a hit roll.
   if (action === 'attack' && isMiss(entry)) {
     return 'miss';
   }

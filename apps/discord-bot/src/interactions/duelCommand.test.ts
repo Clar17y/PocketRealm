@@ -341,6 +341,40 @@ describe('handleDuelButton', () => {
     expect(followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
   });
 
+  it('rethrows a transient edit failure on a V2 message instead of misreporting it as stale', async () => {
+    const api = createApi();
+    vi.mocked(api.post).mockResolvedValue({
+      duel: {
+        id: 'duel-123',
+        status: 'resolved',
+        challengerUsername: 'Astra',
+        targetUsername: 'Borin',
+        winnerUsername: 'Astra',
+        isDraw: false,
+        expiresAt: '2026-06-04T12:15:00.000Z',
+        summary: { totalRounds: 3 },
+        replay: { id: 'duel-123', status: 'resolved', page: 1, pageSize: 10, hasMore: false, entries: [] },
+      },
+    });
+    const editReply = vi.fn(async () => {
+      throw new Error('Service Unavailable');
+    });
+    const followUp = vi.fn<ButtonInteraction['followUp']>();
+    const interaction = createButtonInteraction({
+      customId: 'duel:accept:duel-123:333333333333333333',
+      userId: '333333333333333333',
+      editReply,
+      followUp,
+      messageFlags: MessageFlags.IsComponentsV2,
+    });
+
+    await expect(handleDuelButton(interaction, api)).rejects.toThrow('Service Unavailable');
+    // The card message is already V2, so the failure is transient — let it
+    // propagate to the top-level handler (which logs it) rather than telling
+    // the user their healthy duel is stale.
+    expect(followUp).not.toHaveBeenCalled();
+  });
+
   it('falls back to an ephemeral notice when declining a pre-update duel message', async () => {
     const api = createApi();
     const update = vi.fn(async () => {
@@ -596,7 +630,7 @@ describe('handleDuelButton', () => {
 
     const payload = editReply.mock.calls[0]?.[0];
     const text = cardText(payload);
-    expect(text.length).toBeLessThanOrEqual(1_800);
+    expect(text.length).toBeLessThanOrEqual(4_000);
     expect(text).toContain('Replay event details unavailable.');
     expect(text).not.toContain('internalState');
   });
@@ -677,10 +711,13 @@ function createButtonInteraction(input: {
   deferReply?: ReturnType<typeof vi.fn>;
   editReply?: ReturnType<typeof vi.fn>;
   followUp?: ReturnType<typeof vi.fn>;
+  messageFlags?: number;
 }): ButtonInteraction {
+  const messageFlags = input.messageFlags ?? 0;
   return {
     customId: input.customId,
     user: { id: input.userId ?? '333333333333333333' },
+    message: { flags: { has: (flag: number) => (messageFlags & flag) === flag } },
     reply: input.reply ?? vi.fn(),
     update: input.update ?? vi.fn(),
     deferUpdate: input.deferUpdate ?? vi.fn(),

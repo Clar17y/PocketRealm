@@ -1,4 +1,4 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 import type {
   ButtonInteraction,
   ChatInputCommandInteraction,
@@ -232,8 +232,16 @@ async function applyDuelCardOrNotice(
     } else {
       await interaction.editReply(card);
     }
-  } catch {
-    // The message predates Components V2 and cannot be edited into it.
+  } catch (error) {
+    // A message created before Components V2 shipped cannot be edited into a
+    // V2 card (the flag is fixed at creation) — that is the only failure we
+    // turn into a stale notice. If the message is already V2, the edit should
+    // have worked, so any failure is transient (Discord outage, rate limit);
+    // re-throw it to the top-level handler, which logs it, rather than telling
+    // the user their healthy duel is stale.
+    if (interaction.message.flags.has(MessageFlags.IsComponentsV2)) {
+      throw error;
+    }
     await sendStaleDuelNotice(interaction, delivery);
   }
 }
