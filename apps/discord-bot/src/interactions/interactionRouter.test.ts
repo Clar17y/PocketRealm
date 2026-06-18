@@ -73,9 +73,11 @@ describe('routeInteraction', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('ℹ️ **No wiki results**'),
+      allowedMentions: { parse: [] },
     });
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('"forge"'),
+      allowedMentions: { parse: [] },
     });
   });
 

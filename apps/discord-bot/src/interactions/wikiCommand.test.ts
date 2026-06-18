@@ -5,6 +5,9 @@ import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleWikiCommand } from './wikiCommand.js';
 
 const wikiConfig = { webBaseUrl: 'https://pocketrealm.app', emojiMap: {} };
+const disabledMentions = { allowedMentions: { parse: [] } } as const;
+const unsafeWikiText = '@everyone **bad** [x](https://evil.example)';
+const escapedUnsafeWikiText = '@\u200Beveryone \\*\\*bad\\*\\* \\[x\\]\\(https://evil\\.example\\)';
 
 describe('handleWikiCommand', () => {
   it('returns up to 5 absolute wiki links for a search query', async () => {
@@ -38,6 +41,7 @@ describe('handleWikiCommand', () => {
     expect(content).toContain('https://pocketrealm.app/wiki/forge-1');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-5');
     expect(content).not.toContain('Forge Guide 6');
+    expect(payload).toMatchObject(disabledMentions);
   });
 
   it('responds safely when no wiki results are found', async () => {
@@ -56,7 +60,55 @@ describe('handleWikiCommand', () => {
 
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('ℹ️ **No wiki results**'),
+      ...disabledMentions,
     });
+  });
+
+  it('disables mentions when wiki search is unavailable', async () => {
+    const get = vi.fn(async (): Promise<never> => {
+      throw new Error('unavailable');
+    });
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => 'forge'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining('❌ **Wiki unavailable**'),
+      ...disabledMentions,
+    });
+  });
+
+  it('escapes unsafe query text in public no-results replies and disables mentions', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({ results: [] }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => unsafeWikiText),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining(`No wiki results found for "${escapedUnsafeWikiText}".`),
+      ...disabledMentions,
+    });
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).not.toContain('@everyone');
+    expect(content).not.toContain('**bad**');
+    expect(content).not.toContain('[x](https://evil.example)');
   });
 
   it('skips malformed and unsafe wiki result URLs while still replying', async () => {
@@ -122,6 +174,75 @@ describe('handleWikiCommand', () => {
     expect(content).toContain('https://pocketrealm.app/wiki/safe-guide');
     expect(content).not.toContain('https://evil.example');
     expect(content).not.toContain('https://bad.example');
+  });
+
+  it('escapes unsafe query text in public results headings and disables mentions', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      results: [
+        {
+          title: 'Safe Guide',
+          snippet: 'Safe snippet',
+          url: '/wiki/safe-guide',
+        },
+      ],
+    }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => unsafeWikiText),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining(`📖 **Wiki results for "${escapedUnsafeWikiText}"**`),
+      ...disabledMentions,
+    });
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).not.toContain('@everyone');
+    expect(content).not.toContain('**bad**');
+    expect(content).not.toContain('[x](https://evil.example)');
+  });
+
+  it('escapes unsafe snippet text in public wiki results and disables mentions', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      results: [
+        {
+          title: 'Safe Guide',
+          snippet: unsafeWikiText,
+          url: '/wiki/safe-guide',
+        },
+      ],
+    }) as T);
+    const deferReply = vi.fn<ChatInputCommandInteraction['deferReply']>();
+    const editReply = vi.fn<ChatInputCommandInteraction['editReply']>();
+    const interaction = {
+      options: {
+        getString: vi.fn(() => 'forge'),
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction;
+
+    await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
+
+    expect(editReply).toHaveBeenCalledWith({
+      content: expect.stringContaining(
+        `- [Safe Guide](https://pocketrealm.app/wiki/safe-guide) - ${escapedUnsafeWikiText}`,
+      ),
+      ...disabledMentions,
+    });
+    const reply = editReply.mock.calls[0]?.[0];
+    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    expect(content).toContain('[Safe Guide](https://pocketrealm.app/wiki/safe-guide)');
+    expect(content).not.toContain('@everyone');
+    expect(content).not.toContain('[x](https://evil.example)');
+    expect(content).not.toContain('**bad**');
   });
 
   it('escapes wiki result destinations before rendering markdown links', async () => {

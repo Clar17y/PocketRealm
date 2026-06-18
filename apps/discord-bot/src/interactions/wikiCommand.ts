@@ -5,6 +5,9 @@ import type { BotConfig } from '../config.js';
 import { botHeadline, botStatus } from '../discord/messageFormat.js';
 
 const MAX_WIKI_RESULTS = 5;
+const PUBLIC_REPLY_OPTIONS = {
+  allowedMentions: { parse: [] },
+} as const;
 
 interface WikiSearchResponse {
   results: WikiResult[];
@@ -42,10 +45,12 @@ export async function handleWikiCommand(
         'Unable to search the PocketRealm wiki right now. Please try again later.',
         config.emojiMap,
       ),
+      ...PUBLIC_REPLY_OPTIONS,
     });
     return;
   }
 
+  const escapedQuery = escapeWikiDisplayText(query);
   const wikiBaseUrl = new URL(config.webBaseUrl);
   const results: string[] = [];
   for (const result of response.results) {
@@ -60,16 +65,18 @@ export async function handleWikiCommand(
 
   if (results.length === 0) {
     await interaction.editReply({
-      content: botStatus('info', 'No wiki results', `No wiki results found for "${query}".`, config.emojiMap),
+      content: botStatus('info', 'No wiki results', `No wiki results found for "${escapedQuery}".`, config.emojiMap),
+      ...PUBLIC_REPLY_OPTIONS,
     });
     return;
   }
 
   await interaction.editReply({
     content: [
-      botHeadline('wiki', `Wiki results for "${query}"`, config.emojiMap),
+      botHeadline('wiki', `Wiki results for "${escapedQuery}"`, config.emojiMap),
       ...results,
     ].join('\n'),
+    ...PUBLIC_REPLY_OPTIONS,
   });
 }
 
@@ -81,9 +88,15 @@ function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
 
   const title = result.section ? `${result.title} - ${result.section}` : result.title;
   const label = escapeMarkdownLinkLabel(title);
-  const snippet = result.snippet ? ` - ${result.snippet}` : '';
+  const snippet = result.snippet ? ` - ${escapeWikiDisplayText(result.snippet)}` : '';
 
   return `- [${label}](${url})${snippet}`;
+}
+
+function escapeWikiDisplayText(value: string): string {
+  return value
+    .replace(/@/g, '@\u200B')
+    .replace(/([\\`*_{}\[\]()#+.!|><~-])/g, '\\$1');
 }
 
 function escapeMarkdownLinkLabel(value: string): string {
