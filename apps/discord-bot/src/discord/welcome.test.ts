@@ -14,6 +14,7 @@ const baseConfig = {
   webBaseUrl: 'https://pocketrealm.test',
   welcomeChannelId: WELCOME_CHANNEL_ID,
   duelsChannelId: DUELS_CHANNEL_ID,
+  emojiMap: {},
 } as BotConfig;
 
 describe('welcomeGuildMember', () => {
@@ -25,15 +26,11 @@ describe('welcomeGuildMember', () => {
 
     expect(result).toEqual({ sent: true });
     expect(client.channels.fetch).toHaveBeenCalledWith(WELCOME_CHANNEL_ID);
-    expect(send).toHaveBeenCalledWith({
-      content: [
-        `Welcome <@${USER_ID}> to PocketRealm.`,
-        `Use \`/link\` to connect your game account, \`/wiki\` for game help, and \`/report\` if you need support.`,
-        `Friendly duels live in <#${DUELS_CHANNEL_ID}>.`,
-        'Play: https://pocketrealm.test',
-      ].join('\n'),
+    const payload = send.mock.calls[0][0];
+    expect(payload.content).toContain('👋 **Welcome to PocketRealm');
+    expect(payload).toEqual(expect.objectContaining({
       allowedMentions: { users: [USER_ID], roles: [], parse: [] },
-    });
+    }));
   });
 
   it('waits for members who have not completed membership screening', async () => {

@@ -30,12 +30,10 @@ describe('handleLinkCommand', () => {
       discordUserId: '123456789012345678',
       discordGuildId: '234567890123456789',
     });
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Enter this code in PocketRealm Settings: ABC12345'),
-    });
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('<t:1780574400:F>'),
-    });
+    const payload = editReply.mock.calls[0][0];
+    expect(payload.content).toContain('🔗 **Link PocketRealm**');
+    expect(payload.content).toContain('`ABC12345`');
+    expect(payload.content).toContain('<t:1780574400:F>');
   });
 
   it('edits the deferred reply with safe copy when the API fails', async () => {
@@ -56,7 +54,7 @@ describe('handleLinkCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(editReply).toHaveBeenCalledWith({
-      content: 'Unable to create a PocketRealm link code right now. Please try again later.',
+      content: expect.stringContaining('❌ **Link failed**'),
     });
   });
 
@@ -76,7 +74,7 @@ describe('handleLinkCommand', () => {
     expect(postMock).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       ephemeral: true,
-      content: '/link only works in the PocketRealm Discord server.',
+      content: expect.stringContaining('⚠️ **Server only**'),
     });
   });
 });

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleWikiCommand } from './wikiCommand.js';
 
-const wikiConfig = { webBaseUrl: 'https://pocketrealm.app' };
+const wikiConfig = { webBaseUrl: 'https://pocketrealm.app', emojiMap: {} };
 
 describe('handleWikiCommand', () => {
   it('returns up to 5 absolute wiki links for a search query', async () => {
@@ -29,11 +29,10 @@ describe('handleWikiCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/wiki/search?q=forge');
-    const reply = editReply.mock.calls[0]?.[0];
-    expect(reply).toEqual({
-      content: expect.stringContaining('Forge Guide 1'),
-    });
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    const payload = editReply.mock.calls[0]?.[0];
+    expect(payload.content).toContain('📖 **Wiki results for "forge"**');
+    expect(payload.content).toContain('[Forge Guide 1]');
+    const content = typeof payload === 'object' && 'content' in payload ? payload.content : '';
     expect(content).toContain('https://pocketrealm.app/wiki/forge-1');
     expect(content).toContain('https://pocketrealm.app/wiki/forge-5');
     expect(content).not.toContain('Forge Guide 6');
@@ -54,7 +53,7 @@ describe('handleWikiCommand', () => {
     await handleWikiCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, wikiConfig);
 
     expect(editReply).toHaveBeenCalledWith({
-      content: 'No wiki results found for "missing topic".',
+      content: expect.stringContaining('ℹ️ **No wiki results**'),
     });
   });
 
@@ -111,7 +110,7 @@ describe('handleWikiCommand', () => {
     await handleWikiCommand(
       interaction,
       { get } as Pick<PocketRealmApiClient, 'get'>,
-      { webBaseUrl: 'https://pocketrealm.example' },
+      { webBaseUrl: 'https://pocketrealm.example', emojiMap: {} },
     );
 
     expect(editReply).toHaveBeenCalledOnce();

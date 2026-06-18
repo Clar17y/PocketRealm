@@ -54,6 +54,7 @@ describe('handleNotifyCommand', () => {
       `/api/v1/discord/notifications/preferences?guildId=${GUILD_ID}&discordUserId=${USER_ID}`,
     );
     const payload = interaction.editReply.mock.calls[0][0];
+    expect(payload.content).toContain('🔔 **Discord notifications**');
     expect(payload.components).toHaveLength(1);
     expect(JSON.stringify(payload.components)).toContain(notifyToggleButtonId('turns_capped', true));
   });
@@ -94,7 +95,9 @@ describe('handleNotifyToggleButton', () => {
       type: 'turns_capped',
       enabled: true,
     });
-    expect(interaction.user.send).toHaveBeenCalled();
+    expect(interaction.user.send).toHaveBeenCalledWith({
+      content: expect.stringContaining('✅ **Notification enabled**'),
+    });
     expect(interaction.editReply).toHaveBeenCalled();
   });
 

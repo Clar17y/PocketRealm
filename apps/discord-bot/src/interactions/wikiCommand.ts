@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
+import { botHeadline, botStatus } from '../discord/messageFormat.js';
 
 const MAX_WIKI_RESULTS = 5;
 
@@ -17,7 +18,7 @@ interface WikiResult {
 }
 
 type WikiApiClient = Pick<PocketRealmApiClient, 'get'>;
-type WikiConfig = Pick<BotConfig, 'webBaseUrl'>;
+type WikiConfig = Pick<BotConfig, 'webBaseUrl' | 'emojiMap'>;
 
 export async function handleWikiCommand(
   interaction: ChatInputCommandInteraction,
@@ -35,7 +36,12 @@ export async function handleWikiCommand(
     );
   } catch {
     await interaction.editReply({
-      content: 'Unable to search the PocketRealm wiki right now. Please try again later.',
+      content: botStatus(
+        'error',
+        'Wiki unavailable',
+        'Unable to search the PocketRealm wiki right now. Please try again later.',
+        config.emojiMap,
+      ),
     });
     return;
   }
@@ -48,14 +54,14 @@ export async function handleWikiCommand(
 
   if (results.length === 0) {
     await interaction.editReply({
-      content: `No wiki results found for "${query}".`,
+      content: botStatus('info', 'No wiki results', `No wiki results found for "${query}".`, config.emojiMap),
     });
     return;
   }
 
   await interaction.editReply({
     content: [
-      `Wiki results for "${query}":`,
+      botHeadline('wiki', `Wiki results for "${query}"`, config.emojiMap),
       ...results,
     ].join('\n'),
   });
@@ -67,10 +73,9 @@ function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
     return null;
   }
 
-  const title = result.section ? `${result.title} - ${result.section}` : result.title;
   const snippet = result.snippet ? ` - ${result.snippet}` : '';
 
-  return `- ${title}: ${url}${snippet}`;
+  return `- [${result.title}](${url})${snippet}`;
 }
 
 function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {
