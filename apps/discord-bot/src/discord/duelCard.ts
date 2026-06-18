@@ -127,6 +127,7 @@ export function buildDeclineCard(input: { declinerMention: string }): DuelCardPa
 
 export function buildResultCard(duel: DuelResultData): DuelCardPayload {
   const icons = DEFAULT_DUEL_RESULT_ICONS;
+  const loser = loserName(duel);
   const scoreboard = duel.isDraw
     ? [
       `${icons.draw} **${duel.challengerUsername}**`,
@@ -134,7 +135,7 @@ export function buildResultCard(duel: DuelResultData): DuelCardPayload {
     ]
     : compactStrings([
       `${icons.victory} **${duel.winnerUsername ?? 'A player'}**`,
-      loserName(duel) !== null ? `${icons.loss} ${loserName(duel)}` : null,
+      loser !== null ? `${icons.loss} ${loser}` : null,
     ]);
   const summary = formatSummary(duel.summary);
   const lines = compactStrings(['⚔️ **Friendly Simulation Complete**', ...scoreboard, summary]);
@@ -448,6 +449,17 @@ export function actionIcon(
   return icons[classifyActionKind(entry)];
 }
 
+// Actions whose icon is a straight 1:1 of the action name, with no extra
+// conditions. Kept out of the classifier ladder below so that only the
+// branches with real precedence logic (heal, pinned-defend, crit, miss, magic)
+// remain there.
+const PASSTHROUGH_ACTION_ICONS: Record<string, keyof DuelActionIcons> = {
+  counter: 'counter',
+  ward: 'ward',
+  potion: 'potion',
+  cleanse: 'cleanse',
+};
+
 function classifyActionKind(entry: unknown): keyof DuelActionIcons {
   if (!isRecord(entry)) {
     return 'physical';
@@ -464,17 +476,9 @@ function classifyActionKind(entry: unknown): keyof DuelActionIcons {
   if (action === 'defend' || entry.forcedActionReason === 'pinned') {
     return 'defend';
   }
-  if (action === 'counter') {
-    return 'counter';
-  }
-  if (action === 'ward') {
-    return 'ward';
-  }
-  if (action === 'potion') {
-    return 'potion';
-  }
-  if (action === 'cleanse') {
-    return 'cleanse';
+  const passthrough = action ? PASSTHROUGH_ACTION_ICONS[action] : undefined;
+  if (passthrough) {
+    return passthrough;
   }
   if (entry.isCritical === true) {
     return 'crit';
