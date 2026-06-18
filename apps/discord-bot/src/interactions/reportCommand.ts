@@ -24,6 +24,7 @@ import type { BotConfig } from '../config.js';
 type ReportApiClient = Pick<PocketRealmApiClient, 'post'>;
 type ReportLinkCheckApiClient = Pick<PocketRealmApiClient, 'get'>;
 type ReportCommandConfig = Pick<BotConfig, 'guildId'>;
+type ReportModalSubmitConfig = Pick<BotConfig, 'emojiMap'>;
 
 interface CreateDiscordReportResponse {
   ticket: {
@@ -99,6 +100,7 @@ async function isLinkedPocketRealmUser(
 export async function handleReportModalSubmit(
   interaction: ModalSubmitInteraction,
   api: ReportApiClient,
+  _config: ReportModalSubmitConfig,
 ): Promise<void> {
   if (!interaction.guildId) {
     await interaction.reply({

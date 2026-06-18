@@ -32,6 +32,7 @@ import {
 
 type DuelApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
 type DuelCommandConfig = Pick<BotConfig, 'duelsChannelId'>;
+type DuelButtonConfig = Pick<BotConfig, 'emojiMap'>;
 
 const MAX_REPLAY_CONTENT_LENGTH = 1_800;
 const MAX_REPLAY_ENTRY_LENGTH = 240;
@@ -159,6 +160,7 @@ export async function handleDuelCommand(
 export async function handleDuelButton(
   interaction: ButtonInteraction,
   api: DuelApiClient,
+  _config: DuelButtonConfig,
 ): Promise<void> {
   const parsed = parseDuelButtonId(interaction.customId);
   if (!parsed) return;

@@ -10,6 +10,8 @@ import type {
   DiscordTurnsCappedPayload,
 } from '@pocketrealm/shared/discord/discordNotifications';
 
+import { formatDiscordEmoji, type DiscordEmojiMap } from '../discord/emojis.js';
+
 interface NotificationApi {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body: unknown): Promise<T>;
@@ -47,6 +49,7 @@ export interface DiscordNotificationPollOptions {
   logger: LoggerLike;
   readyClient: ReadyClientLike;
   webBaseUrl: string;
+  emojiMap?: DiscordEmojiMap;
   redis?: DeliverySuppressionStore;
 }
 
@@ -58,43 +61,47 @@ function gameLink(webBaseUrl: string, path: string): string {
   return `${webBaseUrl.replace(/\/$/, '')}${path}`;
 }
 
-export function formatNotificationMessage(event: DiscordNotificationEventView, webBaseUrl: string): string {
+export function formatNotificationMessage(
+  event: DiscordNotificationEventView,
+  webBaseUrl: string,
+  emojiMap: DiscordEmojiMap = {},
+): string {
   switch (event.type) {
     case 'pvp_attack': {
       const p = event.payload as DiscordPvpAttackPayload;
-      return `⚔️ **${p.attackerName}** challenged you in the arena! [Fight back →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
+      return `${formatDiscordEmoji('duel', emojiMap)} **${p.attackerName}** challenged you in the arena! [Fight back →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
     }
     case 'pvp_scout': {
       const p = event.payload as DiscordPvpScoutPayload;
-      return `🔍 **${p.scouterName}** is sizing you up in the arena. [Check the arena →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
+      return `${formatDiscordEmoji('scout', emojiMap)} **${p.scouterName}** is sizing you up in the arena. [Check the arena →](${gameLink(webBaseUrl, '/game?screen=arena')})`;
     }
     case 'boss_appeared': {
       const p = event.payload as DiscordBossAppearedPayload;
-      return `🐉 **${p.bossName}** has appeared in **${p.zoneName}**! [Join the fight →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
+      return `${formatDiscordEmoji('boss', emojiMap)} **${p.bossName}** has appeared in **${p.zoneName}**! [Join the fight →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
     }
     case 'boss_defeated': {
       const p = event.payload as DiscordBossDefeatedPayload;
-      return `🏆 **${p.bossName}** has been slain! [Claim your spoils →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
+      return `${formatDiscordEmoji('victory', emojiMap)} **${p.bossName}** has been slain! [Claim your spoils →](${gameLink(webBaseUrl, '/game?screen=worldEvents')})`;
     }
     case 'expedition_recruiting': {
       const p = event.payload as DiscordExpeditionRecruitingPayload;
-      return `🧭 A Tier ${p.tier} guild expedition is recruiting — [sign up →](${gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions')})`;
+      return `${formatDiscordEmoji('expedition', emojiMap)} A Tier ${p.tier} guild expedition is recruiting — [sign up →](${gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions')})`;
     }
     case 'expedition_finished': {
       const p = event.payload as DiscordExpeditionFinishedPayload;
       const expeditions = gameLink(webBaseUrl, '/game?screen=guild&tab=expeditions');
       return p.outcome === 'victory'
-        ? `🎉 Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
-        : `💀 Your Tier ${p.tier} expedition failed after ${p.attempts} attempts. [View expeditions →](${expeditions})`;
+        ? `${formatDiscordEmoji('success', emojiMap)} Your Tier ${p.tier} expedition was victorious! [Collect rewards →](${expeditions})`
+        : `${formatDiscordEmoji('warning', emojiMap)} Your Tier ${p.tier} expedition failed after ${p.attempts} attempts. [View expeditions →](${expeditions})`;
     }
     case 'turns_capped': {
       const p = event.payload as DiscordTurnsCappedPayload;
       const turns = p.currentTurns.toLocaleString('en-US');
       const cap = p.bankCap.toLocaleString('en-US');
-      return `⚡ ${p.username}, your turns are full (${turns}/${cap})! Regen is going to waste — time for an adventure.`;
+      return `${formatDiscordEmoji('turns', emojiMap)} ${p.username}, your turns are full (${turns}/${cap})! Regen is going to waste — time for an adventure.`;
     }
     default: {
-      return `📢 You have a new Pocketrealm notification! ${gameLink(webBaseUrl, '/game')}`;
+      return `${formatDiscordEmoji('info', emojiMap)} You have a new Pocketrealm notification! ${gameLink(webBaseUrl, '/game')}`;
     }
   }
 }
@@ -123,7 +130,7 @@ export async function pollDiscordNotifications(options: DiscordNotificationPollO
 
     try {
       const user = await options.readyClient.users.fetch(event.discordUserId);
-      await user.send({ content: formatNotificationMessage(event, options.webBaseUrl) });
+      await user.send({ content: formatNotificationMessage(event, options.webBaseUrl, options.emojiMap) });
       deliveredIds.push(event.id);
     } catch (error) {
       failedIds.push(event.id);

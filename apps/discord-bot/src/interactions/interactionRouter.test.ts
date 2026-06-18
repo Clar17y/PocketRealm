@@ -5,6 +5,7 @@ import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { routeInteraction } from './interactionRouter.js';
+import { handleLinkCommand } from './linkCommand.js';
 import { handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
 import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
 import { handleStaffCommand } from './staffCommands.js';
@@ -16,6 +17,10 @@ vi.mock('../support/threadActions.js', () => ({
 vi.mock('./duelCommand.js', () => ({
   handleDuelButton: vi.fn(),
   handleDuelCommand: vi.fn(),
+}));
+
+vi.mock('./linkCommand.js', () => ({
+  handleLinkCommand: vi.fn(),
 }));
 
 vi.mock('./notifyCommand.js', () => ({
@@ -42,6 +47,7 @@ const routerConfig = {
   supportTriageChannelId: 'support-triage-channel-1',
   supportStaffRoleIds: ['staff-role-1'],
   levelRoleMap: new Map<number, string>(),
+  emojiMap: { success: '<:pr_success:123456789012345678>' },
 };
 
 describe('routeInteraction', () => {
@@ -146,6 +152,18 @@ describe('routeInteraction', () => {
     expect(handleDuelCommand).toHaveBeenCalledWith(interaction, api, routerConfig);
   });
 
+  it('routes link commands to the link handler with config', async () => {
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'link',
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleLinkCommand).toHaveBeenCalledWith(interaction, api, routerConfig);
+  });
+
   it('routes duel button interactions to the duel handler', async () => {
     const interaction = {
       isChatInputCommand: () => false,
@@ -156,7 +174,7 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(handleDuelButton).toHaveBeenCalledWith(interaction, api);
+    expect(handleDuelButton).toHaveBeenCalledWith(interaction, api, routerConfig);
     expect(handleSupportThreadAction).not.toHaveBeenCalledWith(interaction, {
       api,
       config: routerConfig,
@@ -172,7 +190,7 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(handleNotifyCommand).toHaveBeenCalledWith(interaction, api);
+    expect(handleNotifyCommand).toHaveBeenCalledWith(interaction, api, routerConfig);
   });
 
   it('routes notify toggle buttons to the toggle handler', async () => {
@@ -185,7 +203,7 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(handleNotifyToggleButton).toHaveBeenCalledWith(interaction, api);
+    expect(handleNotifyToggleButton).toHaveBeenCalledWith(interaction, api, routerConfig);
   });
 
   it('routes report commands to the report modal handler', async () => {
@@ -226,7 +244,7 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
-    expect(handleReportModalSubmit).toHaveBeenCalledWith(interaction, api);
+    expect(handleReportModalSubmit).toHaveBeenCalledWith(interaction, api, routerConfig);
   });
 
   it('replies ephemerally to unknown chat input commands', async () => {

@@ -34,6 +34,7 @@ export interface InteractionRouterOptions {
     | 'supportTriageChannelId'
     | 'levelRoleMap'
     | 'duelsChannelId'
+    | 'emojiMap'
   >;
 }
 
@@ -53,12 +54,12 @@ export async function routeInteraction(
 
   if (typeof interaction.isButton === 'function' && interaction.isButton()) {
     if (parseDuelButtonId(interaction.customId)) {
-      await handleDuelButton(interaction, options.api);
+      await handleDuelButton(interaction, options.api, options.config);
       return;
     }
 
     if (parseNotifyButtonId(interaction.customId)) {
-      await handleNotifyToggleButton(interaction, options.api);
+      await handleNotifyToggleButton(interaction, options.api, options.config);
       return;
     }
 
@@ -75,14 +76,14 @@ export async function routeInteraction(
     && interaction.isModalSubmit()
     && isReportModalCustomId(interaction.customId)
   ) {
-    await handleReportModalSubmit(interaction, options.api);
+    await handleReportModalSubmit(interaction, options.api, options.config);
     return;
   }
 
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'link') {
-    await handleLinkCommand(interaction, options.api);
+    await handleLinkCommand(interaction, options.api, options.config);
     return;
   }
 
@@ -127,7 +128,7 @@ export async function routeInteraction(
   }
 
   if (interaction.commandName === 'notify') {
-    await handleNotifyCommand(interaction, options.api);
+    await handleNotifyCommand(interaction, options.api, options.config);
     return;
   }
 

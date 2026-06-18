@@ -11,12 +11,14 @@ import {
 } from '@pocketrealm/shared/discord/discordNotifications';
 
 import { PocketRealmApiError, type PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import type { BotConfig } from '../config.js';
 
 // Discord allows at most five buttons per action row.
 const MAX_BUTTONS_PER_ROW = 5;
 import { notifyToggleButtonId, parseNotifyButtonId } from '../discord/components.js';
 
 type NotifyApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
+type NotifyCommandConfig = Pick<BotConfig, 'emojiMap'>;
 
 interface PreferencesResponse {
   preferences: DiscordNotificationPreferenceView[];
@@ -48,6 +50,7 @@ function isLinkRequiredError(error: unknown): boolean {
 export async function handleNotifyCommand(
   interaction: ChatInputCommandInteraction,
   api: NotifyApiClient,
+  _config: NotifyCommandConfig,
 ): Promise<void> {
   if (!interaction.guildId) {
     await interaction.reply({
@@ -87,6 +90,7 @@ export async function handleNotifyCommand(
 export async function handleNotifyToggleButton(
   interaction: ButtonInteraction,
   api: NotifyApiClient,
+  _config: NotifyCommandConfig,
 ): Promise<void> {
   const parsed = parseNotifyButtonId(interaction.customId);
   if (!parsed || !interaction.guildId) {

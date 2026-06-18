@@ -41,6 +41,7 @@ function createOptions(overrides: Record<string, unknown> = {}) {
       del: vi.fn().mockResolvedValue(1),
     },
     webBaseUrl: WEB_BASE_URL,
+    emojiMap: {},
     ...overrides,
   };
   return { options, send };
@@ -58,7 +59,9 @@ describe('pollDiscordNotifications', () => {
 
     expect(options.api.get).toHaveBeenCalledWith('/api/v1/discord/notifications/pending?limit=50');
     expect(options.readyClient.users.fetch).toHaveBeenCalledWith(EVENT.discordUserId);
-    expect(send).toHaveBeenCalledWith({ content: formatNotificationMessage(EVENT, WEB_BASE_URL) });
+    expect(send).toHaveBeenCalledWith({
+      content: formatNotificationMessage(EVENT, WEB_BASE_URL, options.emojiMap),
+    });
     expect(options.api.post).toHaveBeenCalledWith('/api/v1/discord/notifications/ack', {
       deliveredIds: [EVENT.id],
       failedIds: [],
@@ -118,6 +121,16 @@ describe('formatNotificationMessage', () => {
     const content = formatNotificationMessage(EVENT, WEB_BASE_URL);
     expect(content).toContain('64,800');
     expect(content.toLowerCase()).toContain('turns are full');
+  });
+
+  it('uses configured custom emoji overrides', () => {
+    const content = formatNotificationMessage(
+      evt('pvp_attack', { attackerName: 'Rook' }),
+      WEB_BASE_URL,
+      { duel: '<:pr_duel:123456789012345678>' },
+    );
+
+    expect(content.startsWith('<:pr_duel:123456789012345678>')).toBe(true);
   });
 
   it('formats a pvp_attack DM with a bold name and arena deep link', () => {

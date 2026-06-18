@@ -213,6 +213,7 @@ async function main(): Promise<void> {
           readyClient,
           redis,
           webBaseUrl: config.webBaseUrl,
+          emojiMap: config.emojiMap,
         });
       } catch (error) {
         logger.warn({ error }, 'Discord notification poll failed');
