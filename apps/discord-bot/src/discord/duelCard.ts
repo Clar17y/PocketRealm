@@ -451,11 +451,11 @@ export function actionIcon(
 
 // Actions whose icon is a straight 1:1 of the action name, with no extra
 // conditions. Kept out of the classifier ladder below so that only the
-// branches with real precedence logic (heal, pinned-defend, crit, miss, magic)
-// remain there.
+// branches with real precedence logic (defend, heal, crit, miss, magic)
+// remain there. Counter/ward aren't here because the engine logs every
+// defensive action as `action: 'defend'` — they're told apart by `actionId`
+// inside the defend branch.
 const PASSTHROUGH_ACTION_ICONS: Record<string, keyof DuelActionIcons> = {
-  counter: 'counter',
-  ward: 'ward',
   potion: 'potion',
   cleanse: 'cleanse',
 };
@@ -467,18 +467,30 @@ function classifyActionKind(entry: unknown): keyof DuelActionIcons {
 
   const action = typeof entry.action === 'string' ? entry.action : null;
 
+  // Every defensive stance logs as `action: 'defend'`; the chosen stance is
+  // only recoverable from the mapped `actionId`. A pinned fighter is forced
+  // into a plain defend regardless of the stance they picked.
+  if (action === 'defend' || entry.forcedActionReason === 'pinned') {
+    if (entry.forcedActionReason !== 'pinned') {
+      const actionId = typeof entry.actionId === 'string' ? entry.actionId : null;
+      if (actionId === 'counter') return 'counter';
+      if (actionId === 'ward') return 'ward';
+    }
+    return 'defend';
+  }
+  // Explicit potion/cleanse labels win over the healAmount heuristic below: a
+  // potion that restores HP should still show the potion icon, not a heal icon.
+  const passthrough = action ? PASSTHROUGH_ACTION_ICONS[action] : undefined;
+  if (passthrough) {
+    return passthrough;
+  }
+  // Supportive heal casts log as `action: 'spell'` carrying a healAmount; tint
+  // the heal icon by the restored resource.
   if (readNumber(entry, 'healAmount') !== null || action === 'heal') {
     const resource = entry.healResourceType;
     if (resource === 'stamina') return 'heal_sta';
     if (resource === 'mana') return 'heal_mp';
     return 'heal_hp';
-  }
-  if (action === 'defend' || entry.forcedActionReason === 'pinned') {
-    return 'defend';
-  }
-  const passthrough = action ? PASSTHROUGH_ACTION_ICONS[action] : undefined;
-  if (passthrough) {
-    return passthrough;
   }
   if (entry.isCritical === true) {
     return 'crit';

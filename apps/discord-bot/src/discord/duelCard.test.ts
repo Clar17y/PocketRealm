@@ -26,15 +26,30 @@ describe('actionIcon', () => {
   });
 
   it('distinguishes defend, counter, ward, and forced-pinned', () => {
-    expect(actionIcon({ action: 'defend' })).toBe(I.defend);
-    expect(actionIcon({ action: 'counter' })).toBe(I.counter);
-    expect(actionIcon({ action: 'ward' })).toBe(I.ward);
+    // The engine logs every defensive stance as action 'defend'; the chosen
+    // stance is only recoverable from the mapped actionId.
+    expect(actionIcon({ action: 'defend', actionId: 'defend' })).toBe(I.defend);
+    expect(actionIcon({ action: 'defend', actionId: 'counter' })).toBe(I.counter);
+    expect(actionIcon({ action: 'defend', actionId: 'ward' })).toBe(I.ward);
+    // A pinned fighter is forced into a plain defend even if their slot picked a stance.
+    expect(actionIcon({ action: 'defend', actionId: 'counter', forcedActionReason: 'pinned' })).toBe(I.defend);
     expect(actionIcon({ action: 'attack', forcedActionReason: 'pinned' })).toBe(I.defend);
   });
 
-  it('returns potion and cleanse icons', () => {
+  it('returns potion and cleanse icons, even when a potion restores a resource', () => {
+    // Potions log action 'potion' alongside a healAmount; the potion icon must
+    // win over the heal-by-resource heuristic.
     expect(actionIcon({ action: 'potion' })).toBe(I.potion);
+    expect(actionIcon({ action: 'potion', healAmount: 30, healResourceType: 'hp' })).toBe(I.potion);
+    expect(actionIcon({ action: 'potion', healAmount: 20, healResourceType: 'stamina' })).toBe(I.potion);
     expect(actionIcon({ action: 'cleanse' })).toBe(I.cleanse);
+  });
+
+  it('returns a heal icon by resource for supportive heal casts', () => {
+    // Supportive heals log as action 'spell' carrying a healAmount.
+    expect(actionIcon({ action: 'spell', healAmount: 18, healResourceType: 'hp' })).toBe(I.heal_hp);
+    expect(actionIcon({ action: 'spell', healAmount: 18, healResourceType: 'stamina' })).toBe(I.heal_sta);
+    expect(actionIcon({ action: 'spell', healAmount: 18, healResourceType: 'mana' })).toBe(I.heal_mp);
   });
 
   it('returns the crit icon for a critical attack', () => {
