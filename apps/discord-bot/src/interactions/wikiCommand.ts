@@ -47,10 +47,16 @@ export async function handleWikiCommand(
   }
 
   const wikiBaseUrl = new URL(config.webBaseUrl);
-  const results = response.results
-    .map((result) => formatWikiResult(result, wikiBaseUrl))
-    .filter((result): result is string => Boolean(result))
-    .slice(0, MAX_WIKI_RESULTS);
+  const results: string[] = [];
+  for (const result of response.results) {
+    const formatted = formatWikiResult(result, wikiBaseUrl);
+    if (formatted) {
+      results.push(formatted);
+    }
+    if (results.length >= MAX_WIKI_RESULTS) {
+      break;
+    }
+  }
 
   if (results.length === 0) {
     await interaction.editReply({

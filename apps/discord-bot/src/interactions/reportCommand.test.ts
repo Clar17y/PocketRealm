@@ -6,7 +6,6 @@ import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { handleReportCommand, handleReportModalSubmit } from './reportCommand.js';
 
 const commandConfig = { guildId: '234567890123456789', emojiMap: {} };
-const modalConfig = { emojiMap: {} };
 
 describe('handleReportCommand', () => {
   it('shows the report modal for linked users in a guild', async () => {
@@ -113,7 +112,7 @@ describe('handleReportModalSubmit', () => {
       editReply,
     });
 
-    await handleReportModalSubmit(interaction, api, modalConfig);
+    await handleReportModalSubmit(interaction, api, commandConfig);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/reports', {
@@ -152,7 +151,7 @@ describe('handleReportModalSubmit', () => {
       editReply: vi.fn(),
     });
 
-    await handleReportModalSubmit(interaction, api, modalConfig);
+    await handleReportModalSubmit(interaction, api, commandConfig);
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/reports', expect.objectContaining({
       area: 'other',
@@ -186,7 +185,7 @@ describe('handleReportModalSubmit', () => {
       editReply,
     });
 
-    await handleReportModalSubmit(interaction, api, modalConfig);
+    await handleReportModalSubmit(interaction, api, commandConfig);
 
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('⚠️ **Link required**'),
@@ -212,7 +211,7 @@ describe('handleReportModalSubmit', () => {
       editReply,
     });
 
-    await handleReportModalSubmit(interaction, api, modalConfig);
+    await handleReportModalSubmit(interaction, api, commandConfig);
 
     expect(editReply).toHaveBeenCalledWith({
       content: expect.stringContaining('❌ **Report failed**'),
@@ -231,7 +230,7 @@ describe('handleReportModalSubmit', () => {
       editReply: vi.fn(),
     });
 
-    await handleReportModalSubmit(interaction, api, modalConfig);
+    await handleReportModalSubmit(interaction, api, commandConfig);
 
     expect(api.post).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({

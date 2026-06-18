@@ -27,6 +27,10 @@ describe('discord emoji catalog', () => {
     expect(formatDiscordEmoji('wiki', emojiMap)).toBe(DEFAULT_DISCORD_EMOJIS.wiki);
   });
 
+  it('uses an explicit fallback when provided', () => {
+    expect(formatDiscordEmoji('success', {}, '🎉')).toBe('🎉');
+  });
+
   it('rejects unknown keys and invalid custom emoji mentions', () => {
     expect(() => parseDiscordEmojiMap('unknown=<:x:123456789012345678>')).toThrow('Unknown Discord emoji key');
     expect(() => parseDiscordEmojiMap('duel=:crossed_swords:')).toThrow('Invalid Discord custom emoji');

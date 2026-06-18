@@ -76,6 +76,10 @@ export function parseDiscordEmojiMap(raw: string | undefined): DiscordEmojiMap {
   return parsed;
 }
 
-export function formatDiscordEmoji(key: DiscordEmojiKey, emojiMap: DiscordEmojiMap = {}): string {
-  return emojiMap[key] ?? DEFAULT_DISCORD_EMOJIS[key];
+export function formatDiscordEmoji(
+  key: DiscordEmojiKey,
+  emojiMap: DiscordEmojiMap = {},
+  fallback: string = DEFAULT_DISCORD_EMOJIS[key],
+): string {
+  return emojiMap[key] ?? fallback;
 }
