@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import { generateRoomAssignments, rollMobPrefix } from '@pocketrealm/game-engine';
+import { assignEncounterRolesToRooms, generateRoomAssignments, rollMobPrefix } from '@pocketrealm/game-engine';
 import { teleportPlayer } from '../zoneService';
 import { adminAudit } from './adminAuditService';
 
@@ -68,6 +68,7 @@ export async function spawnAdminEncounter(
   }
 
   const roomAssignments = generateRoomAssignments(input.size);
+  const roleAssignments = assignEncounterRolesToRooms(roomAssignments.rooms);
   const pickMember = () => family.members[Math.floor(Math.random() * family.members.length)];
   const mobs: Array<{
     slot: number;
@@ -79,64 +80,16 @@ export async function spawnAdminEncounter(
   }> = [];
 
   let slot = 0;
-  for (const room of roomAssignments.rooms) {
-    const isLastRoom = room.roomNumber === roomAssignments.rooms.length;
-
-    if (isLastRoom && input.size === 'large') {
-      const miniBoss = pickMember();
-      mobs.push({
-        slot: slot++,
-        room: room.roomNumber,
-        mobTemplateId: miniBoss.mobTemplate.id,
-        role: 'mini_boss',
-        prefix: rollMobPrefix(),
-        status: 'alive',
-      });
-      for (let index = 1; index < room.mobCount; index += 1) {
-        const elite = pickMember();
-        mobs.push({
-          slot: slot++,
-          room: room.roomNumber,
-          mobTemplateId: elite.mobTemplate.id,
-          role: 'elite',
-          prefix: rollMobPrefix(),
-          status: 'alive',
-        });
-      }
-    } else if (isLastRoom && input.size === 'medium') {
-      const elite = pickMember();
-      mobs.push({
-        slot: slot++,
-        room: room.roomNumber,
-        mobTemplateId: elite.mobTemplate.id,
-        role: 'elite',
-        prefix: rollMobPrefix(),
-        status: 'alive',
-      });
-      for (let index = 1; index < room.mobCount; index += 1) {
-        const trash = pickMember();
-        mobs.push({
-          slot: slot++,
-          room: room.roomNumber,
-          mobTemplateId: trash.mobTemplate.id,
-          role: 'trash',
-          prefix: rollMobPrefix(),
-          status: 'alive',
-        });
-      }
-    } else {
-      for (let index = 0; index < room.mobCount; index += 1) {
-        const trash = pickMember();
-        mobs.push({
-          slot: slot++,
-          room: room.roomNumber,
-          mobTemplateId: trash.mobTemplate.id,
-          role: 'trash',
-          prefix: rollMobPrefix(),
-          status: 'alive',
-        });
-      }
-    }
+  for (const assignment of roleAssignments) {
+    const member = pickMember();
+    mobs.push({
+      slot: slot++,
+      room: assignment.room,
+      mobTemplateId: member.mobTemplate.id,
+      role: assignment.role,
+      prefix: rollMobPrefix(),
+      status: 'alive',
+    });
   }
 
   const sizeNounField = input.size === 'small'
