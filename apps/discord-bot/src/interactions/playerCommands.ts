@@ -188,7 +188,7 @@ function isInvalidCategoryError(error: unknown): boolean {
     && error.code === 'INVALID_CATEGORY';
 }
 
-function buildProfileCard(profile: ProfileResponse['profile'], emojiMap: DiscordEmojiMap): V2CardPayload {
+export function buildProfileCard(profile: ProfileResponse['profile'], emojiMap: DiscordEmojiMap): V2CardPayload {
   const details = [
     `Level ${profile.characterLevel}`,
     profile.activeTitle,
@@ -203,7 +203,7 @@ function buildProfileCard(profile: ProfileResponse['profile'], emojiMap: Discord
   });
 }
 
-function buildTurnsCard(turns: TurnsResponse['turns'], emojiMap: DiscordEmojiMap): V2CardPayload {
+export function buildTurnsCard(turns: TurnsResponse['turns'], emojiMap: DiscordEmojiMap): V2CardPayload {
   const lines = [`${turns.currentTurns} turns available.`];
 
   if (typeof turns.timeToCapMs === 'number') {
@@ -222,7 +222,7 @@ function buildTurnsCard(turns: TurnsResponse['turns'], emojiMap: DiscordEmojiMap
   });
 }
 
-function buildSkillsCard(skills: SkillsResponse['skills'], emojiMap: DiscordEmojiMap): V2CardPayload {
+export function buildSkillsCard(skills: SkillsResponse['skills'], emojiMap: DiscordEmojiMap): V2CardPayload {
   if (skills.length === 0) {
     return statusCard('info', 'Skills', 'No PocketRealm skills found yet.', emojiMap);
   }
@@ -235,7 +235,7 @@ function buildSkillsCard(skills: SkillsResponse['skills'], emojiMap: DiscordEmoj
   });
 }
 
-function buildRankCard(rank: RankResponse['rank'], emojiMap: DiscordEmojiMap): V2CardPayload {
+export function buildRankCard(rank: RankResponse['rank'], emojiMap: DiscordEmojiMap): V2CardPayload {
   const lines: string[] = [];
 
   if (rank.rank === null) {

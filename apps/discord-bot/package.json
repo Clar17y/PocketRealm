@@ -13,7 +13,8 @@
     "test": "vitest run --config vitest.config.ts",
     "register-commands": "tsx src/commands/register.ts",
     "upload-duel-emojis": "tsx src/scripts/uploadDuelEmojis.ts",
-    "preview-duel-cards": "tsx src/scripts/previewDuelCards.ts"
+    "preview-duel-cards": "tsx src/scripts/previewDuelCards.ts",
+    "preview-cards": "tsx src/scripts/previewAllCards.ts"
   },
   "dependencies": {
     "@pocketrealm/shared": "*",

@@ -204,7 +204,7 @@ function notifyLinkRequiredStatus(emojiMap: DiscordEmojiMap, options: { ephemera
   );
 }
 
-function buildPreferenceCard(
+export function buildPreferenceCard(
   preferences: DiscordNotificationPreferenceView[],
   emojiMap: DiscordEmojiMap,
 ) {
