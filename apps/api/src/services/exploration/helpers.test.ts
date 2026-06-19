@@ -53,7 +53,7 @@ describe('buildEncounterSiteMobs', () => {
             },
           },
           {
-            role: 'boss',
+            role: 'mini_boss',
             mobTemplate: {
               id: 'spider-boss',
               name: 'Spider Queen',
@@ -135,7 +135,7 @@ describe('buildEncounterSiteMobs', () => {
             },
           },
           {
-            role: 'boss',
+            role: 'mini_boss',
             mobTemplate: {
               id: 'spider-boss',
               name: 'Spider Queen',
