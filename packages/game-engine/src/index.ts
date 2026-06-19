@@ -25,6 +25,7 @@ export * from './exploration/probabilityModel';
 export * from './exploration/encounterChest';
 export * from './exploration/mobTierFilter';
 export * from './exploration/roomGenerator';
+export * from './exploration/encounterRolePromotion';
 export * from './exploration/zoneExitScaling';
 export * from './exploration/encounterRaidMob';
 
