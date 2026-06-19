@@ -55,6 +55,21 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
       .setName('notify')
       .setDescription('Manage your Pocketrealm notification DMs.'),
     new SlashCommandBuilder()
+      .setName('announcement')
+      .setDescription('Post a Pocketrealm announcement.')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .addStringOption((option) =>
+        option
+          .setName('message')
+          .setDescription('Announcement message to post.')
+          .setRequired(true),
+      )
+      .addBooleanOption((option) =>
+        option
+          .setName('everyone')
+          .setDescription('Notify everyone in the announcement channel.'),
+      ),
+    new SlashCommandBuilder()
       .setName('staff')
       .setDescription('Pocketrealm staff support commands.')
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
