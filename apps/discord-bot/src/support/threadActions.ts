@@ -628,14 +628,22 @@ function updateStatusText(
   actorDiscordUserId: string,
 ): boolean {
   if (component.type === 10 && typeof component.content === 'string') {
-    const replaced = component.content.replace(/Status: `[^`]*`/, `Status: \`${status}\``);
+    // The V2 triage card concatenates the user-controlled summary/title and the
+    // staff metadata into one text component, so both replacements are anchored
+    // to a full line in our own generated format. An un-anchored match could be
+    // hijacked by summary text that happens to contain "Status:" / "Last Update:".
+    const replaced = component.content.replace(/^Status: `[^`]*`$/m, `Status: \`${status}\``);
     if (replaced === component.content) {
       return false;
     }
 
+    // A greedy /Last Update: .*/s would delete everything from the first
+    // occurrence of that phrase through the end of the component — wiping the
+    // status/privacy/category lines below a summary that mentions it.
     const updateLine = `Last Update: \`${publicId}\` marked \`${status}\` by <@${actorDiscordUserId}>.`;
-    component.content = replaced.includes('Last Update:')
-      ? replaced.replace(/Last Update: .*/s, updateLine)
+    const lastUpdatePattern = /^Last Update: `[^`]*` marked `[^`]*` by <@\d+>\.$/m;
+    component.content = lastUpdatePattern.test(replaced)
+      ? replaced.replace(lastUpdatePattern, updateLine)
       : `${replaced}\n${updateLine}`;
     return true;
   }

@@ -367,6 +367,40 @@ describe('handleSupportThreadAction', () => {
     expectMockCard(interaction.editReply, 'Updated `SUP-ABC12345` status to `accepted`.');
   });
 
+  it('does not let summary text containing "Last Update:"/"Status:" corrupt the card on status update', async () => {
+    const api = createApi({
+      ticket: {
+        ...ticketContext.ticket,
+        threadId: THREAD_ID,
+      },
+    });
+    const thread = createThread();
+    const card = buildTriageCard({
+      ...triageTicket,
+      summary: 'Repro steps attached. Last Update: it still happens. Status: `mine`',
+    });
+    const message = { components: card.components, edit: vi.fn() };
+    const interaction = createButtonInteraction({
+      customId: 'support:accepted:SUP-ABC12345',
+      channel: createTriageChannel(thread),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+      message,
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    const text = cardText(lastMockPayload(message.edit));
+    // The real status line is updated and the metadata below the summary survives
+    // (a greedy match would have deleted everything after the user's "Last Update:").
+    expect(text).toContain('Status: `accepted`');
+    expect(text).toContain('Privacy:');
+    expect(text).toContain('Category:');
+    expect(text).toContain('Created:');
+    // The user's own text is left intact, and exactly one staff line is appended.
+    expect(text).toContain('Last Update: it still happens.');
+    expect(text).toContain('`SUP-ABC12345` marked `accepted` by <@7777777777777777>.');
+  });
+
   it('skips the surface edit for legacy non-V2 triage cards instead of stripping their buttons', async () => {
     const api = createApi({
       ticket: {
