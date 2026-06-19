@@ -53,7 +53,7 @@ export function buildEncounterRaidMob(
       critChance: template.critChance,
       critDamage: template.critMultiplier,
     },
-    actionTemplate: template.actionTemplate as BossTemplateAction[],
+    actionTemplate: template.actionTemplate,
     activeEffects: [],
   };
 }
