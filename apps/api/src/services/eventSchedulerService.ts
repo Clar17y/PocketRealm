@@ -3,7 +3,7 @@ import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
 import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 import { logger } from '../logger';
-import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
+import { ACTIVE_AMBIENT_EVENT_WHERE, expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { getCachedZones, getCachedBossMobTemplates, getCachedZoneMobFamilies } from './staticDataCacheService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';
@@ -408,9 +408,7 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
       // Skip the roll entirely if the global ambient cap is already reached —
       // avoids wasted template/target resolution. spawnWorldEvent re-checks
       // this authoritatively inside its transaction.
-      const activeAmbient = await prisma.worldEvent.count({
-        where: { status: 'active', type: { not: 'boss' } },
-      });
+      const activeAmbient = await prisma.worldEvent.count({ where: ACTIVE_AMBIENT_EVENT_WHERE });
       if (activeAmbient < WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS) {
         // Roll for world-wide or zone event (50/50 chance, but caps enforce limits)
         if (Math.random() < 0.5) {

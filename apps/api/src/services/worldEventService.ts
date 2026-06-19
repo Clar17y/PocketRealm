@@ -11,6 +11,14 @@ import {
 import { logger } from '../logger';
 import { roundTimerRegistry } from './roundTimerRegistry';
 
+/**
+ * Prisma `where` filter for active *ambient* (non-boss) world events — the set
+ * the global MAX_ACTIVE_EVENTS cap governs. Bosses are excluded (they are
+ * limited by MAX_BOSS_ENCOUNTERS instead). Shared with the scheduler early-out
+ * so the two definitions of "ambient" cannot drift apart.
+ */
+export const ACTIVE_AMBIENT_EVENT_WHERE = { status: 'active', type: { not: 'boss' } };
+
 function toWorldEventData(row: {
   id: string;
   type: string;
@@ -267,10 +275,12 @@ export async function spawnWorldEvent(params: {
 
     // Global cap on concurrent non-boss events (zone + world-wide). Bosses are
     // governed solely by MAX_BOSS_ENCOUNTERS and are excluded from this gate.
+    // This runs inside the Serializable transaction, so two spawns racing in at
+    // the cap boundary make one transaction abort (P2034) rather than
+    // over-spawning. A skipped spawn is the safe failure mode for a ceiling, so
+    // no retry is needed.
     if (params.type !== 'boss') {
-      const activeAmbient = await tx.worldEvent.count({
-        where: { status: 'active', type: { not: 'boss' } },
-      });
+      const activeAmbient = await tx.worldEvent.count({ where: ACTIVE_AMBIENT_EVENT_WHERE });
       if (activeAmbient >= WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS) return null;
     }
 

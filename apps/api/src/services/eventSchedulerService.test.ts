@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./worldEventService', () => ({
   expireStaleEvents: vi.fn().mockResolvedValue([]),
   spawnWorldEvent: vi.fn().mockResolvedValue(null),
+  // Mirror the real shared predicate so the scheduler's early-out count query
+  // keeps its expected `where` shape under this mock.
+  ACTIVE_AMBIENT_EVENT_WHERE: { status: 'active', type: { not: 'boss' } },
 }));
 vi.mock('./bossEncounterService', () => ({
   createBossEncounter: vi.fn().mockResolvedValue({}),
