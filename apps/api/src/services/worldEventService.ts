@@ -265,6 +265,15 @@ export async function spawnWorldEvent(params: {
       if (activeInZone >= WORLD_EVENT_CONSTANTS.MAX_ZONE_EVENTS) return null;
     }
 
+    // Global cap on concurrent non-boss events (zone + world-wide). Bosses are
+    // governed solely by MAX_BOSS_ENCOUNTERS and are excluded from this gate.
+    if (params.type !== 'boss') {
+      const activeAmbient = await tx.worldEvent.count({
+        where: { status: 'active', type: { not: 'boss' } },
+      });
+      if (activeAmbient >= WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS) return null;
+    }
+
     // Slot check: zone events — no duplicate effectType in the same zone
     if (params.zoneId) {
       const existing = await tx.worldEvent.findFirst({
