@@ -895,6 +895,43 @@ export const ENCOUNTER_SITE_CONSTANTS = {
   AUTO_RESOLVE_MAX_ROUNDS: 100,
 } as const;
 
+export const ENCOUNTER_SITE_ROLE_CONSTANTS = {
+  MIN_ROOMS_FOR_PROMOTED_ROLES: 3,
+  MINI_BOSS_CHANCE: 0.35,
+  ROLE_STAT_MULTIPLIERS: {
+    trash: {
+      hp: 1,
+      damageMin: 1,
+      damageMax: 1,
+      accuracy: 1,
+      defence: 1,
+      magicDefence: 1,
+      evasion: 1,
+      xp: 1,
+    },
+    elite: {
+      hp: 1.6,
+      damageMin: 1.15,
+      damageMax: 1.15,
+      accuracy: 1.08,
+      defence: 1.08,
+      magicDefence: 1.08,
+      evasion: 1,
+      xp: 1.4,
+    },
+    mini_boss: {
+      hp: 2.4,
+      damageMin: 1.3,
+      damageMax: 1.3,
+      accuracy: 1.12,
+      defence: 1.12,
+      magicDefence: 1.12,
+      evasion: 1.05,
+      xp: 2,
+    },
+  },
+} as const;
+
 // =============================================================================
 // LEADERBOARD
 // =============================================================================
