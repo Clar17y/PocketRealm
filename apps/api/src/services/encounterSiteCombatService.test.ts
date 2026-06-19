@@ -34,6 +34,9 @@ const databaseMocks = vi.hoisted(() => {
       mobTemplate: {
         findMany: vi.fn(),
       },
+      mobFamily: {
+        findUnique: vi.fn(),
+      },
       player: {
         update: vi.fn(),
       },
@@ -142,6 +145,7 @@ import { trackEncounterSiteKillProgress } from './encounterSiteProgressService';
 beforeEach(() => {
   vi.resetAllMocks();
   databaseMocks.prisma.$transaction.mockImplementation(async (callback) => callback(databaseMocks.tx));
+  databaseMocks.prisma.mobFamily.findUnique.mockResolvedValue({ name: 'Goblins' });
   routeHelperMocks.parseEncounterSiteMobs.mockImplementation((mobs) => mobs);
   routeHelperMocks.serializeEncounterSiteMobs.mockImplementation((mobs) => mobs);
   routeHelperMocks.countEncounterSiteState.mockImplementation((mobs) => ({
@@ -339,6 +343,8 @@ function mockAutoEncounterSite(
     id: 'goblin',
     name: 'Goblin',
     hp: 1,
+    zoneId: 'zone-1',
+    level: 1,
     accuracy: 0,
     defence: 0,
     magicDefence: 0,
@@ -347,6 +353,8 @@ function mockAutoEncounterSite(
     damageMax: 1,
     damageType: 'physical',
     xpReward: 20,
+    encounterWeight: 1,
+    spellPattern: [],
   }]);
 }
 
@@ -403,10 +411,11 @@ function makeManualEncounterState(overrides: {
       slot: slot.slot,
       name: slot.prefix ? `${slot.prefix} Goblin` : 'Goblin',
       prefix: slot.prefix,
+      role: slot.role,
       hp: 10,
       maxHp: 10,
     })),
-    mobXpByTemplateId: { goblin: 20 },
+    mobXpByEncounterMobId: { [makeEncounterMobId(roomMobSlots[0]!.slot)]: 20 },
     roomMobSlots,
     attackSkill: 'melee',
     guildXpBoost: 0,
@@ -627,45 +636,57 @@ describe('resolveEncounterRoomCombat', () => {
 // ---------------------------------------------------------------------------
 
 describe('computeDefeatedMobXp', () => {
-  const makeSlot = (slot: number, mobTemplateId: string, prefix: string | null = null): EncounterMobSlot => ({
-    slot, mobTemplateId, role: 'trash', prefix, status: 'alive', room: 1,
+  const makeSlot = (
+    slot: number,
+    mobTemplateId: string,
+    overrides: Partial<EncounterMobSlot> = {},
+  ): EncounterMobSlot => ({
+    slot, mobTemplateId, role: 'trash', prefix: null, status: 'alive', room: 1, ...overrides,
   });
 
   it('returns 0 when no mobs defeated', () => {
     const defeated = new Set<string>();
     const slots = [makeSlot(0, 'mob-a')];
-    const xpMap = { 'mob-a': 10 };
+    const xpMap = { [makeEncounterMobId(0)]: 10 };
     expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(0);
   });
 
-  it('sums xpReward for defeated mobs only', () => {
+  it('sums per-encounter-mob XP for defeated mobs only', () => {
     const defeated = new Set(['encounter-mob-0', 'encounter-mob-1']);
     const slots = [makeSlot(0, 'mob-a'), makeSlot(1, 'mob-b'), makeSlot(2, 'mob-a')];
-    const xpMap = { 'mob-a': 10, 'mob-b': 20 };
+    const xpMap = {
+      [makeEncounterMobId(0)]: 10,
+      [makeEncounterMobId(1)]: 20,
+      [makeEncounterMobId(2)]: 30,
+    };
     expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(30);
   });
 
-  it('applies prefix xpMultiplier', () => {
+  it('uses pre-scaled per-mob XP without applying prefix a second time', () => {
     const defeated = new Set(['encounter-mob-0']);
-    const slots = [makeSlot(0, 'mob-a', 'tough')];
-    const xpMap = { 'mob-a': 10 };
-    // tough prefix has xpMultiplier 1.3 — result should be > 10
-    const result = computeDefeatedMobXp(defeated, slots, xpMap);
-    expect(result).toBeGreaterThan(10);
+    const slots = [makeSlot(0, 'mob-a', { prefix: 'tough' })];
+    const xpMap = { [makeEncounterMobId(0)]: 13 };
+    expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(13);
   });
 
-  it('returns 0 for missing template', () => {
+  it('returns 0 for missing encounter mob ID', () => {
     const defeated = new Set(['encounter-mob-0']);
     const slots = [makeSlot(0, 'unknown-mob')];
     const xpMap = {};
     expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(0);
   });
 
-  it('grants XP independently for same template used multiple times', () => {
+  it('supports different XP values for the same template used with different roles', () => {
     const defeated = new Set(['encounter-mob-0', 'encounter-mob-1']);
-    const slots = [makeSlot(0, 'mob-a'), makeSlot(1, 'mob-a')];
-    const xpMap = { 'mob-a': 15 };
-    expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(30);
+    const slots = [
+      makeSlot(0, 'mob-a', { role: 'trash' }),
+      makeSlot(1, 'mob-a', { role: 'elite', prefix: 'gigantic' }),
+    ];
+    const xpMap = {
+      [makeEncounterMobId(0)]: 15,
+      [makeEncounterMobId(1)]: 42,
+    };
+    expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(57);
   });
 });
 
@@ -974,6 +995,8 @@ describe('autoResolveEncounterRoom', () => {
     databaseMocks.prisma.mobTemplate.findMany.mockResolvedValueOnce([{
       id: 'goblin',
       name: 'Goblin',
+      zoneId: 'zone-1',
+      level: 1,
       hp: 100,
       accuracy: 1000,
       defence: 0,
@@ -983,6 +1006,8 @@ describe('autoResolveEncounterRoom', () => {
       damageMax: 100,
       damageType: 'physical',
       xpReward: 20,
+      encounterWeight: 1,
+      spellPattern: [],
     }]);
 
     const result = await autoResolveEncounterRoom(playerId, siteId, 'Tester');
@@ -1223,8 +1248,8 @@ describe('resolveManualEncounterRound', () => {
       zoneId: 'zone-1',
       zoneName: 'Test Zone',
       mobFamilyName: 'Goblins',
-      initialMobs: [{ mobId, slot: 1, name: 'Goblin', prefix: null, hp: 10, maxHp: 10 }],
-      mobXpByTemplateId: { goblin: 20 },
+      initialMobs: [{ mobId, slot: 1, name: 'Goblin', prefix: null, role: 'trash', hp: 10, maxHp: 10 }],
+      mobXpByEncounterMobId: { [mobId]: 20 },
       roomMobSlots,
       attackSkill: 'melee',
       guildXpBoost: 0,

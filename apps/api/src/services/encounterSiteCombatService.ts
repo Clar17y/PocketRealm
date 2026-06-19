@@ -3,6 +3,7 @@ import {
   COMBAT_CONSTANTS,
   makeEncounterMobId,
   parseEncounterMobSlot,
+  type EncounterMobRole,
   type QuestProgressUpdate,
   type RoomStrategyEntry,
 } from '@pocketrealm/shared';
@@ -70,7 +71,7 @@ export interface AutoResolveEncounterResult {
   outcome: 'cleared' | 'defeated' | 'site_cleared';
   roundsResolved: number;
   rounds: import('./encounterSiteCombatCore').RoundSnapshot[];
-  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
+  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; role: EncounterMobRole; hp: number; maxHp: number }>;
   playerHpAfter: number;
   playerStaminaAfter: number;
   playerManaAfter: number;
@@ -163,7 +164,7 @@ export async function autoResolveEncounterRoom(
   const { currentRoom, roomMobs } = advanceResult;
 
   // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
-  const { mobs: expeditionMobs, mobXpByTemplateId } = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
+  const { mobs: expeditionMobs, mobXpByEncounterMobId } = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
   if (expeditionMobs.length === 0) {
     throw new AppError(410, 'No valid mobs in encounter room', 'SITE_DECAYED');
   }
@@ -238,7 +239,7 @@ export async function autoResolveEncounterRoom(
       ? computeDefeatedMobXp(
           new Set(newlyDefeatedMobs.map(s => makeEncounterMobId(s.slot))),
           newlyDefeatedMobs,
-          mobXpByTemplateId,
+          mobXpByEncounterMobId,
         )
       : 0;
 

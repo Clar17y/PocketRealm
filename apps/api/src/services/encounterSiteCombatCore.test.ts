@@ -1,6 +1,97 @@
-import { describe, expect, it } from 'vitest';
-import type { ExpeditionRoundLog } from '@pocketrealm/shared';
-import { countEncounterSiteHits } from './encounterSiteCombatCore';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { makeEncounterMobId, type EncounterMobSlot, type ExpeditionRoundLog } from '@pocketrealm/shared';
+
+const databaseMocks = vi.hoisted(() => ({
+  prisma: {
+    encounterSite: {
+      update: vi.fn(),
+    },
+    mobFamily: {
+      findUnique: vi.fn(),
+    },
+    mobTemplate: {
+      findMany: vi.fn(),
+    },
+  },
+}));
+
+const worldEventMocks = vi.hoisted(() => ({
+  getActiveEventsForZone: vi.fn(),
+  getActiveWorldWideEvents: vi.fn(),
+  computeZoneModifiers: vi.fn(),
+}));
+
+vi.mock('@pocketrealm/database', () => ({ prisma: databaseMocks.prisma, Prisma: {} }));
+vi.mock('./worldEventService', () => worldEventMocks);
+
+import {
+  countEncounterSiteHits,
+  loadRoomMobsAsRaidState,
+} from './encounterSiteCombatCore';
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  databaseMocks.prisma.mobFamily.findUnique.mockResolvedValue({ name: 'Spiders' });
+  databaseMocks.prisma.mobTemplate.findMany.mockResolvedValue([makeMobTemplateRow()]);
+  worldEventMocks.getActiveEventsForZone.mockResolvedValue([]);
+  worldEventMocks.getActiveWorldWideEvents.mockResolvedValue([]);
+  worldEventMocks.computeZoneModifiers.mockReturnValue({
+    mobHpMultiplier: 1,
+    mobDamageMultiplier: 1,
+  });
+});
+
+function makeMobTemplateRow(overrides: Partial<{
+  id: string;
+  name: string;
+  zoneId: string;
+  level: number;
+  hp: number;
+  accuracy: number;
+  defence: number;
+  magicDefence: number;
+  evasion: number;
+  damageMin: number;
+  damageMax: number;
+  damageType: 'physical' | 'magic';
+  xpReward: number;
+  encounterWeight: number;
+  spellPattern: unknown[];
+}> = {}) {
+  return {
+    id: 'web-spinner',
+    name: 'Web Spinner',
+    zoneId: 'zone-1',
+    level: 3,
+    hp: 100,
+    accuracy: 10,
+    defence: 8,
+    magicDefence: 6,
+    evasion: 4,
+    damageMin: 5,
+    damageMax: 9,
+    damageType: 'physical' as const,
+    xpReward: 20,
+    encounterWeight: 1,
+    spellPattern: [],
+    ...overrides,
+  };
+}
+
+function makeEncounterSlot(
+  slot: number,
+  role: EncounterMobSlot['role'],
+  prefix: EncounterMobSlot['prefix'] = null,
+): EncounterMobSlot {
+  return {
+    slot,
+    mobTemplateId: 'web-spinner',
+    role,
+    prefix,
+    status: 'alive',
+    room: 1,
+  };
+}
 
 function makeRoundLog(overrides: Partial<ExpeditionRoundLog['phases']> = {}): ExpeditionRoundLog {
   return {
@@ -111,5 +202,56 @@ describe('countEncounterSiteHits', () => {
     const result = countEncounterSiteHits([round1, round2]);
     expect(result.playerHitsLanded).toBe(2);
     expect(result.mobHitsLanded).toBe(1); // round 2 mob dodged
+  });
+});
+
+describe('loadRoomMobsAsRaidState', () => {
+  it('applies role modifiers per slot when the same template is trash and elite', async () => {
+    const result = await loadRoomMobsAsRaidState(
+      [
+        makeEncounterSlot(0, 'trash'),
+        makeEncounterSlot(1, 'elite'),
+      ],
+      'zone-1',
+      'family-1',
+    );
+
+    const trash = result.mobs.find(mob => mob.id === makeEncounterMobId(0));
+    const elite = result.mobs.find(mob => mob.id === makeEncounterMobId(1));
+
+    expect(trash).toBeDefined();
+    expect(elite).toBeDefined();
+    expect(elite!.maxHp).toBeGreaterThan(trash!.maxHp);
+    expect(elite!.stats.damageMin).toBeGreaterThan(trash!.stats.damageMin);
+    expect(elite!.actionTemplate.map(action => action.actionId)).toEqual([
+      'boss_physical_attack',
+      'boss_poison_spray',
+      'boss_physical_attack',
+    ]);
+    expect(result.mobXpByEncounterMobId[makeEncounterMobId(1)]).toBeGreaterThan(
+      result.mobXpByEncounterMobId[makeEncounterMobId(0)]!,
+    );
+  });
+
+  it('stacks prefixes before role modifiers and keeps XP per encounter mob', async () => {
+    const result = await loadRoomMobsAsRaidState(
+      [
+        makeEncounterSlot(0, 'elite'),
+        makeEncounterSlot(1, 'elite', 'gigantic'),
+      ],
+      'zone-1',
+      'family-1',
+    );
+
+    const plainElite = result.mobs.find(mob => mob.id === makeEncounterMobId(0));
+    const giganticElite = result.mobs.find(mob => mob.id === makeEncounterMobId(1));
+
+    expect(plainElite).toBeDefined();
+    expect(giganticElite).toBeDefined();
+    expect(giganticElite!.name).toBe('Gigantic Web Spinner');
+    expect(giganticElite!.maxHp).toBeGreaterThan(plainElite!.maxHp);
+    expect(result.mobXpByEncounterMobId[makeEncounterMobId(1)]).toBeGreaterThan(
+      result.mobXpByEncounterMobId[makeEncounterMobId(0)]!,
+    );
   });
 });

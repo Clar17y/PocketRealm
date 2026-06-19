@@ -4,7 +4,7 @@ import {
   ENCOUNTER_SITE_CONSTANTS,
   makeEncounterMobId,
   parseEncounterMobSlot,
-  getMobPrefixDefinition,
+  type DamageType,
   type RaidRoundInput,
   type RaidParticipant,
   type RaidParticipantResult,
@@ -18,12 +18,15 @@ import {
   type PotionConsumed,
   type RoomStrategyEntry,
   type EncounterMobSlot,
+  type MobTemplate,
+  type SpellAction,
 } from '@pocketrealm/shared';
 import {
   resolveRaidRound,
   buildEncounterRaidMob,
   buildPlayerCombatStats,
   initThreatTable,
+  applyMobPrefix,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
@@ -42,6 +45,10 @@ import {
   getAllAliveMobsInRoom,
 } from './combat/helpers';
 import { grantEncounterSiteChestRewardsTx } from './chestService';
+import {
+  applyEncounterRoleModifiers,
+  resolveEncounterRoleActionTemplate,
+} from './encounterSiteMobRoleService';
 
 /** Shared flee result shape used by both auto-resolve and manual combat. */
 export interface FleeResult {
@@ -59,6 +66,7 @@ export function toInitialMobSnapshot(mobs: ExpeditionMobState[]) {
     slot: parseEncounterMobSlot(m.id) ?? 0,
     name: m.name,
     prefix: m.prefix,
+    role: m.role ?? 'trash',
     hp: m.hp,
     maxHp: m.maxHp,
   }));
@@ -433,44 +441,109 @@ export async function loadRoomMobsAsRaidState(
   roomMobs: EncounterMobSlot[],
   zoneId: string,
   mobFamilyId: string,
-): Promise<{ mobs: ExpeditionMobState[]; mobXpByTemplateId: Record<string, number> }> {
+): Promise<{ mobs: ExpeditionMobState[]; mobXpByEncounterMobId: Record<string, number> }> {
   const mobTemplateIds = [...new Set(roomMobs.map(m => m.mobTemplateId))];
   const mobTemplateRows = await prisma.mobTemplate.findMany({
     where: { id: { in: mobTemplateIds } },
     select: {
-      id: true, name: true, hp: true, accuracy: true, defence: true,
-      magicDefence: true, evasion: true, damageMin: true, damageMax: true,
-      damageType: true, xpReward: true,
+      id: true,
+      name: true,
+      zoneId: true,
+      level: true,
+      hp: true,
+      accuracy: true,
+      defence: true,
+      magicDefence: true,
+      evasion: true,
+      damageMin: true,
+      damageMax: true,
+      damageType: true,
+      xpReward: true,
+      encounterWeight: true,
+      spellPattern: true,
     },
   });
-  const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, t]));
+  const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, toEncounterMobTemplate(t)]));
 
-  const mobXpByTemplateId: Record<string, number> = {};
-  for (const t of mobTemplateRows) mobXpByTemplateId[t.id] = t.xpReward;
+  const mobXpByEncounterMobId: Record<string, number> = {};
 
-  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+  const [family, cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    prisma.mobFamily.findUnique({ where: { id: mobFamilyId }, select: { name: true } }),
     getActiveEventsForZone(zoneId),
     getActiveWorldWideEvents(),
   ]);
   const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId });
 
-  const defaultActionTemplate = [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }];
-
   const expeditionMobs: ExpeditionMobState[] = [];
   for (const slot of roomMobs) {
     const template = mobTemplateById.get(slot.mobTemplateId);
     if (!template) continue;
-    const modifiedTemplate = {
-      ...template,
-      damageType: template.damageType as import('@pocketrealm/shared').DamageType,
-      hp: Math.max(1, Math.round(template.hp * Math.max(0.1, zoneModifiers.mobHpMultiplier))),
-      damageMin: Math.max(1, Math.round(template.damageMin * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
-      damageMax: Math.max(1, Math.round(template.damageMax * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
-      actionTemplate: defaultActionTemplate,
+    const prefixedTemplate = applyMobPrefix(template, slot.prefix);
+    const damageMultiplier = Math.max(0.1, zoneModifiers.mobDamageMultiplier);
+    const damageMin = Math.max(1, Math.round(prefixedTemplate.damageMin * damageMultiplier));
+    const damageMax = Math.max(damageMin, Math.round(prefixedTemplate.damageMax * damageMultiplier));
+    const zoneModifiedTemplate = {
+      ...prefixedTemplate,
+      hp: Math.max(1, Math.round(prefixedTemplate.hp * Math.max(0.1, zoneModifiers.mobHpMultiplier))),
+      damageMin,
+      damageMax,
     };
+    const roleModifiedTemplate = applyEncounterRoleModifiers(zoneModifiedTemplate, slot.role);
+    const modifiedTemplate = {
+      ...roleModifiedTemplate,
+      actionTemplate: resolveEncounterRoleActionTemplate({
+        role: slot.role,
+        damageType: roleModifiedTemplate.damageType,
+        familyName: family?.name ?? null,
+        mobName: roleModifiedTemplate.name,
+      }),
+    };
+    mobXpByEncounterMobId[makeEncounterMobId(slot.slot)] = roleModifiedTemplate.xpReward;
     expeditionMobs.push(buildEncounterRaidMob(slot, modifiedTemplate));
   }
-  return { mobs: expeditionMobs, mobXpByTemplateId };
+  return { mobs: expeditionMobs, mobXpByEncounterMobId };
+}
+
+function toEncounterMobTemplate(row: {
+  id: string;
+  name: string;
+  zoneId: string;
+  level: number;
+  hp: number;
+  accuracy: number;
+  defence: number;
+  magicDefence: number;
+  evasion: number;
+  damageMin: number;
+  damageMax: number;
+  damageType: string;
+  xpReward: number;
+  encounterWeight: number;
+  spellPattern: unknown;
+}): MobTemplate {
+  return {
+    ...row,
+    damageType: toDamageType(row.damageType),
+    spellPattern: toSpellPattern(row.spellPattern),
+  };
+}
+
+function toDamageType(value: string): DamageType {
+  return value === 'magic' ? 'magic' : 'physical';
+}
+
+function toSpellPattern(value: unknown): SpellAction[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isSpellAction);
+}
+
+function isSpellAction(value: unknown): value is SpellAction {
+  if (!value || typeof value !== 'object') return false;
+  const spell = value as {
+    round?: unknown;
+    name?: unknown;
+  };
+  return typeof spell.round === 'number' && typeof spell.name === 'string';
 }
 
 /**
@@ -506,19 +579,14 @@ export async function handleEncounterDefeat(
 export function computeDefeatedMobXp(
   defeatedMobIds: Set<string>,
   roomMobs: EncounterMobSlot[],
-  mobXpByTemplateId: Record<string, number>,
+  mobXpByEncounterMobId: Record<string, number>,
 ): number {
   let totalXp = 0;
   for (const slot of roomMobs) {
     const mobId = makeEncounterMobId(slot.slot);
     if (!defeatedMobIds.has(mobId)) continue;
-    const baseXp = mobXpByTemplateId[slot.mobTemplateId];
-    if (baseXp === undefined) continue;
-    let xp = baseXp;
-    const prefix = getMobPrefixDefinition(slot.prefix);
-    if (prefix) {
-      xp = Math.max(1, Math.floor(xp * (prefix.xpMultiplier ?? 1)));
-    }
+    const xp = mobXpByEncounterMobId[mobId];
+    if (xp === undefined) continue;
     totalXp += xp;
   }
   return totalXp;
