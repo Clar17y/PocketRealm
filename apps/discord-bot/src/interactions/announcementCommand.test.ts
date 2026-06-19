@@ -9,6 +9,7 @@ const staffRoleId = '345678901234567890';
 const userRoleId = '456789012345678901';
 const announcementChannelId = '567890123456789012';
 const actorUserId = '678901234567890123';
+const zeroWidthSpace = '\u200B';
 
 const config = {
   announcementChannelId,
@@ -115,6 +116,27 @@ describe('handleAnnouncementCommand', () => {
     });
   });
 
+  it('neutralizes everyone mentions inside the body when the toggle is enabled', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      message: 'Event now @here @everyone <@123456789012345678> <@&234567890123456789>',
+      everyone: true,
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, { config });
+
+    expect(channel.send).toHaveBeenCalledWith({
+      content: [
+        '@everyone',
+        '',
+        `Event now @${zeroWidthSpace}here @${zeroWidthSpace}everyone <@123456789012345678> <@&234567890123456789>`,
+      ].join('\n'),
+      allowedMentions: { parse: ['everyone'] },
+    });
+  });
+
   it('rejects whitespace-only announcements before fetching the channel', async () => {
     const channel = createAnnouncementChannel();
     const interaction = createAnnouncementInteraction({
@@ -145,6 +167,23 @@ describe('handleAnnouncementCommand', () => {
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: 'Announcement channel is unavailable. Check DISCORD_ANNOUNCEMENT_CHANNEL_ID and bot permissions.',
     });
+  });
+
+  it('reports a non-sendable announcement channel ephemerally', async () => {
+    const channel = createAnnouncementChannel();
+    channel.isSendable.mockReturnValueOnce(false);
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, { config });
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'Announcement channel is unavailable. Check DISCORD_ANNOUNCEMENT_CHANNEL_ID and bot permissions.',
+    });
+    expect(channel.send).not.toHaveBeenCalled();
   });
 
   it('reports Discord send failures ephemerally', async () => {

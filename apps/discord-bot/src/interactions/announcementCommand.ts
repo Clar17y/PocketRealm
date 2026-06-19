@@ -3,6 +3,9 @@ import type { ChatInputCommandInteraction, MessageMentionOptions } from 'discord
 import type { BotConfig } from '../config.js';
 import { isStaffMember } from '../support/threadActions.js';
 
+const massMentionPattern = /@(everyone|here)\b/g;
+const neutralizedMentionPrefix = '@\u200B';
+
 type AnnouncementConfig = Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds'>;
 
 interface AnnouncementCommandOptions {
@@ -88,11 +91,16 @@ export async function handleAnnouncementCommand(
 
 function buildAnnouncementPayload(message: string, everyone: boolean): AnnouncementPayload {
   const allowedMentions: MessageMentionOptions = everyone ? { parse: ['everyone'] } : { parse: [] };
+  const body = everyone ? neutralizeMassMentions(message) : message;
 
   return {
-    content: everyone ? `@everyone\n\n${message}` : message,
+    content: everyone ? `@everyone\n\n${body}` : body,
     allowedMentions,
   };
+}
+
+function neutralizeMassMentions(message: string): string {
+  return message.replace(massMentionPattern, `${neutralizedMentionPrefix}$1`);
 }
 
 function isSendableAnnouncementChannel(channel: unknown): channel is SendableAnnouncementChannel {
