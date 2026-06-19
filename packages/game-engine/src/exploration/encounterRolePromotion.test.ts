@@ -101,6 +101,20 @@ describe('assignEncounterRolesToRooms', () => {
     expect(rolesForRoom(assignments, 3)).toEqual(['mini_boss']);
   });
 
+  it('suppresses the mini-boss when the only mob slot must satisfy the elite guarantee', () => {
+    const assignments = assignEncounterRolesToRooms(
+      [
+        { roomNumber: 1, mobCount: 0 },
+        { roomNumber: 2, mobCount: 0 },
+        { roomNumber: 3, mobCount: 1 },
+      ],
+      { rng: alwaysRollMiniBoss, miniBossChance: 1 },
+    );
+
+    expect(rolesForRoom(assignments, 3)).toEqual(['elite']);
+    expect(allRoles(assignments)).not.toContain('mini_boss');
+  });
+
   it('adds the required elite pressure to the final room in 4-room layouts when the mini-boss roll fails', () => {
     const assignments = assignEncounterRolesToRooms(
       [
@@ -113,6 +127,25 @@ describe('assignEncounterRolesToRooms', () => {
     );
 
     expect(rolesForRoom(assignments, 4)).toEqual(['elite', 'elite']);
+  });
+
+  it('adds a second elite to the latest occupied room in 4-room layouts with an empty final room', () => {
+    const assignments = assignEncounterRolesToRooms(
+      [
+        { roomNumber: 1, mobCount: 1 },
+        { roomNumber: 2, mobCount: 1 },
+        { roomNumber: 3, mobCount: 1 },
+        { roomNumber: 4, mobCount: 0 },
+      ],
+      { rng: alwaysRollMiniBoss, miniBossChance: 1 },
+    );
+
+    expect(assignments).toEqual([
+      { room: 1, role: 'trash' },
+      { room: 2, role: 'elite' },
+      { room: 3, role: 'elite' },
+    ]);
+    expect(allRoles(assignments)).not.toContain('mini_boss');
   });
 
   it('does not leave an early elite before later all-trash rooms', () => {

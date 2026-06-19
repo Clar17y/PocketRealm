@@ -44,43 +44,55 @@ export function assignEncounterRolesToRooms(
   }
 
   if (finalIndexes.length === 0) {
-    assignments[assignments.length - 1]!.role = 'elite';
-    return assignments;
-  }
-
-  const lastFinalIndex = finalIndexes[finalIndexes.length - 1]!;
-  const shouldAddMiniBoss = rng() < miniBossChance;
-  if (shouldAddMiniBoss) {
-    assignments[lastFinalIndex]!.role = 'mini_boss';
-
-    const finalEliteIndex = finalIndexes.find((index) => assignments[index]!.role === 'trash');
-    if (finalEliteIndex !== undefined) {
-      assignments[finalEliteIndex]!.role = 'elite';
-    } else {
-      promoteLastTrashBeforeRoom(assignments, lastRoom.roomNumber);
-    }
+    promoteLatestTrashAtOrBeforeRoom(assignments, lastRoom.roomNumber);
   } else {
-    assignments[lastFinalIndex]!.role = 'elite';
+    const lastFinalIndex = finalIndexes[finalIndexes.length - 1]!;
+    const shouldAddMiniBoss = rng() < miniBossChance;
+    const hasEliteSlotAfterMiniBoss = findLatestTrashIndexAtOrBeforeRoom(
+      assignments,
+      lastRoom.roomNumber,
+      lastFinalIndex,
+    ) !== undefined;
+
+    if (shouldAddMiniBoss && hasEliteSlotAfterMiniBoss) {
+      assignments[lastFinalIndex]!.role = 'mini_boss';
+      promoteLatestTrashAtOrBeforeRoom(assignments, lastRoom.roomNumber, lastFinalIndex);
+    } else {
+      assignments[lastFinalIndex]!.role = 'elite';
+    }
   }
 
   if (rooms.length >= 4) {
-    const remainingFinalTrash = finalIndexes.find((index) => assignments[index]!.role === 'trash');
-    if (remainingFinalTrash !== undefined) {
-      assignments[remainingFinalTrash]!.role = 'elite';
-    } else {
-      promoteLastTrashBeforeRoom(assignments, lastRoom.roomNumber);
-    }
+    promoteLatestTrashAtOrBeforeRoom(assignments, lastRoom.roomNumber);
   }
 
   return assignments;
 }
 
-function promoteLastTrashBeforeRoom(assignments: EncounterRoleAssignment[], roomNumber: number): void {
+function promoteLatestTrashAtOrBeforeRoom(
+  assignments: EncounterRoleAssignment[],
+  roomNumber: number,
+  excludedIndex?: number,
+): void {
+  const index = findLatestTrashIndexAtOrBeforeRoom(assignments, roomNumber, excludedIndex);
+  if (index === undefined) return;
+
+  assignments[index]!.role = 'elite';
+}
+
+function findLatestTrashIndexAtOrBeforeRoom(
+  assignments: readonly EncounterRoleAssignment[],
+  roomNumber: number,
+  excludedIndex?: number,
+): number | undefined {
   for (let index = assignments.length - 1; index >= 0; index -= 1) {
+    if (index === excludedIndex) continue;
+
     const assignment = assignments[index]!;
-    if (assignment.room < roomNumber && assignment.role === 'trash') {
-      assignment.role = 'elite';
-      return;
+    if (assignment.room <= roomNumber && assignment.role === 'trash') {
+      return index;
     }
   }
+
+  return undefined;
 }
