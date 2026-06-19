@@ -200,6 +200,7 @@ export function CombatScreen({
       id: makeEncounterMobId(m.slot),
       name: m.name,
       prefix: m.prefix,
+      role: m.role,
       hp: m.hp,
       maxHp: m.maxHp,
       activeEffects: [],

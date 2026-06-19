@@ -5,8 +5,8 @@ import { monsterImageSrc } from '@/lib/assets';
 import { PixelCard } from '@/components/PixelCard';
 import { HpBar } from './HpBar';
 import { EffectPill } from './EffectPill';
-import { mobDisplayName } from '@pocketrealm/shared';
 import type { ExpeditionMobInfo } from '@pocketrealm/shared';
+import { encounterMobDisplayName } from './combatHelpers';
 
 export interface MobCardGridProps {
   mobs: ExpeditionMobInfo[];
@@ -59,7 +59,7 @@ export function MobCardGrid({ mobs, myTargetMobId, targetCounts, onSetTarget, di
                     height={24}
                     className="image-rendering-pixelated"
                   />
-                  {mobDisplayName(mob)}
+                  {encounterMobDisplayName(mob)}
                 </span>
                 <div className="flex gap-1 items-center">
                   {count > 0 && (

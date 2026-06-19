@@ -1,4 +1,4 @@
-import type { QuestProgressUpdate, StateUpdates, BossActiveEffect, ExpeditionRoundLog } from '@pocketrealm/shared';
+import type { QuestProgressUpdate, StateUpdates, BossActiveEffect, ExpeditionRoundLog, EncounterMobRole } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { CombatAction } from '@pocketrealm/shared';
 
@@ -492,7 +492,7 @@ export interface EncounterSitesResponse {
     currentRoom: number;
     totalRooms: number;
     roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-    currentRoomMobs: Array<{ slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
+    currentRoomMobs: Array<{ slot: number; name: string; prefix: string | null; role: EncounterMobRole; hp: number; maxHp: number }>;
     eventModifiers?: EventModifierBadge[];
     totalTurnCost: number;
   }>;
@@ -548,6 +548,7 @@ export interface EncounterRoomMobState {
   slot: number;
   hp: number;
   maxHp: number;
+  role?: EncounterMobRole;
   alive: boolean;
   activeEffects: BossActiveEffect[];
 }
@@ -580,7 +581,7 @@ export interface EncounterFleeResult {
 export interface EncounterAutoResolveResponse {
   outcome: 'cleared' | 'defeated' | 'site_cleared';
   rounds: EncounterRoundSnapshot[];
-  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
+  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; role: EncounterMobRole; hp: number; maxHp: number }>;
   chestReward?: {
     rarity: string;
     materials: Array<{ itemTemplateId: string; name: string; quantity: number }>;
@@ -607,6 +608,7 @@ export interface EncounterStartRoomResponse {
     mobId: string;
     name: string;
     prefix: string | null;
+    role: EncounterMobRole;
     hp: number;
     maxHp: number;
     mobTemplateId: string;

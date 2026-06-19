@@ -124,6 +124,7 @@ export interface ExpeditionMobInfo {
   id: string;
   name: string;
   prefix: string | null;
+  role?: EncounterMobRole;
   hp: number;
   maxHp: number;
   activeEffects: BossActiveEffect[];

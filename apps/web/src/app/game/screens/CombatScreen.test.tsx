@@ -158,8 +158,8 @@ function buildProps(overrides: Partial<React.ComponentProps<typeof CombatScreen>
           { room: 2, alive: 2, total: 2 },
         ],
         currentRoomMobs: [
-          { slot: 3, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, hp: 20, maxHp: 20, status: 'alive' },
-          { slot: 4, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, hp: 20, maxHp: 20, status: 'alive' },
+          { slot: 3, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, role: 'trash', hp: 20, maxHp: 20, status: 'alive' },
+          { slot: 4, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, role: 'elite', hp: 20, maxHp: 20, status: 'alive' },
         ],
         eventModifiers: [],
         totalTurnCost: 5,
@@ -217,8 +217,8 @@ function buildProps(overrides: Partial<React.ComponentProps<typeof CombatScreen>
           { room: 2, alive: 2, total: 2 },
         ],
         currentRoomMobs: [
-          { slot: 3, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, hp: 20, maxHp: 20, status: 'alive' },
-          { slot: 4, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, hp: 20, maxHp: 20, status: 'alive' },
+          { slot: 3, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, role: 'trash', hp: 20, maxHp: 20, status: 'alive' },
+          { slot: 4, mobTemplateId: 'mob-1', name: 'Wolf', prefix: null, role: 'elite', hp: 20, maxHp: 20, status: 'alive' },
         ],
         eventModifiers: [],
         totalTurnCost: 5,

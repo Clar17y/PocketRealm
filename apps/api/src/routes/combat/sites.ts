@@ -106,7 +106,7 @@ export function registerSiteRoutes(router: Router): void {
         currentRoom: number;
         totalRooms: number;
         roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; prefix: string | null; status: string }>;
+        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; role: 'trash' | 'elite' | 'mini_boss'; prefix: string | null; status: string }>;
       }> = [];
 
       for (const site of sites) {
@@ -131,7 +131,13 @@ export function registerSiteRoutes(router: Router): void {
         const currentRoomNumber = site.currentRoom ?? 1;
         const currentRoomMobs = decayed.mobs
           .filter(m => (m.room ?? 1) === currentRoomNumber && m.status === 'alive')
-          .map(m => ({ slot: m.slot, mobTemplateId: m.mobTemplateId, prefix: m.prefix ?? null, status: m.status }));
+          .map(m => ({
+            slot: m.slot,
+            mobTemplateId: m.mobTemplateId,
+            role: m.role,
+            prefix: m.prefix ?? null,
+            status: m.status,
+          }));
 
         activeSites.push({
           encounterSiteId: site.id,
@@ -229,6 +235,7 @@ export function registerSiteRoutes(router: Router): void {
                 slot: m.slot,
                 name: template?.name ?? 'Unknown',
                 prefix: m.prefix,
+                role: m.role,
                 hp: template?.hp ?? 0,
                 maxHp: template?.hp ?? 0,
               };
@@ -406,6 +413,7 @@ export function registerSiteRoutes(router: Router): void {
         slot: parseEncounterMobSlot(m.mobId) ?? 0,
         hp: m.hpRemaining,
         maxHp: m.maxHp,
+        role: m.role,
         alive: m.alive,
         activeEffects: m.activeEffects ?? [],
       }));

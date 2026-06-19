@@ -67,7 +67,7 @@ function updateMobsFromSnapshot(
     const slot = parseMobSlot(mob.id);
     const ms = mobStates.find(s => s.slot === slot);
     if (!ms) return { ...mob, hp: 0, activeEffects: [] }; // Not in response = dead
-    return { ...mob, hp: ms.hp, maxHp: ms.maxHp, activeEffects: ms.activeEffects };
+    return { ...mob, role: ms.role ?? mob.role, hp: ms.hp, maxHp: ms.maxHp, activeEffects: ms.activeEffects };
   });
 }
 
@@ -78,6 +78,7 @@ function startRoomMobsToExpeditionMobs(
     id: m.mobId,
     name: m.name,
     prefix: m.prefix,
+    role: m.role,
     hp: m.hp,
     maxHp: m.maxHp,
     activeEffects: [],
@@ -154,6 +155,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
           id: m.mobId,
           name: m.name,
           prefix: m.prefix,
+          role: m.role,
           hp: m.hp,
           maxHp: m.maxHp,
           activeEffects: [],

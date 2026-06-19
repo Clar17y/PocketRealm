@@ -43,8 +43,8 @@ describe('useEncounterSites', () => {
       { room: 4, alive: overrides.aliveMobs ?? 2, total: 2 },
     ],
     currentRoomMobs: [
-      { slot: 9, name: 'Wolf', prefix: null, hp: 22, maxHp: 22 },
-      { slot: 10, name: 'Wolf', prefix: null, hp: 22, maxHp: 22 },
+      { slot: 9, name: 'Wolf', prefix: null, role: 'trash' as const, hp: 22, maxHp: 22 },
+      { slot: 10, name: 'Wolf', prefix: null, role: 'elite' as const, hp: 22, maxHp: 22 },
     ],
     eventModifiers: [],
     totalTurnCost: 100,
