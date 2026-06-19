@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import {
   handleProfileCommand,
   handleRankCommand,
@@ -10,7 +11,7 @@ import {
   handleTurnsCommand,
 } from './playerCommands.js';
 
-const config = { guildId: 'guild-123' };
+const config = { guildId: 'guild-123', emojiMap: {} };
 
 describe('handleProfileCommand', () => {
   it('uses the selected Discord user id when provided', async () => {
@@ -37,15 +38,9 @@ describe('handleProfileCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/users/selected-2/profile?guildId=guild-123');
-    expect(editReply).toHaveBeenCalledWith({
-      embeds: [
-        expect.objectContaining({
-          data: expect.objectContaining({
-            title: 'Astra',
-          }),
-        }),
-      ],
-    });
+    const text = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(text).toContain('🧙 **Astra**');
+    expect(text).toContain('Level 12');
   });
 
   it('tells the user to run /link when their profile is unlinked', async () => {
@@ -65,9 +60,9 @@ describe('handleProfileCommand', () => {
 
     await handleProfileCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Link your PocketRealm account first with /link.',
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('⚠️ **Link required**');
+    expect(content).toContain('/link');
   });
 
   it('makes selected-user unlinked copy clear', async () => {
@@ -87,9 +82,10 @@ describe('handleProfileCommand', () => {
 
     await handleProfileCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'That Discord user needs to link their PocketRealm account with /link first.',
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('⚠️ **Link required**');
+    expect(content).toContain('That Discord user');
+    expect(content).toContain('/link');
   });
 
   it('reports a linked account with no active player without telling the user to run /link', async () => {
@@ -109,11 +105,8 @@ describe('handleProfileCommand', () => {
 
     await handleProfileCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Linked PocketRealm account has no active player.',
-    });
-    const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('⚠️ **Character missing**');
     expect(content).not.toContain('/link');
   });
 
@@ -134,11 +127,8 @@ describe('handleProfileCommand', () => {
 
     await handleProfileCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Unable to load PocketRealm player data right now. Please try again later.',
-    });
-    const reply = editReply.mock.calls[0]?.[0];
-    const content = typeof reply === 'object' && 'content' in reply ? reply.content : '';
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('❌ **Player data unavailable**');
     expect(content).not.toContain('/link');
   });
 });
@@ -164,9 +154,9 @@ describe('handleTurnsCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/turns?guildId=guild-123');
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('34 turns available'),
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('⚡ **Turns**');
+    expect(content).toContain('34 turns available');
   });
 
   it('tells unlinked users to run /link ephemerally', async () => {
@@ -184,9 +174,9 @@ describe('handleTurnsCommand', () => {
     await handleTurnsCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Link your PocketRealm account first with /link.',
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('⚠️ **Link required**');
+    expect(content).toContain('/link');
   });
 });
 
@@ -209,9 +199,9 @@ describe('handleSkillsCommand', () => {
     await handleSkillsCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Forging Lv 7'),
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('✨ **Skills**');
+    expect(content).toContain('Forging Lv 7');
   });
 
   it('tells unlinked users to run /link ephemerally', async () => {
@@ -229,9 +219,9 @@ describe('handleSkillsCommand', () => {
     await handleSkillsCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Link your PocketRealm account first with /link.',
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('⚠️ **Link required**');
+    expect(content).toContain('/link');
   });
 });
 
@@ -261,15 +251,9 @@ describe('handleRankCommand', () => {
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/character_level?guildId=guild-123');
-    expect(editReply).toHaveBeenCalledWith({
-      embeds: [
-        expect.objectContaining({
-          data: expect.objectContaining({
-            title: 'Character Level Rank',
-          }),
-        }),
-      ],
-    });
+    const text = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(text).toContain('🏆 **Character Level Rank**');
+    expect(text).toContain('Rank: #8 of 250');
   });
 
   it('normalizes common rank category aliases before calling the API', async () => {
@@ -312,9 +296,7 @@ describe('handleRankCommand', () => {
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(get).not.toHaveBeenCalled();
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Unknown ranking category'),
-    });
+    expect(replyContent(editReply.mock.calls[0]?.[0])).toContain('Unknown ranking category');
   });
 
   it('explains API-invalid rank categories instead of using the generic data failure copy', async () => {
@@ -335,9 +317,7 @@ describe('handleRankCommand', () => {
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(get).toHaveBeenCalledWith('/api/v1/discord/users/invoker-1/rank/character_level?guildId=guild-123');
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Unknown ranking category'),
-    });
+    expect(replyContent(editReply.mock.calls[0]?.[0])).toContain('Unknown ranking category');
   });
 
   it('formats null rank and score as unranked', async () => {
@@ -362,13 +342,7 @@ describe('handleRankCommand', () => {
 
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
-    const reply = editReply.mock.calls[0]?.[0];
-    const embed = typeof reply === 'object' && 'embeds' in reply ? reply.embeds?.[0] : undefined;
-    expect(embed).toEqual(expect.objectContaining({
-      data: expect.objectContaining({
-        description: 'Rank: Unranked',
-      }),
-    }));
+    expect(replyContent(editReply.mock.calls[0]?.[0])).toContain('Rank: Unranked');
   });
 
   it('tells unlinked users to run /link ephemerally', async () => {
@@ -389,8 +363,13 @@ describe('handleRankCommand', () => {
     await handleRankCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Link your PocketRealm account first with /link.',
-    });
+    const content = replyContent(editReply.mock.calls[0]?.[0]);
+    expect(content).toContain('⚠️ **Link required**');
+    expect(content).toContain('/link');
   });
 });
+
+function replyContent(reply: unknown): string {
+  expectV2Card(reply);
+  return cardText(reply);
+}

@@ -15,10 +15,13 @@ import {
   type DuelCardPayload,
 } from '../discord/duelCard.js';
 import { parseDuelButtonId } from '../discord/components.js';
+import type { DiscordEmojiMap } from '../discord/emojis.js';
+import { statusCard, type V2CardPayload } from '../discord/v2Card.js';
 import { isRecord } from '../utils.js';
 
 type DuelApiClient = Pick<PocketRealmApiClient, 'get' | 'post'>;
-type DuelCommandConfig = Pick<BotConfig, 'duelsChannelId'>;
+type DuelCommandConfig = Pick<BotConfig, 'duelsChannelId' | 'emojiMap'>;
+type DuelButtonConfig = Pick<BotConfig, 'emojiMap'>;
 
 interface CreateDuelResponse {
   duel: {
@@ -63,16 +66,26 @@ export async function handleDuelCommand(
 ): Promise<void> {
   if (interaction.channelId !== config.duelsChannelId) {
     await interaction.reply({
-      ephemeral: true,
-      content: `Use /duel in <#${config.duelsChannelId}>.`,
+      ...statusCard(
+        'warning',
+        'Wrong channel',
+        `Use /duel in <#${config.duelsChannelId}>.`,
+        config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
 
   if (!interaction.guildId) {
     await interaction.reply({
-      ephemeral: true,
-      content: '/duel only works in the PocketRealm Discord server.',
+      ...statusCard(
+        'warning',
+        'Server only',
+        '/duel only works in the PocketRealm Discord server.',
+        config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
@@ -80,16 +93,26 @@ export async function handleDuelCommand(
   const opponent = interaction.options.getUser('opponent', true);
   if (opponent.id === interaction.user.id) {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Challenge another player, not yourself.',
+      ...statusCard(
+        'warning',
+        'Choose an opponent',
+        'Challenge another player, not yourself.',
+        config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
 
   if (opponent.bot) {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Challenge a player, not a bot.',
+      ...statusCard(
+        'warning',
+        'Choose a player',
+        'Challenge a player, not a bot.',
+        config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
@@ -102,9 +125,12 @@ export async function handleDuelCommand(
   // before creating the duel so a misconfigured channel never leaves an orphaned record.
   const channel = interaction.channel;
   if (!channel?.isSendable() || !interaction.appPermissions?.has(PermissionFlagsBits.SendMessages)) {
-    await interaction.editReply({
-      content: 'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
-    });
+    await interaction.editReply(
+      formatDuelPostFailure(
+        'Could not post the public duel challenge. Make sure the bot can send messages in this channel, then run /duel again.',
+        config.emojiMap,
+      ),
+    );
     return;
   }
 
@@ -117,9 +143,7 @@ export async function handleDuelCommand(
       targetDiscordUserId: opponent.id,
     });
   } catch (error) {
-    await interaction.editReply({
-      content: createDuelErrorCopy(error),
-    });
+    await interaction.editReply(createDuelErrorCopy(error, config.emojiMap));
     return;
   }
 
@@ -132,19 +156,25 @@ export async function handleDuelCommand(
       opponentDiscordUserId: opponent.id,
     }));
   } catch {
-    await interaction.editReply({
-      content: 'Could not post the public duel challenge. Please run /duel again.',
-    });
+    await interaction.editReply(
+      formatDuelPostFailure(
+        'Could not post the public duel challenge. Please run /duel again.',
+        config.emojiMap,
+      ),
+    );
     return;
   }
 
-  await interaction.editReply({ content: 'Friendly simulation challenge posted.' });
+  await interaction.editReply(
+    statusCard('success', 'Posted', 'Friendly simulation challenge posted.', config.emojiMap),
+  );
   await recordDuelMessage(api, response.duel.id, replyResult);
 }
 
 export async function handleDuelButton(
   interaction: ButtonInteraction,
   api: DuelApiClient,
+  config: DuelButtonConfig,
 ): Promise<void> {
   const parsed = parseDuelButtonId(interaction.customId);
   if (!parsed) return;
@@ -152,8 +182,13 @@ export async function handleDuelButton(
   if (parsed.action === 'accept' || parsed.action === 'decline') {
     if (interaction.user.id !== parsed.targetDiscordUserId) {
       await interaction.reply({
-        ephemeral: true,
-        content: 'Only the challenged player can use this duel button.',
+        ...statusCard(
+          'warning',
+          'Wrong player',
+          'Only the challenged player can use this duel button.',
+          config.emojiMap,
+          { ephemeral: true },
+        ),
       });
       return;
     }
@@ -163,30 +198,35 @@ export async function handleDuelButton(
         interaction,
         buildDeclineCard({ declinerMention: `<@${interaction.user.id}>` }),
         'update',
+        config.emojiMap,
       );
       return;
     }
 
-    await acceptDuel(interaction, api, parsed.duelId);
+    await acceptDuel(interaction, api, parsed.duelId, config.emojiMap);
     return;
   }
 
   if (parsed.action === 'replay') {
-    await showReplay(interaction, api, parsed.duelId, parsed.page);
+    await showReplay(interaction, api, parsed.duelId, parsed.page, config.emojiMap);
     return;
   }
 
   if (parsed.action === 'builds') {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Build previews are not available for friendly simulations yet.',
+      ...statusCard(
+        'info',
+        'Builds unavailable',
+        'Build previews are not available for friendly simulations yet.',
+        config.emojiMap,
+        { ephemeral: true },
+      ),
     });
     return;
   }
 
   await interaction.reply({
-    ephemeral: true,
-    content: 'Use /duel to start a rematch for now.',
+    ...statusCard('info', 'Rematch', 'Use /duel to start a rematch for now.', config.emojiMap, { ephemeral: true }),
   });
 }
 
@@ -194,6 +234,7 @@ async function acceptDuel(
   interaction: ButtonInteraction,
   api: Pick<PocketRealmApiClient, 'post'>,
   duelId: string,
+  emojiMap: DiscordEmojiMap,
 ): Promise<void> {
   await interaction.deferUpdate();
 
@@ -203,17 +244,15 @@ async function acceptDuel(
       acceptedByDiscordUserId: interaction.user.id,
     });
   } catch (error) {
-    await interaction.followUp({
-      ephemeral: true,
-      content: resolveDuelErrorCopy(error),
-    });
+    await interaction.followUp(resolveDuelErrorCopy(error, emojiMap, { ephemeral: true }));
     return;
   }
 
-  await applyDuelCardOrNotice(interaction, buildResultCard(response.duel), 'editReply');
+  await applyDuelCardOrNotice(interaction, buildResultCard(response.duel), 'editReply', emojiMap);
 }
 
-const STALE_DUEL_NOTICE = 'This duel was started before a bot update and can no longer be updated here. Run /duel to start a fresh one.';
+const STALE_DUEL_NOTICE =
+  'This duel was started before a bot update and can no longer be updated here. Run /duel to start a fresh one.';
 
 // How a duel card reaches the message: a fresh `update` response (interaction
 // not yet acknowledged) or an `editReply` after deferUpdate (acknowledged).
@@ -225,6 +264,7 @@ async function applyDuelCardOrNotice(
   interaction: ButtonInteraction,
   card: DuelCardPayload,
   delivery: DuelCardDelivery,
+  emojiMap: DiscordEmojiMap,
 ): Promise<void> {
   try {
     if (delivery === 'update') {
@@ -242,15 +282,16 @@ async function applyDuelCardOrNotice(
     if (interaction.message.flags.has(MessageFlags.IsComponentsV2)) {
       throw error;
     }
-    await sendStaleDuelNotice(interaction, delivery);
+    await sendStaleDuelNotice(interaction, delivery, emojiMap);
   }
 }
 
 async function sendStaleDuelNotice(
   interaction: ButtonInteraction,
   delivery: DuelCardDelivery,
+  emojiMap: DiscordEmojiMap,
 ): Promise<void> {
-  const payload = { ephemeral: true, content: STALE_DUEL_NOTICE } as const;
+  const payload = statusCard('warning', 'Duel unavailable', STALE_DUEL_NOTICE, emojiMap, { ephemeral: true });
   try {
     if (delivery === 'update') {
       await interaction.reply(payload);
@@ -267,6 +308,7 @@ async function showReplay(
   api: Pick<PocketRealmApiClient, 'get'>,
   duelId: string,
   page: number,
+  emojiMap: DiscordEmojiMap,
 ): Promise<void> {
   await interaction.deferUpdate();
 
@@ -276,15 +318,20 @@ async function showReplay(
     );
     await interaction.editReply(buildReplayCard(response.replay));
   } catch {
-    await sendReplayLoadError(interaction);
+    await sendReplayLoadError(interaction, emojiMap);
   }
 }
 
-async function sendReplayLoadError(interaction: ButtonInteraction): Promise<void> {
+async function sendReplayLoadError(interaction: ButtonInteraction, emojiMap: DiscordEmojiMap): Promise<void> {
   try {
     await interaction.followUp({
-      ephemeral: true,
-      content: 'Unable to load the friendly simulation replay right now.',
+      ...statusCard(
+        'error',
+        'Replay unavailable',
+        'Unable to load the friendly simulation replay right now.',
+        emojiMap,
+        { ephemeral: true },
+      ),
     });
   } catch {
     // The public duel message is already preserved; there is no safe fallback if follow-up delivery fails.
@@ -323,14 +370,23 @@ function readMessageId(value: unknown): string | null {
   return null;
 }
 
-function createDuelErrorCopy(error: unknown): string {
+function formatDuelPostFailure(detail: string, emojiMap: DiscordEmojiMap): V2CardPayload {
+  return statusCard('warning', 'Post failed', detail, emojiMap);
+}
+
+function createDuelErrorCopy(error: unknown, emojiMap: DiscordEmojiMap): V2CardPayload {
   if (error instanceof PocketRealmApiError) {
     if (
       error.code === 'DISCORD_LINK_REQUIRED'
       || error.code === 'DISCORD_DUEL_CHALLENGER_LINK_REQUIRED'
       || error.code === 'DISCORD_DUEL_TARGET_LINK_REQUIRED'
     ) {
-      return 'Both players need linked PocketRealm accounts before dueling.';
+      return statusCard(
+        'warning',
+        'Link required',
+        'Both players need linked PocketRealm accounts before dueling.',
+        emojiMap,
+      );
     }
 
     if (
@@ -338,25 +394,50 @@ function createDuelErrorCopy(error: unknown): string {
       || error.code === 'DISCORD_DUEL_CHALLENGER_PLAYER_NOT_FOUND'
       || error.code === 'DISCORD_DUEL_TARGET_PLAYER_NOT_FOUND'
     ) {
-      return 'Both players need active PocketRealm characters before dueling.';
+      return statusCard(
+        'warning',
+        'Character missing',
+        'Both players need active PocketRealm characters before dueling.',
+        emojiMap,
+      );
     }
 
     if (error.code === 'DISCORD_SELF_CHALLENGE' || error.code === 'DISCORD_DUEL_SELF_CHALLENGE') {
-      return 'Challenge another player, not yourself.';
+      return statusCard(
+        'warning',
+        'Choose an opponent',
+        'Challenge another player, not yourself.',
+        emojiMap,
+      );
     }
   }
 
-  return 'Unable to create a friendly duel right now. Please try again later.';
+  return statusCard(
+    'error',
+    'Duel unavailable',
+    'Unable to create a friendly duel right now. Please try again later.',
+    emojiMap,
+  );
 }
 
-function resolveDuelErrorCopy(error: unknown): string {
+function resolveDuelErrorCopy(
+  error: unknown,
+  emojiMap: DiscordEmojiMap,
+  options: { ephemeral?: boolean } = {},
+): V2CardPayload {
   if (error instanceof PocketRealmApiError) {
     if (
       error.code === 'DISCORD_LINK_REQUIRED'
       || error.code === 'DISCORD_DUEL_CHALLENGER_LINK_REQUIRED'
       || error.code === 'DISCORD_DUEL_TARGET_LINK_REQUIRED'
     ) {
-      return 'Link your PocketRealm account first with /link.';
+      return statusCard(
+        'warning',
+        'Link required',
+        'Link your PocketRealm account first with /link.',
+        emojiMap,
+        options,
+      );
     }
 
     if (
@@ -367,9 +448,21 @@ function resolveDuelErrorCopy(error: unknown): string {
       || error.code === 'DISCORD_DUEL_NOT_PENDING'
       || error.code === 'DISCORD_DUEL_NOT_FOUND'
     ) {
-      return 'That friendly duel is no longer available. Start a new /duel.';
+      return statusCard(
+        'warning',
+        'Duel unavailable',
+        'That friendly duel is no longer available. Start a new /duel.',
+        emojiMap,
+        options,
+      );
     }
   }
 
-  return 'Unable to resolve that friendly duel right now. Please try again later.';
+  return statusCard(
+    'error',
+    'Duel failed',
+    'Unable to resolve that friendly duel right now. Please try again later.',
+    emojiMap,
+    options,
+  );
 }

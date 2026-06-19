@@ -2,6 +2,7 @@ import type { Client, GuildMember, MessageCreateOptions } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { BotConfig } from '../config.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './welcome.js';
 
 const GUILD_ID = '234567890123456789';
@@ -14,6 +15,7 @@ const baseConfig = {
   webBaseUrl: 'https://pocketrealm.test',
   welcomeChannelId: WELCOME_CHANNEL_ID,
   duelsChannelId: DUELS_CHANNEL_ID,
+  emojiMap: {},
 } as BotConfig;
 
 describe('welcomeGuildMember', () => {
@@ -25,15 +27,17 @@ describe('welcomeGuildMember', () => {
 
     expect(result).toEqual({ sent: true });
     expect(client.channels.fetch).toHaveBeenCalledWith(WELCOME_CHANNEL_ID);
-    expect(send).toHaveBeenCalledWith({
-      content: [
-        `Welcome <@${USER_ID}> to PocketRealm.`,
-        `Use \`/link\` to connect your game account, \`/wiki\` for game help, and \`/report\` if you need support.`,
-        `Friendly duels live in <#${DUELS_CHANNEL_ID}>.`,
-        'Play: https://pocketrealm.test',
-      ].join('\n'),
+    const payload = send.mock.calls[0][0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('👋 **Welcome to PocketRealm');
+    expect(cardText(payload)).toContain('/link');
+    expect(cardText(payload)).toContain('/wiki');
+    expect(cardText(payload)).toContain('/report');
+    expect(cardText(payload)).toContain(`<#${DUELS_CHANNEL_ID}>`);
+    expect(cardText(payload)).toContain('Play: https://pocketrealm.test');
+    expect(payload).toEqual(expect.objectContaining({
       allowedMentions: { users: [USER_ID], roles: [], parse: [] },
-    });
+    }));
   });
 
   it('waits for members who have not completed membership screening', async () => {

@@ -58,6 +58,23 @@ describe('parseBotConfig', () => {
     ]);
   });
 
+  it('parses optional custom Discord emoji overrides', () => {
+    const config = parseBotConfig({
+      ...validEnv,
+      DISCORD_EMOJI_MAP: 'duel=<:pr_duel:123456789012345678>,success=<:pr_success:234567890123456789>',
+    });
+
+    expect(config.emojiMap).toEqual({
+      duel: '<:pr_duel:123456789012345678>',
+      success: '<:pr_success:234567890123456789>',
+    });
+  });
+
+  it('rejects malformed custom Discord emoji overrides', () => {
+    expect(() => parseBotConfig({ ...validEnv, DISCORD_EMOJI_MAP: 'duel=:swords:' })).toThrow();
+    expect(() => parseBotConfig({ ...validEnv, DISCORD_EMOJI_MAP: 'notakey=<:x:123456789012345678>' })).toThrow();
+  });
+
   it('rejects invalid snowflake ids and short internal API keys', () => {
     expect(() => parseBotConfig({ ...validEnv, DISCORD_CLIENT_ID: 'not-a-snowflake' })).toThrow();
     expect(() => parseBotConfig({ ...validEnv, DISCORD_ANNOUNCEMENT_CHANNEL_ID: 'not-a-snowflake' })).toThrow();

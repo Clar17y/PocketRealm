@@ -2,7 +2,10 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleLinkCommand } from './linkCommand.js';
+
+const config = { emojiMap: {} };
 
 describe('handleLinkCommand', () => {
   it('defers ephemerally, creates a link code, and edits the reply with the code', async () => {
@@ -21,19 +24,19 @@ describe('handleLinkCommand', () => {
       editReply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleLinkCommand(interaction, api);
+    await handleLinkCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(post).toHaveBeenCalledWith('/api/v1/discord/link-codes', {
       discordUserId: '123456789012345678',
       discordGuildId: '234567890123456789',
     });
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('Enter this code in PocketRealm Settings: ABC12345'),
-    });
-    expect(editReply).toHaveBeenCalledWith({
-      content: expect.stringContaining('<t:1780574400:F>'),
-    });
+    const payload = editReply.mock.calls[0][0];
+    expectV2Card(payload);
+    const content = cardText(payload);
+    expect(content).toContain('🔗 **Link PocketRealm**');
+    expect(content).toContain('`ABC12345`');
+    expect(content).toContain('<t:1780574400:F>');
   });
 
   it('edits the deferred reply with safe copy when the API fails', async () => {
@@ -50,12 +53,12 @@ describe('handleLinkCommand', () => {
       editReply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleLinkCommand(interaction, api);
+    await handleLinkCommand(interaction, api, config);
 
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(editReply).toHaveBeenCalledWith({
-      content: 'Unable to create a PocketRealm link code right now. Please try again later.',
-    });
+    const payload = editReply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('❌ **Link failed**');
   });
 
   it('responds immediately without calling the API when used outside a guild', async () => {
@@ -69,12 +72,12 @@ describe('handleLinkCommand', () => {
       reply,
     } as unknown as ChatInputCommandInteraction;
 
-    await handleLinkCommand(interaction, api);
+    await handleLinkCommand(interaction, api, config);
 
     expect(postMock).not.toHaveBeenCalled();
-    expect(reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: '/link only works in the PocketRealm Discord server.',
-    });
+    const payload = reply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(payload).toEqual(expect.objectContaining({ ephemeral: true }));
+    expect(cardText(payload)).toContain('⚠️ **Server only**');
   });
 });

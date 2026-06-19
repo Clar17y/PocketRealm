@@ -7,11 +7,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.68',
+    date: '2026-06-19',
+    title: 'Discord Message Polish',
+    summary:
+      'The Pocketrealm Discord bot messages have had a visual refresh. Profile, turns, skills, rank, support, notification, and welcome messages now use Discord\'s cleaner card layout for consistent, easier-to-read formatting that matches the duel cards. Server admins can also map each message type to a custom server emoji for a more branded look. This is a presentation update, so the information and commands are unchanged.',
+  },
+  {
     version: '0.67',
     date: '2026-06-17',
     title: 'More Discord Alerts',
     summary:
-      'You can now opt into Discord DMs for far more than turn alerts. Run /notify in the Pocketrealm Discord to toggle DMs for PvP attacks, PvP scouts, bosses appearing, bosses being defeated, expeditions recruiting, and expeditions finishing — each one off until you switch it on. Every alert links straight to the right screen in-game. Link your account with /link first if you have not already.',
+      'You can now opt into Discord DMs for far more than turn alerts. Run /notify in the Pocketrealm Discord to toggle DMs for PvP attacks, PvP scouts, bosses appearing, bosses being defeated, expeditions recruiting, and expeditions finishing, each one off until you switch it on. Every alert links straight to the right screen in-game. Link your account with /link first if you have not already.',
   },
   {
     version: '0.66',
@@ -25,7 +32,7 @@ export const changelog: ChangelogEntry[] = [
     date: '2026-06-15',
     title: 'Discord Turn Alerts',
     summary:
-      'You can now opt in to a Discord DM when your turn bank fills up, so banked regen stops going to waste while you are away. Link your account with /link, then run /notify in the Pocketrealm Discord to toggle alerts on or off — enabling one sends a confirmation DM, and you get nothing until you turn it on. More notification types can be added later; for now it covers turns reaching their cap.',
+      'You can now opt in to a Discord DM when your turn bank fills up, so banked regen stops going to waste while you are away. Link your account with /link, then run /notify in the Pocketrealm Discord to toggle alerts on or off. Enabling one sends a confirmation DM, and you get nothing until you turn it on. More notification types can be added later; for now it covers turns reaching their cap.',
   },
   {
     version: '0.64',
@@ -151,7 +158,7 @@ export const changelog: ChangelogEntry[] = [
     date: '2026-03-20',
     title: 'Encounter Site Rework',
     summary:
-      'Encounter sites have been completely rebuilt as multi-room dungeons. Each site is divided into rooms that you clear one at a time, choosing between auto-resolve (template-locked, earns a chest loot bonus) or manual round-by-round combat. HP, stamina, and mana carry between rooms but regenerate naturally while you\'re between fights. Splash Cascade makes missed attacks bounce to other enemies in the room, each re-rolling hit chance against a new target. Mobs decay over time — if all remaining rooms decay, the site auto-clears and you receive your chest reward. Chest rarity scales with room count: more rooms means better loot. Combat logs now show detailed hit breakdowns including accuracy rolls, dodge checks, and splash chains. Combat history tracks encounter room fights with source filtering. An activity lockout prevents starting other actions while you\'re mid-site.',
+      'Encounter sites have been completely rebuilt as multi-room dungeons. Each site is divided into rooms that you clear one at a time, choosing between auto-resolve (template-locked, earns a chest loot bonus) or manual round-by-round combat. HP, stamina, and mana carry between rooms but regenerate naturally while you\'re between fights. Splash Cascade makes missed attacks bounce to other enemies in the room, each re-rolling hit chance against a new target. Mobs decay over time. If all remaining rooms decay, the site auto-clears and you receive your chest reward. Chest rarity scales with room count: more rooms means better loot. Combat logs now show detailed hit breakdowns including accuracy rolls, dodge checks, and splash chains. Combat history tracks encounter room fights with source filtering. An activity lockout prevents starting other actions while you\'re mid-site.',
   },
   {
     version: '0.46',

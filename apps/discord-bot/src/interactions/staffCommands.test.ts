@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleStaffCommand } from './staffCommands.js';
 
 const guildId = '234567890123456789';
@@ -23,12 +24,58 @@ const config = {
   supportTriageChannelId,
   supportStaffRoleIds: [staffRoleId],
   levelRoleMap: new Map<number, string>(),
+  emojiMap: {},
 } satisfies Pick<
   BotConfig,
-  'guildId' | 'playerRoleId' | 'verifiedRoleId' | 'supportTriageChannelId' | 'supportStaffRoleIds' | 'levelRoleMap'
+  'guildId'
+  | 'playerRoleId'
+  | 'verifiedRoleId'
+  | 'supportTriageChannelId'
+  | 'supportStaffRoleIds'
+  | 'levelRoleMap'
+  | 'emojiMap'
 >;
 
 describe('handleStaffCommand', () => {
+  it('rejects staff commands outside the guild ephemerally', async () => {
+    const interaction = createStaffInteraction({
+      guildId: null,
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'sync-roles',
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+    });
+
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expectCardPayload(firstCallArg(interaction.reply), 'Staff commands only work in the PocketRealm Discord server.');
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it('rejects staff commands when staff roles are not configured', async () => {
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'sync-roles',
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config: {
+        ...config,
+        supportStaffRoleIds: [],
+      },
+    });
+
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expectCardPayload(
+      firstCallArg(interaction.reply),
+      'Staff commands are not configured. Ask an administrator to set support staff roles.',
+    );
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
   it('rejects non-staff users ephemerally', async () => {
     const interaction = createStaffInteraction({
       member: memberWithRoles([userRoleId]),
@@ -40,11 +87,24 @@ describe('handleStaffCommand', () => {
       config,
     });
 
-    expect(interaction.reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: 'Only support staff can use staff commands.',
-    });
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expectCardPayload(firstCallArg(interaction.reply), 'Only support staff can use staff commands.');
     expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it('edits the deferred reply for unknown staff subcommands', async () => {
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'unknown',
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+    });
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expectCardPayload(firstCallArg(interaction.editReply), 'The /staff unknown command is not available yet.');
   });
 
   it('calls the API for XP adjustments', async () => {
@@ -80,9 +140,10 @@ describe('handleStaffCommand', () => {
       amount: 20,
       reason: 'manual event credit',
     });
-    expect(interaction.editReply).toHaveBeenCalledWith({
-      content: 'Adjusted <@789012345678901234> by 20 XP. New total: 110 XP (level 2).',
-    });
+    expectCardPayload(
+      firstCallArg(interaction.editReply),
+      'Adjusted <@789012345678901234> by 20 XP. New total: 110 XP (level 2).',
+    );
   });
 
   it('syncs the highest qualifying level role after an XP adjustment changes level', async () => {
@@ -163,9 +224,10 @@ describe('handleStaffCommand', () => {
       amount: -200,
       reason: 'remove mistaken credit',
     });
-    expect(interaction.editReply).toHaveBeenCalledWith({
-      content: 'Adjusted <@789012345678901234> by -200 XP. New total: 0 XP (level 1).',
-    });
+    expectCardPayload(
+      firstCallArg(interaction.editReply),
+      'Adjusted <@789012345678901234> by -200 XP. New total: 0 XP (level 1).',
+    );
   });
 
   it('replies with a failure message when the XP adjustment API call fails', async () => {
@@ -185,9 +247,23 @@ describe('handleStaffCommand', () => {
 
     await handleStaffCommand(interaction, { api, config });
 
-    expect(interaction.editReply).toHaveBeenCalledWith({
-      content: 'Could not adjust Discord XP right now. Try again or check bot logs.',
+    expectCardPayload(firstCallArg(interaction.editReply), 'Could not adjust Discord XP right now. Try again or check bot logs.');
+  });
+
+  it('edits the deferred reply when the guild is unavailable during role sync', async () => {
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'sync-roles',
+      guild: null,
     });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+    });
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expectCardPayload(firstCallArg(interaction.editReply), 'Could not sync roles because the guild is unavailable.');
   });
 
   it('calls syncLinkedRoles for staff sync-roles commands', async () => {
@@ -217,9 +293,7 @@ describe('handleStaffCommand', () => {
       config,
     });
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(interaction.editReply).toHaveBeenCalledWith({
-      content: 'Role sync complete: 2 synced, 1 missing, 0 failed out of 3 linked players.',
-    });
+    expectCardPayload(firstCallArg(interaction.editReply), 'Role sync complete: 2 synced, 1 missing, 0 failed out of 3 linked players.');
   });
 
   it('edits the deferred reply when role sync fails', async () => {
@@ -239,9 +313,23 @@ describe('handleStaffCommand', () => {
     });
 
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    expect(interaction.editReply).toHaveBeenCalledWith({
-      content: 'Could not sync roles right now. Try again or check bot logs.',
+    expectCardPayload(firstCallArg(interaction.editReply), 'Could not sync roles right now. Try again or check bot logs.');
+  });
+
+  it('edits the deferred reply when the support triage channel is unavailable', async () => {
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'cleanup-triage',
+      cleanupChannel: null,
     });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+    });
+
+    expect(interaction.client.channels.fetch).toHaveBeenCalledWith(supportTriageChannelId);
+    expectCardPayload(firstCallArg(interaction.editReply), 'Could not clean up support triage because the channel is unavailable.');
   });
 
   it('previews support triage cleanup by default', async () => {
@@ -281,9 +369,40 @@ describe('handleStaffCommand', () => {
       scanLimit: 50,
       confirm: false,
     });
-    expect(interaction.editReply).toHaveBeenCalledWith({
-      content: 'Triage cleanup preview for `SUP-ABC12345`: 2 duplicate cards would be deleted across 1 ticket. Re-run with `confirm:true` to delete.',
+    expectCardPayload(
+      firstCallArg(interaction.editReply),
+      'Triage cleanup preview for `SUP-ABC12345`: 2 duplicate cards would be deleted across 1 ticket. Re-run with `confirm:true` to delete.',
+    );
+  });
+
+  it('reports when support triage cleanup finds no duplicates', async () => {
+    const cleanupSupportTriageMessages = vi.fn(async () => ({
+      scanned: 100,
+      matchedTickets: 0,
+      duplicateTicketCount: 0,
+      duplicateCandidates: 0,
+      deleted: 0,
+      skipped: 0,
+      failed: 0,
+      confirmed: false,
+      scanLimit: 100,
+      targetPublicId: null,
+    }));
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'cleanup-triage',
     });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+      cleanupSupportTriageMessages,
+    });
+
+    expectCardPayload(
+      firstCallArg(interaction.editReply),
+      'Triage cleanup found no duplicate support triage cards in the last 100 scanned messages.',
+    );
   });
 
   it('runs confirmed support triage cleanup', async () => {
@@ -316,9 +435,28 @@ describe('handleStaffCommand', () => {
       scanLimit: 100,
       confirm: true,
     }));
-    expect(interaction.editReply).toHaveBeenCalledWith({
-      content: 'Triage cleanup complete: deleted 2 duplicate cards across 2 tickets. 1 skipped, 0 failed.',
+    expectCardPayload(
+      firstCallArg(interaction.editReply),
+      'Triage cleanup complete: deleted 2 duplicate cards across 2 tickets. 1 skipped, 0 failed.',
+    );
+  });
+
+  it('edits the deferred reply when support triage cleanup fails', async () => {
+    const cleanupSupportTriageMessages = vi.fn(async (): Promise<never> => {
+      throw new Error('cleanup failed');
     });
+    const interaction = createStaffInteraction({
+      member: memberWithRoles([staffRoleId]),
+      subcommand: 'cleanup-triage',
+    });
+
+    await handleStaffCommand(interaction, {
+      api: createApi(),
+      config,
+      cleanupSupportTriageMessages,
+    });
+
+    expectCardPayload(firstCallArg(interaction.editReply), 'Could not clean up support triage right now. Try again or check bot logs.');
   });
 });
 
@@ -358,25 +496,27 @@ function createCleanupChannel() {
 }
 
 function createStaffInteraction(input: {
+  guildId?: string | null;
   member: unknown;
   subcommand: string;
   targetUserId?: string;
   amount?: number;
   reason?: string;
-  guild?: ReturnType<typeof createGuild>;
+  guild?: ReturnType<typeof createGuild> | null;
   publicId?: string;
   scanLimit?: number;
   confirm?: boolean;
   cleanupChannel?: unknown;
 }): ChatInputCommandInteraction {
-  const guild = input.guild ?? {
-    id: guildId,
-  };
-  const cleanupChannel = input.cleanupChannel ?? createCleanupChannel();
+  const resolvedGuildId = Object.prototype.hasOwnProperty.call(input, 'guildId') ? input.guildId : guildId;
+  const guild = Object.prototype.hasOwnProperty.call(input, 'guild') ? input.guild : { id: guildId };
+  const cleanupChannel = Object.prototype.hasOwnProperty.call(input, 'cleanupChannel')
+    ? input.cleanupChannel
+    : createCleanupChannel();
 
   return {
     commandName: 'staff',
-    guildId,
+    guildId: resolvedGuildId,
     guild,
     client: {
       user: {
@@ -403,4 +543,17 @@ function createStaffInteraction(input: {
     deferReply: vi.fn(),
     editReply: vi.fn(),
   } as unknown as ChatInputCommandInteraction;
+}
+
+function expectCardPayload(payload: unknown, ...expectedText: string[]): void {
+  expectV2Card(payload);
+  const text = cardText(payload);
+  for (const expected of expectedText) {
+    expect(text).toContain(expected);
+  }
+}
+
+function firstCallArg(fn: unknown): unknown {
+  const mock = fn as { mock: { calls: unknown[][] } };
+  return mock.mock.calls[0]?.[0];
 }

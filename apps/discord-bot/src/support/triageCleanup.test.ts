@@ -60,6 +60,24 @@ describe('cleanupSupportTriageMessages', () => {
     expect(normalMessage.delete).not.toHaveBeenCalled();
   });
 
+  it('matches duplicate triage cards from nested Components V2 text', async () => {
+    const older = v2TriageMessage({ id: 'older-v2', publicId: 'SUP-ABC12345', createdTimestamp: 1000 });
+    const newest = v2TriageMessage({ id: 'newest-v2', publicId: 'SUP-ABC12345', createdTimestamp: 2000 });
+    const channel = channelWithMessages([older, newest]);
+
+    const summary = await cleanupSupportTriageMessages({
+      channel,
+      botUserId: BOT_USER_ID,
+      scanLimit: 100,
+      confirm: true,
+    });
+
+    expect(summary.duplicateCandidates).toBe(1);
+    expect(summary.deleted).toBe(1);
+    expect(older.delete).toHaveBeenCalledWith('Duplicate support triage card for SUP-ABC12345');
+    expect(newest.delete).not.toHaveBeenCalled();
+  });
+
   it('dedupes multiple tickets independently', async () => {
     const firstOlder = triageMessage({ id: 'first-older', publicId: 'SUP-ABC12345', createdTimestamp: 1000 });
     const firstNewest = triageMessage({ id: 'first-newest', publicId: 'SUP-ABC12345', createdTimestamp: 2000 });
@@ -133,9 +151,28 @@ function triageMessage(input: {
   });
 }
 
+function v2TriageMessage(input: {
+  id: string;
+  publicId: string;
+  createdTimestamp: number;
+}) {
+  return message({
+    id: input.id,
+    content: '',
+    components: [{
+      components: [{
+        content: `🎫 **Support ticket ${input.publicId}**\nInventory does not stack`,
+      }],
+    }],
+    createdTimestamp: input.createdTimestamp,
+    authorBot: true,
+  });
+}
+
 function message(input: {
   id: string;
   content: string;
+  components?: unknown[];
   embedTitle?: string;
   createdTimestamp?: number;
   authorBot?: boolean;
@@ -149,6 +186,7 @@ function message(input: {
       id: input.authorBot === false ? '999999999999999999' : BOT_USER_ID,
       bot: input.authorBot ?? true,
     },
+    components: input.components ?? [],
     embeds: input.embedTitle ? [{ title: input.embedTitle }] : [],
     deletable: input.deletable ?? true,
     delete: vi.fn(async () => undefined),

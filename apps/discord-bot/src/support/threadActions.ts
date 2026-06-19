@@ -1,5 +1,7 @@
 import {
   ChannelType,
+  ContainerBuilder,
+  MessageFlags,
   type ButtonInteraction,
   type PrivateThreadChannel,
   type Snowflake,
@@ -11,13 +13,14 @@ import { DISCORD_SUPPORT_BUTTON_STATUSES } from '@pocketrealm/shared/support/sup
 import { PocketRealmApiError, type PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { parseSupportButtonId } from '../discord/components.js';
+import { statusCard, textCard, type V2CardPayload } from '../discord/v2Card.js';
 import { isRecord } from '../utils.js';
 
 const STATUS_ACTIONS = new Set<string>(DISCORD_SUPPORT_BUTTON_STATUSES);
 
 interface SupportThreadActionOptions {
   api: Pick<PocketRealmApiClient, 'get' | 'post'>;
-  config: Pick<BotConfig, 'supportStaffRoleIds'>;
+  config: Pick<BotConfig, 'supportStaffRoleIds' | 'emojiMap'>;
 }
 
 interface SupportActionContextResponse {
@@ -44,8 +47,8 @@ interface ThreadMemberAddable {
 }
 
 interface EditableTriageMessage {
-  embeds: unknown[];
-  edit(payload: { embeds: unknown[] }): Promise<unknown>;
+  components?: unknown[] | null;
+  edit(payload: V2CardPayload): Promise<unknown>;
 }
 
 export function isStaffMember(member: unknown, staffRoleIds: Set<string>): boolean {
@@ -79,16 +82,26 @@ export async function handleSupportThreadAction(
   const staffRoleIds = new Set(options.config.supportStaffRoleIds);
   if (staffRoleIds.size === 0) {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Support actions are not configured. Ask an administrator to set support staff roles.',
+      ...supportActionCard(
+        'warning',
+        'Support actions unavailable',
+        'Support actions are not configured. Ask an administrator to set support staff roles.',
+        options,
+        { ephemeral: true },
+      ),
     });
     return;
   }
 
   if (!isStaffMember(interaction.member, staffRoleIds)) {
     await interaction.reply({
-      ephemeral: true,
-      content: 'Only support staff can use these ticket actions.',
+      ...supportActionCard(
+        'warning',
+        'Staff only',
+        'Only support staff can use these ticket actions.',
+        options,
+        { ephemeral: true },
+      ),
     });
     return;
   }
@@ -97,40 +110,55 @@ export async function handleSupportThreadAction(
 
   try {
     if (parsed.action === 'ask_reporter') {
-      await handleAskReporter(interaction, options.api, parsed.publicId);
+      await handleAskReporter(interaction, options, parsed.publicId);
       return;
     }
 
     if (parsed.action === 'archive_thread') {
-      await handleArchiveThread(interaction, options.api, parsed.publicId);
+      await handleArchiveThread(interaction, options, parsed.publicId);
       return;
     }
 
     if (STATUS_ACTIONS.has(parsed.action)) {
-      await handleStatusUpdate(interaction, options.api, parsed.publicId, parsed.action);
+      await handleStatusUpdate(interaction, options, parsed.publicId, parsed.action);
       return;
     }
 
     await interaction.editReply({
-      content: `Unsupported support action for \`${parsed.publicId}\`.`,
+      ...supportActionCard(
+        'warning',
+        'Unsupported action',
+        `Unsupported support action for \`${parsed.publicId}\`.`,
+        options,
+      ),
     });
   } catch {
     await interaction.editReply({
-      content: `Could not complete the support action for \`${parsed.publicId}\`. Try again or use staff tools.`,
+      ...supportActionCard(
+        'error',
+        'Action failed',
+        `Could not complete the support action for \`${parsed.publicId}\`. Try again or use staff tools.`,
+        options,
+      ),
     });
   }
 }
 
 async function handleAskReporter(
   interaction: ButtonInteraction,
-  api: Pick<PocketRealmApiClient, 'get' | 'post'>,
+  options: SupportThreadActionOptions,
   publicId: string,
 ): Promise<void> {
-  const { ticket } = await fetchActionContext(api, publicId);
+  const { ticket } = await fetchActionContext(options.api, publicId);
 
   if (ticket.threadId) {
     await interaction.editReply({
-      content: `Follow-up thread already exists: <#${ticket.threadId}>.`,
+      ...supportActionCard(
+        'info',
+        'Thread exists',
+        `Follow-up thread already exists: <#${ticket.threadId}>.`,
+        options,
+      ),
     });
     return;
   }
@@ -138,7 +166,12 @@ async function handleAskReporter(
   const triageChannel = interaction.channel;
   if (!isThreadCreatableTextChannel(triageChannel)) {
     await interaction.editReply({
-      content: `Cannot create a follow-up thread for \`${ticket.publicId}\` from this channel.`,
+      ...statusCard(
+        'error',
+        'Thread unavailable',
+        `Cannot create a follow-up thread for \`${ticket.publicId}\` from this channel.`,
+        options.config.emojiMap,
+      ),
     });
     return;
   }
@@ -159,21 +192,26 @@ async function handleAskReporter(
   // Register the thread before posting into it so a registration conflict only
   // ever has to clean up an empty thread.
   try {
-    await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/thread`, {
+    await options.api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/thread`, {
       threadId: thread.id,
       createdByDiscordUserId: interaction.user.id,
     });
   } catch (error) {
     if (isDiscordThreadConflict(error)) {
       const duplicateCleanedUp = await cleanupDuplicateThread(thread, ticket.publicId);
-      const existingThreadId = await refetchThreadId(api, ticket.publicId);
+      const existingThreadId = await refetchThreadId(options.api, ticket.publicId);
       const cleanupMessage = duplicateCleanedUp
         ? 'Removed the duplicate thread.'
         : `A duplicate thread (<#${thread.id}>) was created but could not be removed automatically. Remove it manually.`;
       await interaction.editReply({
-        content: existingThreadId
+        ...statusCard(
+          'warning',
+          'Thread exists',
+          existingThreadId
           ? `Follow-up thread already exists: <#${existingThreadId}>. ${cleanupMessage}`
           : `Follow-up thread already exists for \`${ticket.publicId}\`. ${cleanupMessage}`,
+          options.config.emojiMap,
+        ),
       });
       return;
     }
@@ -181,26 +219,35 @@ async function handleAskReporter(
     throw error;
   }
 
-  const introSendFailed = await sendFollowUpIntro(thread, ticket);
+  const introSendFailed = await sendFollowUpIntro(thread, ticket, options.config.emojiMap);
 
   await interaction.editReply({
-    content: askReporterSuccessCopy(thread.id, actorAddFailed, reporterAddFailed, introSendFailed),
+    ...statusCard(
+      'success',
+      'Follow-up thread',
+      askReporterSuccessCopy(thread.id, actorAddFailed, reporterAddFailed, introSendFailed),
+      options.config.emojiMap,
+    ),
   });
 }
 
 async function sendFollowUpIntro(
-  thread: { send(payload: { content: string }): Promise<unknown> },
+  thread: { send(payload: V2CardPayload): Promise<unknown> },
   ticket: SupportActionContextResponse['ticket'],
+  emojiMap: BotConfig['emojiMap'],
 ): Promise<boolean> {
   try {
-    await thread.send({
-      content: [
-        `Support follow-up for \`${ticket.publicId}\`: ${ticket.title}`,
+    await thread.send(textCard({
+      emojiKey: 'support',
+      title: `Support follow-up for ${ticket.publicId}`,
+      lines: [
+        ticket.title,
         ticket.reporterDiscordUserId
           ? 'Use this thread for staff questions and reporter follow-up. Keep raw private report details in staff tools.'
           : 'Reporter Discord account is not linked or available. Use this thread for staff coordination only.',
-      ].join('\n'),
-    });
+      ],
+      emojiMap,
+    }));
     return false;
   } catch {
     // The thread is registered canonically; the intro message is repairable by hand.
@@ -231,31 +278,36 @@ function askReporterSuccessCopy(
 
 async function handleStatusUpdate(
   interaction: ButtonInteraction,
-  api: Pick<PocketRealmApiClient, 'get' | 'post'>,
+  options: SupportThreadActionOptions,
   publicId: string,
   status: string,
 ): Promise<void> {
-  await api.post(`/api/v1/discord/support/tickets/${publicId}/status`, {
+  await options.api.post(`/api/v1/discord/support/tickets/${publicId}/status`, {
     status,
     actorDiscordUserId: interaction.user.id,
   });
 
   let context: SupportActionContextResponse | null = null;
   try {
-    context = await fetchActionContext(api, publicId);
+    context = await fetchActionContext(options.api, publicId);
   } catch {
     // Status already changed canonically; Discord surface updates are best effort.
   }
 
   await Promise.all([
-    updateTriageMessageStatus(interaction, publicId, status),
+    updateTriageMessageStatus(interaction, publicId, status, options.config.emojiMap),
     context?.ticket.threadId
-      ? postStatusUpdateToThread(interaction, context.ticket.threadId, publicId, status)
+      ? postStatusUpdateToThread(interaction, context.ticket.threadId, publicId, status, options.config.emojiMap)
       : Promise.resolve(),
   ]);
 
   await interaction.editReply({
-    content: `Updated \`${publicId}\` status to \`${status}\`.`,
+    ...statusCard(
+      'success',
+      'Status updated',
+      `Updated \`${publicId}\` status to \`${status}\`.`,
+      options.config.emojiMap,
+    ),
   });
 }
 
@@ -276,14 +328,19 @@ function threadAddFailureLabel(actorAddFailed: boolean, reporterAddFailed: boole
 
 async function handleArchiveThread(
   interaction: ButtonInteraction,
-  api: Pick<PocketRealmApiClient, 'get' | 'post'>,
+  options: SupportThreadActionOptions,
   publicId: string,
 ): Promise<void> {
-  const { ticket } = await fetchActionContext(api, publicId);
+  const { ticket } = await fetchActionContext(options.api, publicId);
 
   if (!ticket.threadId) {
     await interaction.editReply({
-      content: `No follow-up thread exists for \`${ticket.publicId}\`.`,
+      ...statusCard(
+        'warning',
+        'No thread',
+        `No follow-up thread exists for \`${ticket.publicId}\`.`,
+        options.config.emojiMap,
+      ),
     });
     return;
   }
@@ -299,27 +356,42 @@ async function handleArchiveThread(
     await thread.setArchived(true, `Support thread archived for ${ticket.publicId}`);
   } catch {
     await interaction.editReply({
-      content: `Could not archive the Discord thread for \`${ticket.publicId}\`. Try again or archive it manually.`,
+      ...statusCard(
+        'error',
+        'Archive failed',
+        `Could not archive the Discord thread for \`${ticket.publicId}\`. Try again or archive it manually.`,
+        options.config.emojiMap,
+      ),
     });
     return;
   }
 
   try {
-    await api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/archive-thread`, {
+    await options.api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/archive-thread`, {
       actorDiscordUserId: interaction.user.id,
     });
   } catch {
     const reverted = await revertThreadArchive(thread, ticket.publicId);
     await interaction.editReply({
-      content: reverted
+      ...statusCard(
+        'error',
+        'Archive sync failed',
+        reverted
         ? `Could not mark \`${ticket.publicId}\` archived in PocketRealm. The Discord thread was unarchived; try again.`
         : `Archived the Discord thread for \`${ticket.publicId}\`, but PocketRealm still shows it open and the thread could not be unarchived. Repair it with staff tools.`,
+        options.config.emojiMap,
+      ),
     });
     return;
   }
 
   await interaction.editReply({
-    content: `Archived support thread for \`${ticket.publicId}\`.`,
+    ...statusCard(
+      'success',
+      'Thread archived',
+      `Archived support thread for \`${ticket.publicId}\`.`,
+      options.config.emojiMap,
+    ),
   });
 }
 
@@ -336,18 +408,38 @@ async function updateTriageMessageStatus(
   interaction: ButtonInteraction,
   publicId: string,
   status: string,
+  emojiMap: BotConfig['emojiMap'],
 ): Promise<void> {
   const message = editableTriageMessage(interaction.message);
-  if (!message || message.embeds.length === 0) return;
+  if (!message) return;
+
+  const updatedComponents = updateTriageStatusComponents(message.components, publicId, status, interaction.user.id);
+
+  // A triage card created before Components V2 shipped cannot be edited into a
+  // V2 payload (the flag is fixed at creation), and the statusCard fallback
+  // carries no action buttons — editing one in would both fail and strip the
+  // staff buttons. When we have no V2 components to patch and the existing
+  // message is not itself V2, skip the surface edit. The status is canonical in
+  // the API and is also echoed into the thread, so nothing is lost.
+  if (!updatedComponents && !interaction.message.flags.has(MessageFlags.IsComponentsV2)) {
+    return;
+  }
 
   try {
-    await message.edit({
-      embeds: message.embeds.map((embed, index) => (
-        index === 0 ? updateStatusEmbed(embed, publicId, status, interaction.user.id) : embed
-      )),
-    });
+    await message.edit(updatedComponents
+      ? {
+        flags: MessageFlags.IsComponentsV2,
+        components: updatedComponents,
+        allowedMentions: { parse: [] },
+      }
+      : statusCard(
+        'support',
+        `${publicId} status`,
+        `Status: \`${status}\`\nLast Update: \`${publicId}\` marked \`${status}\` by <@${interaction.user.id}>.`,
+        emojiMap,
+      ));
   } catch {
-    // Status is canonical in the API; Discord embed edits are best effort.
+    // Status is canonical in the API; Discord surface edits are best effort.
   }
 }
 
@@ -356,14 +448,19 @@ async function postStatusUpdateToThread(
   threadId: Snowflake,
   publicId: string,
   status: string,
+  emojiMap: BotConfig['emojiMap'],
 ): Promise<void> {
   try {
     const thread = await resolveArchiveTargetThread(interaction.channel, threadId);
     if (!thread) return;
 
-    await thread.send({
-      content: `Ticket \`${publicId}\` marked \`${status}\` by <@${interaction.user.id}>.`,
-    });
+    await thread.send(textCard({
+      emojiKey: 'support',
+      title: 'Ticket status update',
+      lines: [`Ticket \`${publicId}\` marked \`${status}\` by <@${interaction.user.id}>.`],
+      emojiMap,
+      allowedMentions: { users: [interaction.user.id], parse: [] },
+    }));
   } catch {
     // Staff can still see the canonical status on the triage card/API.
   }
@@ -438,66 +535,11 @@ function isPrivateThreadChannel(channel: unknown): channel is PrivateThreadChann
 }
 
 function editableTriageMessage(message: unknown): EditableTriageMessage | null {
-  if (!isRecord(message) || !Array.isArray(message.embeds) || typeof message.edit !== 'function') {
+  if (!isRecord(message) || typeof message.edit !== 'function') {
     return null;
   }
 
   return message as unknown as EditableTriageMessage;
-}
-
-function updateStatusEmbed(embed: unknown, publicId: string, status: string, actorDiscordUserId: string): unknown {
-  const data = embedData(embed);
-  const fields = embedFields(data.fields);
-  const statusIndex = fields.findIndex((field) => field.name.toLowerCase() === 'status');
-
-  if (statusIndex >= 0) {
-    fields[statusIndex] = { ...fields[statusIndex], value: status };
-  } else {
-    fields.unshift({ name: 'Status', value: status, inline: true });
-  }
-
-  const updateField = {
-    name: 'Last Update',
-    value: `\`${publicId}\` marked \`${status}\` by <@${actorDiscordUserId}>.`,
-    inline: false,
-  };
-  const updateIndex = fields.findIndex((field) => field.name.toLowerCase() === 'last update');
-  if (updateIndex >= 0) {
-    fields[updateIndex] = updateField;
-  } else {
-    fields.push(updateField);
-  }
-
-  return {
-    ...data,
-    fields,
-  };
-}
-
-function embedData(embed: unknown): Record<string, unknown> {
-  if (isRecord(embed) && typeof embed.toJSON === 'function') {
-    return asRecord(embed.toJSON());
-  }
-
-  if (isRecord(embed) && isRecord(embed.data)) {
-    return embed.data;
-  }
-
-  return asRecord(embed);
-}
-
-function embedFields(value: unknown): Array<{ name: string; value: string; inline?: boolean }> {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .filter((field): field is { name: string; value: string; inline?: boolean } => (
-      isRecord(field) && typeof field.name === 'string' && typeof field.value === 'string'
-    ))
-    .map((field) => ({
-      name: field.name,
-      value: field.value,
-      ...(typeof field.inline === 'boolean' && { inline: field.inline }),
-    }));
 }
 
 async function cleanupDuplicateThread(thread: ArchivableDiscordThread, publicId: string): Promise<boolean> {
@@ -542,6 +584,89 @@ function isDiscordThreadConflict(error: unknown): boolean {
     error.code === 'SUPPORT_DISCORD_THREAD_CONFLICT';
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {};
+function supportActionCard(
+  emojiKey: 'warning' | 'error' | 'info' | 'success',
+  title: string,
+  detail: string,
+  options: Pick<SupportThreadActionOptions, 'config'>,
+  cardOptions: { ephemeral?: boolean } = {},
+): V2CardPayload {
+  return statusCard(emojiKey, title, detail, options.config.emojiMap, cardOptions);
+}
+
+function updateTriageStatusComponents(
+  components: unknown[] | null | undefined,
+  publicId: string,
+  status: string,
+  actorDiscordUserId: string,
+): ContainerBuilder[] | null {
+  if (!components) return null;
+
+  const updated: ContainerBuilder[] = [];
+  let didUpdate = false;
+
+  for (const component of components) {
+    const json = cloneComponentJson(component);
+    if (!isRecord(json) || json.type !== 17) {
+      continue;
+    }
+
+    if (updateStatusText(json, publicId, status, actorDiscordUserId)) {
+      didUpdate = true;
+    }
+
+    updated.push(new ContainerBuilder(json as ConstructorParameters<typeof ContainerBuilder>[0]));
+  }
+
+  return didUpdate ? updated : null;
+}
+
+function updateStatusText(
+  component: Record<string, unknown>,
+  publicId: string,
+  status: string,
+  actorDiscordUserId: string,
+): boolean {
+  if (component.type === 10 && typeof component.content === 'string') {
+    // The V2 triage card concatenates the user-controlled summary/title and the
+    // staff metadata into one text component, so both replacements are anchored
+    // to a full line in our own generated format. An un-anchored match could be
+    // hijacked by summary text that happens to contain "Status:" / "Last Update:".
+    const replaced = component.content.replace(/^Status: `[^`]*`$/m, `Status: \`${status}\``);
+    if (replaced === component.content) {
+      return false;
+    }
+
+    // A greedy /Last Update: .*/s would delete everything from the first
+    // occurrence of that phrase through the end of the component — wiping the
+    // status/privacy/category lines below a summary that mentions it.
+    const updateLine = `Last Update: \`${publicId}\` marked \`${status}\` by <@${actorDiscordUserId}>.`;
+    const lastUpdatePattern = /^Last Update: `[^`]*` marked `[^`]*` by <@\d+>\.$/m;
+    component.content = lastUpdatePattern.test(replaced)
+      ? replaced.replace(lastUpdatePattern, updateLine)
+      : `${replaced}\n${updateLine}`;
+    return true;
+  }
+
+  const children = component.components;
+  if (!Array.isArray(children)) {
+    return false;
+  }
+
+  let didUpdate = false;
+  for (const child of children) {
+    if (isRecord(child) && updateStatusText(child, publicId, status, actorDiscordUserId)) {
+      didUpdate = true;
+    }
+  }
+
+  return didUpdate;
+}
+
+function cloneComponentJson(component: unknown): unknown {
+  const json = isRecord(component) && typeof component.toJSON === 'function'
+    ? component.toJSON()
+    : component;
+
+  return JSON.parse(JSON.stringify(json)) as unknown;
 }

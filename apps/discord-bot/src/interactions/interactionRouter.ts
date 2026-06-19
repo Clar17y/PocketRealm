@@ -3,6 +3,7 @@ import type { Interaction } from 'discord.js';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
 import { parseDuelButtonId, parseNotifyButtonId, parseSupportButtonId } from '../discord/components.js';
+import { statusCard } from '../discord/v2Card.js';
 import { getRankCategoryAutocompleteChoices } from '../rankCategories.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
 import { handleAnnouncementCommand } from './announcementCommand.js';
@@ -36,6 +37,7 @@ export interface InteractionRouterOptions {
     | 'levelRoleMap'
     | 'duelsChannelId'
     | 'announcementChannelId'
+    | 'emojiMap'
   >;
 }
 
@@ -55,12 +57,12 @@ export async function routeInteraction(
 
   if (typeof interaction.isButton === 'function' && interaction.isButton()) {
     if (parseDuelButtonId(interaction.customId)) {
-      await handleDuelButton(interaction, options.api);
+      await handleDuelButton(interaction, options.api, options.config);
       return;
     }
 
     if (parseNotifyButtonId(interaction.customId)) {
-      await handleNotifyToggleButton(interaction, options.api);
+      await handleNotifyToggleButton(interaction, options.api, options.config);
       return;
     }
 
@@ -77,14 +79,14 @@ export async function routeInteraction(
     && interaction.isModalSubmit()
     && isReportModalCustomId(interaction.customId)
   ) {
-    await handleReportModalSubmit(interaction, options.api);
+    await handleReportModalSubmit(interaction, options.api, options.config);
     return;
   }
 
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'link') {
-    await handleLinkCommand(interaction, options.api);
+    await handleLinkCommand(interaction, options.api, options.config);
     return;
   }
 
@@ -134,7 +136,7 @@ export async function routeInteraction(
   }
 
   if (interaction.commandName === 'notify') {
-    await handleNotifyCommand(interaction, options.api);
+    await handleNotifyCommand(interaction, options.api, options.config);
     return;
   }
 
@@ -146,11 +148,15 @@ async function replyUnhandledInteraction(interaction: Interaction): Promise<void
     return;
   }
 
-  const content = 'This interaction is no longer supported. Try the command again.';
+  const payload = statusCard(
+    'info',
+    'Unsupported interaction',
+    'This interaction is no longer supported. Try the command again.',
+  );
   if (interaction.deferred) {
-    await interaction.editReply({ content });
+    await interaction.editReply(payload);
     return;
   }
 
-  await interaction.reply({ ephemeral: true, content });
+  await interaction.reply({ ...payload, ephemeral: true });
 }

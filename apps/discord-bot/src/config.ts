@@ -1,6 +1,8 @@
 import { DISCORD_SNOWFLAKE_REGEX } from '@pocketrealm/shared/discord/discordIds';
 import { z } from 'zod';
 
+import { parseDiscordEmojiMap, type DiscordEmojiMap } from './discord/emojis.js';
+
 const snowflakeSchema = z.string().trim().regex(DISCORD_SNOWFLAKE_REGEX, 'Expected a Discord snowflake id');
 const optionalSnowflakeSchema = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -29,6 +31,7 @@ const envSchema = z.object({
   DISCORD_XP_IGNORED_CHANNEL_IDS: z.string().optional(),
   DISCORD_XP_ELIGIBLE_CHANNEL_IDS: z.string().optional(),
   DISCORD_LEVEL_ROLE_MAP: z.string().optional(),
+  DISCORD_EMOJI_MAP: z.string().optional(),
 });
 
 export interface BotConfig {
@@ -51,6 +54,7 @@ export interface BotConfig {
   xpIgnoredChannelIds: string[];
   xpEligibleChannelIds: string[];
   levelRoleMap: Map<number, string>;
+  emojiMap: DiscordEmojiMap;
 }
 
 export function parseSnowflakeList(raw: string | undefined): string[] {
@@ -111,6 +115,7 @@ export function parseBotConfig(env: Record<string, string | undefined>): BotConf
     xpIgnoredChannelIds: parseSnowflakeList(parsed.DISCORD_XP_IGNORED_CHANNEL_IDS),
     xpEligibleChannelIds: parseSnowflakeList(parsed.DISCORD_XP_ELIGIBLE_CHANNEL_IDS),
     levelRoleMap: parseLevelRoleMap(parsed.DISCORD_LEVEL_ROLE_MAP),
+    emojiMap: parseDiscordEmojiMap(parsed.DISCORD_EMOJI_MAP),
   };
 }
 
