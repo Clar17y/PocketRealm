@@ -18,6 +18,7 @@ const envSchema = z.object({
   REDIS_URL: requiredUrlSchema,
   DISCORD_INTERNAL_API_KEY: z.string().trim().min(32),
   DISCORD_BOT_HEALTH_CHANNEL_ID: snowflakeSchema,
+  DISCORD_ANNOUNCEMENT_CHANNEL_ID: snowflakeSchema,
   DISCORD_WELCOME_CHANNEL_ID: optionalSnowflakeSchema,
   DISCORD_SUPPORT_TRIAGE_CHANNEL_ID: snowflakeSchema,
   DISCORD_SUPPORT_CATEGORY_ID: snowflakeSchema,
@@ -39,6 +40,7 @@ export interface BotConfig {
   redisUrl: string;
   internalApiKey: string;
   botHealthChannelId: string;
+  announcementChannelId: string;
   welcomeChannelId: string | null;
   supportTriageChannelId: string;
   supportCategoryId: string;
@@ -98,6 +100,7 @@ export function parseBotConfig(env: Record<string, string | undefined>): BotConf
     redisUrl: parsed.REDIS_URL,
     internalApiKey: parsed.DISCORD_INTERNAL_API_KEY,
     botHealthChannelId: parsed.DISCORD_BOT_HEALTH_CHANNEL_ID,
+    announcementChannelId: parsed.DISCORD_ANNOUNCEMENT_CHANNEL_ID,
     welcomeChannelId: parsed.DISCORD_WELCOME_CHANNEL_ID ?? null,
     supportTriageChannelId: parsed.DISCORD_SUPPORT_TRIAGE_CHANNEL_ID,
     supportCategoryId: parsed.DISCORD_SUPPORT_CATEGORY_ID,
