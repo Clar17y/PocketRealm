@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  normalizeEncounterMobRole,
   resolveZoneTiers,
   getHighestUnlockedTier,
   type EncounterSiteSize,
@@ -168,13 +169,13 @@ function pickFamilyMemberByRole(
   role: EncounterMobRole,
   fallback: EncounterMobRole[] = []
 ): ZoneFamilyMember | null {
-  const byRole = members.filter((member) => member.role === role);
+  const byRole = members.filter((member) => normalizeEncounterMobRole(member.role) === role);
   if (byRole.length > 0) {
     return byRole[randomIntInclusive(0, byRole.length - 1)] ?? null;
   }
 
   for (const fbRole of fallback) {
-    const fallbackMembers = members.filter((member) => member.role === fbRole);
+    const fallbackMembers = members.filter((member) => normalizeEncounterMobRole(member.role) === fbRole);
     if (fallbackMembers.length > 0) {
       return fallbackMembers[randomIntInclusive(0, fallbackMembers.length - 1)] ?? null;
     }
@@ -233,18 +234,18 @@ export function buildEncounterSiteMobs(
   const { rooms, totalMobs } = generateRoomAssignments(size);
 
   // Role composition based on total mobs and site size
-  let bossCount = 0;
+  let miniBossCount = 0;
   let eliteCount = 0;
   if (size === 'medium') eliteCount = 1;
-  else if (size === 'large') { bossCount = 1; eliteCount = 2; }
+  else if (size === 'large') { miniBossCount = 1; eliteCount = 2; }
 
-  const trashCount = Math.max(0, totalMobs - eliteCount - bossCount);
+  const trashCount = Math.max(0, totalMobs - eliteCount - miniBossCount);
 
-  // Build role queue — trash first, elites/bosses last so they land in final rooms
+  // Build role queue — trash first, elites/mini-bosses last so they land in final rooms
   const roleQueue: EncounterMobRole[] = [
     ...Array(trashCount).fill('trash' as const),
     ...Array(eliteCount).fill('elite' as const),
-    ...Array(bossCount).fill('boss' as const),
+    ...Array(miniBossCount).fill('mini_boss' as const),
   ];
 
   // Assign mobs to rooms sequentially
@@ -256,8 +257,8 @@ export function buildEncounterSiteMobs(
     for (let i = 0; i < room.mobCount && roleIndex < roleQueue.length; i++) {
       const role = roleQueue[roleIndex]!;
       const fallbacks: EncounterMobRole[] = role === 'trash'
-        ? ['elite', 'boss'] : role === 'elite'
-        ? ['trash', 'boss'] : ['elite', 'trash'];
+        ? ['elite', 'mini_boss'] : role === 'elite'
+        ? ['trash', 'mini_boss'] : ['elite', 'trash'];
 
       const member = pickMemberWithBleedthrough(role, fallbacks);
       if (!member) { roleIndex++; continue; }

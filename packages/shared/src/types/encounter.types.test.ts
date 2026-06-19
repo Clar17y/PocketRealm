@@ -8,6 +8,12 @@ describe('encounter role normalization', () => {
     expect(isEncounterMobRole('mini_boss')).toBe(true);
   });
 
+  it('preserves current encounter mob roles during normalization', () => {
+    expect(normalizeEncounterMobRole('trash')).toBe('trash');
+    expect(normalizeEncounterMobRole('elite')).toBe('elite');
+    expect(normalizeEncounterMobRole('mini_boss')).toBe('mini_boss');
+  });
+
   it('normalizes legacy boss encounter slots to mini_boss', () => {
     expect(normalizeEncounterMobRole('boss')).toBe('mini_boss');
   });

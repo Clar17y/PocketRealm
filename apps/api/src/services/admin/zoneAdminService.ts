@@ -83,12 +83,12 @@ export async function spawnAdminEncounter(
     const isLastRoom = room.roomNumber === roomAssignments.rooms.length;
 
     if (isLastRoom && input.size === 'large') {
-      const boss = pickMember();
+      const miniBoss = pickMember();
       mobs.push({
         slot: slot++,
         room: room.roomNumber,
-        mobTemplateId: boss.mobTemplate.id,
-        role: 'boss',
+        mobTemplateId: miniBoss.mobTemplate.id,
+        role: 'mini_boss',
         prefix: rollMobPrefix(),
         status: 'alive',
       });
