@@ -405,11 +405,19 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
       select: { id: true },
     });
     if (!recentEvent) {
-      // Roll for world-wide or zone event (50/50 chance, but caps enforce limits)
-      if (Math.random() < 0.5) {
-        await trySpawnWorldWideEvent(io);
-      } else {
-        await trySpawnZoneEvent(io);
+      // Skip the roll entirely if the global ambient cap is already reached —
+      // avoids wasted template/target resolution. spawnWorldEvent re-checks
+      // this authoritatively inside its transaction.
+      const activeAmbient = await prisma.worldEvent.count({
+        where: { status: 'active', type: { not: 'boss' } },
+      });
+      if (activeAmbient < WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS) {
+        // Roll for world-wide or zone event (50/50 chance, but caps enforce limits)
+        if (Math.random() < 0.5) {
+          await trySpawnWorldWideEvent(io);
+        } else {
+          await trySpawnZoneEvent(io);
+        }
       }
     }
   } catch (err) {
