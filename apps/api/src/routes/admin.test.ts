@@ -44,6 +44,10 @@ vi.mock('@pocketrealm/game-engine', () => ({
   generateRoomAssignments: vi.fn(() => ({
     rooms: [{ roomNumber: 1, mobCount: 2 }],
   })),
+  assignEncounterRolesToRooms: vi.fn(() => [
+    { room: 1, role: 'trash' },
+    { room: 1, role: 'elite' },
+  ]),
 }));
 vi.mock('../middleware/auth', () => ({
   authenticate: vi.fn((_req: any, _res: any, next: any) => next()),
