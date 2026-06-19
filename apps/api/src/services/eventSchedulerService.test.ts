@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./worldEventService', () => ({
   expireStaleEvents: vi.fn().mockResolvedValue([]),
   spawnWorldEvent: vi.fn().mockResolvedValue(null),
+  // Mirror the real shared predicate so the scheduler's early-out count query
+  // keeps its expected `where` shape under this mock.
+  ACTIVE_AMBIENT_EVENT_WHERE: { status: 'active', type: { not: 'boss' } },
 }));
 vi.mock('./bossEncounterService', () => ({
   createBossEncounter: vi.fn().mockResolvedValue({}),
@@ -66,6 +69,8 @@ describe('eventSchedulerService', () => {
 
     // Block boss spawn timer by default (boss-specific tests override)
     mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
+    // Default: global ambient cap not reached (zone-spawn tests rely on this)
+    mockPrisma.worldEvent.count.mockResolvedValue(0);
 
     // Reset in-memory boss spawn debounce so each test starts fresh
     _resetBossSpawnTimer();
@@ -123,6 +128,21 @@ describe('eventSchedulerService', () => {
         where: { startedAt: { gte: expectedCutoff } },
         select: { id: true },
       });
+    });
+
+    it('does not attempt to spawn an event when the global ambient cap is reached', async () => {
+      mockPrisma.worldEvent.findFirst.mockResolvedValue(null); // respawn cooldown clear
+      // Global ambient count at the cap
+      mockPrisma.worldEvent.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS);
+      // bossEncounter.count defaults to MAX in beforeEach → boss path skipped
+      vi.spyOn(Math, 'random').mockReturnValue(0.99); // would otherwise pick the zone path
+
+      await checkAndSpawnEvents(null);
+
+      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
+        where: { status: 'active', type: { not: 'boss' } },
+      });
+      expect(spawnWorldEvent).not.toHaveBeenCalled();
     });
   });
 
@@ -917,20 +937,32 @@ describe('eventSchedulerService', () => {
 
       // getCachedZones is only called in the zone path
       expect(mockGetCachedZones).toHaveBeenCalled();
-      // worldEvent.count is only called in the world-wide path
-      expect(mockPrisma.worldEvent.count).not.toHaveBeenCalled();
+      // Global cap check runs first (count < MAX → spawn roll proceeds), then zone path taken
+      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
+        where: { status: 'active', type: { not: 'boss' } },
+      });
+      // World-wide cap count is NOT called (zone path taken)
+      expect(mockPrisma.worldEvent.count).not.toHaveBeenCalledWith({
+        where: { zoneId: null, status: 'active' },
+      });
     });
 
     it('50/50 coin flip: random 0.49 takes world-wide path', async () => {
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
       vi.spyOn(Math, 'random').mockReturnValue(0.49);
 
-      // World path → count check
+      // World path → world-wide cap count check (global cap check uses count with 'type: { not: boss }')
       mockPrisma.worldEvent.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_WORLD_EVENTS);
 
       await checkAndSpawnEvents(null);
 
-      expect(mockPrisma.worldEvent.count).toHaveBeenCalled();
+      // Both the global ambient cap check and the world-wide cap check call count
+      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
+        where: { status: 'active', type: { not: 'boss' } },
+      });
+      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
+        where: { zoneId: null, status: 'active' },
+      });
       expect(mockGetCachedZones).not.toHaveBeenCalled();
     });
   });

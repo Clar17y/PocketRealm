@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPrisma } from '../__test__/setup';
 import { roundTimerRegistry } from './roundTimerRegistry';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./roundTimerRegistry', () => ({
   roundTimerRegistry: {
@@ -179,6 +180,11 @@ describe('worldEventService', () => {
       durationHours: 6,
     };
 
+    // Route count() by query scope: the per-zone cap query carries `zoneId`,
+    // the global ambient cap query does not.
+    const countByScope = (perZone: number, global: number) => (args: any) =>
+      Promise.resolve('zoneId' in (args?.where ?? {}) ? perZone : global);
+
     it('creates a new event when no duplicate effect exists', async () => {
       mockPrisma.worldEvent.count.mockResolvedValue(0);
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
@@ -200,7 +206,8 @@ describe('worldEventService', () => {
       expect(mockPrisma.worldEvent.create).not.toHaveBeenCalled();
     });
 
-    it('skips both checks for world-wide events (no zoneId)', async () => {
+    it('enforces the global cap but skips per-zone checks for world-wide events', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(0); // global ambient count under cap
       mockPrisma.worldEvent.create.mockResolvedValue(
         makeEventRow({ zoneId: null, zone: null }),
       );
@@ -214,8 +221,63 @@ describe('worldEventService', () => {
       });
 
       expect(result).not.toBeNull();
-      expect(mockPrisma.worldEvent.count).not.toHaveBeenCalled();
+      // No per-zone dedup for world-wide events
       expect(mockPrisma.worldEvent.findFirst).not.toHaveBeenCalled();
+      // But the global ambient cap IS checked
+      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
+        where: { status: 'active', type: { not: 'boss' } },
+      });
+    });
+
+    it('returns null when the global MAX_ACTIVE_EVENTS cap is reached', async () => {
+      // Per-zone count under its cap, but global ambient count at the cap
+      mockPrisma.worldEvent.count.mockImplementation(
+        countByScope(0, WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS),
+      );
+
+      const result = await spawnWorldEvent(baseParams);
+
+      expect(result).toBeNull();
+      // Global cap short-circuits before dedup / create
+      expect(mockPrisma.worldEvent.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.worldEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('allows spawn when below the global MAX_ACTIVE_EVENTS cap', async () => {
+      // Per-zone under cap (1), global one below cap
+      mockPrisma.worldEvent.count.mockImplementation(
+        countByScope(1, WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS - 1),
+      );
+      mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
+      mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow());
+
+      const result = await spawnWorldEvent(baseParams);
+
+      expect(result).not.toBeNull();
+      expect(mockPrisma.worldEvent.create).toHaveBeenCalled();
+    });
+
+    it('allows boss spawn even when the global ambient cap is reached', async () => {
+      // Global ambient at cap, but bosses skip the global gate; per-zone count is 0
+      mockPrisma.worldEvent.count.mockImplementation(
+        countByScope(0, WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS),
+      );
+      mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
+      mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow({ type: 'boss' }));
+
+      const result = await spawnWorldEvent({
+        ...baseParams,
+        type: 'boss',
+        effectType: 'damage_up',
+        effectValue: 0,
+      });
+
+      expect(result).not.toBeNull();
+      // The global ambient cap query must NOT run for boss spawns
+      expect(mockPrisma.worldEvent.count).not.toHaveBeenCalledWith({
+        where: { status: 'active', type: { not: 'boss' } },
+      });
+      expect(mockPrisma.worldEvent.create).toHaveBeenCalled();
     });
 
     it('returns null when zone already has MAX_ZONE_EVENTS active', async () => {
