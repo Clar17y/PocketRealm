@@ -9,6 +9,7 @@ import {
   type EncounterMobSlot,
 } from '@pocketrealm/shared';
 import {
+  assignEncounterRolesToRooms,
   generateRoomAssignments,
   rollMobPrefix,
   selectTierWithBleedthrough,
@@ -164,25 +165,26 @@ export function getSiteName(
   return `Large ${familyName} ${nouns.siteNounLarge}`;
 }
 
-function pickFamilyMemberByRole(
+function isPermanentEncounterFamilyRole(role: string): boolean {
+  return normalizeEncounterMobRole(role) !== null;
+}
+
+function isMiniBossFamilyRole(role: string): boolean {
+  return normalizeEncounterMobRole(role) === 'mini_boss';
+}
+
+function pickBaseFamilyMember(
   members: ZoneFamilyMember[],
   role: EncounterMobRole,
-  fallback: EncounterMobRole[] = []
 ): ZoneFamilyMember | null {
-  const byRole = members.filter((member) => normalizeEncounterMobRole(member.role) === role);
-  if (byRole.length > 0) {
-    return byRole[randomIntInclusive(0, byRole.length - 1)] ?? null;
-  }
+  const permanentMembers = members.filter((member) => isPermanentEncounterFamilyRole(member.role));
+  const nonMiniBossMembers = permanentMembers.filter((member) => !isMiniBossFamilyRole(member.role));
+  const pool = role === 'mini_boss'
+    ? (permanentMembers.length > 0 ? permanentMembers : members)
+    : (nonMiniBossMembers.length > 0 ? nonMiniBossMembers : members);
 
-  for (const fbRole of fallback) {
-    const fallbackMembers = members.filter((member) => normalizeEncounterMobRole(member.role) === fbRole);
-    if (fallbackMembers.length > 0) {
-      return fallbackMembers[randomIntInclusive(0, fallbackMembers.length - 1)] ?? null;
-    }
-  }
-
-  if (members.length === 0) return null;
-  return members[randomIntInclusive(0, members.length - 1)] ?? null;
+  if (pool.length === 0) return null;
+  return pool[randomIntInclusive(0, pool.length - 1)] ?? null;
 }
 
 export function buildEncounterSiteMobs(
@@ -219,60 +221,36 @@ export function buildEncounterSiteMobs(
   // Pick a member at a bleedthrough-selected tier, falling back to lower tiers
   function pickMemberWithBleedthrough(
     role: EncounterMobRole,
-    fallbackRoles: EncounterMobRole[],
   ): ZoneFamilyMember | null {
     const selectedTier = selectTierWithBleedthrough(currentTier, tiers);
     for (let t = selectedTier; t >= 1; t--) {
       const tierMembers = membersByTier.get(t) ?? [];
       if (tierMembers.length === 0) continue;
-      const picked = pickFamilyMemberByRole(tierMembers, role, fallbackRoles);
+      const picked = pickBaseFamilyMember(tierMembers, role);
       if (picked) return picked;
     }
-    return pickFamilyMemberByRole(eligibleZoneMembers, role, fallbackRoles);
+    return pickBaseFamilyMember(eligibleZoneMembers, role);
   }
 
-  const { rooms, totalMobs } = generateRoomAssignments(size);
-
-  // Role composition based on total mobs and site size
-  let miniBossCount = 0;
-  let eliteCount = 0;
-  if (size === 'medium') eliteCount = 1;
-  else if (size === 'large') { miniBossCount = 1; eliteCount = 2; }
-
-  const trashCount = Math.max(0, totalMobs - eliteCount - miniBossCount);
-
-  // Build role queue — trash first, elites/mini-bosses last so they land in final rooms
-  const roleQueue: EncounterMobRole[] = [
-    ...Array(trashCount).fill('trash' as const),
-    ...Array(eliteCount).fill('elite' as const),
-    ...Array(miniBossCount).fill('mini_boss' as const),
-  ];
+  const { rooms } = generateRoomAssignments(size);
+  const roleAssignments = assignEncounterRolesToRooms(rooms);
 
   // Assign mobs to rooms sequentially
   const mobs: EncounterMobSlot[] = [];
   let slot = 0;
-  let roleIndex = 0;
 
-  for (const room of rooms) {
-    for (let i = 0; i < room.mobCount && roleIndex < roleQueue.length; i++) {
-      const role = roleQueue[roleIndex]!;
-      const fallbacks: EncounterMobRole[] = role === 'trash'
-        ? ['elite', 'mini_boss'] : role === 'elite'
-        ? ['trash', 'mini_boss'] : ['elite', 'trash'];
+  for (const assignment of roleAssignments) {
+    const member = pickMemberWithBleedthrough(assignment.role);
+    if (!member) continue;
 
-      const member = pickMemberWithBleedthrough(role, fallbacks);
-      if (!member) { roleIndex++; continue; }
-
-      mobs.push({
-        slot: slot++,
-        mobTemplateId: member.mobTemplate.id,
-        role,
-        prefix: rollMobPrefix(),
-        status: 'alive',
-        room: room.roomNumber,
-      });
-      roleIndex++;
-    }
+    mobs.push({
+      slot: slot++,
+      mobTemplateId: member.mobTemplate.id,
+      role: assignment.role,
+      prefix: rollMobPrefix(),
+      status: 'alive',
+      room: assignment.room,
+    });
   }
 
   // Fallback: if no mobs were generated
