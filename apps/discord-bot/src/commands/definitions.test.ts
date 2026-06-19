@@ -61,15 +61,18 @@ describe('buildCommandDefinitions', () => {
     const commands = buildCommandDefinitions();
     const announcementCommand = commands.find((command) => command.name === 'announcement');
 
+    expect(announcementCommand?.description).toBe('Post a Pocketrealm announcement.');
     expect(announcementCommand?.default_member_permissions).toBe(String(PermissionFlagsBits.ManageGuild));
     expect(announcementCommand?.options).toEqual([
       expect.objectContaining({
         name: 'message',
+        description: 'Announcement message to post.',
         type: ApplicationCommandOptionType.String,
         required: true,
       }),
       expect.objectContaining({
         name: 'everyone',
+        description: 'Notify everyone in the announcement channel.',
         type: ApplicationCommandOptionType.Boolean,
         required: false,
       }),

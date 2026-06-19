@@ -220,9 +220,11 @@ describe('routeInteraction', () => {
 
     await routeInteraction(interaction, { api, config: routerConfig });
 
+    expect(handleAnnouncementCommand).toHaveBeenCalledTimes(1);
     expect(handleAnnouncementCommand).toHaveBeenCalledWith(interaction, {
       config: routerConfig,
     });
+    expect(reply).not.toHaveBeenCalled();
   });
 
   it('routes staff commands to the staff handler', async () => {
