@@ -404,19 +404,19 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
       where: { startedAt: { gte: cooldownCutoff } },
       select: { id: true },
     });
-    if (!recentEvent) {
-      // Skip the roll entirely if the global ambient cap is already reached —
-      // avoids wasted template/target resolution. spawnWorldEvent re-checks
-      // this authoritatively inside its transaction.
-      const activeAmbient = await prisma.worldEvent.count({ where: ACTIVE_AMBIENT_EVENT_WHERE });
-      if (activeAmbient < WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS) {
-        // Roll for world-wide or zone event (50/50 chance, but caps enforce limits)
-        if (Math.random() < 0.5) {
-          await trySpawnWorldWideEvent(io);
-        } else {
-          await trySpawnZoneEvent(io);
-        }
-      }
+    if (recentEvent) return;
+
+    // Skip the roll entirely if the global ambient cap is already reached —
+    // avoids wasted template/target resolution. spawnWorldEvent re-checks
+    // this authoritatively inside its transaction.
+    const activeAmbient = await prisma.worldEvent.count({ where: ACTIVE_AMBIENT_EVENT_WHERE });
+    if (activeAmbient >= WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS) return;
+
+    // Roll for world-wide or zone event (50/50 chance, but caps enforce limits)
+    if (Math.random() < 0.5) {
+      await trySpawnWorldWideEvent(io);
+    } else {
+      await trySpawnZoneEvent(io);
     }
   } catch (err) {
     logger.error({ err, step: 'spawnNewEvent' }, 'Scheduler step failed');

@@ -180,6 +180,11 @@ describe('worldEventService', () => {
       durationHours: 6,
     };
 
+    // Route count() by query scope: the per-zone cap query carries `zoneId`,
+    // the global ambient cap query does not.
+    const countByScope = (perZone: number, global: number) => (args: any) =>
+      Promise.resolve('zoneId' in (args?.where ?? {}) ? perZone : global);
+
     it('creates a new event when no duplicate effect exists', async () => {
       mockPrisma.worldEvent.count.mockResolvedValue(0);
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
@@ -226,10 +231,8 @@ describe('worldEventService', () => {
 
     it('returns null when the global MAX_ACTIVE_EVENTS cap is reached', async () => {
       // Per-zone count under its cap, but global ambient count at the cap
-      mockPrisma.worldEvent.count.mockImplementation((args: any) =>
-        Promise.resolve(
-          'zoneId' in (args?.where ?? {}) ? 0 : WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS,
-        ),
+      mockPrisma.worldEvent.count.mockImplementation(
+        countByScope(0, WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS),
       );
 
       const result = await spawnWorldEvent(baseParams);
@@ -242,12 +245,8 @@ describe('worldEventService', () => {
 
     it('allows spawn when below the global MAX_ACTIVE_EVENTS cap', async () => {
       // Per-zone under cap (1), global one below cap
-      mockPrisma.worldEvent.count.mockImplementation((args: any) =>
-        Promise.resolve(
-          'zoneId' in (args?.where ?? {})
-            ? 1
-            : WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS - 1,
-        ),
+      mockPrisma.worldEvent.count.mockImplementation(
+        countByScope(1, WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS - 1),
       );
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
       mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow());
@@ -260,10 +259,8 @@ describe('worldEventService', () => {
 
     it('allows boss spawn even when the global ambient cap is reached', async () => {
       // Global ambient at cap, but bosses skip the global gate; per-zone count is 0
-      mockPrisma.worldEvent.count.mockImplementation((args: any) =>
-        Promise.resolve(
-          'zoneId' in (args?.where ?? {}) ? 0 : WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS,
-        ),
+      mockPrisma.worldEvent.count.mockImplementation(
+        countByScope(0, WORLD_EVENT_CONSTANTS.MAX_ACTIVE_EVENTS),
       );
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
       mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow({ type: 'boss' }));
