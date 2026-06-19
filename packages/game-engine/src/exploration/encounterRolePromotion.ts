@@ -44,6 +44,7 @@ export function assignEncounterRolesToRooms(
   }
 
   if (finalIndexes.length === 0) {
+    assignments[assignments.length - 1]!.role = 'elite';
     return assignments;
   }
 

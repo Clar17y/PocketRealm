@@ -130,7 +130,7 @@ describe('assignEncounterRolesToRooms', () => {
     expectNoEliteBeforeLaterAllTrashRoom(assignments);
   });
 
-  it('does not promote earlier rooms when the final room has no mob slots', () => {
+  it('promotes the last occupied room to elite when the final room has no mob slots', () => {
     const rooms: EncounterRoleRoomLayout[] = [
       { roomNumber: 1, mobCount: 1 },
       { roomNumber: 2, mobCount: 1 },
@@ -144,7 +144,8 @@ describe('assignEncounterRolesToRooms', () => {
 
     expect(assignments).toEqual([
       { room: 1, role: 'trash' },
-      { room: 2, role: 'trash' },
+      { room: 2, role: 'elite' },
     ]);
+    expect(allRoles(assignments)).not.toContain('mini_boss');
   });
 });
