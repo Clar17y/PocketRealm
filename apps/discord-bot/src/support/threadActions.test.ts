@@ -367,6 +367,35 @@ describe('handleSupportThreadAction', () => {
     expectMockCard(interaction.editReply, 'Updated `SUP-ABC12345` status to `accepted`.');
   });
 
+  it('skips the surface edit for legacy non-V2 triage cards instead of stripping their buttons', async () => {
+    const api = createApi({
+      ticket: {
+        ...ticketContext.ticket,
+        threadId: THREAD_ID,
+      },
+    });
+    const thread = createThread();
+    const message = createLegacyTriageMessage();
+    const interaction = createButtonInteraction({
+      customId: 'support:accepted:SUP-ABC12345',
+      channel: createTriageChannel(thread),
+      member: memberWithRoles([STAFF_ROLE_ID]),
+      message,
+    });
+
+    await handleSupportThreadAction(interaction, { api, config });
+
+    // Status still propagates canonically and to the thread...
+    expect(api.post).toHaveBeenCalledWith('/api/v1/discord/support/tickets/SUP-ABC12345/status', {
+      status: 'accepted',
+      actorDiscordUserId: ACTOR_ID,
+    });
+    expectMockCard(thread.send, 'Ticket `SUP-ABC12345` marked `accepted` by <@7777777777777777>.');
+    // ...but the legacy card is left untouched (editing it into a V2 payload would
+    // fail and drop its action buttons).
+    expect(message.edit).not.toHaveBeenCalled();
+  });
+
   it('answers unsupported support actions after deferring', async () => {
     const api = createApi(ticketContext);
     const interaction = createButtonInteraction({
@@ -463,6 +492,16 @@ function createTriageMessage() {
 
   return {
     components: card.components,
+    edit: vi.fn(),
+  };
+}
+
+function createLegacyTriageMessage() {
+  // A triage card posted before Components V2 shipped: rendered as an embed with
+  // no V2 container components and without the IsComponentsV2 message flag.
+  return {
+    components: [],
+    flags: { has: () => false },
     edit: vi.fn(),
   };
 }

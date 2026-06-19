@@ -415,6 +415,16 @@ async function updateTriageMessageStatus(
 
   const updatedComponents = updateTriageStatusComponents(message.components, publicId, status, interaction.user.id);
 
+  // A triage card created before Components V2 shipped cannot be edited into a
+  // V2 payload (the flag is fixed at creation), and the statusCard fallback
+  // carries no action buttons — editing one in would both fail and strip the
+  // staff buttons. When we have no V2 components to patch and the existing
+  // message is not itself V2, skip the surface edit. The status is canonical in
+  // the API and is also echoed into the thread, so nothing is lost.
+  if (!updatedComponents && !interaction.message.flags.has(MessageFlags.IsComponentsV2)) {
+    return;
+  }
+
   try {
     await message.edit(updatedComponents
       ? {
