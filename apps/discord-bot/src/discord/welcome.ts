@@ -1,6 +1,7 @@
 import type { Client, GuildMember, MessageCreateOptions } from 'discord.js';
 
 import type { BotConfig } from '../config.js';
+import { textCard } from './v2Card.js';
 
 export type WelcomeResult =
   | { sent: true }
@@ -52,13 +53,19 @@ export function shouldWelcomeAfterMemberUpdate(
 }
 
 function createWelcomeMessage(member: GuildMember, config: BotConfig): MessageCreateOptions {
-  return {
-    content: [
-      `Welcome <@${member.id}> to PocketRealm.`,
+  return buildWelcomeCard(member.id, config);
+}
+
+export function buildWelcomeCard(memberId: string, config: BotConfig): MessageCreateOptions {
+  return textCard({
+    emojiKey: 'welcome',
+    title: `Welcome to PocketRealm, <@${memberId}>`,
+    emojiMap: config.emojiMap,
+    lines: [
       'Use `/link` to connect your game account, `/wiki` for game help, and `/report` if you need support.',
       `Friendly duels live in <#${config.duelsChannelId}>.`,
       `Play: ${config.webBaseUrl}`,
-    ].join('\n'),
-    allowedMentions: { users: [member.id], roles: [], parse: [] },
-  };
+    ],
+    allowedMentions: { users: [memberId], roles: [], parse: [] },
+  }) as MessageCreateOptions;
 }

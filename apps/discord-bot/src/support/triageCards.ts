@@ -2,11 +2,11 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
-  type MessageCreateOptions,
 } from 'discord.js';
 
 import { supportButtonId } from '../discord/components.js';
+import type { DiscordEmojiMap } from '../discord/emojis.js';
+import { textCard, type V2CardPayload } from '../discord/v2Card.js';
 
 export interface SupportTriageTicketDto {
   publicId: string;
@@ -25,31 +25,9 @@ export interface UnpostedTicketsResponse {
   tickets: SupportTriageTicketDto[];
 }
 
-export interface TriageCardPayload extends MessageCreateOptions {
-  content: string;
-  embeds: EmbedBuilder[];
-  components: ActionRowBuilder<ButtonBuilder>[];
-}
+export type TriageCardPayload = V2CardPayload;
 
-export function buildTriageCard(ticket: SupportTriageTicketDto): TriageCardPayload {
-  const embed = new EmbedBuilder()
-    .setTitle(`${ticket.publicId} - ${ticket.title}`)
-    .setDescription(ticket.summary || 'No summary provided.')
-    .setColor(0x2f80ed)
-    .setTimestamp(new Date(ticket.createdAt))
-    .addFields(
-      { name: 'Status', value: ticket.status, inline: true },
-      { name: 'Privacy', value: ticket.privacy, inline: true },
-      { name: 'Category', value: ticket.category, inline: true },
-      { name: 'Area', value: ticket.area, inline: true },
-      { name: 'Realm', value: ticket.realmLabel ?? 'Unknown', inline: true },
-      {
-        name: 'Sensitivity',
-        value: ticket.sensitivityFlags.length > 0 ? ticket.sensitivityFlags.join(', ') : 'none',
-        inline: false,
-      },
-    );
-
+export function buildTriageCard(ticket: SupportTriageTicketDto, emojiMap: DiscordEmojiMap = {}): TriageCardPayload {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     supportButton('Ask Reporter', 'ask_reporter', ticket.publicId, ButtonStyle.Secondary),
     supportButton('Needs Info', 'needs_info', ticket.publicId, ButtonStyle.Secondary),
@@ -62,11 +40,23 @@ export function buildTriageCard(ticket: SupportTriageTicketDto): TriageCardPaylo
     supportButton('Archive Thread', 'archive_thread', ticket.publicId, ButtonStyle.Secondary),
   );
 
-  return {
-    content: `New support ticket \`${ticket.publicId}\``,
-    embeds: [embed],
-    components: [row, archiveRow],
-  };
+  return textCard({
+    emojiKey: 'support',
+    title: `${ticket.publicId} - ${ticket.title}`,
+    emojiMap,
+    lines: [
+      ticket.summary || 'No summary provided.',
+      `Status: \`${ticket.status}\``,
+      `Privacy: \`${ticket.privacy}\``,
+      `Category: \`${ticket.category}\``,
+      `Area: \`${ticket.area}\``,
+      `Realm: ${ticket.realmLabel ?? 'Unknown'}`,
+      `Sensitivity: ${ticket.sensitivityFlags.length > 0 ? ticket.sensitivityFlags.join(', ') : 'none'}`,
+      `Created: <t:${Math.floor(new Date(ticket.createdAt).getTime() / 1000)}:f>`,
+    ],
+    accentColor: 0x2f80ed,
+    actionRows: [row, archiveRow],
+  });
 }
 
 function supportButton(

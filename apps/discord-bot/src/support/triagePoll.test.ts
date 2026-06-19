@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { pollSupportTriageTickets } from './triagePoll.js';
 import type { SupportTriageTicketDto } from './triageCards.js';
 
@@ -66,6 +67,9 @@ function createPollDeps(options: PollDepsOptions = {}) {
     config: {
       guildId: '123456789012345678',
       supportTriageChannelId: '234567890123456789',
+      emojiMap: {
+        support: '<:pr_support:123456789012345678>',
+      },
     },
     logger,
     readyClient: {
@@ -91,6 +95,11 @@ describe('pollSupportTriageTickets', () => {
     await pollSupportTriageTickets(deps);
 
     expect(deps.send).toHaveBeenCalledTimes(1);
+    const payload = deps.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain(
+      '<:pr_support:123456789012345678> **SUP-ABC12345 - Inventory does not stack**',
+    );
     expect(deps.post).toHaveBeenCalledWith(
       '/api/v1/discord/support/tickets/SUP-ABC12345/triage-message',
       {

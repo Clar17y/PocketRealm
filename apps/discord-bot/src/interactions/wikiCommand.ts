@@ -2,8 +2,12 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import type { BotConfig } from '../config.js';
+import { statusCard, textCard } from '../discord/v2Card.js';
 
 const MAX_WIKI_RESULTS = 5;
+const PUBLIC_REPLY_OPTIONS = {
+  allowedMentions: { parse: [] },
+} as const;
 
 interface WikiSearchResponse {
   results: WikiResult[];
@@ -17,7 +21,7 @@ interface WikiResult {
 }
 
 type WikiApiClient = Pick<PocketRealmApiClient, 'get'>;
-type WikiConfig = Pick<BotConfig, 'webBaseUrl'>;
+type WikiConfig = Pick<BotConfig, 'webBaseUrl' | 'emojiMap'>;
 
 export async function handleWikiCommand(
   interaction: ChatInputCommandInteraction,
@@ -35,30 +39,50 @@ export async function handleWikiCommand(
     );
   } catch {
     await interaction.editReply({
-      content: 'Unable to search the PocketRealm wiki right now. Please try again later.',
+      ...statusCard(
+        'error',
+        'Wiki unavailable',
+        'Unable to search the PocketRealm wiki right now. Please try again later.',
+        config.emojiMap,
+        PUBLIC_REPLY_OPTIONS,
+      ),
     });
     return;
   }
 
+  const escapedQuery = escapeWikiDisplayText(query);
   const wikiBaseUrl = new URL(config.webBaseUrl);
-  const results = response.results
-    .map((result) => formatWikiResult(result, wikiBaseUrl))
-    .filter((result): result is string => Boolean(result))
-    .slice(0, MAX_WIKI_RESULTS);
+  const results: string[] = [];
+  for (const result of response.results) {
+    const formatted = formatWikiResult(result, wikiBaseUrl);
+    if (formatted) {
+      results.push(formatted);
+    }
+    if (results.length >= MAX_WIKI_RESULTS) {
+      break;
+    }
+  }
 
   if (results.length === 0) {
     await interaction.editReply({
-      content: `No wiki results found for "${query}".`,
+      ...statusCard(
+        'info',
+        'No wiki results',
+        `No wiki results found for "${escapedQuery}".`,
+        config.emojiMap,
+        PUBLIC_REPLY_OPTIONS,
+      ),
     });
     return;
   }
 
-  await interaction.editReply({
-    content: [
-      `Wiki results for "${query}":`,
-      ...results,
-    ].join('\n'),
-  });
+  await interaction.editReply(textCard({
+    emojiKey: 'wiki',
+    title: `Wiki results for "${escapedQuery}"`,
+    emojiMap: config.emojiMap,
+    lines: results,
+    ...PUBLIC_REPLY_OPTIONS,
+  }));
 }
 
 function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
@@ -68,9 +92,20 @@ function formatWikiResult(result: WikiResult, wikiBaseUrl: URL): string | null {
   }
 
   const title = result.section ? `${result.title} - ${result.section}` : result.title;
-  const snippet = result.snippet ? ` - ${result.snippet}` : '';
+  const label = escapeMarkdownLinkLabel(title);
+  const snippet = result.snippet ? ` - ${escapeWikiDisplayText(result.snippet)}` : '';
 
-  return `- ${title}: ${url}${snippet}`;
+  return `- [${label}](${url})${snippet}`;
+}
+
+function escapeWikiDisplayText(value: string): string {
+  return value
+    .replace(/@/g, '@\u200B')
+    .replace(/([\\`*_{}\[\]()#+.!|><~-])/g, '\\$1');
+}
+
+function escapeMarkdownLinkLabel(value: string): string {
+  return value.replace(/([\\`*_{}\[\]()#+.!|>])/g, '\\$1');
 }
 
 function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {
@@ -89,5 +124,14 @@ function toAbsoluteWikiUrl(url: string, wikiBaseUrl: URL): string | null {
     return null;
   }
 
-  return parsedUrl.toString();
+  const pathWithQueryAndHash = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  return `${parsedUrl.origin}${escapeMarkdownLinkDestination(pathWithQueryAndHash)}`;
+}
+
+function escapeMarkdownLinkDestination(value: string): string {
+  return value.replace(/[()[\]<>:]/g, encodeMarkdownDestinationCharacter);
+}
+
+function encodeMarkdownDestinationCharacter(character: string): string {
+  return `%${character.charCodeAt(0).toString(16).toUpperCase()}`;
 }

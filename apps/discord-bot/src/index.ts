@@ -8,6 +8,7 @@ import pino from 'pino';
 import { PocketRealmApiClient } from './api/pocketRealmApi.js';
 import { loadBotConfig } from './config.js';
 import { syncLinkedRoles } from './discord/roleSync.js';
+import { statusCard } from './discord/v2Card.js';
 import { shouldWelcomeAfterMemberUpdate, welcomeGuildMember } from './discord/welcome.js';
 import { routeInteraction } from './interactions/interactionRouter.js';
 import { pollDiscordNotifications } from './notifications/notificationPoll.js';
@@ -141,9 +142,7 @@ async function main(): Promise<void> {
     try {
       const channel = await readyClient.channels.fetch(config.botHealthChannelId);
       if (channel?.isSendable()) {
-        await channel.send({
-          content: `Pocketrealm bot ready at ${new Date().toISOString()}`,
-        });
+        await channel.send(statusCard('success', 'Bot ready', `PocketRealm bot ready at ${new Date().toISOString()}`, config.emojiMap));
       }
     } catch (error) {
       logger.warn({ error }, 'Failed to post Discord bot health message');
@@ -213,6 +212,7 @@ async function main(): Promise<void> {
           readyClient,
           redis,
           webBaseUrl: config.webBaseUrl,
+          emojiMap: config.emojiMap,
         });
       } catch (error) {
         logger.warn({ error }, 'Discord notification poll failed');

@@ -1,3 +1,4 @@
+import type { DiscordEmojiMap } from '../discord/emojis.js';
 import { buildTriageCard, type UnpostedTicketsResponse } from './triageCards.js';
 
 const TRIAGE_POST_SUPPRESSION_SECONDS = 60 * 60;
@@ -45,6 +46,7 @@ export interface SupportTriagePollOptions {
   config: {
     guildId: string;
     supportTriageChannelId: string;
+    emojiMap?: DiscordEmojiMap;
   };
   logger: LoggerLike;
   readyClient: ReadyClientLike;
@@ -73,7 +75,7 @@ export async function pollSupportTriageTickets(options: SupportTriagePollOptions
 
     let sentMessage: SentTriageMessage | null = null;
     try {
-      sentMessage = await channel.send(buildTriageCard(ticket));
+      sentMessage = await channel.send(buildTriageCard(ticket, options.config.emojiMap));
       await options.api.post(`/api/v1/discord/support/tickets/${ticket.publicId}/triage-message`, {
         guildId: options.config.guildId,
         triageChannelId: options.config.supportTriageChannelId,

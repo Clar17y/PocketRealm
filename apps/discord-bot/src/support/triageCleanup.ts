@@ -7,6 +7,8 @@ const MIN_SCAN_LIMIT = 1;
 export interface TriageCleanupMessage {
   id: string;
   content: string | null;
+  components?: unknown[] | null;
+  embeds?: Array<{ title?: string | null }> | null;
   createdTimestamp: number;
   author?: {
     id?: string;
@@ -144,7 +146,62 @@ function extractSupportTicketId(message: TriageCleanupMessage): string | null {
     return normalizePublicId(contentMatch[1]);
   }
 
+  for (const text of extractComponentText(message.components)) {
+    const componentMatch = extractSupportTicketIdFromCardText(text);
+    if (componentMatch) {
+      return componentMatch;
+    }
+  }
+
+  const embedTitleMatch = message.embeds?.find((embed) => embed.title)?.title?.match(/\b(SUP-[A-Z0-9-]+)\b/i);
+  if (embedTitleMatch?.[1]) {
+    return normalizePublicId(embedTitleMatch[1]);
+  }
+
   return null;
+}
+
+function extractSupportTicketIdFromCardText(text: string): string | null {
+  const hintedMatch = text.match(/support ticket[\s\S]*?\b(SUP-[A-Z0-9-]+)\b/i);
+  if (hintedMatch?.[1]) {
+    return normalizePublicId(hintedMatch[1]);
+  }
+
+  const headlineMatch = text.match(/^\s*(?:<a?:\w+:\d+>|\W)*\*{0,2}(SUP-[A-Z0-9-]+)\b/i);
+  if (headlineMatch?.[1]) {
+    return normalizePublicId(headlineMatch[1]);
+  }
+
+  return null;
+}
+
+function extractComponentText(components: unknown[] | null | undefined): string[] {
+  if (!components) {
+    return [];
+  }
+
+  const text: string[] = [];
+  for (const component of components) {
+    collectComponentText(component, text);
+  }
+
+  return text;
+}
+
+function collectComponentText(component: unknown, text: string[]): void {
+  if (!isRecord(component)) {
+    return;
+  }
+
+  if (typeof component.content === 'string') {
+    text.push(component.content);
+  }
+
+  if (Array.isArray(component.components)) {
+    for (const child of component.components) {
+      collectComponentText(child, text);
+    }
+  }
 }
 
 function normalizeScanLimit(scanLimit: number | null | undefined): number {

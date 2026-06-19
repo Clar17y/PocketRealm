@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DISCORD_NOTIFICATION_TYPES } from '@pocketrealm/shared/discord/discordNotifications';
 import { PocketRealmApiError } from '../api/pocketRealmApi.js';
 import { notifyToggleButtonId } from '../discord/components.js';
+import { cardJson, cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { buildPreferenceComponents, handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
 
 const GUILD_ID = '23456789012345678';
 const USER_ID = '34567890123456789';
+const config = { emojiMap: {} };
 
 function createApi(overrides: Record<string, unknown> = {}) {
   return {
@@ -46,15 +48,16 @@ describe('handleNotifyCommand', () => {
     const api = createApi();
     const interaction = createCommandInteraction();
 
-    await handleNotifyCommand(interaction as never, api as never);
+    await handleNotifyCommand(interaction as never, api as never, config);
 
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(api.get).toHaveBeenCalledWith(
       `/api/v1/discord/notifications/preferences?guildId=${GUILD_ID}&discordUserId=${USER_ID}`,
     );
     const payload = interaction.editReply.mock.calls[0][0];
-    expect(payload.components).toHaveLength(1);
-    expect(JSON.stringify(payload.components)).toContain(notifyToggleButtonId('turns_capped', true));
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('🔔 **Discord notifications**');
+    expect(cardJson(payload)).toContain(notifyToggleButtonId('turns_capped', true));
   });
 
   it('prompts unlinked users to /link', async () => {
@@ -63,18 +66,37 @@ describe('handleNotifyCommand', () => {
     });
     const interaction = createCommandInteraction();
 
-    await handleNotifyCommand(interaction as never, api as never);
+    await handleNotifyCommand(interaction as never, api as never, config);
 
     const payload = interaction.editReply.mock.calls[0][0];
-    expect(payload.content).toContain('/link');
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('⚠️ **Link required**');
+    expect(cardText(payload)).toContain('/link');
+  });
+
+  it('surfaces a formatted load error when preferences cannot be loaded', async () => {
+    const api = createApi({
+      get: vi.fn().mockRejectedValue(new Error('api unavailable')),
+    });
+    const interaction = createCommandInteraction();
+
+    await handleNotifyCommand(interaction as never, api as never, config);
+
+    const payload = interaction.editReply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('❌ **Load failed**');
   });
 
   it('rejects use outside the guild', async () => {
     const interaction = createCommandInteraction({ guildId: null });
 
-    await handleNotifyCommand(interaction as never, createApi() as never);
+    await handleNotifyCommand(interaction as never, createApi() as never, config);
 
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({
+      ephemeral: true,
+    }));
+    expectV2Card(interaction.reply.mock.calls[0]?.[0]);
+    expect(cardText(interaction.reply.mock.calls[0]?.[0])).toContain('⚠️ **Server only**');
   });
 });
 
@@ -85,7 +107,7 @@ describe('handleNotifyToggleButton', () => {
     const api = createApi();
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/notifications/preferences', {
       discordGuildId: GUILD_ID,
@@ -93,7 +115,8 @@ describe('handleNotifyToggleButton', () => {
       type: 'turns_capped',
       enabled: true,
     });
-    expect(interaction.user.send).toHaveBeenCalled();
+    expectV2Card(interaction.user.send.mock.calls[0]?.[0]);
+    expect(cardText(interaction.user.send.mock.calls[0]?.[0])).toContain('✅ **Notification enabled**');
     expect(interaction.editReply).toHaveBeenCalled();
   });
 
@@ -102,7 +125,7 @@ describe('handleNotifyToggleButton', () => {
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
     interaction.user.send = vi.fn().mockRejectedValue(new Error('Cannot send messages to this user'));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/discord/notifications/preferences', {
       discordGuildId: GUILD_ID,
@@ -112,8 +135,9 @@ describe('handleNotifyToggleButton', () => {
     });
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
       ephemeral: true,
-      content: expect.stringContaining('DM'),
     }));
+    expectV2Card(interaction.followUp.mock.calls[0]?.[0]);
+    expect(cardText(interaction.followUp.mock.calls[0]?.[0])).toContain('DM');
   });
 
   it('surfaces an error when the DM fails and the revert also fails', async () => {
@@ -124,12 +148,30 @@ describe('handleNotifyToggleButton', () => {
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
     interaction.user.send = vi.fn().mockRejectedValue(new Error('Cannot send messages to this user'));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     // both upserts attempted (enable + revert)
     expect(api.post).toHaveBeenCalledTimes(2);
     // user is informed; no unhandled rejection (test completes)
-    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
+      ephemeral: true,
+    }));
+    expectV2Card(interaction.followUp.mock.calls[0]?.[0]);
+    expect(cardText(interaction.followUp.mock.calls[0]?.[0])).toContain('❌ **Update failed**');
+  });
+
+  it('keeps link-required toggle errors ephemeral', async () => {
+    const api = createApi({
+      post: vi.fn().mockRejectedValue(new PocketRealmApiError('not linked', 404, 'DISCORD_LINK_REQUIRED', {})),
+    });
+    const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', true));
+
+    await handleNotifyToggleButton(interaction as never, api as never, config);
+
+    const payload = interaction.followUp.mock.calls[0]?.[0];
+    expect(payload).toEqual(expect.objectContaining({ ephemeral: true }));
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('⚠️ **Link required**');
   });
 
   it('disables without sending a DM', async () => {
@@ -138,7 +180,7 @@ describe('handleNotifyToggleButton', () => {
     });
     const interaction = createButtonInteraction(notifyToggleButtonId('turns_capped', false));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     expect(interaction.user.send).not.toHaveBeenCalled();
   });
@@ -150,18 +192,17 @@ describe('handleNotifyToggleButton', () => {
     });
     const interaction = createButtonInteraction(notifyToggleButtonId('pvp_attack', true));
 
-    await handleNotifyToggleButton(interaction as never, api as never);
+    await handleNotifyToggleButton(interaction as never, api as never, config);
 
     // After toggling, the menu re-fetches the full list and re-renders every type.
     expect(api.get).toHaveBeenCalledWith(
       `/api/v1/discord/notifications/preferences?guildId=${GUILD_ID}&discordUserId=${USER_ID}`,
     );
     const payload = interaction.editReply.mock.calls.at(-1)![0];
-    const totalButtons = payload.components.reduce(
-      (sum: number, row: { components: unknown[] }) => sum + row.components.length,
-      0,
-    );
-    expect(totalButtons).toBe(DISCORD_NOTIFICATION_TYPES.length);
+    expectV2Card(payload);
+    for (const type of DISCORD_NOTIFICATION_TYPES) {
+      expect(cardJson(payload)).toContain(type);
+    }
   });
 });
 
