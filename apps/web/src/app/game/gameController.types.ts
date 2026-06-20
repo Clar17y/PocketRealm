@@ -47,6 +47,7 @@ export interface PendingEncounter {
   nextMobTemplateId: string | null;
   nextMobName: string | null;
   nextMobPrefix: string | null;
+  nextMobRole: EncounterMobRole | null;
   nextMobDisplayName: string | null;
   discoveredAt: string;
   currentRoom: number;

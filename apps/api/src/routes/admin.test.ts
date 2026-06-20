@@ -577,7 +577,7 @@ describe('admin routes', () => {
     it('creates an encounter site with mobs', async () => {
       mockPrisma.mobFamily.findUniqueOrThrow.mockResolvedValue({
         id: 'fam-1', name: 'Wolves', siteNounSmall: 'Den', siteNounMedium: 'Lair', siteNounLarge: 'Cavern',
-        members: [{ mobTemplate: { id: 'mob-1' } }],
+        members: [{ role: 'trash', mobTemplate: { id: 'mob-1' } }],
       });
       mockPrisma.encounterSite.create.mockResolvedValue({ id: 'site-1' });
 

@@ -160,4 +160,49 @@ describe('buildEncounterSiteMobs', () => {
     ]);
     expect(mobs.map((mob) => mob.role)).toEqual(['trash', 'elite', 'mini_boss']);
   });
+
+  it('skips tiers that only have expedition members when building encounter sites', () => {
+    const mobs = buildEncounterSiteMobs(
+      {
+        id: 'family-spider',
+        name: 'Spiders',
+        siteNounSmall: 'Nest',
+        siteNounMedium: 'Nest',
+        siteNounLarge: 'Nest',
+        members: [
+          {
+            role: 'trash',
+            mobTemplate: {
+              id: 'web-spinner',
+              name: 'Web Spinner',
+              zoneId: ZONE_ID,
+              explorationTier: 2,
+            },
+          },
+          {
+            role: 'expedition_normal',
+            mobTemplate: {
+              id: 'expedition-broodguard',
+              name: 'Expedition Broodguard',
+              zoneId: ZONE_ID,
+              explorationTier: 3,
+            },
+          },
+        ],
+      },
+      'large',
+      ZONE_ID,
+      100,
+      null,
+      3,
+    );
+
+    expect(mobs).toHaveLength(3);
+    expect(mobs.map((mob) => mob.mobTemplateId)).toEqual([
+      'web-spinner',
+      'web-spinner',
+      'web-spinner',
+    ]);
+    expect(mobs.map((mob) => mob.role)).toEqual(['trash', 'elite', 'mini_boss']);
+  });
 });

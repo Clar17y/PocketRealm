@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@pocketrealm/shared';
+import { getMobPrefixDefinition, COMBAT_CONSTANTS, type EncounterMobRole } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination, serializeXpGrant } from '../../utils/routeHelpers.js';
-import { getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
+import { getActiveZoneModifiers, getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
 import {
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
 } from '../../services/combat/helpers';
+import { applyEncounterRoleModifiers } from '../../services/encounterSiteMobRoleService';
 import {
   autoResolveEncounterRoom,
   startManualEncounterRoom,
@@ -28,6 +29,98 @@ const roundSchema = z.object({
   action: z.enum(['template']).optional(),
   targetMobSlot: z.number().int().optional(),
 });
+
+type EncounterSitePreviewSlot = {
+  slot: number;
+  prefix: string | null;
+  role: EncounterMobRole;
+};
+
+type EncounterSitePreviewTemplate = {
+  name: string;
+  hp: number;
+};
+
+export function buildEncounterSiteMobDisplayName(mob: {
+  name: string;
+  prefix: string | null;
+  role?: EncounterMobRole | null;
+}): string {
+  const prefixLabel = mob.prefix ? getPrefixDisplayName(mob.prefix) : null;
+  const baseName = prefixLabel ? stripLeadingPrefix(mob.name, prefixLabel) : mob.name;
+  const roleLabel = mob.role && mob.role !== 'trash' ? roleLabelFor(mob.role) : null;
+
+  return [prefixLabel, roleLabel, baseName].filter(Boolean).join(' ');
+}
+
+export function buildEncounterSiteMobPreview(
+  slot: EncounterSitePreviewSlot,
+  template: EncounterSitePreviewTemplate | undefined,
+  mobHpMultiplier: number,
+): {
+  slot: number;
+  name: string;
+  prefix: string | null;
+  role: EncounterMobRole;
+  hp: number;
+  maxHp: number;
+} {
+  if (!template) {
+    return {
+      slot: slot.slot,
+      name: 'Unknown',
+      prefix: slot.prefix,
+      role: slot.role,
+      hp: 0,
+      maxHp: 0,
+    };
+  }
+
+  const prefixDefinition = getMobPrefixDefinition(slot.prefix);
+  const prefixedHp = Math.max(1, Math.floor(template.hp * (prefixDefinition?.statMultipliers.hp ?? 1)));
+  const eventModifiedHp = Math.max(1, Math.round(prefixedHp * Math.max(0.1, mobHpMultiplier)));
+  const roleModified = applyEncounterRoleModifiers({
+    hp: eventModifiedHp,
+    accuracy: 0,
+    defence: 0,
+    magicDefence: 0,
+    evasion: 0,
+    damageMin: 1,
+    damageMax: 1,
+    xpReward: 1,
+  }, slot.role);
+
+  return {
+    slot: slot.slot,
+    name: template.name,
+    prefix: slot.prefix,
+    role: slot.role,
+    hp: roleModified.hp,
+    maxHp: roleModified.hp,
+  };
+}
+
+function getPrefixDisplayName(prefix: string): string {
+  return getMobPrefixDefinition(prefix)?.displayName ?? capitalize(prefix);
+}
+
+function roleLabelFor(role: EncounterMobRole): string | null {
+  if (role === 'elite') return 'Elite';
+  if (role === 'mini_boss') return 'Mini-Boss';
+  return null;
+}
+
+function stripLeadingPrefix(name: string, prefixLabel: string): string {
+  const leadingPrefix = `${prefixLabel} `;
+  if (name.toLowerCase().startsWith(leadingPrefix.toLowerCase())) {
+    return name.slice(leadingPrefix.length);
+  }
+  return name;
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 async function mapChestRewardDTO(completionRewards: Awaited<ReturnType<typeof autoResolveEncounterRoom>>['completionRewards']) {
   if (!completionRewards) return undefined;
@@ -102,6 +195,7 @@ export function registerSiteRoutes(router: Router): void {
         decayedMobs: number;
         nextMobTemplateId: string | null;
         nextMobPrefix: string | null;
+        nextMobRole: EncounterMobRole | null;
         discoveredAt: string;
         currentRoom: number;
         totalRooms: number;
@@ -153,6 +247,7 @@ export function registerSiteRoutes(router: Router): void {
           decayedMobs: decayed.state.decayed,
           nextMobTemplateId: decayed.nextMob?.mobTemplateId ?? null,
           nextMobPrefix: decayed.nextMob?.prefix ?? null,
+          nextMobRole: decayed.nextMob?.role ?? null,
           discoveredAt: site.discoveredAt.toISOString(),
           currentRoom: currentRoomNumber,
           totalRooms: site.totalRooms ?? roomNumbers.length,
@@ -193,21 +288,30 @@ export function registerSiteRoutes(router: Router): void {
         .map(([id, name]) => ({ id, name }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      const badgeCache = new Map<string, EventModifierBadge[]>();
+      const modifierCache = new Map<string, { badges: EventModifierBadge[]; mobHpMultiplier: number }>();
       for (const site of pageItems) {
         const key = `${site.zoneId}:${site.mobFamilyId}`;
-        if (!badgeCache.has(key)) {
-          badgeCache.set(key, await getEventModifiersForEntity(site.zoneId, { mobFamilyId: site.mobFamilyId }));
+        if (!modifierCache.has(key)) {
+          const [badges, modifiers] = await Promise.all([
+            getEventModifiersForEntity(site.zoneId, { mobFamilyId: site.mobFamilyId }),
+            getActiveZoneModifiers(site.zoneId, { mobFamilyId: site.mobFamilyId }),
+          ]);
+          modifierCache.set(key, { badges, mobHpMultiplier: modifiers.mobHpMultiplier });
         }
       }
 
       res.json({
         encounterSites: pageItems.map((site) => {
           const nextMobName = site.nextMobTemplateId ? nextMobNameById.get(site.nextMobTemplateId) ?? null : null;
-          const prefixDefinition = getMobPrefixDefinition(site.nextMobPrefix);
           const nextMobDisplayName = nextMobName
-            ? (prefixDefinition ? `${prefixDefinition.displayName} ${nextMobName}` : nextMobName)
+            ? buildEncounterSiteMobDisplayName({
+                name: nextMobName,
+                prefix: site.nextMobPrefix,
+                role: site.nextMobRole,
+              })
             : null;
+          const modifierKey = `${site.zoneId}:${site.mobFamilyId}`;
+          const modifiers = modifierCache.get(modifierKey);
 
           return {
             encounterSiteId: site.encounterSiteId,
@@ -224,6 +328,7 @@ export function registerSiteRoutes(router: Router): void {
             nextMobTemplateId: site.nextMobTemplateId,
             nextMobName,
             nextMobPrefix: site.nextMobPrefix,
+            nextMobRole: site.nextMobRole,
             nextMobDisplayName,
             discoveredAt: site.discoveredAt,
             totalRooms: site.totalRooms,
@@ -231,16 +336,9 @@ export function registerSiteRoutes(router: Router): void {
             roomMobCounts: site.roomMobCounts,
             currentRoomMobs: site.currentRoomMobs.map(m => {
               const template = mobTemplateById.get(m.mobTemplateId);
-              return {
-                slot: m.slot,
-                name: template?.name ?? 'Unknown',
-                prefix: m.prefix,
-                role: m.role,
-                hp: template?.hp ?? 0,
-                maxHp: template?.hp ?? 0,
-              };
+              return buildEncounterSiteMobPreview(m, template, modifiers?.mobHpMultiplier ?? 1);
             }),
-            eventModifiers: badgeCache.get(`${site.zoneId}:${site.mobFamilyId}`) ?? [],
+            eventModifiers: modifiers?.badges ?? [],
             totalTurnCost: site.aliveMobs * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
           };
         }),

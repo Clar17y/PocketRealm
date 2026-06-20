@@ -41,6 +41,7 @@ describe('spawnAdminEncounter', () => {
       siteNounLarge: 'Lair',
       members: [
         {
+          role: 'trash',
           mobTemplate: {
             id: 'web-spinner',
           },
@@ -92,5 +93,79 @@ describe('spawnAdminEncounter', () => {
     }));
     expect(JSON.stringify(result.site)).not.toContain('"boss"');
     expect(mockGenerateRoomAssignments).toHaveBeenCalledWith('large');
+  });
+
+  it('does not use permanent mini boss templates for trash or elite admin slots when alternatives exist', async () => {
+    mockPrisma.mobFamily.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'family-spider',
+      name: 'Spiders',
+      siteNounSmall: 'Web',
+      siteNounMedium: 'Nest',
+      siteNounLarge: 'Lair',
+      members: [
+        {
+          role: 'mini_boss',
+          mobTemplate: {
+            id: 'web-matron',
+          },
+        },
+        {
+          role: 'trash',
+          mobTemplate: {
+            id: 'web-spinner',
+          },
+        },
+      ],
+    });
+
+    const result = await spawnAdminEncounter('player-1', {
+      mobFamilyId: 'family-spider',
+      zoneId: 'zone-1',
+      size: 'large',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mockPrisma.encounterSite.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        mobs: {
+          mobs: [
+            { slot: 0, room: 1, mobTemplateId: 'web-spinner', role: 'trash', prefix: null, status: 'alive' },
+            { slot: 1, room: 2, mobTemplateId: 'web-spinner', role: 'elite', prefix: null, status: 'alive' },
+            { slot: 2, room: 3, mobTemplateId: 'web-matron', role: 'mini_boss', prefix: null, status: 'alive' },
+          ],
+        },
+      }),
+    });
+  });
+
+  it('rejects admin encounter spawns for families without encounter-site members', async () => {
+    mockPrisma.mobFamily.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'family-spider',
+      name: 'Spiders',
+      siteNounSmall: 'Web',
+      siteNounMedium: 'Nest',
+      siteNounLarge: 'Lair',
+      members: [
+        {
+          role: 'expedition_normal',
+          mobTemplate: {
+            id: 'expedition-broodguard',
+          },
+        },
+      ],
+    });
+
+    const result = await spawnAdminEncounter('player-1', {
+      mobFamilyId: 'family-spider',
+      zoneId: 'zone-1',
+      size: 'large',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      error: { message: 'Mob family has no encounter-site members', code: 'NO_ENCOUNTER_MEMBERS' },
+    });
+    expect(mockPrisma.encounterSite.create).not.toHaveBeenCalled();
   });
 });

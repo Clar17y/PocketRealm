@@ -26,6 +26,7 @@ function mapEncounterSites(sites: EncounterSitesResponse['encounterSites']): Pen
     nextMobTemplateId: site.nextMobTemplateId,
     nextMobName: site.nextMobName,
     nextMobPrefix: site.nextMobPrefix,
+    nextMobRole: site.nextMobRole,
     nextMobDisplayName: site.nextMobDisplayName,
     discoveredAt: site.discoveredAt,
     currentRoom: site.currentRoom,

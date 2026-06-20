@@ -134,6 +134,19 @@ describe('resolveRaidRound', () => {
       expect(result.mobActionResults[0].damageDealt).toBeGreaterThan(0);
       expect(result.mobActionResults[1].damageDealt).toBeGreaterThan(0);
     });
+
+    it('preserves encounter roles on surviving mobs', () => {
+      const p1 = makeParticipant({ playerId: 'p1' });
+      const mob1 = makeMob({ id: 'mob1', role: 'mini_boss' });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      expect(result.mobsAfter).toHaveLength(1);
+      expect(result.mobsAfter[0]?.role).toBe('mini_boss');
+    });
   });
 
   describe('auto-target lowest HP mob', () => {

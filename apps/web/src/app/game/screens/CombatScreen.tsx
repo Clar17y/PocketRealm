@@ -21,7 +21,7 @@ import { CopyButton } from '@/components/common/CopyButton';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
-import { getMobPrefixDefinition, HP_CONSTANTS, TUTORIAL_STEP_COMBAT } from '@pocketrealm/shared';
+import { HP_CONSTANTS, TUTORIAL_STEP_COMBAT } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
 import type { RefreshPendingEncounterOptions } from '../hooks/useEncounterSites';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
@@ -601,10 +601,7 @@ export function CombatScreen({
             {!pendingEncountersError && !pendingEncountersLoading && pendingEncounters.length > 0 && (
               <div className="space-y-2">
                 {pendingEncounters.map((e) => {
-                  const prefix = getMobPrefixDefinition(e.nextMobPrefix);
-                  const nextMobLabel = e.nextMobName
-                    ? (prefix ? `${prefix.displayName} ${e.nextMobName}` : e.nextMobName)
-                    : null;
+                  const nextMobLabel = e.nextMobDisplayName ?? e.nextMobName;
                   const isWrongZone = Boolean(currentZoneId) && e.zoneId !== currentZoneId;
                   const isExpeditionLocked = isActivityLocked && activityLockReason === 'expedition';
                   const isDisabled = isOverEncumbered || hpState.isRecovering || isExpeditionLocked || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData || isOffline;

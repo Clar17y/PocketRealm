@@ -208,11 +208,12 @@ export function buildEncounterSiteMobs(
   const eligibleZoneMembers = zoneMembers.filter(
     (member) => (member.mobTemplate.explorationTier ?? 1) <= currentTier,
   );
-  if (eligibleZoneMembers.length === 0) return [];
+  const eligibleEncounterMembers = eligibleZoneMembers.filter((member) => isPermanentEncounterFamilyRole(member.role));
+  if (eligibleEncounterMembers.length === 0) return [];
 
   // Group members by tier
   const membersByTier = new Map<number, ZoneFamilyMember[]>();
-  for (const member of eligibleZoneMembers) {
+  for (const member of eligibleEncounterMembers) {
     const tier = member.mobTemplate.explorationTier ?? 1;
     if (!membersByTier.has(tier)) membersByTier.set(tier, []);
     membersByTier.get(tier)!.push(member);
@@ -229,7 +230,7 @@ export function buildEncounterSiteMobs(
       const picked = pickBaseFamilyMember(tierMembers, role);
       if (picked) return picked;
     }
-    return pickBaseFamilyMember(eligibleZoneMembers, role);
+    return pickBaseFamilyMember(eligibleEncounterMembers, role);
   }
 
   const { rooms } = generateRoomAssignments(size);

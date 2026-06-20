@@ -32,6 +32,7 @@ describe('useEncounterSites', () => {
     nextMobTemplateId: 'wolf',
     nextMobName: 'Wolf',
     nextMobPrefix: null,
+    nextMobRole: 'trash' as const,
     nextMobDisplayName: 'Wolf',
     discoveredAt: '2026-05-19T22:06:32.628Z',
     currentRoom: overrides.currentRoom ?? 1,
