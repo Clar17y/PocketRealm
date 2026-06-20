@@ -39,6 +39,24 @@ describe('talentTreeDefinitions', () => {
         expect(aoeNode, `${treeName} should have ${expectedAoe} at tier 2`).toBeDefined();
       }
     });
+
+    it('talent damage actions expose target mode metadata for planning displays', () => {
+      for (const node of getAllTalentNodes()) {
+        if (!node.unlocksAction) continue;
+
+        const action = BASE_ACTION_DEFINITIONS[node.unlocksAction];
+        if (action.damageMultiplier == null) continue;
+
+        expect(
+          action.targetMode,
+          `${node.unlocksAction} must declare targetMode for skill tree damage metadata`,
+        ).toBeDefined();
+      }
+
+      expect(BASE_ACTION_DEFINITIONS.power_strike.targetMode).toBe('single_target');
+      expect(BASE_ACTION_DEFINITIONS.cleave.targetMode).toBe('aoe');
+      expect(BASE_ACTION_DEFINITIONS.frost_nova.targetMode).toBe('aoe');
+    });
   });
 
   describe('prerequisite validity', () => {
