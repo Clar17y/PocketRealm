@@ -22,7 +22,7 @@ describe('handleItemCommand', () => {
     const get = vi.fn(async <T>(): Promise<T> => ({
       match: {
         name: 'Iron Ingot', itemType: 'resource', slot: null, tier: 2, weightClass: null,
-        setId: null, requiredSkill: null, requiredLevel: 1, sellPrice: 10, flavorText: null,
+        requiredSkill: null, requiredLevel: 1, sellPrice: 10, flavorText: null,
         season: null, stats: [], sources: { drops: [], craft: null },
       },
       suggestions: [],

@@ -4,7 +4,6 @@ import { statusCard, textCard, type V2CardPayload } from './v2Card.js';
 
 const MAX_LIST = 15;
 const MAX_FLAVOR = 300;
-const PUBLIC_REPLY_OPTIONS = { allowedMentions: { parse: [] } } as const;
 
 export interface ItemCardData {
   name: string;
@@ -12,7 +11,6 @@ export interface ItemCardData {
   slot: string | null;
   tier: number;
   weightClass: string | null;
-  setId: string | null;
   requiredSkill: string | null;
   requiredLevel: number;
   sellPrice: number | null;
@@ -115,7 +113,6 @@ export function buildItemCard(data: ItemCardData, emojiMap: DiscordEmojiMap): V2
     title: escapeDiscordText(data.name),
     emojiMap,
     lines,
-    ...PUBLIC_REPLY_OPTIONS,
   });
 }
 
@@ -153,7 +150,6 @@ export function buildMobCard(data: MobCardData, emojiMap: DiscordEmojiMap): V2Ca
     title: escapeDiscordText(data.name),
     emojiMap,
     lines,
-    ...PUBLIC_REPLY_OPTIONS,
   });
 }
 
@@ -169,7 +165,6 @@ export function buildSuggestionCard(
     title: `No exact ${kind} match for "${escapeDiscordText(query)}"`,
     emojiMap,
     lines: ['Did you mean:', ...lines],
-    ...PUBLIC_REPLY_OPTIONS,
   });
 }
 
@@ -183,6 +178,5 @@ export function buildNotFoundCard(
     `No ${kind} found`,
     `No ${kind} found for "${escapeDiscordText(query)}".`,
     emojiMap,
-    PUBLIC_REPLY_OPTIONS,
   );
 }

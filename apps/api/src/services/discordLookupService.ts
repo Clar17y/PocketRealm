@@ -8,7 +8,6 @@ export interface ItemCardData {
   slot: string | null;
   tier: number;
   weightClass: string | null;
-  setId: string | null;
   requiredSkill: string | null;
   requiredLevel: number;
   sellPrice: number | null;
@@ -51,6 +50,10 @@ function dropRatePct(dropChance: unknown): number {
 interface SeasonRef { id: string; name: string; startsAt?: Date | string | null }
 interface SeasonedRow { id: string; seasonId: string | null; season: SeasonRef | null }
 
+function seasonLabel(season: SeasonRef | null | undefined): { name: string } | null {
+  return season ? { name: season.name } : null;
+}
+
 async function activeSeasonId(): Promise<string | null> {
   const season = await prisma.season.findFirst({
     where: { status: SEASON_STATUSES.ACTIVE },
@@ -71,7 +74,7 @@ function resolveSeasonScope<T extends SeasonedRow>(
   const hasActive = activeId !== null && rows.some((row) => row.seasonId === activeId);
   if (hasActive) {
     const scoped = rows.filter((row) => row.seasonId === activeId);
-    return { scoped, season: scoped[0]?.season ? { name: scoped[0].season!.name } : null };
+    return { scoped, season: seasonLabel(scoped[0]?.season) };
   }
 
   const hasBase = rows.some((row) => row.seasonId === null);
@@ -84,14 +87,14 @@ function resolveSeasonScope<T extends SeasonedRow>(
   );
   const newestSeasonId = sorted[0]?.seasonId ?? null;
   const scoped = rows.filter((row) => row.seasonId === newestSeasonId);
-  return { scoped, season: scoped[0]?.season ? { name: scoped[0].season!.name } : null };
+  return { scoped, season: seasonLabel(scoped[0]?.season) };
 }
 
 export async function lookupItemForDiscord(query: string): Promise<ItemLookupResult> {
   const templates = await prisma.itemTemplate.findMany({
     select: {
       id: true, name: true, itemType: true, slot: true, tier: true, weightClass: true,
-      setId: true, requiredSkill: true, requiredLevel: true, sellPrice: true,
+      requiredSkill: true, requiredLevel: true, sellPrice: true,
       flavorText: true, baseStats: true, seasonId: true,
       season: { select: { id: true, name: true, startsAt: true } },
     },
@@ -109,13 +112,19 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
   const ids = scoped.map((row) => row.id);
   const primary = scoped[0]!;
 
-  const dropRows = await prisma.dropTable.findMany({
-    where: { itemTemplateId: { in: ids } },
-    select: {
-      dropChance: true, minQuantity: true, maxQuantity: true,
-      mobTemplate: { select: { name: true, zone: { select: { name: true } } } },
-    },
-  });
+  const [dropRows, recipe] = await Promise.all([
+    prisma.dropTable.findMany({
+      where: { itemTemplateId: { in: ids } },
+      select: {
+        dropChance: true, minQuantity: true, maxQuantity: true,
+        mobTemplate: { select: { name: true, zone: { select: { name: true } } } },
+      },
+    }),
+    prisma.craftingRecipe.findFirst({
+      where: { resultTemplateId: { in: ids } },
+      select: { skillType: true, requiredLevel: true, turnCost: true, xpReward: true, materials: true },
+    }),
+  ]);
   const drops = dropRows
     .map((row) => ({
       mobName: row.mobTemplate.name,
@@ -125,11 +134,6 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
       maxQty: row.maxQuantity,
     }))
     .sort((a, b) => b.dropRatePct - a.dropRatePct);
-
-  const recipe = await prisma.craftingRecipe.findFirst({
-    where: { resultTemplateId: { in: ids } },
-    select: { skillType: true, requiredLevel: true, turnCost: true, xpReward: true, materials: true },
-  });
 
   let craft: ItemCardData['sources']['craft'] = null;
   if (recipe) {
@@ -169,7 +173,6 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
       slot: primary.slot,
       tier: primary.tier,
       weightClass: primary.weightClass,
-      setId: primary.setId,
       requiredSkill: primary.requiredSkill,
       requiredLevel: primary.requiredLevel,
       sellPrice: primary.sellPrice,

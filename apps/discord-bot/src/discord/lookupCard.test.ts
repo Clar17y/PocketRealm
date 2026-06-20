@@ -17,7 +17,6 @@ const item: ItemCardData = {
   slot: null,
   tier: 2,
   weightClass: null,
-  setId: null,
   requiredSkill: null,
   requiredLevel: 1,
   sellPrice: 10,

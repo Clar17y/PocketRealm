@@ -15,8 +15,6 @@ import {
 type LookupApiClient = Pick<PocketRealmApiClient, 'get'>;
 type LookupConfig = Pick<BotConfig, 'emojiMap'>;
 
-const PUBLIC_REPLY_OPTIONS = { allowedMentions: { parse: [] } } as const;
-
 interface ItemLookupResponse { match: ItemCardData | null; suggestions: string[]; }
 interface MobLookupResponse { match: MobCardData | null; suggestions: string[]; }
 
@@ -84,6 +82,5 @@ function unavailableCard(kind: 'item' | 'mob', config: LookupConfig) {
     'Lookup unavailable',
     `Unable to look up that ${kind} right now. Please try again later.`,
     config.emojiMap,
-    PUBLIC_REPLY_OPTIONS,
   );
 }
