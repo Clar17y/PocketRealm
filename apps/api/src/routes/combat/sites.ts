@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
 import {
-  getMobPrefixDefinition,
   COMBAT_CONSTANTS,
   formatEncounterMobDisplayName,
   type EncounterMobRole,
@@ -21,7 +20,7 @@ import {
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
 } from '../../services/combat/helpers';
-import { scaleEncounterRoleHp } from '../../services/encounterSiteMobRoleService';
+import { buildEncounterSiteMobPreview } from '../../services/encounterSiteMobRoleService';
 import {
   autoResolveEncounterRoom,
   startManualEncounterRoom,
@@ -40,55 +39,6 @@ const roundSchema = z.object({
   action: z.enum(['template']).optional(),
   targetMobSlot: z.number().int().optional(),
 });
-
-type EncounterSitePreviewSlot = {
-  slot: number;
-  prefix: string | null;
-  role: EncounterMobRole;
-};
-
-type EncounterSitePreviewTemplate = {
-  name: string;
-  hp: number;
-};
-
-export function buildEncounterSiteMobPreview(
-  slot: EncounterSitePreviewSlot,
-  template: EncounterSitePreviewTemplate | undefined,
-  mobHpMultiplier: number,
-): {
-  slot: number;
-  name: string;
-  prefix: string | null;
-  role: EncounterMobRole;
-  hp: number;
-  maxHp: number;
-} {
-  if (!template) {
-    return {
-      slot: slot.slot,
-      name: 'Unknown',
-      prefix: slot.prefix,
-      role: slot.role,
-      hp: 0,
-      maxHp: 0,
-    };
-  }
-
-  const prefixDefinition = getMobPrefixDefinition(slot.prefix);
-  const prefixedHp = Math.max(1, Math.floor(template.hp * (prefixDefinition?.statMultipliers.hp ?? 1)));
-  const eventModifiedHp = Math.max(1, Math.round(prefixedHp * Math.max(0.1, mobHpMultiplier)));
-  const hp = scaleEncounterRoleHp(eventModifiedHp, slot.role);
-
-  return {
-    slot: slot.slot,
-    name: template.name,
-    prefix: slot.prefix,
-    role: slot.role,
-    hp,
-    maxHp: hp,
-  };
-}
 
 async function mapChestRewardDTO(completionRewards: Awaited<ReturnType<typeof autoResolveEncounterRoom>>['completionRewards']) {
   if (!completionRewards) return undefined;

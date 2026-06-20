@@ -1,6 +1,10 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { assignEncounterRolesToRooms, generateRoomAssignments, rollMobPrefix } from '@pocketrealm/game-engine';
-import { normalizeEncounterMobRole, type EncounterMobRole } from '@pocketrealm/shared';
+import {
+  isMiniBossFamilyRole,
+  isPermanentEncounterFamilyRole,
+  type EncounterMobRole,
+} from '@pocketrealm/shared';
 import { teleportPlayer } from '../zoneService';
 import { adminAudit } from './adminAuditService';
 
@@ -10,14 +14,6 @@ type AdminEncounterFamilyMember = {
     id: string;
   };
 };
-
-function isPermanentEncounterFamilyRole(role: string): boolean {
-  return normalizeEncounterMobRole(role) !== null;
-}
-
-function isMiniBossFamilyRole(role: string): boolean {
-  return normalizeEncounterMobRole(role) === 'mini_boss';
-}
 
 function pickAdminEncounterFamilyMember<TMember extends AdminEncounterFamilyMember>(
   members: readonly TMember[],

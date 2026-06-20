@@ -1,5 +1,6 @@
 import {
   ENCOUNTER_SITE_ROLE_CONSTANTS,
+  getMobPrefixDefinition,
   type BossTemplateAction,
   type DamageType,
   type EncounterMobRole,
@@ -90,58 +91,85 @@ function inferFamilyTheme(
   damageType: DamageType,
 ): FamilyTheme {
   const text = `${familyName ?? ''} ${mobName}`.toLowerCase();
-  if (text.includes('spider') || text.includes('web') || text.includes('venom')) return 'spider';
-  if (text.includes('wolf') || text.includes('warg') || text.includes('coyote')) return 'wolf';
-  if (text.includes('bandit') || text.includes('goblin')) return 'bandit';
-  if (text.includes('treant') || text.includes('golem') || text.includes('bark')) return 'treant';
-  if (text.includes('spirit') || text.includes('fae') || text.includes('wisp') || text.includes('witch')) return 'spirit';
-  if (text.includes('undead') || text.includes('skeleton') || text.includes('wraith') || text.includes('lich')) return 'undead';
+  for (const [theme, keywords] of Object.entries(ENCOUNTER_SITE_ROLE_CONSTANTS.FAMILY_THEME_KEYWORDS)) {
+    if (keywords.some((keyword) => text.includes(keyword))) {
+      return theme as FamilyTheme;
+    }
+  }
   if (damageType === 'magic') return 'caster';
   return 'default';
 }
 
+function themedSpecial(
+  theme: FamilyTheme,
+): { elite: BossTemplateAction; mini_boss: BossTemplateAction } | undefined {
+  const map = ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_SPECIAL_ACTIONS;
+  return theme in map ? map[theme as keyof typeof map] : undefined;
+}
+
+function resolveDamageTypeSpecial(damageType: DamageType): BossTemplateAction {
+  return damageType === 'magic'
+    ? { actionId: 'boss_weaken', targetMode: 'aoe' }
+    : { actionId: 'boss_enrage', targetMode: 'single_target' };
+}
+
 function resolveEliteSpecial(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
-  switch (theme) {
-    case 'spider':
-      return { actionId: 'boss_poison_spray', targetMode: 'aoe' };
-    case 'wolf':
-      return { actionId: 'boss_frenzy', targetMode: 'single_target' };
-    case 'bandit':
-      return { actionId: 'boss_smoke_bomb', targetMode: 'aoe' };
-    case 'treant':
-      return { actionId: 'boss_root', targetMode: 'single_target' };
-    case 'spirit':
-    case 'caster':
-      return { actionId: 'boss_weaken', targetMode: 'aoe' };
-    case 'undead':
-      return { actionId: 'boss_wither', targetMode: 'single_target' };
-    case 'default':
-    default:
-      return damageType === 'magic'
-        ? { actionId: 'boss_weaken', targetMode: 'aoe' }
-        : { actionId: 'boss_enrage', targetMode: 'single_target' };
-  }
+  return themedSpecial(theme)?.elite ?? resolveDamageTypeSpecial(damageType);
 }
 
 function resolveMiniBossSpecial(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
-  switch (theme) {
-    case 'spider':
-      return { actionId: 'boss_venom_cloud', targetMode: 'aoe' };
-    case 'wolf':
-      return { actionId: 'boss_terrifying_howl', targetMode: 'aoe' };
-    case 'bandit':
-      return { actionId: 'boss_mark_for_death', targetMode: 'single_target' };
-    case 'treant':
-      return { actionId: 'boss_shield_wall', targetMode: 'single_target' };
-    case 'spirit':
-    case 'caster':
-      return { actionId: 'boss_weaken', targetMode: 'aoe' };
-    case 'undead':
-      return { actionId: 'boss_blight_cloud', targetMode: 'aoe' };
-    case 'default':
-    default:
-      return damageType === 'magic'
-        ? { actionId: 'boss_weaken', targetMode: 'aoe' }
-        : { actionId: 'boss_enrage', targetMode: 'single_target' };
+  return themedSpecial(theme)?.mini_boss ?? resolveDamageTypeSpecial(damageType);
+}
+
+type EncounterSitePreviewSlot = {
+  slot: number;
+  prefix: string | null;
+  role: EncounterMobRole;
+};
+
+type EncounterSitePreviewTemplate = {
+  name: string;
+  hp: number;
+};
+
+/**
+ * Builds the role-scaled HP preview for an encounter-site mob, applying the same
+ * prefix -> event -> role multiplier chain used when loading mobs into combat.
+ */
+export function buildEncounterSiteMobPreview(
+  slot: EncounterSitePreviewSlot,
+  template: EncounterSitePreviewTemplate | undefined,
+  mobHpMultiplier: number,
+): {
+  slot: number;
+  name: string;
+  prefix: string | null;
+  role: EncounterMobRole;
+  hp: number;
+  maxHp: number;
+} {
+  if (!template) {
+    return {
+      slot: slot.slot,
+      name: 'Unknown',
+      prefix: slot.prefix,
+      role: slot.role,
+      hp: 0,
+      maxHp: 0,
+    };
   }
+
+  const prefixDefinition = getMobPrefixDefinition(slot.prefix);
+  const prefixedHp = Math.max(1, Math.floor(template.hp * (prefixDefinition?.statMultipliers.hp ?? 1)));
+  const eventModifiedHp = Math.max(1, Math.round(prefixedHp * Math.max(0.1, mobHpMultiplier)));
+  const hp = scaleEncounterRoleHp(eventModifiedHp, slot.role);
+
+  return {
+    slot: slot.slot,
+    name: template.name,
+    prefix: slot.prefix,
+    role: slot.role,
+    hp,
+    maxHp: hp,
+  };
 }

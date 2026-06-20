@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
-  normalizeEncounterMobRole,
+  isMiniBossFamilyRole,
+  isPermanentEncounterFamilyRole,
   resolveZoneTiers,
   getHighestUnlockedTier,
   type EncounterSiteSize,
@@ -165,14 +166,6 @@ export function getSiteName(
   return `Large ${familyName} ${nouns.siteNounLarge}`;
 }
 
-function isPermanentEncounterFamilyRole(role: string): boolean {
-  return normalizeEncounterMobRole(role) !== null;
-}
-
-function isMiniBossFamilyRole(role: string): boolean {
-  return normalizeEncounterMobRole(role) === 'mini_boss';
-}
-
 function pickBaseFamilyMember(
   members: ZoneFamilyMember[],
   role: EncounterMobRole,
@@ -253,9 +246,10 @@ export function buildEncounterSiteMobs(
     });
   }
 
-  // Fallback: if no mobs were generated
-  if (mobs.length === 0 && eligibleZoneMembers.length > 0) {
-    const member = eligibleZoneMembers[0]!;
+  // Fallback: if no mobs were generated, use an encounter-eligible member
+  // (never an expedition-only member from eligibleZoneMembers).
+  if (mobs.length === 0 && eligibleEncounterMembers.length > 0) {
+    const member = eligibleEncounterMembers[0]!;
     mobs.push({
       slot: 0,
       mobTemplateId: member.mobTemplate.id,

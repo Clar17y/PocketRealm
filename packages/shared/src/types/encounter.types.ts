@@ -35,6 +35,16 @@ export function normalizeEncounterMobRole(value: unknown): EncounterMobRole | nu
   return null;
 }
 
+/** True if a family-member role maps to a permanent encounter-site role (trash/elite/mini_boss). */
+export function isPermanentEncounterFamilyRole(role: string): boolean {
+  return normalizeEncounterMobRole(role) !== null;
+}
+
+/** True if a family-member role is a mini-boss (or legacy 'boss'). */
+export function isMiniBossFamilyRole(role: string): boolean {
+  return normalizeEncounterMobRole(role) === 'mini_boss';
+}
+
 export interface EncounterMobSlot {
   slot: number;
   mobTemplateId: string;
