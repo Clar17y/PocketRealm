@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DockedActionBar } from './DockedActionBar';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  document.documentElement.style.removeProperty('--rpg-docked-bar-height');
+});
 
 describe('DockedActionBar', () => {
   it('portals its children onto document.body, not the React root container', () => {
@@ -13,9 +16,7 @@ describe('DockedActionBar', () => {
       </DockedActionBar>,
     );
 
-    // Portaled out of the local render container...
     expect(container.querySelector('button')).toBeNull();
-    // ...but present in the document, attached under <body>.
     const btn = screen.getByRole('button', { name: 'Craft' });
     expect(document.body.contains(btn)).toBe(true);
   });
@@ -43,5 +44,29 @@ describe('DockedActionBar', () => {
     const inner = screen.getByText('Inner').parentElement as HTMLElement;
     expect(inner.className).toContain('custom-pad');
     expect(inner.className).toContain('max-w-lg');
+  });
+
+  it('publishes its measured height to --rpg-docked-bar-height while mounted', () => {
+    const heightSpy = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(120);
+
+    const { unmount } = render(
+      <DockedActionBar>
+        <span>X</span>
+      </DockedActionBar>,
+    );
+
+    expect(
+      document.documentElement.style.getPropertyValue('--rpg-docked-bar-height'),
+    ).toBe('120px');
+
+    unmount();
+
+    expect(
+      document.documentElement.style.getPropertyValue('--rpg-docked-bar-height'),
+    ).toBe('0px');
+
+    heightSpy.mockRestore();
   });
 });

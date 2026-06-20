@@ -104,7 +104,7 @@ export function ChatPanel({
     return (
       <button
         onClick={toggleChat}
-        className="fixed bottom-[calc(var(--rpg-bottom-nav-offset)_+_0.75rem)] right-4 z-30 flex items-center justify-center w-12 h-12 rounded-full bg-[var(--rpg-surface)] border border-[var(--rpg-border)] shadow-lg hover:border-[var(--rpg-gold)] transition-colors"
+        className="fixed bottom-[calc(var(--rpg-bottom-nav-offset)_+_var(--rpg-docked-bar-height,_0px)_+_0.75rem)] right-4 z-30 flex items-center justify-center w-12 h-12 rounded-full bg-[var(--rpg-surface)] border border-[var(--rpg-border)] shadow-lg hover:border-[var(--rpg-gold)] transition-colors"
         aria-label="Open chat"
       >
         <MessageCircle size={20} className="text-[var(--rpg-gold)]" />
@@ -119,8 +119,8 @@ export function ChatPanel({
 
   // Expanded: chat panel
   return (
-    <div className="fixed bottom-[var(--rpg-bottom-nav-offset)] left-0 right-0 z-30 flex justify-center pointer-events-none">
-      <div className="w-full max-w-lg mx-4 pointer-events-auto flex flex-col bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-t-lg shadow-xl" style={{ maxHeight: 'min(55vh, calc(100dvh - var(--rpg-bottom-nav-offset) - 5rem))' }}>
+    <div className="fixed bottom-[calc(var(--rpg-bottom-nav-offset)_+_var(--rpg-docked-bar-height,_0px))] left-0 right-0 z-30 flex justify-center pointer-events-none">
+      <div className="w-full max-w-lg mx-4 pointer-events-auto flex flex-col bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-t-lg shadow-xl" style={{ maxHeight: 'min(55vh, calc(100dvh - var(--rpg-bottom-nav-offset) - var(--rpg-docked-bar-height, 0px) - 5rem))' }}>
         {/* Header with tabs */}
         <div className="flex items-center border-b border-[var(--rpg-border)] px-2 py-1.5 shrink-0">
           <div role="tablist" aria-label="Chat channels" className="flex items-center">
