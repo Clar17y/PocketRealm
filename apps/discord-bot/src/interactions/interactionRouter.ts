@@ -21,6 +21,7 @@ import {
   isReportModalCustomId,
 } from './reportCommand.js';
 import { handleStaffCommand } from './staffCommands.js';
+import { handleItemCommand, handleMobCommand } from './lookupCommand.js';
 import { handleWikiCommand } from './wikiCommand.js';
 
 export interface InteractionRouterOptions {
@@ -90,6 +91,16 @@ export async function routeInteraction(
 
   if (interaction.commandName === 'wiki') {
     await handleWikiCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'item') {
+    await handleItemCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'mob') {
+    await handleMobCommand(interaction, options.api, options.config);
     return;
   }
 

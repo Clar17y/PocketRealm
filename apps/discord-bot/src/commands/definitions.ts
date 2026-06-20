@@ -16,6 +16,24 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
           .setRequired(true),
       ),
     new SlashCommandBuilder()
+      .setName('item')
+      .setDescription('Look up a Pocketrealm item.')
+      .addStringOption((option) =>
+        option
+          .setName('query')
+          .setDescription('Item name to look up.')
+          .setRequired(true),
+      ),
+    new SlashCommandBuilder()
+      .setName('mob')
+      .setDescription('Look up a Pocketrealm creature.')
+      .addStringOption((option) =>
+        option
+          .setName('query')
+          .setDescription('Creature name to look up.')
+          .setRequired(true),
+      ),
+    new SlashCommandBuilder()
       .setName('profile')
       .setDescription('View a Pocketrealm player profile.')
       .addUserOption((option) =>
