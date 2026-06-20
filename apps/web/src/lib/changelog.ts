@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.69',
+    date: '2026-06-20',
+    title: 'Discord Item & Mob Lookups',
+    summary:
+      'The Pocketrealm Discord now has public /item and /mob lookup commands for quick game-reference cards. Use /item with an item name to see its type, slot, stats, requirements, drops, and crafting source information. Use /mob with a monster name to see where it appears, what it drops, and its flavour text without revealing combat stats. Both commands support fuzzy matching and seasonal labels, so close searches and seasonal content are easier to understand.',
+  },
+  {
     version: '0.68',
     date: '2026-06-19',
     title: 'Discord Message Polish',
