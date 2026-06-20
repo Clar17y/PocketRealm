@@ -1,16 +1,27 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { getMobPrefixDefinition, COMBAT_CONSTANTS, type EncounterMobRole } from '@pocketrealm/shared';
+import {
+  getMobPrefixDefinition,
+  COMBAT_CONSTANTS,
+  formatEncounterMobDisplayName,
+  type EncounterMobRole,
+} from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination, serializeXpGrant } from '../../utils/routeHelpers.js';
-import { getActiveZoneModifiers, getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
+import {
+  computeZoneModifiers,
+  filterEventModifiers,
+  getActiveEventsForZone,
+  getActiveWorldWideEvents,
+  type EventModifierBadge,
+} from '../../services/worldEventService';
 import {
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
 } from '../../services/combat/helpers';
-import { applyEncounterRoleModifiers } from '../../services/encounterSiteMobRoleService';
+import { scaleEncounterRoleHp } from '../../services/encounterSiteMobRoleService';
 import {
   autoResolveEncounterRoom,
   startManualEncounterRoom,
@@ -41,18 +52,6 @@ type EncounterSitePreviewTemplate = {
   hp: number;
 };
 
-export function buildEncounterSiteMobDisplayName(mob: {
-  name: string;
-  prefix: string | null;
-  role?: EncounterMobRole | null;
-}): string {
-  const prefixLabel = mob.prefix ? getPrefixDisplayName(mob.prefix) : null;
-  const baseName = prefixLabel ? stripLeadingPrefix(mob.name, prefixLabel) : mob.name;
-  const roleLabel = mob.role && mob.role !== 'trash' ? roleLabelFor(mob.role) : null;
-
-  return [prefixLabel, roleLabel, baseName].filter(Boolean).join(' ');
-}
-
 export function buildEncounterSiteMobPreview(
   slot: EncounterSitePreviewSlot,
   template: EncounterSitePreviewTemplate | undefined,
@@ -79,47 +78,16 @@ export function buildEncounterSiteMobPreview(
   const prefixDefinition = getMobPrefixDefinition(slot.prefix);
   const prefixedHp = Math.max(1, Math.floor(template.hp * (prefixDefinition?.statMultipliers.hp ?? 1)));
   const eventModifiedHp = Math.max(1, Math.round(prefixedHp * Math.max(0.1, mobHpMultiplier)));
-  const roleModified = applyEncounterRoleModifiers({
-    hp: eventModifiedHp,
-    accuracy: 0,
-    defence: 0,
-    magicDefence: 0,
-    evasion: 0,
-    damageMin: 1,
-    damageMax: 1,
-    xpReward: 1,
-  }, slot.role);
+  const hp = scaleEncounterRoleHp(eventModifiedHp, slot.role);
 
   return {
     slot: slot.slot,
     name: template.name,
     prefix: slot.prefix,
     role: slot.role,
-    hp: roleModified.hp,
-    maxHp: roleModified.hp,
+    hp,
+    maxHp: hp,
   };
-}
-
-function getPrefixDisplayName(prefix: string): string {
-  return getMobPrefixDefinition(prefix)?.displayName ?? capitalize(prefix);
-}
-
-function roleLabelFor(role: EncounterMobRole): string | null {
-  if (role === 'elite') return 'Elite';
-  if (role === 'mini_boss') return 'Mini-Boss';
-  return null;
-}
-
-function stripLeadingPrefix(name: string, prefixLabel: string): string {
-  const leadingPrefix = `${prefixLabel} `;
-  if (name.toLowerCase().startsWith(leadingPrefix.toLowerCase())) {
-    return name.slice(leadingPrefix.length);
-  }
-  return name;
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 async function mapChestRewardDTO(completionRewards: Awaited<ReturnType<typeof autoResolveEncounterRoom>>['completionRewards']) {
@@ -200,7 +168,7 @@ export function registerSiteRoutes(router: Router): void {
         currentRoom: number;
         totalRooms: number;
         roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; role: 'trash' | 'elite' | 'mini_boss'; prefix: string | null; status: string }>;
+        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; role: EncounterMobRole; prefix: string | null; status: string }>;
       }> = [];
 
       for (const site of sites) {
@@ -289,13 +257,25 @@ export function registerSiteRoutes(router: Router): void {
         .sort((a, b) => a.name.localeCompare(b.name));
 
       const modifierCache = new Map<string, { badges: EventModifierBadge[]; mobHpMultiplier: number }>();
-      for (const site of pageItems) {
-        const key = `${site.zoneId}:${site.mobFamilyId}`;
-        if (!modifierCache.has(key)) {
-          const [badges, modifiers] = await Promise.all([
-            getEventModifiersForEntity(site.zoneId, { mobFamilyId: site.mobFamilyId }),
-            getActiveZoneModifiers(site.zoneId, { mobFamilyId: site.mobFamilyId }),
-          ]);
+      if (pageItems.length > 0) {
+        const uniqueZoneIds = [...new Set(pageItems.map((site) => site.zoneId))];
+        const [worldEvents, zoneEventEntries] = await Promise.all([
+          getActiveWorldWideEvents(),
+          Promise.all(uniqueZoneIds.map(async (zoneId) => [
+            zoneId,
+            await getActiveEventsForZone(zoneId),
+          ] as const)),
+        ]);
+        const zoneEventsById = new Map(zoneEventEntries);
+
+        for (const site of pageItems) {
+          const key = `${site.zoneId}:${site.mobFamilyId}`;
+          if (modifierCache.has(key)) continue;
+
+          const zoneEvents = zoneEventsById.get(site.zoneId) ?? [];
+          const context = { mobFamilyId: site.mobFamilyId };
+          const badges = filterEventModifiers(zoneEvents, worldEvents, context);
+          const modifiers = computeZoneModifiers(zoneEvents, worldEvents, context);
           modifierCache.set(key, { badges, mobHpMultiplier: modifiers.mobHpMultiplier });
         }
       }
@@ -304,7 +284,7 @@ export function registerSiteRoutes(router: Router): void {
         encounterSites: pageItems.map((site) => {
           const nextMobName = site.nextMobTemplateId ? nextMobNameById.get(site.nextMobTemplateId) ?? null : null;
           const nextMobDisplayName = nextMobName
-            ? buildEncounterSiteMobDisplayName({
+            ? formatEncounterMobDisplayName({
                 name: nextMobName,
                 prefix: site.nextMobPrefix,
                 role: site.nextMobRole,

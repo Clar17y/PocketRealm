@@ -21,7 +21,7 @@ import type {
   EncounterFleeResult,
 } from '@/lib/api/combat';
 import { parseEncounterMobSlot } from '@pocketrealm/shared';
-import type { ExpeditionMobInfo, ExpeditionRoundLog, CombatTemplateData } from '@pocketrealm/shared';
+import type { EncounterMobRole, ExpeditionMobInfo, ExpeditionRoundLog, CombatTemplateData } from '@pocketrealm/shared';
 
 type CombatState = 'room_preview' | 'auto_playback' | 'manual_combat' | 'room_result';
 
@@ -72,7 +72,14 @@ function updateMobsFromSnapshot(
 }
 
 function startRoomMobsToExpeditionMobs(
-  mobs: EncounterStartRoomResponse['mobs'],
+  mobs: ReadonlyArray<{
+    mobId: string;
+    name: string;
+    prefix: string | null;
+    role: EncounterMobRole;
+    hp: number;
+    maxHp: number;
+  }>,
 ): ExpeditionMobInfo[] {
   return mobs.map(m => ({
     id: m.mobId,
@@ -151,15 +158,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
 
       // Seed mob list from auto-resolve response (mobs weren't loaded in preview)
       if (result.initialMobs) {
-        setMobs(result.initialMobs.map(m => ({
-          id: m.mobId,
-          name: m.name,
-          prefix: m.prefix,
-          role: m.role,
-          hp: m.hp,
-          maxHp: m.maxHp,
-          activeEffects: [],
-        })));
+        setMobs(startRoomMobsToExpeditionMobs(result.initialMobs));
       }
 
       setPlaybackRounds(result.rounds);

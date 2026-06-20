@@ -27,6 +27,7 @@ import {
   buildPlayerCombatStats,
   initThreatTable,
   applyMobPrefix,
+  applyMobEventModifiers,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
@@ -441,37 +442,37 @@ export async function loadRoomMobsAsRaidState(
   roomMobs: EncounterMobSlot[],
   zoneId: string,
   mobFamilyId: string,
+  mobFamilyName: string | null = null,
 ): Promise<{ mobs: ExpeditionMobState[]; mobXpByEncounterMobId: Record<string, number> }> {
   const mobTemplateIds = [...new Set(roomMobs.map(m => m.mobTemplateId))];
-  const mobTemplateRows = await prisma.mobTemplate.findMany({
-    where: { id: { in: mobTemplateIds } },
-    select: {
-      id: true,
-      name: true,
-      zoneId: true,
-      level: true,
-      hp: true,
-      accuracy: true,
-      defence: true,
-      magicDefence: true,
-      evasion: true,
-      damageMin: true,
-      damageMax: true,
-      damageType: true,
-      xpReward: true,
-      encounterWeight: true,
-      spellPattern: true,
-    },
-  });
-  const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, toEncounterMobTemplate(t)]));
 
   const mobXpByEncounterMobId: Record<string, number> = {};
 
-  const [family, cachedZoneEvents, cachedWorldEvents] = await Promise.all([
-    prisma.mobFamily.findUnique({ where: { id: mobFamilyId }, select: { name: true } }),
+  const [mobTemplateRows, cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    prisma.mobTemplate.findMany({
+      where: { id: { in: mobTemplateIds } },
+      select: {
+        id: true,
+        name: true,
+        zoneId: true,
+        level: true,
+        hp: true,
+        accuracy: true,
+        defence: true,
+        magicDefence: true,
+        evasion: true,
+        damageMin: true,
+        damageMax: true,
+        damageType: true,
+        xpReward: true,
+        encounterWeight: true,
+        spellPattern: true,
+      },
+    }),
     getActiveEventsForZone(zoneId),
     getActiveWorldWideEvents(),
   ]);
+  const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, toEncounterMobTemplate(t)]));
   const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId });
 
   const expeditionMobs: ExpeditionMobState[] = [];
@@ -479,22 +480,14 @@ export async function loadRoomMobsAsRaidState(
     const template = mobTemplateById.get(slot.mobTemplateId);
     if (!template) continue;
     const prefixedTemplate = applyMobPrefix(template, slot.prefix);
-    const damageMultiplier = Math.max(0.1, zoneModifiers.mobDamageMultiplier);
-    const damageMin = Math.max(1, Math.round(prefixedTemplate.damageMin * damageMultiplier));
-    const damageMax = Math.max(damageMin, Math.round(prefixedTemplate.damageMax * damageMultiplier));
-    const zoneModifiedTemplate = {
-      ...prefixedTemplate,
-      hp: Math.max(1, Math.round(prefixedTemplate.hp * Math.max(0.1, zoneModifiers.mobHpMultiplier))),
-      damageMin,
-      damageMax,
-    };
+    const zoneModifiedTemplate = applyMobEventModifiers(prefixedTemplate, zoneModifiers);
     const roleModifiedTemplate = applyEncounterRoleModifiers(zoneModifiedTemplate, slot.role);
     const modifiedTemplate = {
       ...roleModifiedTemplate,
       actionTemplate: resolveEncounterRoleActionTemplate({
         role: slot.role,
         damageType: roleModifiedTemplate.damageType,
-        familyName: family?.name ?? null,
+        familyName: mobFamilyName,
         mobName: roleModifiedTemplate.name,
       }),
     };

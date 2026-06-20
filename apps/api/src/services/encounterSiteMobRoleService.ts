@@ -21,6 +21,10 @@ type FamilyTheme =
   | 'caster'
   | 'default';
 
+export function scaleEncounterRoleHp(hp: number, role: EncounterMobRole): number {
+  return scale(hp, ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_STAT_MULTIPLIERS[role].hp, 1);
+}
+
 export function applyEncounterRoleModifiers<TMob extends EncounterRoleTemplate>(
   mob: TMob,
   role: EncounterMobRole,
@@ -31,7 +35,7 @@ export function applyEncounterRoleModifiers<TMob extends EncounterRoleTemplate>(
 
   return {
     ...mob,
-    hp: scale(mob.hp, multipliers.hp, 1),
+    hp: scaleEncounterRoleHp(mob.hp, role),
     accuracy: scale(mob.accuracy, multipliers.accuracy, 0),
     defence: scale(mob.defence, multipliers.defence, 0),
     magicDefence: scale(mob.magicDefence, multipliers.magicDefence, 0),

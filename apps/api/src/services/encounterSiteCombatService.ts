@@ -164,7 +164,12 @@ export async function autoResolveEncounterRoom(
   const { currentRoom, roomMobs } = advanceResult;
 
   // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
-  const { mobs: expeditionMobs, mobXpByEncounterMobId } = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
+  const { mobs: expeditionMobs, mobXpByEncounterMobId } = await loadRoomMobsAsRaidState(
+    roomMobs,
+    site.zoneId,
+    site.mobFamilyId,
+    site.mobFamily.name,
+  );
   if (expeditionMobs.length === 0) {
     throw new AppError(410, 'No valid mobs in encounter room', 'SITE_DECAYED');
   }

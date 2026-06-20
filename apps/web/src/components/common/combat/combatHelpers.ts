@@ -1,4 +1,4 @@
-import { getMobPrefixDefinition } from '@pocketrealm/shared';
+import { formatEncounterMobDisplayName } from '@pocketrealm/shared';
 import type { BossActiveEffect, EncounterMobRole, ExpeditionRoomType } from '@pocketrealm/shared';
 import { formatCombatEffectDescription, formatRounds } from '@pocketrealm/shared/constants/combatEffectNames';
 
@@ -30,29 +30,7 @@ export function encounterMobDisplayName(mob: {
   prefix: string | null;
   role?: EncounterMobRole | null;
 }): string {
-  const prefixLabel = mob.prefix ? getPrefixDisplayName(mob.prefix) : null;
-  const baseName = prefixLabel ? stripLeadingPrefix(mob.name, prefixLabel) : mob.name;
-  const roleLabel = mob.role && mob.role !== 'trash'
-    ? encounterMobRoleBadge(mob.role).label
-    : null;
-
-  return [prefixLabel, roleLabel, baseName].filter(Boolean).join(' ');
-}
-
-function getPrefixDisplayName(prefix: string): string {
-  return getMobPrefixDefinition(prefix)?.displayName ?? capitalize(prefix);
-}
-
-function stripLeadingPrefix(name: string, prefixLabel: string): string {
-  const leadingPrefix = `${prefixLabel} `;
-  if (name.toLowerCase().startsWith(leadingPrefix.toLowerCase())) {
-    return name.slice(leadingPrefix.length);
-  }
-  return name;
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  return formatEncounterMobDisplayName(mob);
 }
 
 export function isEffectDebuff(effect: BossActiveEffect): boolean {

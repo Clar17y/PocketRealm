@@ -177,10 +177,9 @@ function pickBaseFamilyMember(
   members: ZoneFamilyMember[],
   role: EncounterMobRole,
 ): ZoneFamilyMember | null {
-  const permanentMembers = members.filter((member) => isPermanentEncounterFamilyRole(member.role));
-  const nonMiniBossMembers = permanentMembers.filter((member) => !isMiniBossFamilyRole(member.role));
+  const nonMiniBossMembers = members.filter((member) => !isMiniBossFamilyRole(member.role));
   const pool = role === 'mini_boss'
-    ? (permanentMembers.length > 0 ? permanentMembers : members)
+    ? members
     : (nonMiniBossMembers.length > 0 ? nonMiniBossMembers : members);
 
   if (pool.length === 0) return null;
