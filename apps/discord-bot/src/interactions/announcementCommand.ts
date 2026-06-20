@@ -1,10 +1,12 @@
-import type { ChatInputCommandInteraction, MessageMentionOptions } from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
 
 import type { BotConfig } from '../config.js';
+import {
+  AnnouncementCardValidationError,
+  buildAnnouncementCard,
+} from '../discord/announcementCard.js';
+import type { V2CardPayload } from '../discord/v2Card.js';
 import { isStaffMember } from '../support/threadActions.js';
-
-const massMentionPattern = /@(everyone|here)\b/g;
-const neutralizedMentionPrefix = '@\u200B';
 
 type AnnouncementConfig = Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds'>;
 
@@ -12,14 +14,9 @@ interface AnnouncementCommandOptions {
   config: AnnouncementConfig;
 }
 
-interface AnnouncementPayload {
-  content: string;
-  allowedMentions: MessageMentionOptions;
-}
-
 interface SendableAnnouncementChannel {
   isSendable(): boolean;
-  send(payload: AnnouncementPayload): Promise<unknown>;
+  send(payload: V2CardPayload): Promise<unknown>;
 }
 
 export async function handleAnnouncementCommand(
@@ -60,6 +57,22 @@ export async function handleAnnouncementCommand(
     return;
   }
 
+  const everyone = interaction.options.getBoolean('everyone') ?? false;
+  let announcementPayload: V2CardPayload;
+  try {
+    announcementPayload = buildAnnouncementCard({ message, everyone });
+  } catch (error) {
+    if (error instanceof AnnouncementCardValidationError) {
+      await interaction.reply({
+        ephemeral: true,
+        content: error.message,
+      });
+      return;
+    }
+
+    throw error;
+  }
+
   await interaction.deferReply({ ephemeral: true });
 
   const channel = await interaction.client.channels
@@ -73,10 +86,8 @@ export async function handleAnnouncementCommand(
     return;
   }
 
-  const everyone = interaction.options.getBoolean('everyone') ?? false;
-
   try {
-    await channel.send(buildAnnouncementPayload(message, everyone));
+    await channel.send(announcementPayload);
   } catch {
     await interaction.editReply({
       content: 'Could not send the announcement right now. Check bot logs and channel permissions.',
@@ -87,20 +98,6 @@ export async function handleAnnouncementCommand(
   await interaction.editReply({
     content: `Announcement posted to <#${options.config.announcementChannelId}>.`,
   });
-}
-
-function buildAnnouncementPayload(message: string, everyone: boolean): AnnouncementPayload {
-  const allowedMentions: MessageMentionOptions = everyone ? { parse: ['everyone'] } : { parse: [] };
-  const body = everyone ? neutralizeMassMentions(message) : message;
-
-  return {
-    content: everyone ? `@everyone\n\n${body}` : body,
-    allowedMentions,
-  };
-}
-
-function neutralizeMassMentions(message: string): string {
-  return message.replace(massMentionPattern, `${neutralizedMentionPrefix}$1`);
 }
 
 function isSendableAnnouncementChannel(channel: unknown): channel is SendableAnnouncementChannel {
