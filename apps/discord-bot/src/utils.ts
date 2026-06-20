@@ -51,3 +51,10 @@ export function readString(record: Record<string, unknown>, key: string): string
   const value = record[key];
   return typeof value === 'string' && value.trim() ? value : null;
 }
+
+/** Neutralize mentions and escape Discord markdown control characters for safe display. */
+export function escapeDiscordText(value: string): string {
+  return value
+    .replace(/@/g, '@​')
+    .replace(/([\\`*_{}\[\]()#+.!|><~-])/g, '\\$1');
+}
