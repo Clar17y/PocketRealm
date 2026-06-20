@@ -6,6 +6,7 @@ import { parseDuelButtonId, parseNotifyButtonId, parseSupportButtonId } from '..
 import { statusCard } from '../discord/v2Card.js';
 import { getRankCategoryAutocompleteChoices } from '../rankCategories.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
+import { handleAnnouncementCommand } from './announcementCommand.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { handleLinkCommand } from './linkCommand.js';
 import { handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
@@ -36,6 +37,7 @@ export interface InteractionRouterOptions {
     | 'supportTriageChannelId'
     | 'levelRoleMap'
     | 'duelsChannelId'
+    | 'announcementChannelId'
     | 'emojiMap'
   >;
 }
@@ -126,6 +128,11 @@ export async function routeInteraction(
 
   if (interaction.commandName === 'report') {
     await handleReportCommand(interaction, options.api, options.config);
+    return;
+  }
+
+  if (interaction.commandName === 'announcement') {
+    await handleAnnouncementCommand(interaction, { config: options.config });
     return;
   }
 
