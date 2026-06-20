@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
+import { handleAnnouncementCommand } from './announcementCommand.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { routeInteraction } from './interactionRouter.js';
 import { handleLinkCommand } from './linkCommand.js';
@@ -13,6 +14,10 @@ import { handleStaffCommand } from './staffCommands.js';
 
 vi.mock('../support/threadActions.js', () => ({
   handleSupportThreadAction: vi.fn(),
+}));
+
+vi.mock('./announcementCommand.js', () => ({
+  handleAnnouncementCommand: vi.fn(),
 }));
 
 vi.mock('./duelCommand.js', () => ({
@@ -48,6 +53,7 @@ const routerConfig = {
   supportTriageChannelId: 'support-triage-channel-1',
   supportStaffRoleIds: ['staff-role-1'],
   levelRoleMap: new Map<number, string>(),
+  announcementChannelId: 'announcement-channel-1',
   emojiMap: { success: '<:pr_success:123456789012345678>' },
 };
 
@@ -218,6 +224,27 @@ describe('routeInteraction', () => {
     await routeInteraction(interaction, { api, config: routerConfig });
 
     expect(handleReportCommand).toHaveBeenCalledWith(interaction, api, routerConfig);
+  });
+
+  it('routes announcement commands to the announcement handler', async () => {
+    const reply = vi.fn<ChatInputCommandInteraction['reply']>();
+    const interaction = {
+      isChatInputCommand: () => true,
+      isRepliable: () => true,
+      commandName: 'announcement',
+      replied: false,
+      deferred: false,
+      reply,
+    } as unknown as Interaction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleAnnouncementCommand).toHaveBeenCalledTimes(1);
+    expect(handleAnnouncementCommand).toHaveBeenCalledWith(interaction, {
+      config: routerConfig,
+    });
+    expect(reply).not.toHaveBeenCalled();
   });
 
   it('routes staff commands to the staff handler', async () => {

@@ -11,6 +11,7 @@ const validEnv = {
   REDIS_URL: 'redis://localhost:6379',
   DISCORD_INTERNAL_API_KEY: 'a'.repeat(32),
   DISCORD_BOT_HEALTH_CHANNEL_ID: '345678901234567890',
+  DISCORD_ANNOUNCEMENT_CHANNEL_ID: '445566778899001122',
   DISCORD_SUPPORT_TRIAGE_CHANNEL_ID: '456789012345678901',
   DISCORD_SUPPORT_CATEGORY_ID: '567890123456789012',
   DISCORD_DUELS_CHANNEL_ID: '678901234567890123',
@@ -34,6 +35,7 @@ describe('parseBotConfig', () => {
       redisUrl: 'redis://localhost:6379',
       internalApiKey: 'a'.repeat(32),
       botHealthChannelId: '345678901234567890',
+      announcementChannelId: '445566778899001122',
       welcomeChannelId: null,
       duelsChannelId: '678901234567890123',
     });
@@ -75,6 +77,7 @@ describe('parseBotConfig', () => {
 
   it('rejects invalid snowflake ids and short internal API keys', () => {
     expect(() => parseBotConfig({ ...validEnv, DISCORD_CLIENT_ID: 'not-a-snowflake' })).toThrow();
+    expect(() => parseBotConfig({ ...validEnv, DISCORD_ANNOUNCEMENT_CHANNEL_ID: 'not-a-snowflake' })).toThrow();
     expect(() => parseBotConfig({ ...validEnv, DISCORD_INTERNAL_API_KEY: 'too-short' })).toThrow();
   });
 

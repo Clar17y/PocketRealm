@@ -18,9 +18,10 @@ describe('buildCommandDefinitions', () => {
       'duel',
       'report',
       'notify',
+      'announcement',
       'staff',
     ]);
-    expect(commands).toHaveLength(10);
+    expect(commands).toHaveLength(11);
   });
 
   it('builds public command options with the expected schema', () => {
@@ -52,6 +53,28 @@ describe('buildCommandDefinitions', () => {
         name: 'opponent',
         type: ApplicationCommandOptionType.User,
         required: true,
+      }),
+    ]);
+  });
+
+  it('builds the announcement command with staff permissions and mention toggle', () => {
+    const commands = buildCommandDefinitions();
+    const announcementCommand = commands.find((command) => command.name === 'announcement');
+
+    expect(announcementCommand?.description).toBe('Post a Pocketrealm announcement.');
+    expect(announcementCommand?.default_member_permissions).toBe(String(PermissionFlagsBits.ManageGuild));
+    expect(announcementCommand?.options).toEqual([
+      expect.objectContaining({
+        name: 'message',
+        description: 'Announcement message to post.',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      }),
+      expect.objectContaining({
+        name: 'everyone',
+        description: 'Notify everyone in the announcement channel.',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
       }),
     ]);
   });
