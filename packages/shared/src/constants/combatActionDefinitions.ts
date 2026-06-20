@@ -159,6 +159,7 @@ const powerStrike: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.POWER_STRIKE_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 1.3,
   accuracyModifier: 0,
 };
@@ -171,6 +172,7 @@ const cleave: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.CLEAVE_STAMINA, mana: 0 },
+  targetMode: 'aoe',
   damageMultiplier: 0.8,
   accuracyModifier: 0,
 };
@@ -194,6 +196,7 @@ const devastatingBlow: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.DEVASTATING_BLOW_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 2.0,
   accuracyModifier: 0,
   isChanneling: true,
@@ -218,6 +221,7 @@ const execute: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.EXECUTE_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 2.5,
   accuracyModifier: 0,
 };
@@ -230,6 +234,7 @@ const titansWrath: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.TITANS_WRATH_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 2.5,
   accuracyModifier: 0,
   isChanneling: true,
@@ -245,6 +250,7 @@ const aimedShot: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.AIMED_SHOT_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 1.3,
   accuracyModifier: 5,
 };
@@ -257,6 +263,7 @@ const cripplingShot: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.CRIPPLING_SHOT_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 0.8,
   accuracyModifier: 0,
   effect: { name: 'Pinned', stat: 'pinned', modifier: 0, duration: 1, isDebuff: true },
@@ -281,6 +288,7 @@ const volley: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.VOLLEY_STAMINA, mana: 0 },
+  targetMode: 'aoe',
   damageMultiplier: 0.9,
   accuracyModifier: 0,
   effect: {
@@ -312,6 +320,7 @@ const piercingShot: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.PIERCING_SHOT_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 1.8,
   accuracyModifier: 0,
   defenceReduction: 50,
@@ -325,6 +334,7 @@ const deathMark: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.DEATH_MARK_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 2.5,
   accuracyModifier: 0,
   effect: { name: 'Death Mark', stat: 'defence', modifier: -40, duration: 4, isDebuff: true, damagePerRound: 5 },
@@ -340,6 +350,7 @@ const fireBolt: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.FIRE_BOLT_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 1.2,
   damageType: 'magic',
 };
@@ -364,6 +375,7 @@ const frostNova: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.FROST_NOVA_MANA },
+  targetMode: 'aoe',
   damageMultiplier: 0.7,
   damageType: 'magic',
   effect: { name: 'Frozen', stat: 'evasion', modifier: -15, duration: 2, isDebuff: true, alwaysApplies: true },
@@ -400,6 +412,7 @@ const arcaneBlast: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.ARCANE_BLAST_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 2.0,
   damageType: 'magic',
   effect: { name: 'Arcane Burn', stat: 'magicDefence', modifier: -15, duration: 3, isDebuff: true },
@@ -424,6 +437,7 @@ const meteorStrike: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.METEOR_STRIKE_MANA },
+  targetMode: 'aoe',
   damageMultiplier: 1.3,
   damageType: 'magic',
   isChanneling: true,
@@ -440,6 +454,7 @@ const flameSword: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.FLAME_SWORD_STAMINA, mana: COMBAT_ACTION_CONSTANTS.FLAME_SWORD_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 1.2,
   damageType: 'magic',
   effect: {
@@ -462,6 +477,7 @@ const venomousStrike: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.VENOMOUS_STRIKE_STAMINA, mana: COMBAT_ACTION_CONSTANTS.VENOMOUS_STRIKE_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 0.9,
   damageType: 'physical',
   effect: {
@@ -484,6 +500,7 @@ const rendingSlash: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.RENDING_SLASH_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 1.1,
   damageType: 'physical',
   effect: {
@@ -506,6 +523,7 @@ const flameArrow: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.FLAME_ARROW_STAMINA, mana: COMBAT_ACTION_CONSTANTS.FLAME_ARROW_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 1.1,
   damageType: 'magic',
   effect: {
@@ -531,6 +549,7 @@ const barbedArrow: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.BARBED_ARROW_STAMINA, mana: 0 },
+  targetMode: 'single_target',
   damageMultiplier: 0.9,
   damageType: 'physical',
   effect: {
@@ -553,6 +572,7 @@ const shadowArrow: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.SHADOW_ARROW_STAMINA, mana: COMBAT_ACTION_CONSTANTS.SHADOW_ARROW_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 1.2,
   damageType: 'magic',
   lifeLeechPercent: 25,
@@ -568,6 +588,7 @@ const earthSpikes: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.EARTH_SPIKES_STAMINA, mana: COMBAT_ACTION_CONSTANTS.EARTH_SPIKES_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 1.3,
   damageType: 'physical',
   effect: {
@@ -587,6 +608,7 @@ const lifeDrain: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.LIFE_DRAIN_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 1.0,
   damageType: 'magic',
   lifeLeechPercent: 25,
@@ -600,6 +622,7 @@ const curse: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.CURSE_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 0.8,
   damageType: 'magic',
   effect: {
@@ -619,6 +642,7 @@ const enfeeble: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.ENFEEBLE_MANA },
+  targetMode: 'single_target',
   damageMultiplier: 0.5,
   damageType: 'magic',
   effect: {
@@ -664,6 +688,7 @@ const whirlwind: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.WHIRLWIND_STAMINA, mana: 0 },
+  targetMode: 'aoe',
   damageMultiplier: 1.0,
   accuracyModifier: 0,
 };
@@ -676,6 +701,7 @@ const scatterShot: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.SCATTER_SHOT_STAMINA, mana: 0 },
+  targetMode: 'aoe',
   damageMultiplier: 0.7,
   accuracyModifier: 0,
   effect: {
@@ -695,6 +721,7 @@ const blizzard: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.BLIZZARD_MANA },
+  targetMode: 'aoe',
   damageMultiplier: 1.0,
   damageType: 'magic',
   accuracyModifier: 0,
