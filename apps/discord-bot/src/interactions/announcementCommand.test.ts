@@ -15,7 +15,8 @@ const actorUserId = '678901234567890123';
 const config = {
   announcementChannelId,
   supportStaffRoleIds: [staffRoleId],
-} satisfies Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds'>;
+  emojiMap: {},
+} satisfies Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds' | 'emojiMap'>;
 
 describe('handleAnnouncementCommand', () => {
   it('rejects usage outside the PocketRealm Discord server', async () => {
@@ -47,6 +48,7 @@ describe('handleAnnouncementCommand', () => {
       config: {
         announcementChannelId,
         supportStaffRoleIds: [],
+        emojiMap: {},
       },
     });
 
@@ -131,6 +133,28 @@ describe('handleAnnouncementCommand', () => {
       '⚔️ Raid bosses now show threat progress.',
       '• Duel replay damage order is fixed.',
     ].join('\n'));
+  });
+
+  it('uses configured announcement emoji overrides', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      message: '# Patch Notes',
+      everyone: false,
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, {
+      config: {
+        ...config,
+        emojiMap: { announcement: '<:pr_scroll:123456789012345678>' },
+      },
+    });
+
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const payload = channel.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toBe('<:pr_scroll:123456789012345678> **Patch Notes**');
   });
 
   it('rejects oversized announcements before fetching the channel', async () => {

@@ -89,7 +89,10 @@ function parseAnnouncement(message: string): ParsedAnnouncement {
 
   let title = 'Announcement';
   const bodySourceLines = [...rawLines];
-  const firstContentHeading = headingPattern.exec(rawLines[firstContentIndex]?.trim() ?? '');
+  const firstContentLine = rawLines[firstContentIndex] ?? '';
+  const firstContentHeading = isTopLevelLine(firstContentLine)
+    ? headingPattern.exec(firstContentLine.trim())
+    : null;
 
   if (firstContentHeading?.[1] === '#') {
     title = firstContentHeading[2]?.trim() || 'Announcement';
@@ -106,13 +109,25 @@ function parseAnnouncement(message: string): ParsedAnnouncement {
 
 function normalizeBodyLines(lines: string[]): string[] {
   const normalized: string[] = [];
+  let inCodeFence = false;
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
+    if (inCodeFence || line.startsWith('```')) {
+      normalized.push(rawLine.trimEnd());
+      inCodeFence = line.startsWith('```') ? !inCodeFence : inCodeFence;
+      continue;
+    }
+
     if (!line) {
       if (normalized.length > 0 && normalized[normalized.length - 1] !== '') {
         normalized.push('');
       }
+      continue;
+    }
+
+    if (!isTopLevelLine(rawLine)) {
+      normalized.push(rawLine.trimEnd());
       continue;
     }
 
@@ -136,6 +151,10 @@ function normalizeBodyLines(lines: string[]): string[] {
   }
 
   return normalized;
+}
+
+function isTopLevelLine(line: string): boolean {
+  return line === line.trimStart();
 }
 
 function renderAnnouncementText(input: {

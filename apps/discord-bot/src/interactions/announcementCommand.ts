@@ -8,7 +8,7 @@ import {
 import type { V2CardPayload } from '../discord/v2Card.js';
 import { isStaffMember } from '../support/threadActions.js';
 
-type AnnouncementConfig = Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds'>;
+type AnnouncementConfig = Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds' | 'emojiMap'>;
 
 interface AnnouncementCommandOptions {
   config: AnnouncementConfig;
@@ -60,7 +60,10 @@ export async function handleAnnouncementCommand(
   const everyone = interaction.options.getBoolean('everyone') ?? false;
   let announcementPayload: V2CardPayload;
   try {
-    announcementPayload = buildAnnouncementCard({ message, everyone });
+    announcementPayload = buildAnnouncementCard(
+      { message, everyone },
+      { emojiMap: options.config.emojiMap },
+    );
   } catch (error) {
     if (error instanceof AnnouncementCardValidationError) {
       await interaction.reply({

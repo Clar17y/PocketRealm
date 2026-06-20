@@ -154,6 +154,46 @@ describe('buildAnnouncementCard', () => {
     ].join('\n'));
   });
 
+  it('preserves indented bullets as unsupported nested list text', () => {
+    const card = buildAnnouncementCard({
+      message: [
+        '# Patch Notes',
+        '- Parent',
+        '  - Child stays nested',
+      ].join('\n'),
+      everyone: false,
+    });
+
+    expect(cardText(card)).toBe([
+      '📜 **Patch Notes**',
+      '',
+      '• Parent',
+      '  - Child stays nested',
+    ].join('\n'));
+  });
+
+  it('preserves fenced code lines that look like markdown', () => {
+    const card = buildAnnouncementCard({
+      message: [
+        '# Patch Notes',
+        '```',
+        '- do not normalize',
+        '## do not bold',
+        '```',
+      ].join('\n'),
+      everyone: false,
+    });
+
+    expect(cardText(card)).toBe([
+      '📜 **Patch Notes**',
+      '',
+      '```',
+      '- do not normalize',
+      '## do not bold',
+      '```',
+    ].join('\n'));
+  });
+
   it('prefixes one intentional everyone mention and neutralizes body mass mentions', () => {
     const card = buildAnnouncementCard({
       message: 'Event now @here @everyone <@123456789012345678> <@&234567890123456789>',
