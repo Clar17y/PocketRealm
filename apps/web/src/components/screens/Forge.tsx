@@ -19,6 +19,7 @@ import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { ForgeTutorial } from '@/components/common/ForgeTutorial';
 import { ItemIcon } from '@/components/common/ItemIcon';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { DockedActionBar } from '../common/DockedActionBar';
 
 function SacrificePicker({
   items,
@@ -276,7 +277,7 @@ export function Forge({
   const baseEntries = statEntries(selected?.baseStats);
 
   return (
-    <ScreenContainer>
+    <ScreenContainer bottomInset>
       <NpcDialogueBanner npcKey={forgeNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
@@ -430,25 +431,6 @@ export function Forge({
                   keyPrefix="upgrade-sac"
                 />
               </div>
-
-              <PixelButton
-                variant="gold"
-                size="sm"
-                className="w-full"
-                disabled={
-                  isRecovering
-                  || noFacility
-                  || !canUseForge
-                  || !hasUpgradeSacrifice
-                  || !selectedUpgradeSacrificeId
-                  || !nextRarity
-                  || upgradeCost === null
-                  || busy !== null
-                }
-                onClick={() => tryForgeAction(setConfirmUpgrade, handleUpgrade)}
-              >
-                Upgrade Rarity
-              </PixelButton>
             </div>
 
             <div className="border border-[var(--rpg-border)] rounded p-3 bg-[var(--rpg-surface)] space-y-2">
@@ -478,27 +460,51 @@ export function Forge({
                   keyPrefix="reroll-sac"
                 />
               </div>
-
-              <PixelButton
-                variant="primary"
-                size="sm"
-                className="w-full"
-                disabled={
-                  isRecovering
-                  || noFacility
-                  || !canUseForge
-                  || !hasRerollSacrifice
-                  || !selectedRerollSacrificeId
-                  || rerollCost === null
-                  || busy !== null
-                }
-                onClick={() => tryForgeAction(setConfirmReroll, handleReroll)}
-              >
-                Reroll Bonus Stats
-              </PixelButton>
             </div>
           </div>
         </PixelCard>
+      )}
+
+      {selected && (
+        <DockedActionBar>
+          <div className="grid grid-cols-2 gap-3">
+            <PixelButton
+              variant="gold"
+              size="sm"
+              className="w-full"
+              disabled={
+                isRecovering
+                || noFacility
+                || !canUseForge
+                || !hasUpgradeSacrifice
+                || !selectedUpgradeSacrificeId
+                || !nextRarity
+                || upgradeCost === null
+                || busy !== null
+              }
+              onClick={() => tryForgeAction(setConfirmUpgrade, handleUpgrade)}
+            >
+              Upgrade Rarity
+            </PixelButton>
+            <PixelButton
+              variant="primary"
+              size="sm"
+              className="w-full"
+              disabled={
+                isRecovering
+                || noFacility
+                || !canUseForge
+                || !hasRerollSacrifice
+                || !selectedRerollSacrificeId
+                || rerollCost === null
+                || busy !== null
+              }
+              onClick={() => tryForgeAction(setConfirmReroll, handleReroll)}
+            >
+              Reroll Bonus Stats
+            </PixelButton>
+          </div>
+        </DockedActionBar>
       )}
 
       {confirmUpgrade && (
