@@ -108,6 +108,34 @@ describe('lookupItemForDiscord', () => {
       expect.objectContaining({ where: { itemTemplateId: { in: ['seasonal'] } } }),
     );
   });
+
+  it('falls back to the most recent season when there is no active or base template', async () => {
+    mockPrisma.season.findFirst.mockResolvedValue(null);
+    mockPrisma.itemTemplate.findMany.mockResolvedValueOnce([
+      {
+        id: 'old', name: 'Frost Brand', itemType: 'weapon', slot: 'mainhand', tier: 2,
+        weightClass: null, setId: null, requiredSkill: null, requiredLevel: 1,
+        sellPrice: null, flavorText: null, baseStats: {},
+        seasonId: 'season-1', season: { id: 'season-1', name: 'Old Season', startsAt: new Date('2026-01-01') },
+      },
+      {
+        id: 'new', name: 'Frost Brand', itemType: 'weapon', slot: 'mainhand', tier: 4,
+        weightClass: null, setId: null, requiredSkill: null, requiredLevel: 1,
+        sellPrice: null, flavorText: null, baseStats: {},
+        seasonId: 'season-3', season: { id: 'season-3', name: 'New Season', startsAt: new Date('2026-05-01') },
+      },
+    ]);
+    mockPrisma.dropTable.findMany.mockResolvedValueOnce([]);
+    mockPrisma.craftingRecipe.findFirst.mockResolvedValueOnce(null);
+
+    const result = await lookupItemForDiscord('Frost Brand');
+
+    expect(result.match?.season).toEqual({ name: 'New Season' });
+    expect(result.match?.tier).toBe(4);
+    expect(mockPrisma.dropTable.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { itemTemplateId: { in: ['new'] } } }),
+    );
+  });
 });
 
 describe('lookupMobForDiscord', () => {

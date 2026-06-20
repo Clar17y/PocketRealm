@@ -54,7 +54,7 @@ interface SeasonedRow { id: string; seasonId: string | null; season: SeasonRef |
 async function activeSeasonId(): Promise<string | null> {
   const season = await prisma.season.findFirst({
     where: { status: SEASON_STATUSES.ACTIVE },
-    select: { id: true, name: true },
+    select: { id: true },
   });
   return season?.id ?? null;
 }
@@ -104,7 +104,8 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
 
   const normalizedMatch = normalizeLookupName(matchedName);
   const rows = templates.filter((t) => normalizeLookupName(t.name) === normalizedMatch);
-  const { scoped, season } = resolveSeasonScope(rows, await activeSeasonId());
+  const activeId = rows.length > 1 ? await activeSeasonId() : null;
+  const { scoped, season } = resolveSeasonScope(rows, activeId);
   const ids = scoped.map((row) => row.id);
   const primary = scoped[0]!;
 
@@ -196,7 +197,8 @@ export async function lookupMobForDiscord(query: string): Promise<MobLookupResul
 
   const normalizedMatch = normalizeLookupName(matchedName);
   const rows = templates.filter((t) => normalizeLookupName(t.name) === normalizedMatch);
-  const { scoped, season } = resolveSeasonScope(rows, await activeSeasonId());
+  const activeId = rows.length > 1 ? await activeSeasonId() : null;
+  const { scoped, season } = resolveSeasonScope(rows, activeId);
   const ids = scoped.map((row) => row.id);
   const primary = scoped[0]!;
 
