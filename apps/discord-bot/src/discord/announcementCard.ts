@@ -14,7 +14,7 @@ export const MAX_ANNOUNCEMENT_TEXT_LENGTH = 3900;
 const ANNOUNCEMENT_ACCENT_COLOR = 0x57f287;
 const massMentionPattern = /@(everyone|here)\b/g;
 const neutralizedMentionPrefix = '@\u200B';
-const headingPattern = /^(#{1,3})\s*(.*)$/;
+const headingPattern = /^(#{1,3})(?!#)\s+(.*)$/;
 const bulletPattern = /^[-*•]\s+(.+)$/;
 
 export class AnnouncementCardValidationError extends Error {
@@ -90,8 +90,9 @@ function parseAnnouncement(message: string): ParsedAnnouncement {
   let title = 'Announcement';
   const bodySourceLines = [...rawLines];
   const titleLineIndex = rawLines.findIndex((line) => {
-    const heading = headingPattern.exec(line.trim());
-    return heading?.[1] === '#';
+    const trimmed = line.trim();
+    const heading = headingPattern.exec(trimmed);
+    return heading?.[1] === '#' || trimmed === '#';
   });
 
   if (titleLineIndex !== -1) {

@@ -89,6 +89,19 @@ describe('buildAnnouncementCard', () => {
     ].join('\n'));
   });
 
+  it('preserves top-level heading text without a whitespace separator', () => {
+    const card = buildAnnouncementCard({
+      message: '#Title',
+      everyone: false,
+    });
+
+    expect(cardText(card)).toBe([
+      '📜 **Announcement**',
+      '',
+      '#Title',
+    ].join('\n'));
+  });
+
   it('keeps unsupported markdown as text instead of interpreting it', () => {
     const card = buildAnnouncementCard({
       message: [
@@ -105,6 +118,22 @@ describe('buildAnnouncementCard', () => {
     expect(cardText(card)).toContain('> Quoted text stays as text.');
     expect(cardText(card)).toContain('| Area | Change |');
     expect(cardText(card)).toContain('| Combat | Faster logs |');
+  });
+
+  it('preserves unsupported deep headings as literal text', () => {
+    const card = buildAnnouncementCard({
+      message: [
+        '# Patch Notes',
+        '#### Deep Heading',
+      ].join('\n'),
+      everyone: false,
+    });
+
+    expect(cardText(card)).toBe([
+      '📜 **Patch Notes**',
+      '',
+      '#### Deep Heading',
+    ].join('\n'));
   });
 
   it('prefixes one intentional everyone mention and neutralizes body mass mentions', () => {
