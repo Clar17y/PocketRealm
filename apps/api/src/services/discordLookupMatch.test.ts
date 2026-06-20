@@ -35,9 +35,15 @@ describe('matchLookupName', () => {
     const result = matchLookupName('slime', many);
     expect(result.suggestions).toHaveLength(5);
     expect(new Set(result.suggestions).size).toBe(5);
+    expect(result.suggestions).toEqual(['Slime A', 'Slime B', 'Slime C', 'Slime D', 'Slime E']);
+    expect(result.suggestions).not.toContain('Slime F');
   });
 
   it('returns no suggestions when nothing is close', () => {
     expect(matchLookupName('zzzzzz', names)).toEqual({ matchedName: null, suggestions: [] });
+  });
+
+  it('returns null match and empty suggestions for whitespace-only query', () => {
+    expect(matchLookupName('   ', names)).toEqual({ matchedName: null, suggestions: [] });
   });
 });
