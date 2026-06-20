@@ -134,11 +134,11 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
   let craft: ItemCardData['sources']['craft'] = null;
   if (recipe) {
     const materialList = Array.isArray(recipe.materials)
-      ? (recipe.materials as Array<{ itemTemplateId: string; quantity: number }>)
+      ? (recipe.materials as Array<{ templateId: string; quantity: number }>)
       : [];
     const matTemplates = materialList.length
       ? await prisma.itemTemplate.findMany({
-          where: { id: { in: materialList.map((m) => m.itemTemplateId) } },
+          where: { id: { in: materialList.map((m) => m.templateId) } },
           select: { id: true, name: true },
         })
       : [];
@@ -149,7 +149,7 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
       turnCost: recipe.turnCost,
       xpReward: recipe.xpReward,
       materials: materialList.map((m) => ({
-        name: nameById.get(m.itemTemplateId) ?? 'Unknown material',
+        name: nameById.get(m.templateId) ?? 'Unknown material',
         quantity: m.quantity,
       })),
     };

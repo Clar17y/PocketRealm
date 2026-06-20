@@ -40,7 +40,7 @@ describe('lookupItemForDiscord', () => {
       requiredLevel: 12,
       turnCost: 12,
       xpReward: 22,
-      materials: [{ itemTemplateId: 'ore-1', quantity: 2 }],
+      materials: [{ templateId: 'ore-1', quantity: 2 }],
     });
     mockPrisma.itemTemplate.findMany.mockResolvedValueOnce([{ id: 'ore-1', name: 'Iron Ore' }]);
 
