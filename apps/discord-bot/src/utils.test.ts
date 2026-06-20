@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDiscordTimestamp, isRecord, truncateText } from './utils.js';
+import { escapeDiscordText, formatDiscordTimestamp, isRecord, truncateText } from './utils.js';
 
 describe('isRecord', () => {
   it('accepts plain objects', () => {
@@ -39,5 +39,15 @@ describe('formatDiscordTimestamp', () => {
   it('falls back to the provided copy for invalid dates', () => {
     expect(formatDiscordTimestamp('not-a-date', 'F', 'the listed expiry time')).toBe('the listed expiry time');
     expect(formatDiscordTimestamp('not-a-date', 'R', 'unknown')).toBe('unknown');
+  });
+});
+
+describe('escapeDiscordText', () => {
+  it('neutralizes mentions and escapes markdown control characters', () => {
+    expect(escapeDiscordText('@everyone **bold** _x_')).toBe('@​everyone \\*\\*bold\\*\\* \\_x\\_');
+  });
+
+  it('leaves plain text untouched', () => {
+    expect(escapeDiscordText('Spider Silk')).toBe('Spider Silk');
   });
 });

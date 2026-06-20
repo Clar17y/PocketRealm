@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   upsertDiscordNotificationPreference: vi.fn(),
   listPendingDiscordNotificationEvents: vi.fn(),
   ackDiscordNotificationEvents: vi.fn(),
+  lookupItemForDiscord: vi.fn(),
+  lookupMobForDiscord: vi.fn(),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -121,6 +123,11 @@ vi.mock('../services/discordNotificationService', () => ({
   upsertDiscordNotificationPreference: mocks.upsertDiscordNotificationPreference,
   listPendingDiscordNotificationEvents: mocks.listPendingDiscordNotificationEvents,
   ackDiscordNotificationEvents: mocks.ackDiscordNotificationEvents,
+}));
+
+vi.mock('../services/discordLookupService', () => ({
+  lookupItemForDiscord: mocks.lookupItemForDiscord,
+  lookupMobForDiscord: mocks.lookupMobForDiscord,
 }));
 
 import { discordRouter } from './discord';
@@ -994,5 +1001,40 @@ describe('discordRouter', () => {
       .expect(401);
 
     expect(mocks.listPendingDiscordNotificationEvents).not.toHaveBeenCalled();
+  });
+
+  it('requires bot auth and returns an item lookup card', async () => {
+    await request(app()).get('/api/v1/discord/items/lookup?q=iron').expect(401);
+
+    mocks.lookupItemForDiscord.mockResolvedValue({
+      match: { name: 'Iron Ingot', sources: { drops: [], craft: null }, stats: [], season: null },
+      suggestions: [],
+    });
+
+    const res = await request(app())
+      .get('/api/v1/discord/items/lookup?q=iron%20ingot')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body.match.name).toBe('Iron Ingot');
+    expect(mocks.lookupItemForDiscord).toHaveBeenCalledWith('iron ingot');
+  });
+
+  it('returns mob suggestions when there is no exact match', async () => {
+    mocks.lookupMobForDiscord.mockResolvedValue({ match: null, suggestions: ['Forest Spider'] });
+
+    const res = await request(app())
+      .get('/api/v1/discord/mobs/lookup?q=spider')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body).toEqual({ match: null, suggestions: ['Forest Spider'] });
+  });
+
+  it('rejects an empty lookup query', async () => {
+    await request(app())
+      .get('/api/v1/discord/items/lookup?q=')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(400);
   });
 });

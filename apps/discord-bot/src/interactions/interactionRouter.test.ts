@@ -44,6 +44,11 @@ vi.mock('./staffCommands.js', () => ({
   handleStaffCommand: vi.fn(),
 }));
 
+vi.mock('./lookupCommand.js', () => ({
+  handleItemCommand: vi.fn(),
+  handleMobCommand: vi.fn(),
+}));
+
 const routerConfig = {
   guildId: 'guild-123',
   webBaseUrl: 'https://pocketrealm.app',
@@ -82,6 +87,38 @@ describe('routeInteraction', () => {
     expectV2Card(payload);
     expect(cardText(payload)).toContain('ℹ️ **No wiki results**');
     expect(cardText(payload)).toContain('"forge"');
+  });
+
+  it('routes item commands to the item handler', async () => {
+    const { handleItemCommand } = await import('./lookupCommand.js');
+    const api = createApi(null);
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'item',
+      options: { getString: vi.fn(() => 'iron') },
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    } as unknown as Interaction;
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleItemCommand).toHaveBeenCalledOnce();
+  });
+
+  it('routes mob commands to the mob handler', async () => {
+    const { handleMobCommand } = await import('./lookupCommand.js');
+    const api = createApi(null);
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'mob',
+      options: { getString: vi.fn(() => 'warg') },
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    } as unknown as Interaction;
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleMobCommand).toHaveBeenCalledOnce();
   });
 
   it('routes player commands with guild config', async () => {

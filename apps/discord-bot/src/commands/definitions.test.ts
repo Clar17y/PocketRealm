@@ -11,6 +11,8 @@ describe('buildCommandDefinitions', () => {
     expect(commandNames).toEqual([
       'link',
       'wiki',
+      'item',
+      'mob',
       'profile',
       'turns',
       'skills',
@@ -21,13 +23,27 @@ describe('buildCommandDefinitions', () => {
       'announcement',
       'staff',
     ]);
-    expect(commands).toHaveLength(11);
+    expect(commands).toHaveLength(13);
   });
 
   it('builds public command options with the expected schema', () => {
     const commands = buildCommandDefinitions();
 
     expect(commands.find((command) => command.name === 'wiki')?.options).toEqual([
+      expect.objectContaining({
+        name: 'query',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      }),
+    ]);
+    expect(commands.find((command) => command.name === 'item')?.options).toEqual([
+      expect.objectContaining({
+        name: 'query',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      }),
+    ]);
+    expect(commands.find((command) => command.name === 'mob')?.options).toEqual([
       expect.objectContaining({
         name: 'query',
         type: ApplicationCommandOptionType.String,

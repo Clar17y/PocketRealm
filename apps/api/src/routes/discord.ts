@@ -64,6 +64,7 @@ import { notifySupportTicketCreated } from '../services/discordSupportNotifier';
 import { createDiscordSupportTicket } from '../services/supportTicketService';
 import { createSupportTicketSchema, supportTicketPublicIdParamsSchema } from '../services/supportTicketSchemas';
 import { searchWikiForDiscord } from '../services/wikiSearchService';
+import { lookupItemForDiscord, lookupMobForDiscord } from '../services/discordLookupService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const discordRouter = Router();
@@ -82,6 +83,10 @@ const discordRankParamsSchema = discordUserParamsSchema.extend({
 
 const discordWikiSearchQuerySchema = z.object({
   q: z.string().trim().min(1).max(120),
+}).strict();
+
+const discordLookupQuerySchema = z.object({
+  q: z.string().trim().min(1).max(64),
 }).strict();
 
 const discordReportSchema = createSupportTicketSchema.extend({
@@ -267,6 +272,20 @@ discordRouter.get('/wiki/search', requireInternalBotAuth, asyncHandler(async (re
   const results = searchWikiForDiscord(query.q, webBaseUrl());
 
   res.json({ results });
+}));
+
+discordRouter.get('/items/lookup', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const query = discordLookupQuerySchema.parse(req.query);
+  const result = await lookupItemForDiscord(query.q);
+
+  res.json(result);
+}));
+
+discordRouter.get('/mobs/lookup', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const query = discordLookupQuerySchema.parse(req.query);
+  const result = await lookupMobForDiscord(query.q);
+
+  res.json(result);
 }));
 
 discordRouter.post('/xp/messages', requireInternalBotAuth, asyncHandler(async (req, res) => {

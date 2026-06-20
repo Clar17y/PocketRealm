@@ -558,6 +558,7 @@ model DropTable {
   itemTemplate ItemTemplate @relation(fields: [itemTemplateId], references: [id], onDelete: Cascade)
 
   @@index([mobTemplateId])
+  @@index([itemTemplateId])
   @@map("drop_tables")
 }
 
