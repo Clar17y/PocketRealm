@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.70',
+    date: '2026-06-20',
+    title: 'Skill Tree Action Details',
+    summary:
+      'Skill tree action unlocks now show the practical combat details you need before spending points. Talent action nodes list their stamina or mana cost and, when relevant, damage scaling such as stronger single-target attacks or lower-damage area attacks. This makes it easier to compare choices like AoE coverage against focused single-target damage directly from the skill tree.',
+  },
+  {
     version: '0.69',
     date: '2026-06-20',
     title: 'Discord Item & Mob Lookups',
