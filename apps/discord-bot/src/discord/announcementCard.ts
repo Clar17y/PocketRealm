@@ -48,11 +48,14 @@ export function buildAnnouncementCard(
   }
 
   const parsed = parseAnnouncement(normalized);
+  const title = input.everyone
+    ? neutralizeMassMentions(parsed.title)
+    : parsed.title;
   const bodyLines = input.everyone
     ? parsed.bodyLines.map(neutralizeMassMentions)
     : parsed.bodyLines;
   const content = renderAnnouncementText({
-    title: parsed.title,
+    title,
     bodyLines,
     everyone: input.everyone,
     emojiMap: options.emojiMap ?? {},
@@ -85,15 +88,19 @@ function parseAnnouncement(message: string): ParsedAnnouncement {
   }
 
   let title = 'Announcement';
-  let bodyStartIndex = 0;
-  const firstContentLine = rawLines[firstContentIndex].trim();
-  const firstHeading = headingPattern.exec(firstContentLine);
-  if (firstHeading?.[1] === '#') {
-    title = firstHeading[2]?.trim() || 'Announcement';
-    bodyStartIndex = firstContentIndex + 1;
+  const bodySourceLines = [...rawLines];
+  const titleLineIndex = rawLines.findIndex((line) => {
+    const heading = headingPattern.exec(line.trim());
+    return heading?.[1] === '#';
+  });
+
+  if (titleLineIndex !== -1) {
+    const titleHeading = headingPattern.exec(rawLines[titleLineIndex]?.trim() ?? '');
+    title = titleHeading?.[2]?.trim() || 'Announcement';
+    bodySourceLines.splice(titleLineIndex, 1);
   }
 
-  const bodyLines = normalizeBodyLines(rawLines.slice(bodyStartIndex));
+  const bodyLines = normalizeBodyLines(bodySourceLines);
   if (title === 'Announcement' && bodyLines.length === 0) {
     throw new AnnouncementCardValidationError('Announcement message cannot be empty.');
   }

@@ -71,6 +71,24 @@ describe('buildAnnouncementCard', () => {
     expect(cardText(card)).toBe('📜 **Server restart at 20:00 UTC**');
   });
 
+  it('uses the first top-level heading as title even after body text', () => {
+    const card = buildAnnouncementCard({
+      message: [
+        'Intro text',
+        '# Real Title',
+        'Body',
+      ].join('\n'),
+      everyone: false,
+    });
+
+    expect(cardText(card)).toBe([
+      '📜 **Real Title**',
+      '',
+      'Intro text',
+      'Body',
+    ].join('\n'));
+  });
+
   it('keeps unsupported markdown as text instead of interpreting it', () => {
     const card = buildAnnouncementCard({
       message: [
@@ -102,6 +120,19 @@ describe('buildAnnouncementCard', () => {
       '📜 **Announcement**',
       '',
       `Event now @${zeroWidthSpace}here @${zeroWidthSpace}everyone <@123456789012345678> <@&234567890123456789>`,
+    ].join('\n'));
+  });
+
+  it('neutralizes title mass mentions when sending an intentional everyone mention', () => {
+    const card = buildAnnouncementCard({
+      message: '# Update @everyone and @here',
+      everyone: true,
+    });
+
+    expect(cardText(card)).toBe([
+      '@everyone',
+      '',
+      `📜 **Update @${zeroWidthSpace}everyone and @${zeroWidthSpace}here**`,
     ].join('\n'));
   });
 
