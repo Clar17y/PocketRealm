@@ -70,4 +70,3 @@
 - [ ] Run `rtk npm run test -w apps/web -- combatHelpers CombatScreen useEncounterSites`.
 - [ ] Run `rtk npm run typecheck`.
 - [ ] Push the branch with `git push`.
-
