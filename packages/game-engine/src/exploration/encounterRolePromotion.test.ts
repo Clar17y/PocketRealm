@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import type { EncounterMobRole } from '@pocketrealm/shared';
 import {
   assignEncounterRolesToRooms,
+  rollNormalExplorationMobRole,
   type EncounterRoleAssignment,
   type EncounterRoleRoomLayout,
 } from './encounterRolePromotion';
 
 const alwaysRollMiniBoss = (): number => 0;
 const neverRollMiniBoss = (): number => 1;
+const rollSequence = (values: number[]): (() => number) => {
+  let index = 0;
+  return () => values[index++] ?? 1;
+};
 
 function rolesForRoom(assignments: readonly EncounterRoleAssignment[], room: number): EncounterMobRole[] {
   return assignments
@@ -42,17 +47,17 @@ function expectNoEliteBeforeLaterAllTrashRoom(assignments: readonly EncounterRol
 }
 
 describe('assignEncounterRolesToRooms', () => {
-  it('leaves 1-room and 2-room layouts all trash', () => {
+  it('leaves 1-room and 2-room layouts all trash when elite rolls miss', () => {
     const oneRoom = assignEncounterRolesToRooms(
       [{ roomNumber: 1, mobCount: 3 }],
-      { rng: alwaysRollMiniBoss, miniBossChance: 1 },
+      { rng: neverRollMiniBoss, miniBossChance: 1 },
     );
     const twoRooms = assignEncounterRolesToRooms(
       [
         { roomNumber: 1, mobCount: 2 },
         { roomNumber: 2, mobCount: 2 },
       ],
-      { rng: alwaysRollMiniBoss, miniBossChance: 1 },
+      { rng: neverRollMiniBoss, miniBossChance: 1 },
     );
 
     expect(allRoles(oneRoom)).toEqual(['trash', 'trash', 'trash']);
@@ -86,19 +91,19 @@ describe('assignEncounterRolesToRooms', () => {
     expect(rolesForRoom(assignments, 3)).toEqual(['elite', 'mini_boss']);
   });
 
-  it('places the elite in the penultimate room when a mini-boss uses the only final-room slot', () => {
+  it('suppresses the mini-boss when it would prevent the only elite from being final-room pressure', () => {
     const assignments = assignEncounterRolesToRooms(
       [
         { roomNumber: 1, mobCount: 1 },
         { roomNumber: 2, mobCount: 1 },
         { roomNumber: 3, mobCount: 1 },
       ],
-      { rng: alwaysRollMiniBoss },
+      { rng: rollSequence([1, 1, 1, 0]) },
     );
 
     expect(rolesForRoom(assignments, 1)).toEqual(['trash']);
-    expect(rolesForRoom(assignments, 2)).toEqual(['elite']);
-    expect(rolesForRoom(assignments, 3)).toEqual(['mini_boss']);
+    expect(rolesForRoom(assignments, 2)).toEqual(['trash']);
+    expect(rolesForRoom(assignments, 3)).toEqual(['elite']);
   });
 
   it('suppresses the mini-boss when the only mob slot must satisfy the elite guarantee', () => {
@@ -137,7 +142,7 @@ describe('assignEncounterRolesToRooms', () => {
         { roomNumber: 3, mobCount: 1 },
         { roomNumber: 4, mobCount: 0 },
       ],
-      { rng: alwaysRollMiniBoss, miniBossChance: 1 },
+      { rng: neverRollMiniBoss, miniBossChance: 1 },
     );
 
     expect(assignments).toEqual([
@@ -156,10 +161,11 @@ describe('assignEncounterRolesToRooms', () => {
         { roomNumber: 3, mobCount: 1 },
         { roomNumber: 4, mobCount: 1 },
       ],
-      { rng: alwaysRollMiniBoss, miniBossChance: 1 },
+      { rng: rollSequence([0, 1, 1, 1, 1]), eliteChance: 0.5, miniBossChance: 0 },
     );
 
     expect(rolesForRoom(assignments, 1)).toEqual(['trash']);
+    expect(rolesForRoom(assignments, 4)).toEqual(['elite']);
     expectNoEliteBeforeLaterAllTrashRoom(assignments);
   });
 
@@ -171,7 +177,7 @@ describe('assignEncounterRolesToRooms', () => {
     ];
 
     const assignments = assignEncounterRolesToRooms(rooms, {
-      rng: alwaysRollMiniBoss,
+      rng: neverRollMiniBoss,
       miniBossChance: 1,
     });
 
@@ -180,5 +186,66 @@ describe('assignEncounterRolesToRooms', () => {
       { room: 2, role: 'elite' },
     ]);
     expect(allRoles(assignments)).not.toContain('mini_boss');
+  });
+
+  it('keeps chance-rolled early elites when final-room elite pressure exists', () => {
+    const assignments = assignEncounterRolesToRooms(
+      [
+        { roomNumber: 1, mobCount: 1 },
+        { roomNumber: 2, mobCount: 1 },
+        { roomNumber: 3, mobCount: 1 },
+      ],
+      {
+        rng: rollSequence([0, 1, 0, 1]),
+        eliteChance: 0.5,
+        miniBossChance: 0,
+      },
+    );
+
+    expect(assignments).toEqual([
+      { room: 1, role: 'elite' },
+      { room: 2, role: 'trash' },
+      { room: 3, role: 'elite' },
+    ]);
+  });
+
+  it('moves the only chance-rolled elite to the final room', () => {
+    const assignments = assignEncounterRolesToRooms(
+      [
+        { roomNumber: 1, mobCount: 1 },
+        { roomNumber: 2, mobCount: 1 },
+        { roomNumber: 3, mobCount: 1 },
+      ],
+      {
+        rng: rollSequence([0, 1, 1, 1]),
+        eliteChance: 0.5,
+        miniBossChance: 0,
+      },
+    );
+
+    expect(assignments).toEqual([
+      { room: 1, role: 'trash' },
+      { room: 2, role: 'trash' },
+      { room: 3, role: 'elite' },
+    ]);
+  });
+});
+
+describe('rollNormalExplorationMobRole', () => {
+  it('returns trash when the elite roll misses', () => {
+    expect(rollNormalExplorationMobRole({ rng: () => 1, eliteChance: 0.05 })).toBe('trash');
+  });
+
+  it('returns elite when the elite roll hits', () => {
+    expect(rollNormalExplorationMobRole({ rng: () => 0, eliteChance: 0.05 })).toBe('elite');
+  });
+
+  it('does not emit mini-boss for normal exploration', () => {
+    const roles = Array.from({ length: 10 }, () =>
+      rollNormalExplorationMobRole({ rng: () => 0, eliteChance: 1 }),
+    );
+
+    expect(roles).toEqual(Array(10).fill('elite'));
+    expect(roles).not.toContain('mini_boss');
   });
 });
