@@ -146,8 +146,8 @@ describe('lookupMobForDiscord', () => {
 
   it('aggregates zones across same-named mobs and omits combat stats', async () => {
     mockPrisma.mobTemplate.findMany.mockResolvedValueOnce([
-      { id: 'm1', name: 'Warg', isBoss: false, flavorAppearance: 'A grey wolf.', seasonId: null, season: null, zone: { name: 'Whispering Plains' } },
-      { id: 'm2', name: 'Warg', isBoss: false, flavorAppearance: 'A grey wolf.', seasonId: null, season: null, zone: { name: 'Frostpeak' } },
+      { id: 'm1', name: 'Warg', isBoss: false, isExpeditionMob: false, flavorAppearance: 'A grey wolf.', seasonId: null, season: null, zone: { name: 'Whispering Plains' } },
+      { id: 'm2', name: 'Warg', isBoss: false, isExpeditionMob: false, flavorAppearance: 'A grey wolf.', seasonId: null, season: null, zone: { name: 'Frostpeak' } },
     ]);
     mockPrisma.dropTable.findMany.mockResolvedValueOnce([
       { dropChance: 0.5, minQuantity: 1, maxQuantity: 1, itemTemplate: { name: 'Warg Pelt', itemType: 'resource', tier: 1 } },
@@ -158,12 +158,24 @@ describe('lookupMobForDiscord', () => {
     expect(result.match).toEqual({
       name: 'Warg',
       isBoss: false,
+      isExpeditionMob: false,
       season: null,
       zones: ['Whispering Plains', 'Frostpeak'],
       flavorAppearance: 'A grey wolf.',
       drops: [{ itemName: 'Warg Pelt', itemType: 'resource', tier: 1, dropRatePct: 50, minQty: 1, maxQty: 1 }],
     });
     expect(JSON.stringify(result.match)).not.toContain('hp');
+  });
+
+  it('flags expedition-only mobs', async () => {
+    mockPrisma.mobTemplate.findMany.mockResolvedValueOnce([
+      { id: 'm1', name: 'Cavern Spider', isBoss: false, isExpeditionMob: true, flavorAppearance: null, seasonId: null, season: null, zone: { name: 'Forest Edge' } },
+    ]);
+    mockPrisma.dropTable.findMany.mockResolvedValueOnce([]);
+
+    const result = await lookupMobForDiscord('Cavern Spider');
+
+    expect(result.match?.isExpeditionMob).toBe(true);
   });
 
   it('returns suggestions when no exact mob match exists', async () => {

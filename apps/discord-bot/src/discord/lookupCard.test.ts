@@ -32,6 +32,7 @@ const item: ItemCardData = {
 const mob: MobCardData = {
   name: 'Warg',
   isBoss: false,
+  isExpeditionMob: false,
   season: null,
   zones: ['Whispering Plains', 'Frostpeak'],
   flavorAppearance: 'A grey wolf.',
@@ -54,6 +55,17 @@ describe('buildItemCard', () => {
     const payload = buildItemCard({ ...item, season: { name: 'Season of Embers' } }, emojiMap);
     expect(cardText(payload)).toContain('Season of Embers');
   });
+
+  it('caps a long craft-material list to stay within the card budget', () => {
+    const materials = Array.from({ length: 18 }, (_, i) => ({ name: `Mat ${i + 1}`, quantity: 1 }));
+    const payload = buildItemCard(
+      { ...item, sources: { drops: [], craft: { ...item.sources.craft!, materials } } },
+      emojiMap,
+    );
+    const text = cardText(payload);
+    expect(text).toContain('…and 3 more');
+    expect(text).not.toContain('Mat 16');
+  });
 });
 
 describe('buildMobCard', () => {
@@ -65,6 +77,16 @@ describe('buildMobCard', () => {
     expect(text).toContain('Whispering Plains');
     expect(text).toContain('Warg Pelt');
     expect(text).not.toContain('HP');
+  });
+
+  it('labels expedition-only mobs instead of showing a zone', () => {
+    const payload = buildMobCard(
+      { ...mob, isExpeditionMob: true, zones: ['Forest Edge'] },
+      emojiMap,
+    );
+    const text = cardText(payload);
+    expect(text).toContain('Expeditions (expedition only)');
+    expect(text).not.toContain('Forest Edge');
   });
 });
 

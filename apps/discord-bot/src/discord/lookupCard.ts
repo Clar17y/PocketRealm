@@ -32,6 +32,7 @@ export interface ItemCardData {
 export interface MobCardData {
   name: string;
   isBoss: boolean;
+  isExpeditionMob: boolean;
   season: { name: string } | null;
   zones: string[];
   flavorAppearance: string | null;
@@ -91,8 +92,10 @@ export function buildItemCard(data: ItemCardData, emojiMap: DiscordEmojiMap): V2
   if (data.sources.craft) {
     const craft = data.sources.craft;
     lines.push(`**Crafted** (${escapeDiscordText(craft.skillType)} Lv. ${craft.requiredLevel}, ${craft.turnCost} turns)`);
-    for (const mat of craft.materials) {
-      lines.push(`• ${escapeDiscordText(mat.name)} ×${mat.quantity}`);
+    for (const line of cappedList(craft.materials, (mat) =>
+      `• ${escapeDiscordText(mat.name)} ×${mat.quantity}`,
+    )) {
+      lines.push(line);
     }
   }
 
@@ -124,7 +127,9 @@ export function buildMobCard(data: MobCardData, emojiMap: DiscordEmojiMap): V2Ca
   const season = seasonLine(data.season);
   if (season) lines.push(season);
 
-  if (data.zones.length) {
+  if (data.isExpeditionMob) {
+    lines.push('**Found in:** Expeditions (expedition only)');
+  } else if (data.zones.length) {
     lines.push(`**Found in:** ${data.zones.map(escapeDiscordText).join(', ')}`);
   } else {
     lines.push('**Found in:** _Unknown_');

@@ -29,6 +29,7 @@ export interface ItemCardData {
 export interface MobCardData {
   name: string;
   isBoss: boolean;
+  isExpeditionMob: boolean;
   season: { name: string } | null;
   zones: string[];
   flavorAppearance: string | null;
@@ -98,6 +99,7 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
       flavorText: true, baseStats: true, seasonId: true,
       season: { select: { id: true, name: true, startsAt: true } },
     },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
   });
 
   const { matchedName, suggestions } = matchLookupName(query, templates.map((t) => t.name));
@@ -120,9 +122,11 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
         mobTemplate: { select: { name: true, zone: { select: { name: true } } } },
       },
     }),
+    // Prefer the standard recipe over advanced/soulbound variants for the same result.
     prisma.craftingRecipe.findFirst({
       where: { resultTemplateId: { in: ids } },
       select: { skillType: true, requiredLevel: true, turnCost: true, xpReward: true, materials: true },
+      orderBy: { isAdvanced: 'asc' },
     }),
   ]);
   const drops = dropRows
@@ -187,10 +191,11 @@ export async function lookupItemForDiscord(query: string): Promise<ItemLookupRes
 export async function lookupMobForDiscord(query: string): Promise<MobLookupResult> {
   const templates = await prisma.mobTemplate.findMany({
     select: {
-      id: true, name: true, isBoss: true, flavorAppearance: true, seasonId: true,
+      id: true, name: true, isBoss: true, isExpeditionMob: true, flavorAppearance: true, seasonId: true,
       season: { select: { id: true, name: true, startsAt: true } },
       zone: { select: { name: true } },
     },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
   });
 
   const { matchedName, suggestions } = matchLookupName(query, templates.map((t) => t.name));
@@ -230,6 +235,7 @@ export async function lookupMobForDiscord(query: string): Promise<MobLookupResul
     match: {
       name: primary.name,
       isBoss: primary.isBoss,
+      isExpeditionMob: primary.isExpeditionMob,
       season,
       zones,
       flavorAppearance: primary.flavorAppearance,

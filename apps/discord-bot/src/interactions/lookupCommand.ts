@@ -26,6 +26,11 @@ export async function handleItemCommand(
   const query = interaction.options.getString('query', true).trim();
   await interaction.deferReply({ ephemeral: false });
 
+  if (!query) {
+    await interaction.editReply(buildNotFoundCard(query, 'item', config.emojiMap));
+    return;
+  }
+
   let response: ItemLookupResponse;
   try {
     response = await api.get<ItemLookupResponse>(
@@ -54,6 +59,11 @@ export async function handleMobCommand(
 ): Promise<void> {
   const query = interaction.options.getString('query', true).trim();
   await interaction.deferReply({ ephemeral: false });
+
+  if (!query) {
+    await interaction.editReply(buildNotFoundCard(query, 'mob', config.emojiMap));
+    return;
+  }
 
   let response: MobLookupResponse;
   try {

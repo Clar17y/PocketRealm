@@ -71,7 +71,7 @@ describe('handleItemCommand', () => {
 describe('handleMobCommand', () => {
   it('renders a mob card on a match', async () => {
     const get = vi.fn(async <T>(): Promise<T> => ({
-      match: { name: 'Warg', isBoss: false, season: null, zones: ['Whispering Plains'], flavorAppearance: null, drops: [] },
+      match: { name: 'Warg', isBoss: false, isExpeditionMob: false, season: null, zones: ['Whispering Plains'], flavorAppearance: null, drops: [] },
       suggestions: [],
     }) as T);
     const { interaction, deferReply, editReply } = makeInteraction('warg');
@@ -81,5 +81,18 @@ describe('handleMobCommand', () => {
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/mobs/lookup?q=warg');
     expect(cardText(editReply.mock.calls[0]?.[0])).toContain('Whispering Plains');
+  });
+});
+
+describe('empty query handling', () => {
+  it('skips the API call and shows a not-found card for a whitespace-only query', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({ match: null, suggestions: [] }) as T);
+    const { interaction, deferReply, editReply } = makeInteraction('   ');
+
+    await handleItemCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
+    expect(get).not.toHaveBeenCalled();
+    expect(cardText(editReply.mock.calls[0]?.[0])).toContain('No item found');
   });
 });
