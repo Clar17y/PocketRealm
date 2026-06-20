@@ -90,9 +90,8 @@ function parseAnnouncement(message: string): ParsedAnnouncement {
   let title = 'Announcement';
   const bodySourceLines = [...rawLines];
   const titleLineIndex = rawLines.findIndex((line) => {
-    const trimmed = line.trim();
-    const heading = headingPattern.exec(trimmed);
-    return heading?.[1] === '#' || trimmed === '#';
+    const heading = headingPattern.exec(line.trim());
+    return heading?.[1] === '#';
   });
 
   if (titleLineIndex !== -1) {

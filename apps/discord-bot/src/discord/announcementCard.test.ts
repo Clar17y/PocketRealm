@@ -102,6 +102,23 @@ describe('buildAnnouncementCard', () => {
     ].join('\n'));
   });
 
+  it('preserves a lone hash line as body text', () => {
+    const card = buildAnnouncementCard({
+      message: [
+        '#',
+        'Body',
+      ].join('\n'),
+      everyone: false,
+    });
+
+    expect(cardText(card)).toBe([
+      '📜 **Announcement**',
+      '',
+      '#',
+      'Body',
+    ].join('\n'));
+  });
+
   it('keeps unsupported markdown as text instead of interpreting it', () => {
     const card = buildAnnouncementCard({
       message: [
@@ -181,7 +198,6 @@ describe('buildAnnouncementCard', () => {
 
   it('rejects empty announcement text', () => {
     expect(() => buildAnnouncementCard({ message: '   ', everyone: false })).toThrow(AnnouncementCardValidationError);
-    expect(() => buildAnnouncementCard({ message: '#   ', everyone: false })).toThrow('Announcement message cannot be empty.');
   });
 
   it('rejects output that exceeds the card text limit', () => {
