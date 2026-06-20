@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { BotConfig } from '../config.js';
+import type { V2CardPayload } from '../discord/v2Card.js';
 import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleAnnouncementCommand } from './announcementCommand.js';
 
@@ -284,7 +285,7 @@ function memberWithRoles(roleIds: string[]): GuildMember {
 function createAnnouncementChannel() {
   return {
     isSendable: vi.fn(() => true),
-    send: vi.fn(async () => ({})),
+    send: vi.fn(async (_payload: V2CardPayload) => ({})),
   };
 }
 
