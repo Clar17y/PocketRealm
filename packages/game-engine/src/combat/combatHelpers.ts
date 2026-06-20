@@ -260,7 +260,7 @@ export function applyResourceCosts(
     const def = s.actionDef;
 
     // Deduct action cost
-    if (def && !s.wasExhausted) {
+    if (def && !s.wasExhausted && def.potionType !== 'stamina') {
       s.stamina -= def.cost.stamina;
       s.mana -= def.cost.mana;
     }

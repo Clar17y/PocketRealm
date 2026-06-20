@@ -135,6 +135,7 @@ export function resolveRaidOutcomePhases({
         state.hp += actualRestore;
         state.healingDone = actualRestore;
       } else if (potionType === 'stamina') {
+        state.stamina -= definition.cost.stamina;
         actualRestore = Math.min(potion.healAmount, participant.maxStamina - state.stamina);
         state.stamina += actualRestore;
       } else {

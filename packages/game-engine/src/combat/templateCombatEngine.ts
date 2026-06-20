@@ -1,4 +1,5 @@
 import type {
+  ActionDefinition,
   CombatOutcome,
   PotionConsumed,
   CombatOptions,
@@ -8,6 +9,7 @@ import { rollInitiative } from './damageCalculator';
 import {
   MAX_ROUNDS,
   buildLogEntry,
+  type CombatantState,
   type RoundContext,
   type TemplateCombatState,
   type TemplateCombatLogEntry,
@@ -50,6 +52,14 @@ export { isStatDebuff, isMagicDot } from './templateEffects';
 export type { CombatantState, TemplateCombatState, RoundContext } from './templateCombatTypes';
 
 // --- Main Engine ---
+
+function deductActionCost(combatant: CombatantState, action: ActionDefinition): void {
+  const nextStamina = combatant.stamina - action.cost.stamina;
+  combatant.stamina = action.potionType === 'stamina'
+    ? nextStamina
+    : Math.max(0, nextStamina);
+  combatant.mana = Math.max(0, combatant.mana - action.cost.mana);
+}
 
 function buildRoundContext(
   resolvedAction: ResolvedAction,
@@ -192,8 +202,7 @@ export function runTemplateCombat(
     // Deduct each combatant's resource cost immediately before their action
     // so the log entry snapshot reflects the cost at the right moment.
     if (aGoesFirst) {
-      cA.stamina = Math.max(0, cA.stamina - resolvedA.action.cost.stamina);
-      cA.mana = Math.max(0, cA.mana - resolvedA.action.cost.mana);
+      deductActionCost(cA, resolvedA.action);
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,
         resolvedA.action, interaction, true,
@@ -203,8 +212,7 @@ export function runTemplateCombat(
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
       );
-      cB.stamina = Math.max(0, cB.stamina - resolvedB.action.cost.stamina);
-      cB.mana = Math.max(0, cB.mana - resolvedB.action.cost.mana);
+      deductActionCost(cB, resolvedB.action);
       if (state.outcome) break;
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
@@ -216,8 +224,7 @@ export function runTemplateCombat(
         combatantB.perActionScaling,
       );
     } else {
-      cB.stamina = Math.max(0, cB.stamina - resolvedB.action.cost.stamina);
-      cB.mana = Math.max(0, cB.mana - resolvedB.action.cost.mana);
+      deductActionCost(cB, resolvedB.action);
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
         resolvedB.action, interaction, false,
@@ -227,8 +234,7 @@ export function runTemplateCombat(
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
       );
-      cA.stamina = Math.max(0, cA.stamina - resolvedA.action.cost.stamina);
-      cA.mana = Math.max(0, cA.mana - resolvedA.action.cost.mana);
+      deductActionCost(cA, resolvedA.action);
       if (state.outcome) break;
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,

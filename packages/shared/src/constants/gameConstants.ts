@@ -668,9 +668,9 @@ export const POTION_CONSTANTS = {
   GREATER_HEALTH_HEAL: 400,
 
   // Stamina potions
-  MINOR_STAMINA_RESTORE: 30,
-  STAMINA_RESTORE: 60,
-  GREATER_STAMINA_RESTORE: 100,
+  MINOR_STAMINA_RESTORE: 75,
+  STAMINA_RESTORE: 100,
+  GREATER_STAMINA_RESTORE: 150,
 
   // Mana potions (T1–T5; T1/T4/T5 names are pre-existing and referenced externally)
   MINOR_MANA_RESTORE: 25,  // T1

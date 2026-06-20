@@ -173,6 +173,20 @@ describe('resolveAction', () => {
     expect(result.wasExhausted).toBe(true);
   });
 
+  it('allows stamina potions when current stamina is below the potion cost', () => {
+    const slots = slotsOf('use_stamina_potion');
+    const result = resolveAction(
+      slots,
+      1,
+      100, 100,
+      0, 100,
+      0, 100,
+      [], 'combatantA',
+    );
+    expect(result.action.id).toBe('use_stamina_potion');
+    expect(result.wasExhausted).toBe(false);
+  });
+
   // --- Conditional slot tests ---
 
   it('uses thenActionId when condition is met', () => {
