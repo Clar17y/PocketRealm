@@ -71,7 +71,7 @@ describe('buildAnnouncementCard', () => {
     expect(cardText(card)).toBe('📜 **Server restart at 20:00 UTC**');
   });
 
-  it('uses the first top-level heading as title even after body text', () => {
+  it('preserves later top-level headings as body text', () => {
     const card = buildAnnouncementCard({
       message: [
         'Intro text',
@@ -82,9 +82,10 @@ describe('buildAnnouncementCard', () => {
     });
 
     expect(cardText(card)).toBe([
-      '📜 **Real Title**',
+      '📜 **Announcement**',
       '',
       'Intro text',
+      '# Real Title',
       'Body',
     ].join('\n'));
   });

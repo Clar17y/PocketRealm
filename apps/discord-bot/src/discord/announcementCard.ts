@@ -89,15 +89,11 @@ function parseAnnouncement(message: string): ParsedAnnouncement {
 
   let title = 'Announcement';
   const bodySourceLines = [...rawLines];
-  const titleLineIndex = rawLines.findIndex((line) => {
-    const heading = headingPattern.exec(line.trim());
-    return heading?.[1] === '#';
-  });
+  const firstContentHeading = headingPattern.exec(rawLines[firstContentIndex]?.trim() ?? '');
 
-  if (titleLineIndex !== -1) {
-    const titleHeading = headingPattern.exec(rawLines[titleLineIndex]?.trim() ?? '');
-    title = titleHeading?.[2]?.trim() || 'Announcement';
-    bodySourceLines.splice(titleLineIndex, 1);
+  if (firstContentHeading?.[1] === '#') {
+    title = firstContentHeading[2]?.trim() || 'Announcement';
+    bodySourceLines.splice(firstContentIndex, 1);
   }
 
   const bodyLines = normalizeBodyLines(bodySourceLines);
