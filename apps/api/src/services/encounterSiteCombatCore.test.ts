@@ -224,9 +224,16 @@ describe('loadRoomMobsAsRaidState', () => {
     expect(elite!.maxHp).toBeGreaterThan(trash!.maxHp);
     expect(elite!.stats.damageMin).toBeGreaterThan(trash!.stats.damageMin);
     expect(elite!.actionTemplate.map(action => action.actionId)).toEqual([
+      'boss_root',
       'boss_physical_attack',
-      'boss_poison_spray',
+      'elite_venom_strike',
       'boss_physical_attack',
+    ]);
+    expect(elite!.actionTemplate.map(action => action.targetMode)).toEqual([
+      'single_target',
+      'single_target',
+      'single_target',
+      'single_target',
     ]);
     expect(result.mobXpByEncounterMobId[makeEncounterMobId(1)]).toBeGreaterThan(
       result.mobXpByEncounterMobId[makeEncounterMobId(0)]!,

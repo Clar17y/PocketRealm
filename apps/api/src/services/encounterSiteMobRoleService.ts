@@ -63,17 +63,19 @@ export function resolveEncounterRoleActionTemplate(input: {
 
   if (input.role === 'elite') {
     return [
+      resolveEliteSetup(theme, input.damageType),
       basicAction,
-      resolveEliteSpecial(theme, input.damageType),
+      resolveEliteSpike(theme, input.damageType),
       basicAction,
     ];
   }
 
   const finisher: BossTemplateAction = input.damageType === 'magic'
-    ? { actionId: 'boss_arcane_storm', targetMode: 'aoe', isTelegraphed: true, label: 'ARCANE STORM' }
-    : { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true, label: 'EARTHQUAKE' };
+    ? { actionId: 'mini_boss_arcane_spike', targetMode: 'single_target', isTelegraphed: true, label: 'ARCANE SPIKE' }
+    : { actionId: 'mini_boss_execution_strike', targetMode: 'single_target', isTelegraphed: true, label: 'EXECUTION STRIKE' };
 
   return [
+    resolveMiniBossSetup(theme, input.damageType),
     basicAction,
     resolveMiniBossSpecial(theme, input.damageType),
     basicAction,
@@ -100,25 +102,40 @@ function inferFamilyTheme(
   return 'default';
 }
 
-function themedSpecial(
-  theme: FamilyTheme,
-): { elite: BossTemplateAction; mini_boss: BossTemplateAction } | undefined {
-  const map = ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_SPECIAL_ACTIONS;
-  return theme in map ? map[theme as keyof typeof map] : undefined;
+function singleTargetAction(actionId: string): BossTemplateAction {
+  return { actionId, targetMode: 'single_target' };
 }
 
-function resolveDamageTypeSpecial(damageType: DamageType): BossTemplateAction {
-  return damageType === 'magic'
-    ? { actionId: 'boss_weaken', targetMode: 'aoe' }
-    : { actionId: 'boss_enrage', targetMode: 'single_target' };
+function resolveEliteSetup(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
+  if (theme === 'spider' || theme === 'treant') return singleTargetAction('boss_root');
+  if (theme === 'bandit') return singleTargetAction('boss_smoke_bomb');
+  if (theme === 'wolf') return singleTargetAction('boss_frenzy');
+  if (theme === 'undead') return singleTargetAction('boss_wither');
+  if (theme === 'spirit' || damageType === 'magic') return singleTargetAction('boss_weaken');
+  return singleTargetAction('boss_enrage');
 }
 
-function resolveEliteSpecial(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
-  return themedSpecial(theme)?.elite ?? resolveDamageTypeSpecial(damageType);
+function resolveEliteSpike(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
+  if (theme === 'spider') return singleTargetAction('elite_venom_strike');
+  if (theme === 'wolf') return singleTargetAction('elite_maul');
+  if (theme === 'bandit') return singleTargetAction('elite_backstab');
+  if (theme === 'treant') return singleTargetAction('elite_crushing_blow');
+  if (theme === 'spirit' || damageType === 'magic') return singleTargetAction('elite_arcane_lance');
+  if (theme === 'undead') return singleTargetAction('elite_draining_strike');
+  return singleTargetAction(damageType === 'magic' ? 'elite_arcane_lance' : 'elite_crushing_blow');
+}
+
+function resolveMiniBossSetup(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
+  if (theme === 'spider' || theme === 'treant') return singleTargetAction('boss_root');
+  if (theme === 'bandit') return singleTargetAction('boss_smoke_bomb');
+  if (theme === 'wolf') return singleTargetAction('boss_frenzy');
+  if (theme === 'undead') return singleTargetAction('boss_wither');
+  if (theme === 'spirit' || damageType === 'magic') return singleTargetAction('boss_weaken');
+  return singleTargetAction('boss_enrage');
 }
 
 function resolveMiniBossSpecial(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
-  return themedSpecial(theme)?.mini_boss ?? resolveDamageTypeSpecial(damageType);
+  return resolveEliteSpike(theme, damageType);
 }
 
 type EncounterSitePreviewSlot = {

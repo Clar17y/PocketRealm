@@ -76,7 +76,7 @@ describe('resolveEncounterRoleActionTemplate', () => {
     })).toEqual([{ actionId: 'boss_magic_attack', targetMode: 'single_target' }]);
   });
 
-  it('gives spider elites a spider-themed special rotation', () => {
+  it('gives spider elites a single-target setup and spike rotation', () => {
     const actions = resolveEncounterRoleActionTemplate({
       role: 'elite',
       damageType: 'physical',
@@ -84,14 +84,33 @@ describe('resolveEncounterRoleActionTemplate', () => {
       mobName: 'Web Spinner',
     });
 
-    expect(actions.map(action => action.actionId)).toEqual([
-      'boss_physical_attack',
-      'boss_poison_spray',
-      'boss_physical_attack',
+    expect(actions).toEqual([
+      { actionId: 'boss_root', targetMode: 'single_target' },
+      { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+      { actionId: 'elite_venom_strike', targetMode: 'single_target' },
+      { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     ]);
   });
 
-  it('gives magic mini-bosses a telegraphed arcane pressure action', () => {
+  it('keeps elite and mini-boss generated templates single-target', () => {
+    const inputs = [
+      { role: 'elite', damageType: 'physical', familyName: 'Spiders', mobName: 'Web Spinner' },
+      { role: 'elite', damageType: 'magic', familyName: 'Witches', mobName: 'Hedge Witch' },
+      { role: 'mini_boss', damageType: 'physical', familyName: 'Golems', mobName: 'Stone Golem' },
+      { role: 'mini_boss', damageType: 'magic', familyName: 'Fae Spirits', mobName: 'Glimmer Wisp' },
+    ] as const;
+
+    for (const input of inputs) {
+      const actions = resolveEncounterRoleActionTemplate(input);
+
+      expect(actions.map(action => action.targetMode)).toEqual(
+        Array.from({ length: actions.length }, () => 'single_target'),
+      );
+      expect(actions).not.toContainEqual(expect.objectContaining({ targetMode: 'aoe' }));
+    }
+  });
+
+  it('gives magic mini-bosses a telegraphed single-target arcane finisher', () => {
     const actions = resolveEncounterRoleActionTemplate({
       role: 'mini_boss',
       damageType: 'magic',
@@ -99,14 +118,15 @@ describe('resolveEncounterRoleActionTemplate', () => {
       mobName: 'Glimmer Wisp',
     });
 
-    expect(actions).toContainEqual(expect.objectContaining({
-      actionId: 'boss_arcane_storm',
-      targetMode: 'aoe',
+    expect(actions).toContainEqual({
+      actionId: 'mini_boss_arcane_spike',
+      targetMode: 'single_target',
       isTelegraphed: true,
-    }));
+      label: 'ARCANE SPIKE',
+    });
   });
 
-  it('gives physical mini-bosses a telegraphed earthquake pressure action', () => {
+  it('gives physical mini-bosses a telegraphed single-target execution finisher', () => {
     const actions = resolveEncounterRoleActionTemplate({
       role: 'mini_boss',
       damageType: 'physical',
@@ -114,11 +134,29 @@ describe('resolveEncounterRoleActionTemplate', () => {
       mobName: 'Stone Golem',
     });
 
-    expect(actions).toContainEqual(expect.objectContaining({
-      actionId: 'boss_earthquake',
-      targetMode: 'aoe',
+    expect(actions).toContainEqual({
+      actionId: 'mini_boss_execution_strike',
+      targetMode: 'single_target',
       isTelegraphed: true,
-    }));
+      label: 'EXECUTION STRIKE',
+    });
+  });
+
+  it('builds mini-bosses with setup, basic, special, basic, and finisher actions', () => {
+    const actions = resolveEncounterRoleActionTemplate({
+      role: 'mini_boss',
+      damageType: 'physical',
+      familyName: 'Golems',
+      mobName: 'Stone Golem',
+    });
+
+    expect(actions.map(action => action.actionId)).toEqual([
+      'boss_root',
+      'boss_physical_attack',
+      'elite_crushing_blow',
+      'boss_physical_attack',
+      'mini_boss_execution_strike',
+    ]);
   });
 });
 
