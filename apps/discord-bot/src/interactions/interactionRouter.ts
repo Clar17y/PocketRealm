@@ -6,7 +6,11 @@ import { parseDuelButtonId, parseNotifyButtonId, parseSupportButtonId } from '..
 import { statusCard } from '../discord/v2Card.js';
 import { getRankCategoryAutocompleteChoices } from '../rankCategories.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
-import { handleAnnouncementCommand } from './announcementCommand.js';
+import {
+  handleAnnouncementCommand,
+  handleAnnouncementModalSubmit,
+  isAnnouncementModalCustomId,
+} from './announcementCommand.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { handleLinkCommand } from './linkCommand.js';
 import { handleNotifyCommand, handleNotifyToggleButton } from './notifyCommand.js';
@@ -75,12 +79,18 @@ export async function routeInteraction(
     return;
   }
 
-  if (
-    typeof interaction.isModalSubmit === 'function'
-    && interaction.isModalSubmit()
-    && isReportModalCustomId(interaction.customId)
-  ) {
-    await handleReportModalSubmit(interaction, options.api, options.config);
+  if (typeof interaction.isModalSubmit === 'function' && interaction.isModalSubmit()) {
+    if (isReportModalCustomId(interaction.customId)) {
+      await handleReportModalSubmit(interaction, options.api, options.config);
+      return;
+    }
+
+    if (isAnnouncementModalCustomId(interaction.customId)) {
+      await handleAnnouncementModalSubmit(interaction, { config: options.config });
+      return;
+    }
+
+    await replyUnhandledInteraction(interaction);
     return;
   }
 

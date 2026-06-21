@@ -1,10 +1,14 @@
-import type { ChatInputCommandInteraction, GuildMember } from 'discord.js';
+import type { ChatInputCommandInteraction, GuildMember, ModalSubmitInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { BotConfig } from '../config.js';
 import type { V2CardPayload } from '../discord/v2Card.js';
 import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
-import { handleAnnouncementCommand } from './announcementCommand.js';
+import {
+  handleAnnouncementCommand,
+  handleAnnouncementModalSubmit,
+  isAnnouncementModalCustomId,
+} from './announcementCommand.js';
 
 const guildId = '234567890123456789';
 const staffRoleId = '345678901234567890';
@@ -18,7 +22,29 @@ const config = {
   emojiMap: {},
 } satisfies Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds' | 'emojiMap'>;
 
+type MockAnnouncementInteraction = ChatInputCommandInteraction & {
+  reply: ReturnType<typeof vi.fn>;
+  deferReply: ReturnType<typeof vi.fn>;
+  editReply: ReturnType<typeof vi.fn>;
+  showModal: ReturnType<typeof vi.fn>;
+  client: { channels: { fetch: ReturnType<typeof vi.fn> } };
+};
+
+type MockAnnouncementModalInteraction = ModalSubmitInteraction & {
+  reply: ReturnType<typeof vi.fn>;
+  deferReply: ReturnType<typeof vi.fn>;
+  editReply: ReturnType<typeof vi.fn>;
+  client: { channels: { fetch: ReturnType<typeof vi.fn> } };
+};
+
 describe('handleAnnouncementCommand', () => {
+  it('matches announcement modal custom ids only', () => {
+    expect(isAnnouncementModalCustomId('announcement:0')).toBe(true);
+    expect(isAnnouncementModalCustomId('announcement:1')).toBe(true);
+    expect(isAnnouncementModalCustomId('announcement:bad')).toBe(false);
+    expect(isAnnouncementModalCustomId('report:user-1')).toBe(false);
+  });
+
   it('rejects usage outside the PocketRealm Discord server', async () => {
     const channel = createAnnouncementChannel();
     const interaction = createAnnouncementInteraction({
@@ -77,7 +103,39 @@ describe('handleAnnouncementCommand', () => {
     expect(channel.send).not.toHaveBeenCalled();
   });
 
-  it('posts trimmed announcements with mentions suppressed by default', async () => {
+  it('shows a multi-line announcement modal when no quick message is supplied', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      message: null,
+      everyone: false,
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, { config });
+
+    expect(interaction.showModal).toHaveBeenCalledTimes(1);
+    expect(shownModalCustomId(interaction)).toBe('announcement:0');
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(interaction.client.channels.fetch).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('shows a multi-line announcement modal with the everyone toggle encoded', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      message: null,
+      everyone: true,
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, { config });
+
+    expect(shownModalCustomId(interaction)).toBe('announcement:1');
+  });
+
+  it('posts trimmed quick announcements with mentions suppressed by default', async () => {
     const channel = createAnnouncementChannel();
     const interaction = createAnnouncementInteraction({
       member: memberWithRoles([staffRoleId]),
@@ -231,7 +289,7 @@ describe('handleAnnouncementCommand', () => {
     ].join('\n'));
   });
 
-  it('rejects whitespace-only announcements before fetching the channel', async () => {
+  it('shows the multi-line editor for whitespace-only quick messages before fetching the channel', async () => {
     const channel = createAnnouncementChannel();
     const interaction = createAnnouncementInteraction({
       member: memberWithRoles([staffRoleId]),
@@ -241,10 +299,8 @@ describe('handleAnnouncementCommand', () => {
 
     await handleAnnouncementCommand(interaction, { config });
 
-    expect(interaction.reply).toHaveBeenCalledWith({
-      ephemeral: true,
-      content: 'Announcement message cannot be empty.',
-    });
+    expect(interaction.showModal).toHaveBeenCalledTimes(1);
+    expect(interaction.reply).not.toHaveBeenCalled();
     expect(interaction.client.channels.fetch).not.toHaveBeenCalled();
     expect(channel.send).not.toHaveBeenCalled();
   });
@@ -296,6 +352,125 @@ describe('handleAnnouncementCommand', () => {
   });
 });
 
+describe('handleAnnouncementModalSubmit', () => {
+  it('rejects invalid modal custom ids without posting', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementModalInteraction({
+      member: memberWithRoles([staffRoleId]),
+      customId: 'announcement:bad',
+      message: 'The realm event starts now.',
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementModalSubmit(interaction, { config });
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'This announcement editor is no longer supported. Run /announcement again.',
+    });
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-staff modal submissions without posting', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementModalInteraction({
+      member: memberWithRoles([userRoleId]),
+      customId: 'announcement:0',
+      message: 'The realm event starts now.',
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementModalSubmit(interaction, { config });
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'Only support staff can send announcements.',
+    });
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('rejects whitespace-only modal announcements before fetching the channel', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementModalInteraction({
+      member: memberWithRoles([staffRoleId]),
+      customId: 'announcement:0',
+      message: '   ',
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementModalSubmit(interaction, { config });
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'Announcement message cannot be empty.',
+    });
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(interaction.client.channels.fetch).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('posts multi-line modal announcements through the card formatter', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementModalInteraction({
+      member: memberWithRoles([staffRoleId]),
+      customId: 'announcement:0',
+      message: [
+        '# Stamina Potions Recharged ⚡',
+        '',
+        'Stamina potions just got a major combat buff.',
+        '',
+        '## What changed',
+        '• Tier 1 stamina potions now restore **75 stamina**',
+        '• Tier 2 stamina potions now restore **100 stamina**',
+      ].join('\n'),
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementModalSubmit(interaction, { config });
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.client.channels.fetch).toHaveBeenCalledWith(announcementChannelId);
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const payload = channel.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toBe([
+      '📜 **Stamina Potions Recharged ⚡**',
+      '',
+      'Stamina potions just got a major combat buff.',
+      '',
+      '**What changed**',
+      '• Tier 1 stamina potions now restore **75 stamina**',
+      '• Tier 2 stamina potions now restore **100 stamina**',
+    ].join('\n'));
+  });
+
+  it('prepends and permits @everyone for modal announcements when encoded', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementModalInteraction({
+      member: memberWithRoles([staffRoleId]),
+      customId: 'announcement:1',
+      message: 'The realm event starts now.',
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementModalSubmit(interaction, { config });
+
+    const payload = channel.send.mock.calls[0]?.[0];
+    expect(payload).toEqual(expect.objectContaining({
+      allowedMentions: { parse: ['everyone'] },
+    }));
+    expect(cardText(payload)).toBe([
+      '@everyone',
+      '',
+      '📜 **Announcement**',
+      '',
+      'The realm event starts now.',
+    ].join('\n'));
+  });
+});
+
 function memberWithRoles(roleIds: string[]): GuildMember {
   return {
     roles: {
@@ -313,13 +488,18 @@ function createAnnouncementChannel() {
   };
 }
 
+function shownModalCustomId(interaction: MockAnnouncementInteraction): string | undefined {
+  const modal = interaction.showModal.mock.calls[0]?.[0] as { toJSON: () => { custom_id: string } } | undefined;
+  return modal?.toJSON().custom_id;
+}
+
 function createAnnouncementInteraction(input: {
   member: unknown;
-  message?: string;
+  message?: string | null;
   everyone?: boolean | null;
   announcementChannel?: ReturnType<typeof createAnnouncementChannel> | null;
   guildId?: string | null;
-}): ChatInputCommandInteraction {
+}): MockAnnouncementInteraction {
   return {
     commandName: 'announcement',
     guildId: input.guildId === undefined ? guildId : input.guildId,
@@ -333,11 +513,37 @@ function createAnnouncementInteraction(input: {
       },
     },
     options: {
-      getString: vi.fn(() => input.message ?? 'Server reset at 20:00 UTC'),
+      getString: vi.fn(() => input.message === undefined ? 'Server reset at 20:00 UTC' : input.message),
       getBoolean: vi.fn(() => input.everyone ?? null),
     },
     reply: vi.fn(),
     deferReply: vi.fn(),
     editReply: vi.fn(),
-  } as unknown as ChatInputCommandInteraction;
+    showModal: vi.fn(),
+  } as unknown as MockAnnouncementInteraction;
+}
+
+function createAnnouncementModalInteraction(input: {
+  member: unknown;
+  customId: string;
+  message: string;
+  announcementChannel?: ReturnType<typeof createAnnouncementChannel> | null;
+  guildId?: string | null;
+}): MockAnnouncementModalInteraction {
+  return {
+    guildId: input.guildId === undefined ? guildId : input.guildId,
+    customId: input.customId,
+    member: input.member,
+    client: {
+      channels: {
+        fetch: vi.fn(async () => input.announcementChannel ?? null),
+      },
+    },
+    fields: {
+      getTextInputValue: vi.fn(() => input.message),
+    },
+    reply: vi.fn(),
+    deferReply: vi.fn(),
+    editReply: vi.fn(),
+  } as unknown as MockAnnouncementModalInteraction;
 }
