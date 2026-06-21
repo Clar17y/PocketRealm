@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.71',
+    date: '2026-06-21',
+    title: 'Stronger Stamina Potions',
+    summary:
+      'Stamina potions are now much more useful in combat. Tier 1, Tier 2, and Tier 3 stamina potions restore 75, 100, and 150 stamina, and they can be used even when you are below the 5 stamina action cost. The action cost is still paid correctly in duels, raids, and boss fights, so a potion can bridge you back into heavier stamina skills without becoming free.',
+  },
+  {
     version: '0.70',
     date: '2026-06-20',
     title: 'Skill Tree Action Details',
