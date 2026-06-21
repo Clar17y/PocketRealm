@@ -932,6 +932,23 @@ export const ENCOUNTER_SITE_ROLE_CONSTANTS = {
       xp: 2,
     },
   },
+  ROLE_ACTION_MULTIPLIERS: {
+    trash: {
+      specialDamage: 1,
+      spikeDamage: 1,
+      debuffModifier: 1,
+    },
+    elite: {
+      specialDamage: 1.25,
+      spikeDamage: 1.5,
+      debuffModifier: 1,
+    },
+    mini_boss: {
+      specialDamage: 1.45,
+      spikeDamage: 1.9,
+      debuffModifier: 1.25,
+    },
+  },
   /** Keyword lists used to infer a mob family's combat theme for role-based action rotations. */
   FAMILY_THEME_KEYWORDS: {
     spider: ['spider', 'web', 'venom'],

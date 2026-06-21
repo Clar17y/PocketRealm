@@ -10,7 +10,7 @@ import type {
   ExpeditionMobState,
   CombatPotion,
 } from '@pocketrealm/shared';
-import { COMBAT_ACTION_CONSTANTS, HIT_CURVE_CONSTANTS } from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS, ENCOUNTER_SITE_ROLE_CONSTANTS, HIT_CURVE_CONSTANTS } from '@pocketrealm/shared';
 import { resolveRaidRound } from './raidRoundResolver';
 import type { RaidRoundRng } from './raidRoundResolver';
 import { calculateHitChance } from './damageCalculator';
@@ -2353,6 +2353,36 @@ describe('resolveRaidRound', () => {
       const withered = effects.find(e => e.stat === 'defence');
       expect(withered).toBeDefined();
       expect(withered!.modifier).toBe(-8);
+    });
+  });
+
+  describe('encounter role spike actions', () => {
+    it('elite_venom_strike is an always-hit single-target magic spike with poison pressure', () => {
+      const definition = BOSS_ACTION_DEFINITIONS.elite_venom_strike;
+
+      expect(definition).toEqual(expect.objectContaining({
+        id: 'elite_venom_strike',
+        actionType: 'damage_spell',
+        damageType: 'magic',
+        alwaysHits: true,
+        damageMultiplier: expect.any(Number),
+      }));
+      expect(definition.damageMultiplier).toBeGreaterThan(1);
+      expect(definition.effect).toEqual(expect.objectContaining({
+        name: 'Venom-Touched',
+        stat: 'poison',
+        isDebuff: true,
+        damagePerRound: expect.any(Number),
+      }));
+    });
+
+    it('role spike actions are tuned by encounter role action multipliers', () => {
+      expect(BOSS_ACTION_DEFINITIONS.elite_maul.damageMultiplier).toBe(
+        1.6 * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS.elite.spikeDamage,
+      );
+      expect(BOSS_ACTION_DEFINITIONS.mini_boss_execution_strike.damageMultiplier).toBe(
+        2.1 * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS.mini_boss.spikeDamage,
+      );
     });
   });
 

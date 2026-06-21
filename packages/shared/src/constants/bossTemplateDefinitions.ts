@@ -1,8 +1,13 @@
 import type { ActionDefinition } from '../types/combatAction.types';
 import type { BossTemplateDefinition } from '../types/bossTemplate.types';
+import { ENCOUNTER_SITE_ROLE_CONSTANTS } from './gameConstants';
 
 // Boss action definitions — all zero-cost (mobs don't manage resources)
 const BOSS_ZERO_COST = { stamina: 0, mana: 0 } as const;
+
+function roleSpikeMultiplier(role: 'elite' | 'mini_boss', base: number): number {
+  return base * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].spikeDamage;
+}
 
 const bossPhysicalAttack: ActionDefinition = {
   id: 'boss_physical_attack',
@@ -346,6 +351,112 @@ const bossFrenzy: ActionDefinition = {
   },
 };
 
+const eliteVenomStrike: ActionDefinition = {
+  id: 'elite_venom_strike',
+  name: 'Venom Strike',
+  description: 'A precise venomous strike that leaves poison behind.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.5),
+  damageType: 'magic',
+  alwaysHits: true,
+  effect: {
+    name: 'Venom-Touched',
+    stat: 'poison',
+    modifier: 0,
+    duration: 3,
+    isDebuff: true,
+    damagePerRound: 4,
+    dotDamageType: 'magic',
+  },
+};
+
+const eliteMaul: ActionDefinition = {
+  id: 'elite_maul',
+  name: 'Maul',
+  description: 'A brutal tearing strike.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.6),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const eliteBackstab: ActionDefinition = {
+  id: 'elite_backstab',
+  name: 'Backstab',
+  description: 'A precise strike from a blind angle.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.7),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const eliteCrushingBlow: ActionDefinition = {
+  id: 'elite_crushing_blow',
+  name: 'Crushing Blow',
+  description: 'A heavy blow that lands with crushing force.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.7),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const eliteArcaneLance: ActionDefinition = {
+  id: 'elite_arcane_lance',
+  name: 'Arcane Lance',
+  description: 'A focused lance of arcane force.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.65),
+  damageType: 'magic',
+  alwaysHits: true,
+};
+
+const eliteDrainingStrike: ActionDefinition = {
+  id: 'elite_draining_strike',
+  name: 'Draining Strike',
+  description: 'A draining strike that restores the attacker.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.5),
+  damageType: 'magic',
+  alwaysHits: true,
+  lifeLeechPercent: 0.25,
+};
+
+const miniBossExecutionStrike: ActionDefinition = {
+  id: 'mini_boss_execution_strike',
+  name: 'Execution Strike',
+  description: 'A telegraphed execution strike aimed at one target.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('mini_boss', 2.1),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const miniBossArcaneSpike: ActionDefinition = {
+  id: 'mini_boss_arcane_spike',
+  name: 'Arcane Spike',
+  description: 'A telegraphed arcane spike aimed at one target.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('mini_boss', 2.1),
+  damageType: 'magic',
+  alwaysHits: true,
+};
+
 const bossBarkShield: ActionDefinition = {
   id: 'boss_bark_shield',
   name: 'Bark Shield',
@@ -524,6 +635,14 @@ export const BOSS_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   boss_root: bossRoot,
   boss_fear_howl: bossFearHowl,
   boss_frenzy: bossFrenzy,
+  elite_venom_strike: eliteVenomStrike,
+  elite_maul: eliteMaul,
+  elite_backstab: eliteBackstab,
+  elite_crushing_blow: eliteCrushingBlow,
+  elite_arcane_lance: eliteArcaneLance,
+  elite_draining_strike: eliteDrainingStrike,
+  mini_boss_execution_strike: miniBossExecutionStrike,
+  mini_boss_arcane_spike: miniBossArcaneSpike,
   boss_bark_shield: bossBarkShield,
   boss_rally: bossRally,
   boss_shield_wall: bossShieldWall,
