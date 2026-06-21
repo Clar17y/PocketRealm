@@ -107,7 +107,7 @@ describe('ChatPanel', () => {
     renderChatPanel({ isOpen: false });
 
     expect(screen.getByRole('button', { name: 'Open chat' }).className).toContain(
-      'bottom-[calc(var(--rpg-bottom-nav-offset)_+_0.75rem)]',
+      'bottom-[calc(var(--rpg-bottom-nav-offset)_+_var(--rpg-docked-bar-height,_0px)_+_0.75rem)]',
     );
   });
 
