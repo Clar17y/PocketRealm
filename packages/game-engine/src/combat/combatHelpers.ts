@@ -46,6 +46,7 @@ export interface CombatParticipantState {
   exhaustedReason?: ExhaustedActionReason | null;
   healTargetPlayerId?: string | null;
   alternateActionDef?: ActionDefinition | null;
+  costPaid?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +261,7 @@ export function applyResourceCosts(
     const def = s.actionDef;
 
     // Deduct action cost
-    if (def && !s.wasExhausted && def.potionType !== 'stamina') {
+    if (def && !s.wasExhausted && !s.costPaid) {
       s.stamina -= def.cost.stamina;
       s.mana -= def.cost.mana;
     }
