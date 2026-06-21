@@ -44,6 +44,8 @@ export interface ActionCost {
   mana: number;
 }
 
+export type ActionTargetMode = 'single_target' | 'aoe';
+
 export interface ActionDefinition {
   id: string;
   name: string;
@@ -51,6 +53,8 @@ export interface ActionDefinition {
   actionType: CombatActionType;
   category: ActionCategory;
   cost: ActionCost;
+  /** Whether the action resolves against one target or all valid targets. */
+  targetMode?: ActionTargetMode;
   /** Damage multiplier relative to base weapon damage (1.0 = normal) */
   damageMultiplier?: number;
   /** Accuracy modifier added to hit roll */
