@@ -58,7 +58,7 @@ const bossArcaneStorm: ActionDefinition = {
 const bossWeaken: ActionDefinition = {
   id: 'boss_weaken',
   name: 'Weaken',
-  description: 'Reduces all players\' attack for 3 rounds.',
+  description: 'Reduces target attack for 3 rounds.',
   actionType: 'debuff_spell',
   category: 'offensive',
   cost: BOSS_ZERO_COST,

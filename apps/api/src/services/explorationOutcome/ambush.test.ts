@@ -11,6 +11,7 @@ vi.mock('@pocketrealm/game-engine', () => ({
   buildPlayerCombatStats: vi.fn(() => ({ damageMin: 1, damageMax: 3, defence: 1 })),
   filterAndWeightMobsByTier: vi.fn((mobs: unknown[]) => mobs),
   mobToTemplateCombatant: vi.fn(() => ({ id: 'mob-1' })),
+  rollNormalExplorationMobRole: vi.fn(() => 'trash'),
   rollMobPrefix: vi.fn(() => null),
   runTemplateCombat: vi.fn(() => ({
     outcome: 'victory',
@@ -89,6 +90,7 @@ vi.mock('../../utils/routeHelpers.js', () => ({
 }));
 
 import { mockPrisma } from '../../__test__/setup';
+import { mobToTemplateCombatant, rollNormalExplorationMobRole } from '@pocketrealm/game-engine';
 import { setHp } from '../hpService';
 import { consumeBuffChargesPerMob } from '../buffService';
 import { processCombatVictoryRewards } from '../combatOrchestrationService';
@@ -231,5 +233,38 @@ describe('processAmbushOutcome', () => {
     expect(processCombatVictoryRewards).toHaveBeenCalledWith(
       expect.objectContaining({ guildXpBoost: 0.12 }),
     );
+  });
+
+  it('applies normal exploration elite role rolls before resolving ambush combat', async () => {
+    vi.mocked(rollNormalExplorationMobRole).mockReturnValueOnce('elite');
+
+    const events: Parameters<typeof processAmbushOutcome>[0]['events'] = [];
+
+    await processAmbushOutcome({
+      ctx: buildContext(),
+      outcome: { turnOccurred: 12, type: 'ambush' },
+      currentHp: 100,
+      currentStamina: 100,
+      currentMana: 50,
+      buffUsesLeft: { damage: 0, defence: 0, durability: 0 },
+      potionPool: [],
+      events,
+      pendingCombatLogs: [],
+      allPotionsConsumed: [],
+      ambushPendingLootSessionIds: [],
+      allNewItemIds: [],
+      allUpdatedItemIds: [],
+      allQuestProgress: [],
+    });
+
+    expect(rollNormalExplorationMobRole).toHaveBeenCalledOnce();
+    expect(mobToTemplateCombatant).toHaveBeenCalledWith(expect.objectContaining({
+      hp: 19,
+      damageMin: 1,
+      damageMax: 5,
+      xpReward: 8,
+      mobDisplayName: 'Elite Forest Rat',
+    }));
+    expect(events[0]?.description).toContain('Elite Forest Rat');
   });
 });
