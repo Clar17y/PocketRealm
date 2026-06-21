@@ -2378,12 +2378,17 @@ describe('resolveRaidRound', () => {
         alwaysHits: true,
         damageMultiplier: expect.any(Number),
       }));
-      expect(definition.damageMultiplier).toBeGreaterThan(1);
+      expect(definition.damageMultiplier).toBe(
+        1.5 * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS.elite.spikeDamage,
+      );
       expect(definition.effect).toEqual(expect.objectContaining({
         name: 'Venom-Touched',
         stat: 'poison',
+        modifier: 0,
+        duration: 3,
         isDebuff: true,
-        damagePerRound: expect.any(Number),
+        damagePerRound: 4,
+        dotDamageType: 'magic',
       }));
     });
 
