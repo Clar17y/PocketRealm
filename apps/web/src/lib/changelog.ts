@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.72',
+    date: '2026-06-21',
+    title: 'Encounter Site Recipe Rewards',
+    summary:
+      'Encounter site end chests now have a separate chance to drop a copy of that family\'s advanced weapon or armour while keeping the recipe itself rarer. Recipe unlock chances have been reduced slightly, but item-copy drops can appear more often, so you can farm sites for pieces like the Goblin King\'s Crown while still working longer to learn how to craft your own.',
+  },
+  {
     version: '0.71',
     date: '2026-06-21',
     title: 'Stronger Stamina Potions',

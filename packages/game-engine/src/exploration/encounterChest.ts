@@ -76,6 +76,17 @@ export function getChestRecipeChanceForRoomCount(rooms: number): number {
   }
 }
 
+export function getChestAdvancedItemChanceForRoomCount(rooms: number): number {
+  const rarity = getChestRarityForRoomCount(rooms);
+  switch (rarity) {
+    case 'common': return CHEST_CONSTANTS.CHEST_ADVANCED_ITEM_CHANCE_SMALL;
+    case 'uncommon': return CHEST_CONSTANTS.CHEST_ADVANCED_ITEM_CHANCE_MEDIUM;
+    case 'rare': return CHEST_CONSTANTS.CHEST_ADVANCED_ITEM_CHANCE_LARGE;
+    case 'epic': return CHEST_CONSTANTS.CHEST_ADVANCED_ITEM_CHANCE_EPIC;
+    case 'legendary': return CHEST_CONSTANTS.CHEST_ADVANCED_ITEM_CHANCE_LEGENDARY;
+  }
+}
+
 export function rollChestMaterialRollsByRoomCount(rooms: number, rng: () => number = Math.random): number {
   const range = getChestMaterialRollRangeForRoomCount(rooms);
   if (range.min >= range.max) return range.min;
