@@ -73,7 +73,7 @@ describe('buildCommandDefinitions', () => {
     ]);
   });
 
-  it('builds the announcement command with staff permissions and mention toggle', () => {
+  it('builds the announcement command with staff permissions, optional quick message, and mention toggle', () => {
     const commands = buildCommandDefinitions();
     const announcementCommand = commands.find((command) => command.name === 'announcement');
 
@@ -82,9 +82,9 @@ describe('buildCommandDefinitions', () => {
     expect(announcementCommand?.options).toEqual([
       expect.objectContaining({
         name: 'message',
-        description: 'Announcement message to post.',
+        description: 'Optional one-line message. Omit to open the multi-line editor.',
         type: ApplicationCommandOptionType.String,
-        required: true,
+        required: false,
       }),
       expect.objectContaining({
         name: 'everyone',

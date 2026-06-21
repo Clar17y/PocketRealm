@@ -176,6 +176,12 @@ describe('POTION_CONSTANTS', () => {
       .toBeLessThan(POTION_CONSTANTS.GREATER_HEALTH_HEAL);
   });
 
+  it('stamina restore amounts are tuned for combat potion usage', () => {
+    expect(POTION_CONSTANTS.MINOR_STAMINA_RESTORE).toBe(75);
+    expect(POTION_CONSTANTS.STAMINA_RESTORE).toBe(100);
+    expect(POTION_CONSTANTS.GREATER_STAMINA_RESTORE).toBe(150);
+  });
+
 });
 
 describe('CHEST_CONSTANTS', () => {

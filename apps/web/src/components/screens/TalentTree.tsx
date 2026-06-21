@@ -5,6 +5,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Lock, CheckCircle, Sparkles, Zap } from 'lucide-react';
 import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@pocketrealm/shared';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { SkillPointState } from '@/lib/api';
@@ -52,6 +53,27 @@ function countTierAllocations(
   return nodes
     .filter(n => n.tier === tier)
     .reduce((sum, n) => sum + (allocations[n.id] ?? 0), 0);
+}
+
+function formatActionName(actionId: string): string {
+  return BASE_ACTION_DEFINITIONS[actionId]?.name ?? actionId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatActionMetadata(actionId: string): string | null {
+  const actionDefinition = BASE_ACTION_DEFINITIONS[actionId];
+  if (!actionDefinition) return null;
+
+  const metadata: string[] = [];
+  if (actionDefinition.cost.stamina > 0) metadata.push(`Stamina ${actionDefinition.cost.stamina}`);
+  if (actionDefinition.cost.mana > 0) metadata.push(`Mana ${actionDefinition.cost.mana}`);
+  if (actionDefinition.cost.stamina === 0 && actionDefinition.cost.mana === 0) metadata.push('Free');
+
+  if (actionDefinition.damageMultiplier != null) {
+    const targetLabel = actionDefinition.targetMode === 'aoe' ? ' AoE' : '';
+    metadata.push(`${actionDefinition.damageMultiplier}x${targetLabel} dmg`);
+  }
+
+  return metadata.length > 0 ? metadata.join(' · ') : null;
 }
 
 export function TalentTree({
@@ -206,6 +228,7 @@ export function TalentTree({
                 const check = canAllocate(node);
                 const isAffordable = check.allowed;
                 const isLocked = !isAllocated && !isAffordable;
+                const actionMetadataLabel = node.unlocksAction ? formatActionMetadata(node.unlocksAction) : null;
 
                 return (
                   <PixelCard
@@ -273,11 +296,18 @@ export function TalentTree({
 
                         {/* Action unlock badge */}
                         {node.unlocksAction && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Zap size={11} style={{ color: activeTabMeta.color }} />
-                            <span className="text-[11px] font-semibold" style={{ color: activeTabMeta.color }}>
-                              Unlocks: {node.unlocksAction.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                            </span>
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            <div className="flex items-center gap-1">
+                              <Zap size={11} style={{ color: activeTabMeta.color }} />
+                              <span className="text-[11px] font-semibold" style={{ color: activeTabMeta.color }}>
+                                Unlocks: {formatActionName(node.unlocksAction)}
+                              </span>
+                            </div>
+                            {actionMetadataLabel && (
+                              <span className="text-[11px] text-[var(--rpg-text-secondary)]">
+                                {actionMetadataLabel}
+                              </span>
+                            )}
                           </div>
                         )}
 

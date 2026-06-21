@@ -42,8 +42,11 @@ function canAfford(
   currentStamina: number,
   currentMana: number,
 ): boolean {
+  // Stamina potions are the one stamina-cost action that must be usable when exhausted.
+  const hasRequiredStamina = action.potionType === 'stamina'
+    || currentStamina >= action.cost.stamina;
   return (
-    currentStamina >= action.cost.stamina && currentMana >= action.cost.mana
+    hasRequiredStamina && currentMana >= action.cost.mana
   );
 }
 

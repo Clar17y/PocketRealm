@@ -1,3 +1,4 @@
+import { COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/combatActionDefinitions';
 import { BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/bossTemplateDefinitions';
 import { describe, it, expect } from 'vitest';
@@ -112,6 +113,23 @@ describe('resolveBossRound', () => {
       const p = makeParticipant({ template, templateRound: 5 });
       const result = resolveBossRound(makeInput({ participants: [p] }), alwaysHitRng);
       expect(result.participantResults[0].actionId).toBe('normal_attack');
+    });
+
+    it('deducts stamina potion cost in boss rounds', () => {
+      const p = makeParticipant({
+        stamina: COMBAT_ACTION_CONSTANTS.USE_POTION_STAMINA,
+        staminaRegenPerRound: 0,
+        template: slotsOf('use_stamina_potion'),
+      });
+      const boss = makeBoss({
+        template: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveBossRound(makeInput({ boss, participants: [p] }), alwaysHitRng);
+
+      expect(result.participantResults[0].actionId).toBe('use_stamina_potion');
+      expect(result.participantResults[0].wasExhausted).toBe(false);
+      expect(result.participantResults[0].staminaAfter).toBe(0);
     });
   });
 
