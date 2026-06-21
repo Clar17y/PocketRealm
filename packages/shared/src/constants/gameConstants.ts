@@ -958,33 +958,6 @@ export const ENCOUNTER_SITE_ROLE_CONSTANTS = {
     spirit: ['spirit', 'fae', 'wisp', 'witch'],
     undead: ['undead', 'skeleton', 'wraith', 'lich'],
   },
-  /** Themed special actions used in elite / mini-boss action rotations. */
-  ROLE_SPECIAL_ACTIONS: {
-    spider: {
-      elite: { actionId: 'boss_poison_spray', targetMode: 'aoe' },
-      mini_boss: { actionId: 'boss_venom_cloud', targetMode: 'aoe' },
-    },
-    wolf: {
-      elite: { actionId: 'boss_frenzy', targetMode: 'single_target' },
-      mini_boss: { actionId: 'boss_terrifying_howl', targetMode: 'aoe' },
-    },
-    bandit: {
-      elite: { actionId: 'boss_smoke_bomb', targetMode: 'aoe' },
-      mini_boss: { actionId: 'boss_mark_for_death', targetMode: 'single_target' },
-    },
-    treant: {
-      elite: { actionId: 'boss_root', targetMode: 'single_target' },
-      mini_boss: { actionId: 'boss_shield_wall', targetMode: 'single_target' },
-    },
-    spirit: {
-      elite: { actionId: 'boss_weaken', targetMode: 'aoe' },
-      mini_boss: { actionId: 'boss_weaken', targetMode: 'aoe' },
-    },
-    undead: {
-      elite: { actionId: 'boss_wither', targetMode: 'single_target' },
-      mini_boss: { actionId: 'boss_blight_cloud', targetMode: 'aoe' },
-    },
-  },
 } as const;
 
 // =============================================================================

@@ -63,7 +63,7 @@ export function resolveEncounterRoleActionTemplate(input: {
 
   if (input.role === 'elite') {
     return [
-      resolveEliteSetup(theme, input.damageType),
+      resolveSetupAction(theme, input.damageType),
       basicAction,
       resolveEliteSpike(theme, input.damageType),
       basicAction,
@@ -75,7 +75,7 @@ export function resolveEncounterRoleActionTemplate(input: {
     : { actionId: 'mini_boss_execution_strike', targetMode: 'single_target', isTelegraphed: true, label: 'EXECUTION STRIKE' };
 
   return [
-    resolveMiniBossSetup(theme, input.damageType),
+    resolveSetupAction(theme, input.damageType),
     basicAction,
     resolveMiniBossSpecial(theme, input.damageType),
     basicAction,
@@ -106,7 +106,7 @@ function singleTargetAction(actionId: string): BossTemplateAction {
   return { actionId, targetMode: 'single_target' };
 }
 
-function resolveEliteSetup(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
+function resolveSetupAction(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
   if (theme === 'spider' || theme === 'treant') return singleTargetAction('boss_root');
   if (theme === 'bandit') return singleTargetAction('boss_smoke_bomb');
   if (theme === 'wolf') return singleTargetAction('boss_frenzy');
@@ -123,15 +123,6 @@ function resolveEliteSpike(theme: FamilyTheme, damageType: DamageType): BossTemp
   if (theme === 'spirit' || damageType === 'magic') return singleTargetAction('elite_arcane_lance');
   if (theme === 'undead') return singleTargetAction('elite_draining_strike');
   return singleTargetAction(damageType === 'magic' ? 'elite_arcane_lance' : 'elite_crushing_blow');
-}
-
-function resolveMiniBossSetup(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
-  if (theme === 'spider' || theme === 'treant') return singleTargetAction('boss_root');
-  if (theme === 'bandit') return singleTargetAction('boss_smoke_bomb');
-  if (theme === 'wolf') return singleTargetAction('boss_frenzy');
-  if (theme === 'undead') return singleTargetAction('boss_wither');
-  if (theme === 'spirit' || damageType === 'magic') return singleTargetAction('boss_weaken');
-  return singleTargetAction('boss_enrage');
 }
 
 function resolveMiniBossSpecial(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
