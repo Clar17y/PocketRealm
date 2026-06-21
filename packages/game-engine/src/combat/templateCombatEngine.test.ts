@@ -795,6 +795,36 @@ describe('runTemplateCombat', () => {
       expect(potionEntry?.message).toContain('Stamina');
     });
 
+    it('stamina potion can be used from zero stamina and pays its cost from the restored stamina', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Player', {
+        template: templateOf('use_stamina_potion', 'light_attack'),
+        stats: makeStats({ hp: 100, maxHp: 100, damageMin: 200, damageMax: 200 }),
+        stamina: 0,
+        maxStamina: 100,
+        staminaRegenPerRound: 0,
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Stamina Potion', healAmount: 30, templateId: 'stam-1', potionType: 'stamina' },
+        ],
+      });
+
+      const potionEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'potion',
+      );
+      expect(result.potionsConsumed).toHaveLength(1);
+      expect(result.potionsConsumed[0].healAmount).toBe(30);
+      expect(potionEntry?.combatantAStaminaAfter).toBe(
+        30 - COMBAT_ACTION_CONSTANTS.USE_POTION_STAMINA,
+      );
+    });
+
     it('mana potion restores mana during combat', () => {
       mockCombatRandom();
 

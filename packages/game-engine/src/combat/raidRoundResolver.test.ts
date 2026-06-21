@@ -875,6 +875,31 @@ describe('resolveRaidRound', () => {
       expect(pr.potionsConsumed).toHaveLength(1);
     });
 
+    it('use_stamina_potion works from zero stamina and pays its cost from the restored stamina', () => {
+      const potion = makePotion({ potionType: 'stamina', name: 'Stamina Potion', templateId: 'potion-stam-1', healAmount: 30 });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        stamina: 0, maxStamina: 100, staminaRegenPerRound: 0,
+        template: [{ actionId: 'use_stamina_potion', sortOrder: 0 }],
+        availablePotions: [potion],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      expect(pr.wasExhausted).toBe(false);
+      expect(pr.staminaAfter).toBe(30 - COMBAT_ACTION_CONSTANTS.USE_POTION_STAMINA);
+      expect(pr.potionsConsumed).toHaveLength(1);
+    });
+
     it('hp potion does not overheal past maxHp (cap)', () => {
       const potion = makePotion({ healAmount: 80 });
       const p1 = makeParticipant({
