@@ -122,7 +122,7 @@ function resolveEliteSpike(theme: FamilyTheme, damageType: DamageType): BossTemp
   if (theme === 'treant') return singleTargetAction('elite_crushing_blow');
   if (theme === 'spirit' || damageType === 'magic') return singleTargetAction('elite_arcane_lance');
   if (theme === 'undead') return singleTargetAction('elite_draining_strike');
-  return singleTargetAction(damageType === 'magic' ? 'elite_arcane_lance' : 'elite_crushing_blow');
+  return singleTargetAction('elite_crushing_blow');
 }
 
 function resolveMiniBossSpecial(theme: FamilyTheme, damageType: DamageType): BossTemplateAction {
