@@ -2409,6 +2409,41 @@ describe('resolveRaidRound', () => {
     it('elite_draining_strike uses whole-percent life leech semantics', () => {
       expect(BOSS_ACTION_DEFINITIONS.elite_draining_strike.lifeLeechPercent).toBe(25);
     });
+
+    it('elite_draining_strike heals the mob for life leech damage dealt', () => {
+      const participant = makeParticipant({
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        stats: makeStats({ magicDefence: 0, defence: 0 }),
+        hp: 100,
+        maxHp: 100,
+      });
+      const mob = makeMob({
+        id: 'drainer',
+        hp: 50,
+        maxHp: 100,
+        stats: makeStats({
+          hp: 100,
+          maxHp: 100,
+          damageMin: 20,
+          damageMax: 20,
+          damageType: 'magic',
+          accuracy: 100,
+        }),
+        actionTemplate: [{ actionId: 'elite_draining_strike', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [participant], mobs: [mob] }),
+        alwaysHitRng,
+      );
+
+      expect(result.mobActionResults[0].damageDealt).toBeGreaterThan(0);
+      const expectedHeal = Math.floor(
+        result.mobActionResults[0].damageDealt * BOSS_ACTION_DEFINITIONS.elite_draining_strike.lifeLeechPercent! / 100,
+      );
+      expect(result.mobActionResults[0].healingDone).toBe(expectedHeal);
+      expect(result.mobsAfter[0].hp).toBe(50 + expectedHeal);
+    });
   });
 
   describe('pinned effect', () => {
