@@ -2,6 +2,8 @@ import type { ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { BotConfig } from '../config.js';
+import type { V2CardPayload } from '../discord/v2Card.js';
+import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleAnnouncementCommand } from './announcementCommand.js';
 
 const guildId = '234567890123456789';
@@ -9,12 +11,12 @@ const staffRoleId = '345678901234567890';
 const userRoleId = '456789012345678901';
 const announcementChannelId = '567890123456789012';
 const actorUserId = '678901234567890123';
-const zeroWidthSpace = '\u200B';
 
 const config = {
   announcementChannelId,
   supportStaffRoleIds: [staffRoleId],
-} satisfies Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds'>;
+  emojiMap: {},
+} satisfies Pick<BotConfig, 'announcementChannelId' | 'supportStaffRoleIds' | 'emojiMap'>;
 
 describe('handleAnnouncementCommand', () => {
   it('rejects usage outside the PocketRealm Discord server', async () => {
@@ -46,6 +48,7 @@ describe('handleAnnouncementCommand', () => {
       config: {
         announcementChannelId,
         supportStaffRoleIds: [],
+        emojiMap: {},
       },
     });
 
@@ -87,13 +90,90 @@ describe('handleAnnouncementCommand', () => {
 
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(interaction.client.channels.fetch).toHaveBeenCalledWith(announcementChannelId);
-    expect(channel.send).toHaveBeenCalledWith({
-      content: 'Patch notes are live @everyone <@123456789012345678>',
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const payload = channel.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(payload).toEqual(expect.objectContaining({
       allowedMentions: { parse: [] },
-    });
+    }));
+    expect(cardText(payload)).toBe([
+      '📜 **Announcement**',
+      '',
+      'Patch notes are live @everyone <@123456789012345678>',
+    ].join('\n'));
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: `Announcement posted to <#${announcementChannelId}>.`,
     });
+  });
+
+  it('posts changelog rich text as a Components V2 announcement card', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      message: [
+        '# Weekly Realm Update',
+        '',
+        '## Combat',
+        '⚔️ Raid bosses now show threat progress.',
+        '- Duel replay damage order is fixed.',
+      ].join('\n'),
+      everyone: false,
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, { config });
+
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const payload = channel.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toBe([
+      '📜 **Weekly Realm Update**',
+      '',
+      '**Combat**',
+      '⚔️ Raid bosses now show threat progress.',
+      '• Duel replay damage order is fixed.',
+    ].join('\n'));
+  });
+
+  it('uses configured announcement emoji overrides', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      message: '# Patch Notes',
+      everyone: false,
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, {
+      config: {
+        ...config,
+        emojiMap: { announcement: '<:pr_scroll:123456789012345678>' },
+      },
+    });
+
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const payload = channel.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(cardText(payload)).toBe('<:pr_scroll:123456789012345678> **Patch Notes**');
+  });
+
+  it('rejects oversized announcements before fetching the channel', async () => {
+    const channel = createAnnouncementChannel();
+    const interaction = createAnnouncementInteraction({
+      member: memberWithRoles([staffRoleId]),
+      message: `# Patch Notes\n${'x'.repeat(4000)}`,
+      announcementChannel: channel,
+    });
+
+    await handleAnnouncementCommand(interaction, { config });
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      ephemeral: true,
+      content: 'Announcement message is too long. Shorten it and try again.',
+    });
+    expect(interaction.client.channels.fetch).not.toHaveBeenCalled();
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
   });
 
   it('prepends and permits @everyone when the toggle is enabled', async () => {
@@ -107,10 +187,19 @@ describe('handleAnnouncementCommand', () => {
 
     await handleAnnouncementCommand(interaction, { config });
 
-    expect(channel.send).toHaveBeenCalledWith({
-      content: '@everyone\n\nThe realm event starts now.',
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const payload = channel.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(payload).toEqual(expect.objectContaining({
       allowedMentions: { parse: ['everyone'] },
-    });
+    }));
+    expect(cardText(payload)).toBe([
+      '@everyone',
+      '',
+      '📜 **Announcement**',
+      '',
+      'The realm event starts now.',
+    ].join('\n'));
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: `Announcement posted to <#${announcementChannelId}>.`,
     });
@@ -127,14 +216,19 @@ describe('handleAnnouncementCommand', () => {
 
     await handleAnnouncementCommand(interaction, { config });
 
-    expect(channel.send).toHaveBeenCalledWith({
-      content: [
-        '@everyone',
-        '',
-        `Event now @${zeroWidthSpace}here @${zeroWidthSpace}everyone <@123456789012345678> <@&234567890123456789>`,
-      ].join('\n'),
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const payload = channel.send.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    expect(payload).toEqual(expect.objectContaining({
       allowedMentions: { parse: ['everyone'] },
-    });
+    }));
+    expect(cardText(payload)).toBe([
+      '@everyone',
+      '',
+      '📜 **Announcement**',
+      '',
+      'Event now @\u200Bhere @\u200Beveryone <@123456789012345678> <@&234567890123456789>',
+    ].join('\n'));
   });
 
   it('rejects whitespace-only announcements before fetching the channel', async () => {
@@ -215,7 +309,7 @@ function memberWithRoles(roleIds: string[]): GuildMember {
 function createAnnouncementChannel() {
   return {
     isSendable: vi.fn(() => true),
-    send: vi.fn(async () => ({})),
+    send: vi.fn(async (_payload: V2CardPayload) => ({})),
   };
 }
 
