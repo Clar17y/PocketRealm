@@ -2357,7 +2357,18 @@ describe('resolveRaidRound', () => {
   });
 
   describe('encounter role spike actions', () => {
-    it('elite_venom_strike is an always-hit single-target magic spike with poison pressure', () => {
+    const roleSpikeCases = [
+      ['elite_venom_strike', 'elite', 'magic', 1.5],
+      ['elite_maul', 'elite', 'physical', 1.6],
+      ['elite_backstab', 'elite', 'physical', 1.7],
+      ['elite_crushing_blow', 'elite', 'physical', 1.7],
+      ['elite_arcane_lance', 'elite', 'magic', 1.65],
+      ['elite_draining_strike', 'elite', 'magic', 1.5],
+      ['mini_boss_execution_strike', 'mini_boss', 'physical', 2.1],
+      ['mini_boss_arcane_spike', 'mini_boss', 'magic', 2.1],
+    ] as const;
+
+    it('elite_venom_strike is an always-hit magic spike with poison pressure', () => {
       const definition = BOSS_ACTION_DEFINITIONS.elite_venom_strike;
 
       expect(definition).toEqual(expect.objectContaining({
@@ -2376,13 +2387,22 @@ describe('resolveRaidRound', () => {
       }));
     });
 
-    it('role spike actions are tuned by encounter role action multipliers', () => {
-      expect(BOSS_ACTION_DEFINITIONS.elite_maul.damageMultiplier).toBe(
-        1.6 * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS.elite.spikeDamage,
-      );
-      expect(BOSS_ACTION_DEFINITIONS.mini_boss_execution_strike.damageMultiplier).toBe(
-        2.1 * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS.mini_boss.spikeDamage,
-      );
+    it.each(roleSpikeCases)(
+      '%s is tuned by encounter role action multipliers',
+      (actionId, role, damageType, baseMultiplier) => {
+        const definition = BOSS_ACTION_DEFINITIONS[actionId];
+
+        expect(definition).toBeDefined();
+        expect(definition.alwaysHits).toBe(true);
+        expect(definition.damageMultiplier).toBe(
+          baseMultiplier * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].spikeDamage,
+        );
+        expect(definition.damageType).toBe(damageType);
+      },
+    );
+
+    it('elite_draining_strike uses whole-percent life leech semantics', () => {
+      expect(BOSS_ACTION_DEFINITIONS.elite_draining_strike.lifeLeechPercent).toBe(25);
     });
   });
 

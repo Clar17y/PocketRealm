@@ -430,7 +430,7 @@ const eliteDrainingStrike: ActionDefinition = {
   damageMultiplier: roleSpikeMultiplier('elite', 1.5),
   damageType: 'magic',
   alwaysHits: true,
-  lifeLeechPercent: 0.25,
+  lifeLeechPercent: 25,
 };
 
 const miniBossExecutionStrike: ActionDefinition = {
