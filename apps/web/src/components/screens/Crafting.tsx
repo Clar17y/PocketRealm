@@ -16,6 +16,7 @@ import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { ItemIcon } from '@/components/common/ItemIcon';
 import { SkillHeader } from '@/components/common/SkillHeader';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { DockedActionBar } from '../common/DockedActionBar';
 
 interface Material {
   name: string;
@@ -172,7 +173,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer bottomInset>
       {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
 
       {/* Knockout Banner */}
@@ -393,9 +394,16 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
             </div>
           </div>
 
+        </PixelCard>
+      )}
+
+      <ActivityLog entries={activityLog} maxHeight="max-h-48" />
+
+      {selectedRecipe && (
+        <DockedActionBar>
           {/* Quantity Selector */}
           {selectedMax > 1 && !selectedRecipeLocked && !selectedLevelLocked && (
-            <div className="flex items-center justify-between mb-4 bg-[var(--rpg-surface)] rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2 bg-[var(--rpg-surface)] rounded-lg p-3">
               <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">Quantity</span>
               <div className="flex items-center gap-3">
                 <button
@@ -456,10 +464,8 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
               ? `Craft ${quantity}x ${selectedRecipe.name}`
               : `Craft ${selectedRecipe.name}`}
           </PixelButton>
-        </PixelCard>
+        </DockedActionBar>
       )}
-
-      <ActivityLog entries={activityLog} maxHeight="max-h-48" />
     </ScreenContainer>
   );
 }

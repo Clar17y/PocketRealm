@@ -47,6 +47,7 @@ import {
   markEncounterRoomMobsDefeated,
   buildParticipantForEncounterSite,
   countEncounterSiteHits,
+  storeEncounterChestOverflow,
   accumulateEncounterSiteXpContribution,
   accumulateEncounterSiteEffectTickXpContributions,
   createEncounterSiteXpContributions,
@@ -180,6 +181,7 @@ export interface StartManualRoomResult {
   siteAutoCleared?: boolean;
   /** Chest rewards granted on auto-clear. */
   completionRewards?: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
+  pendingLootSessionId?: string | null;
 }
 
 /**
@@ -249,7 +251,7 @@ export async function startManualEncounterRoom(
 
   // All remaining rooms decayed — auto-clear site with chest reward
   if (!advanceResult) {
-    const completionRewards = await handleDecayedSiteClearance(playerId, siteId, site);
+    const { completionRewards, pendingLootSessionId } = await handleDecayedSiteClearance(playerId, siteId, site);
     return {
       currentRoom: site.currentRoom ?? 1,
       totalRooms: site.totalRooms ?? 1,
@@ -264,6 +266,7 @@ export async function startManualEncounterRoom(
       roundLogs: [],
       siteAutoCleared: true,
       completionRewards,
+      pendingLootSessionId,
     };
   }
 
@@ -351,6 +354,7 @@ export interface ManualRoundResult {
   outcome: 'ongoing' | 'cleared' | 'defeated' | 'site_cleared';
   siteCleared: boolean;
   completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
+  pendingLootSessionId: string | null;
   fleeResult: FleeResult | null;
   respawnedTo: { townId: string; townName: string } | null;
   xpGrants: GrantXpResult[];
@@ -464,6 +468,7 @@ export async function resolveManualEncounterRound(
       outcome: 'ongoing',
       siteCleared: false,
       completionRewards: null,
+      pendingLootSessionId: null,
       fleeResult: null,
       respawnedTo: null,
       xpGrants: [],
@@ -616,6 +621,7 @@ export async function resolveManualEncounterRound(
   const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(state.roundLogs);
   const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
   const durabilityDamagedItemIds = durabilityLost.map(d => d.itemId);
+  const pendingLootSessionId = await storeEncounterChestOverflow(playerId, txResult.completionRewards);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];
@@ -663,6 +669,7 @@ export async function resolveManualEncounterRound(
     outcome,
     siteCleared: txResult.siteCleared,
     completionRewards: txResult.completionRewards,
+    pendingLootSessionId,
     fleeResult,
     respawnedTo,
     xpGrants,

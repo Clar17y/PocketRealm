@@ -875,6 +875,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     isOverEncumbered: inventoryUsedSlots > inventoryCapacity,
     backpackFull: inventoryUsedSlots >= inventoryCapacity,
     pendingLootSession: loot.pendingLootSession,
+    activatePendingLoot: loot.activatePendingLoot,
     handleClaimLoot: loot.handleClaimLoot,
     handleDismissLoot: loot.handleDismissLoot,
     handleReopenLoot: loot.handleReopenLoot,

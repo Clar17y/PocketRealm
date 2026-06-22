@@ -758,6 +758,22 @@ describe('applyResourceCosts', () => {
     expect(pState[0].mana).toBe(23);
   });
 
+  it('does not deduct cost when it was already paid earlier in the round', () => {
+    const potionDef = makeActionDef({
+      id: 'use_stamina_potion',
+      cost: { stamina: 5, mana: 0 },
+    });
+
+    const participants = [makeParticipant({ maxStamina: 50, maxMana: 30, staminaRegenPerRound: 5, manaRegenPerRound: 3 })];
+    const pState = [makeState({ stamina: 40, mana: 20, actionDef: potionDef, costPaid: true, templateRound: 0 })];
+
+    applyResourceCosts(participants, pState);
+
+    expect(pState[0].stamina).toBe(45);
+    expect(pState[0].mana).toBe(23);
+    expect(pState[0].templateRound).toBe(1);
+  });
+
   it('caps resources at max after regen', () => {
     const atkDef = makeActionDef({
       id: 'light_attack',

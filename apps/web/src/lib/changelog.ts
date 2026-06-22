@@ -7,6 +7,34 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.73',
+    date: '2026-06-21',
+    title: 'Encounter Site Recipe Rewards',
+    summary:
+      'Encounter site end chests now have a separate chance to drop a copy of that family\'s advanced weapon or armour while keeping the recipe itself rarer. Recipe unlock chances have been reduced slightly, but item-copy drops can appear more often, so you can farm sites for pieces like the Goblin King\'s Crown while still working longer to learn how to craft your own.',
+  },
+  {
+    version: '0.72',
+    date: '2026-06-21',
+    title: 'Docked Action Bars',
+    summary:
+      'Crafting, Gathering, and the Forge now keep their main action within easy reach. Once you pick a recipe, gathering node, or forge item, its primary controls dock to a bar pinned just above the bottom navigation, so you no longer have to scroll back down past long lists to craft, gather, or upgrade. The list and detail content scroll behind the bar, and the chat button shifts up to stay clear of it.',
+  },
+  {
+    version: '0.71',
+    date: '2026-06-21',
+    title: 'Stronger Stamina Potions',
+    summary:
+      'Stamina potions are now much more useful in combat. Tier 1, Tier 2, and Tier 3 stamina potions restore 75, 100, and 150 stamina, and they can be used even when you are below the 5 stamina action cost. The action cost is still paid correctly in duels, raids, and boss fights, so a potion can bridge you back into heavier stamina skills without becoming free.',
+  },
+  {
+    version: '0.70',
+    date: '2026-06-20',
+    title: 'Skill Tree Action Details',
+    summary:
+      'Skill tree action unlocks now show the practical combat details you need before spending points. Talent action nodes list their stamina or mana cost and, when relevant, damage scaling such as stronger single-target attacks or lower-damage area attacks. This makes it easier to compare choices like AoE coverage against focused single-target damage directly from the skill tree.',
+  },
+  {
     version: '0.69',
     date: '2026-06-20',
     title: 'Discord Item & Mob Lookups',

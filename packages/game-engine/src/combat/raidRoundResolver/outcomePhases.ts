@@ -61,6 +61,7 @@ export function resolveRaidOutcomePhases({
     exhaustedReason: import('@pocketrealm/shared').ExhaustedActionReason | null;
     healTargetPlayerId: string | null;
     alternateActionDef: ActionDefinition | null;
+    costPaid?: boolean;
   }>;
   logPlayerAttacks: PlayerRoundActionEntry[];
   logDefences: DefensiveActionEntry[];
@@ -135,6 +136,8 @@ export function resolveRaidOutcomePhases({
         state.hp += actualRestore;
         state.healingDone = actualRestore;
       } else if (potionType === 'stamina') {
+        state.stamina -= definition.cost.stamina;
+        state.costPaid = true;
         actualRestore = Math.min(potion.healAmount, participant.maxStamina - state.stamina);
         state.stamina += actualRestore;
       } else {

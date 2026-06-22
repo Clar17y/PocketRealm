@@ -9,6 +9,7 @@ import {
   getChestRarityForRoomCount,
   getChestMaterialRollRangeForRoomCount,
   getChestRecipeChanceForRoomCount,
+  getChestAdvancedItemChanceForRoomCount,
   rollChestMaterialRollsByRoomCount,
 } from './encounterChest';
 
@@ -20,9 +21,9 @@ describe('encounterChest', () => {
   });
 
   it('maps site size to recipe chance', () => {
-    expect(getChestRecipeChanceForEncounterSize('small')).toBe(0.005);
-    expect(getChestRecipeChanceForEncounterSize('medium')).toBe(0.02);
-    expect(getChestRecipeChanceForEncounterSize('large')).toBe(0.05);
+    expect(getChestRecipeChanceForEncounterSize('small')).toBe(0.004);
+    expect(getChestRecipeChanceForEncounterSize('medium')).toBe(0.015);
+    expect(getChestRecipeChanceForEncounterSize('large')).toBe(0.04);
   });
 
   it('maps site size to material roll ranges', () => {
@@ -42,8 +43,8 @@ describe('encounterChest', () => {
     expect(rollEncounterChestRecipeDrop('small', () => 0)).toBe(true);
     expect(rollEncounterChestRecipeDrop('small', () => 0.005)).toBe(false);
     expect(rollEncounterChestRecipeDrop('medium', () => 0.01)).toBe(true);
-    expect(rollEncounterChestRecipeDrop('medium', () => 0.02)).toBe(false);
-    expect(rollEncounterChestRecipeDrop('large', () => 0.049)).toBe(true);
+    expect(rollEncounterChestRecipeDrop('medium', () => 0.015)).toBe(false);
+    expect(rollEncounterChestRecipeDrop('large', () => 0.039)).toBe(true);
   });
 });
 
@@ -85,7 +86,16 @@ describe('getChestMaterialRollRangeForRoomCount', () => {
 
 describe('getChestRecipeChanceForRoomCount', () => {
   it('returns epic chance for 4 rooms', () => {
-    expect(getChestRecipeChanceForRoomCount(4)).toBe(0.08);
+    expect(getChestRecipeChanceForRoomCount(4)).toBe(0.06);
+  });
+});
+
+describe('getChestAdvancedItemChanceForRoomCount', () => {
+  it('returns a higher item-copy chance than recipe-unlock chance', () => {
+    for (const rooms of [1, 2, 3, 4]) {
+      expect(getChestAdvancedItemChanceForRoomCount(rooms))
+        .toBeGreaterThan(getChestRecipeChanceForRoomCount(rooms));
+    }
   });
 });
 

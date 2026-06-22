@@ -1,5 +1,6 @@
 import { Prisma } from '@pocketrealm/database';
 import {
+  getChestAdvancedItemChanceForRoomCount,
   getChestRarityForRoomCount,
   getChestRecipeChanceForRoomCount,
   rollChestMaterialRollsByRoomCount,
@@ -32,6 +33,18 @@ interface RecipeUnlockReward {
   soulbound: boolean;
 }
 
+interface AdvancedFamilyRecipe {
+  id: string;
+  resultTemplateId: string;
+  soulbound: boolean;
+  resultTemplate: {
+    name: string;
+    itemType: string;
+    stackable: boolean;
+    maxDurability: number;
+  };
+}
+
 interface EncounterSiteChestRewards extends GrantedItemIds {
   chestRarity: ChestRarity;
   materialRolls: number;
@@ -56,6 +69,20 @@ const CHEST_DROP_ENTRY_INCLUDE = {
 } as const;
 
 const CHEST_RARITIES: ChestRarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+const ADVANCED_FAMILY_RECIPE_SELECT = {
+  id: true,
+  resultTemplateId: true,
+  soulbound: true,
+  resultTemplate: {
+    select: {
+      name: true,
+      itemType: true,
+      stackable: true,
+      maxDurability: true,
+    },
+  },
+} as const;
 
 const AMBIENT_CHEST_RESOURCE_NAMES = new Set([
   'Copper Ore',
@@ -187,6 +214,45 @@ async function getChestDropEntriesTx(
   });
 }
 
+async function getAdvancedFamilyRecipesTx(
+  tx: Prisma.TransactionClient,
+  mobFamilyId: string,
+): Promise<AdvancedFamilyRecipe[]> {
+  return tx.craftingRecipe.findMany({
+    where: {
+      isAdvanced: true,
+      mobFamilyId,
+    },
+    select: ADVANCED_FAMILY_RECIPE_SELECT,
+    orderBy: [{ requiredLevel: 'asc' }, { id: 'asc' }],
+  });
+}
+
+async function grantAdvancedRecipeResultItemTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  recipes: AdvancedFamilyRecipe[],
+  availableSlots?: number,
+): Promise<DropGrantResult | null> {
+  if (recipes.length === 0) return null;
+
+  const pickedRecipe = recipes[randomIntInclusive(0, recipes.length - 1)]!;
+  return rollAndGrantDropsTx(
+    tx,
+    playerId,
+    [{
+      itemTemplateId: pickedRecipe.resultTemplateId,
+      dropChance: 1,
+      minQuantity: 1,
+      maxQuantity: 1,
+      itemTemplate: pickedRecipe.resultTemplate,
+    }],
+    1,
+    'common',
+    availableSlots,
+  );
+}
+
 async function getSignatureChestDropEntriesTx(
   tx: Prisma.TransactionClient,
   mobFamilyId: string,
@@ -268,31 +334,21 @@ export async function grantEncounterSiteChestRewardsTx(
     ? params.availableSlots
     : Math.max(0, params.availableSlots - signatureResult.slotsConsumed);
   const randomDropResult = await rollAndGrantDropsTx(tx, params.playerId, randomDropEntries, materialRolls, 'common', remainingSlots);
-  const dropResult = signatureResult
+  const materialDropResult = signatureResult
     ? mergeDropGrantResults([signatureResult, randomDropResult])
     : randomDropResult;
+  let dropResult = materialDropResult;
 
   let recipeUnlocked: RecipeUnlockReward | null = null;
   const baseRecipeChance = getChestRecipeChanceForRoomCount(params.totalRooms);
   const recipeChance = baseRecipeChance * (1 + bonusFraction * (ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_RECIPE_MULTIPLIER - 1));
   const rolledRecipe = Math.random() < recipeChance;
-  if (rolledRecipe) {
-    const advancedRecipes = await tx.craftingRecipe.findMany({
-      where: {
-        isAdvanced: true,
-        mobFamilyId: params.mobFamilyId,
-      },
-      select: {
-        id: true,
-        resultTemplateId: true,
-        soulbound: true,
-        resultTemplate: {
-          select: { name: true },
-        },
-      },
-      orderBy: [{ requiredLevel: 'asc' }, { id: 'asc' }],
-    });
+  const baseAdvancedItemChance = getChestAdvancedItemChanceForRoomCount(params.totalRooms);
+  const advancedItemChance = baseAdvancedItemChance * (1 + bonusFraction * (ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_RECIPE_MULTIPLIER - 1));
+  let advancedRecipes: AdvancedFamilyRecipe[] | null = null;
 
+  if (rolledRecipe) {
+    advancedRecipes = await getAdvancedFamilyRecipesTx(tx, params.mobFamilyId);
     if (advancedRecipes.length > 0) {
       const known = await tx.playerRecipe.findMany({
         where: {
@@ -321,6 +377,25 @@ export async function grantEncounterSiteChestRewardsTx(
           soulbound: Boolean(pickedRecipe.soulbound),
         };
       }
+    }
+  }
+
+  const rolledAdvancedItem = recipeUnlocked == null && Math.random() < advancedItemChance;
+  if (rolledAdvancedItem) {
+    advancedRecipes ??= await getAdvancedFamilyRecipesTx(tx, params.mobFamilyId);
+
+    const remainingSlots = params.availableSlots == null
+      ? undefined
+      : Math.max(0, params.availableSlots - materialDropResult.slotsConsumed);
+    const advancedItemResult = await grantAdvancedRecipeResultItemTx(
+      tx,
+      params.playerId,
+      advancedRecipes,
+      remainingSlots,
+    );
+
+    if (advancedItemResult) {
+      dropResult = mergeDropGrantResults([materialDropResult, advancedItemResult]);
     }
   }
 

@@ -417,7 +417,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
   describe('recipe unlock', () => {
     it('does not unlock recipe when random roll fails', async () => {
-      // Recipe chance for 1 room is 0.005, so 0.999 won't trigger it
+      // Recipe chance for 1 room is 0.004, so 0.999 won't trigger it.
       vi.spyOn(Math, 'random').mockReturnValue(0.999);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
@@ -431,15 +431,15 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        totalRooms: 3, // has non-zero recipe chance (0.05)
+        totalRooms: 3, // has non-zero recipe chance (0.04)
       });
 
-      // random 0.999 > 0.05 (3-room recipe chance), so recipe roll fails
+      // random 0.999 > 0.04 (3-room recipe chance), so recipe roll fails.
       expect(mockPrisma.craftingRecipe.findMany).not.toHaveBeenCalled();
     });
 
     it('unlocks a recipe when random roll succeeds and unknown recipes exist', async () => {
-      // For 3 rooms: recipe chance = 0.05, so random < 0.05 triggers recipe
+      // For 3 rooms: recipe chance = 0.04, so random < 0.04 triggers recipe.
       vi.spyOn(Math, 'random').mockReturnValue(0.01);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
@@ -494,7 +494,10 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
 
     it('skips recipe when all advanced recipes are already known', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.01);
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999) // material roll count
+        .mockReturnValueOnce(0.01) // recipe roll succeeds
+        .mockReturnValueOnce(0.999); // advanced item copy fails
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
         {
@@ -587,13 +590,16 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
 
     it('applies AUTO_RESOLVE_RECIPE_MULTIPLIER proportionally', async () => {
-      // 3-room base recipe chance is 0.05
-      // With full auto-resolve (bonusFraction=1): 0.05 * 1.5 = 0.075
-      // So a random value of 0.06 should succeed with full bonus but fail without
-      vi.spyOn(Math, 'random').mockReturnValue(0.06);
+      // 3-room base recipe chance is 0.04
+      // With full auto-resolve (bonusFraction=1): 0.04 * 1.5 = 0.06
+      // So a recipe roll of 0.05 succeeds with full bonus but fails without.
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999) // material roll count
+        .mockReturnValueOnce(0.05) // recipe unlock fails without bonus
+        .mockReturnValueOnce(0.999); // advanced item copy also fails
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
-      // Without auto-resolve bonus, 0.06 > 0.05, so no recipe
+      // Without auto-resolve bonus, 0.05 > 0.04, so no recipe.
       const resultWithout = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
         totalRooms: 3,
@@ -601,8 +607,10 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       });
       expect(resultWithout.recipeUnlocked).toBeNull();
 
-      // With full auto-resolve bonus, 0.06 < 0.075, so recipe roll passes
-      vi.spyOn(Math, 'random').mockReturnValue(0.06);
+      // With full auto-resolve bonus, 0.05 < 0.06, so recipe roll passes.
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999) // material roll count
+        .mockReturnValueOnce(0.05); // recipe unlock succeeds with bonus
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
         {
@@ -669,7 +677,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
 
     it('skips recipe unlock for 1-room encounters when roll exceeds chance', async () => {
-      // 1-room recipe chance is 0.005, so random = 0.01 won't trigger
+      // 1-room recipe chance is 0.004, so random = 0.01 won't trigger.
       vi.spyOn(Math, 'random').mockReturnValue(0.01);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
@@ -919,7 +927,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
   describe('recipe unlock for 2-room encounters', () => {
     it('triggers recipe unlock for 2-room encounters when roll succeeds', async () => {
-      // 2-room recipe chance is 0.02
+      // 2-room recipe chance is 0.015.
       vi.spyOn(Math, 'random').mockReturnValue(0.01);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
@@ -943,12 +951,203 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
   });
 
+  // ── Advanced item drops ─────────────────────────────────────────────────
+
+  describe('advanced item drops', () => {
+    it('can grant an advanced family item while leaving the recipe locked', async () => {
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999) // material roll count
+        .mockReturnValueOnce(0.999) // recipe unlock fails
+        .mockReturnValueOnce(0) // advanced item drop succeeds
+        .mockReturnValueOnce(0); // picks the only advanced recipe result
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+      mockPrisma.craftingRecipe.findMany.mockResolvedValue([
+        {
+          id: 'recipe-crown',
+          resultTemplateId: 'goblin-crown',
+          soulbound: true,
+          resultTemplate: {
+            name: "Goblin King's Crown",
+            itemType: 'armor',
+            stackable: false,
+            maxDurability: 120,
+          },
+        },
+      ]);
+      mockPrisma.item.create.mockResolvedValue({ id: 'crown-item-1' });
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+      });
+
+      expect(result.recipeUnlocked).toBeNull();
+      expect(result.loot).toContainEqual({
+        itemTemplateId: 'goblin-crown',
+        quantity: 1,
+        rarity: 'common',
+      });
+      expect(mockPrisma.playerRecipe.create).not.toHaveBeenCalled();
+      expect(mockPrisma.item.create).toHaveBeenCalledWith({
+        data: {
+          ownerId: 'p1',
+          templateId: 'goblin-crown',
+          rarity: 'common',
+          quantity: 1,
+          maxDurability: 120,
+          currentDurability: 120,
+        },
+        select: { id: true },
+      });
+    });
+
+    it('does not grant an advanced item copy when an unknown recipe unlocks', async () => {
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999) // material roll count
+        .mockReturnValueOnce(0) // recipe unlock succeeds
+        .mockReturnValueOnce(0); // would grant an advanced item copy if evaluated
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+      mockPrisma.craftingRecipe.findMany.mockResolvedValue([
+        {
+          id: 'recipe-new-crown',
+          resultTemplateId: 'new-goblin-crown',
+          soulbound: true,
+          resultTemplate: {
+            name: "Goblin King's Crown",
+            itemType: 'armor',
+            stackable: false,
+            maxDurability: 120,
+          },
+        },
+      ]);
+      mockPrisma.playerRecipe.findMany.mockResolvedValue([]);
+      mockPrisma.playerRecipe.create.mockResolvedValue({});
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+      });
+
+      expect(result.recipeUnlocked).toEqual({
+        recipeId: 'recipe-new-crown',
+        resultTemplateId: 'new-goblin-crown',
+        recipeName: "Goblin King's Crown",
+        soulbound: true,
+      });
+      expect(mockPrisma.playerRecipe.create).toHaveBeenCalledWith({
+        data: {
+          playerId: 'p1',
+          recipeId: 'recipe-new-crown',
+        },
+      });
+      expect(mockPrisma.item.create).not.toHaveBeenCalled();
+      expect(result.loot).not.toContainEqual(
+        expect.objectContaining({ itemTemplateId: 'new-goblin-crown' }),
+      );
+    });
+
+    it('can grant an advanced family item when the recipe roll finds only known recipes', async () => {
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999) // material roll count
+        .mockReturnValueOnce(0) // recipe roll succeeds
+        .mockReturnValueOnce(0) // advanced item drop succeeds because no recipe unlock happened
+        .mockReturnValueOnce(0); // picks the only advanced recipe result
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+      mockPrisma.craftingRecipe.findMany.mockResolvedValue([
+        {
+          id: 'recipe-known-crown',
+          resultTemplateId: 'known-goblin-crown',
+          soulbound: true,
+          resultTemplate: {
+            name: "Goblin King's Crown",
+            itemType: 'armor',
+            stackable: false,
+            maxDurability: 120,
+          },
+        },
+      ]);
+      mockPrisma.playerRecipe.findMany.mockResolvedValue([{ recipeId: 'recipe-known-crown' }]);
+      mockPrisma.item.create.mockResolvedValue({ id: 'known-crown-item-1' });
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+      });
+
+      expect(result.recipeUnlocked).toBeNull();
+      expect(result.loot).toContainEqual({
+        itemTemplateId: 'known-goblin-crown',
+        quantity: 1,
+        rarity: 'common',
+      });
+      expect(mockPrisma.playerRecipe.create).not.toHaveBeenCalled();
+      expect(mockPrisma.item.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            ownerId: 'p1',
+            templateId: 'known-goblin-crown',
+          }),
+        }),
+      );
+    });
+
+    it('overflows an advanced family item when no backpack slots remain', async () => {
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999) // material roll count
+        .mockReturnValueOnce(0.999) // recipe unlock fails
+        .mockReturnValueOnce(0) // advanced item drop succeeds
+        .mockReturnValueOnce(0); // picks the only advanced recipe result
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+      mockPrisma.item.findMany.mockResolvedValue([]);
+      mockPrisma.itemTemplate.findMany.mockResolvedValue([
+        { id: 'overflow-goblin-crown', name: "Goblin King's Crown" },
+      ]);
+      mockPrisma.craftingRecipe.findMany.mockResolvedValue([
+        {
+          id: 'recipe-overflow-crown',
+          resultTemplateId: 'overflow-goblin-crown',
+          soulbound: true,
+          resultTemplate: {
+            name: "Goblin King's Crown",
+            itemType: 'armor',
+            stackable: false,
+            maxDurability: 120,
+          },
+        },
+      ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+        availableSlots: 0,
+      });
+
+      expect(result.recipeUnlocked).toBeNull();
+      expect(result.loot).toContainEqual({
+        itemTemplateId: 'overflow-goblin-crown',
+        quantity: 1,
+        rarity: 'common',
+      });
+      expect(result.overflow).toContainEqual({
+        templateId: 'overflow-goblin-crown',
+        templateName: "Goblin King's Crown",
+        rarity: 'common',
+        quantity: 1,
+        bonusStats: null,
+        currentDurability: 120,
+        maxDurability: 120,
+      });
+      expect(result.slotsConsumed).toBe(0);
+      expect(mockPrisma.item.create).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Auto-resolve + recipe combined ───────────────────────────────────────
 
   describe('auto-resolve bonus with recipe', () => {
     it('uses totalRooms for rarity and auto-resolve bonus for recipe chance', async () => {
       // 1 room → common rarity
-      // With full auto-resolve bonus (bonusFraction=1): recipe chance = 0.005 * 1.5 = 0.0075
+      // With full auto-resolve bonus (bonusFraction=1): recipe chance = 0.004 * 1.5 = 0.006.
       vi.spyOn(Math, 'random').mockReturnValue(0.005);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
@@ -970,7 +1169,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       // 1 room → common
       expect(result.chestRarity).toBe('common');
-      // 0.005 < 0.0075 → recipe unlocks
+      // 0.005 < 0.006 → recipe unlocks.
       expect(result.recipeUnlocked).not.toBeNull();
     });
   });

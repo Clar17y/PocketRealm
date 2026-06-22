@@ -193,6 +193,7 @@ function buildProps(overrides: Partial<React.ComponentProps<typeof CombatScreen>
     onActivateTemplate: vi.fn(),
     onStateUpdates: vi.fn(),
     updateQuestProgress: vi.fn(),
+    activatePendingLoot: vi.fn(),
     refreshPendingEncounters: vi.fn().mockResolvedValue([
       {
         encounterSiteId: 'site-1',
@@ -305,6 +306,30 @@ describe('CombatScreen encounter site locking', () => {
     });
   });
 
+  it('activates pending loot from encounter-site auto-resolve responses', async () => {
+    combatApiMocks.autoResolveEncounterRoom.mockResolvedValue({
+      outcome: 'site_cleared',
+      rounds: [],
+      initialMobs: [],
+      pendingLootSessionId: 'pending-session-1',
+      questProgress: [],
+      stateUpdates: {},
+      skillXpGrants: [],
+      fleeResult: null,
+      respawnedTo: null,
+    });
+    const props = buildProps();
+
+    render(<CombatScreen {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fight' }));
+    fireEvent.click(screen.getByRole('button', { name: 'auto-resolve' }));
+
+    await waitFor(() => {
+      expect(props.activatePendingLoot).toHaveBeenCalledWith('pending-session-1');
+    });
+  });
+
   it('updates quest progress from manual encounter-site round responses', async () => {
     const questProgress = [
       { questId: 'weekly-kills', questName: 'Weekly Bounty', current: 1, target: 75, completed: false },
@@ -331,6 +356,33 @@ describe('CombatScreen encounter site locking', () => {
 
     await waitFor(() => {
       expect(props.updateQuestProgress).toHaveBeenCalledWith(questProgress);
+    });
+  });
+
+  it('activates pending loot from manual encounter-site round responses', async () => {
+    combatApiMocks.resolveEncounterRound.mockResolvedValue({
+      roundNumber: 1,
+      roundLog: { round: 1, phases: { playerAttacks: [], defences: [], mobActions: [], healing: [], effectTicks: [], outcome: {} }, telegraphs: [] },
+      mobStates: [],
+      playerState: { hp: 90, maxHp: 100, stamina: 80, maxStamina: 100, mana: 40, maxMana: 50, activeEffects: [] },
+      outcome: 'site_cleared',
+      siteCleared: true,
+      pendingLootSessionId: 'pending-session-2',
+      questProgress: [],
+      stateUpdates: {},
+      skillXpGrants: [],
+      fleeResult: null,
+      respawnedTo: null,
+    });
+    const props = buildProps();
+
+    render(<CombatScreen {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fight' }));
+    fireEvent.click(screen.getByRole('button', { name: 'resolve-round' }));
+
+    await waitFor(() => {
+      expect(props.activatePendingLoot).toHaveBeenCalledWith('pending-session-2');
     });
   });
 });
