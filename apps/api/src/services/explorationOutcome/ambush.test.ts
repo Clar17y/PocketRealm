@@ -54,6 +54,7 @@ vi.mock('../combatLogMapper', () => ({
 }));
 vi.mock('../durabilityService', () => ({
   degradeEquippedDurability: vi.fn().mockResolvedValue([]),
+  resolveExplorationDurabilityMultiplier: vi.fn().mockReturnValue(1),
 }));
 vi.mock('../lootService', () => ({
   enrichLootWithNames: vi.fn().mockResolvedValue([]),

@@ -67,6 +67,7 @@ vi.mock('./combatOrchestrationService', () => ({
 }));
 vi.mock('./durabilityService', () => ({
   degradeEquippedDurability: vi.fn().mockResolvedValue([]),
+  resolveExplorationDurabilityMultiplier: vi.fn().mockReturnValue(1),
 }));
 vi.mock('./expeditionLockoutService', () => ({
   checkActivityLockout: vi.fn().mockResolvedValue(undefined),

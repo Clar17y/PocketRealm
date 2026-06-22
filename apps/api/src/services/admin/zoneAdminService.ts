@@ -1,32 +1,11 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { assignEncounterRolesToRooms, generateRoomAssignments, rollMobPrefix } from '@pocketrealm/game-engine';
 import {
-  isMiniBossFamilyRole,
   isPermanentEncounterFamilyRole,
-  type EncounterMobRole,
 } from '@pocketrealm/shared';
 import { teleportPlayer } from '../zoneService';
 import { adminAudit } from './adminAuditService';
-
-type AdminEncounterFamilyMember = {
-  role: string;
-  mobTemplate: {
-    id: string;
-  };
-};
-
-function pickAdminEncounterFamilyMember<TMember extends AdminEncounterFamilyMember>(
-  members: readonly TMember[],
-  role: EncounterMobRole,
-): TMember | null {
-  const nonMiniBossMembers = members.filter((member) => !isMiniBossFamilyRole(member.role));
-  const pool = role === 'mini_boss'
-    ? members
-    : (nonMiniBossMembers.length > 0 ? nonMiniBossMembers : members);
-
-  if (pool.length === 0) return null;
-  return pool[Math.floor(Math.random() * pool.length)] ?? null;
-}
+import { pickEncounterFamilyMemberForRole } from '../exploration/helpers';
 
 export async function listAdminZones() {
   return prisma.zone.findMany({
@@ -114,7 +93,7 @@ export async function spawnAdminEncounter(
 
   let slot = 0;
   for (const assignment of roleAssignments) {
-    const member = pickAdminEncounterFamilyMember(encounterMembers, assignment.role);
+    const member = pickEncounterFamilyMemberForRole(encounterMembers, assignment.role);
     if (!member) continue;
 
     mobs.push({

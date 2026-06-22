@@ -10,7 +10,7 @@ import {
   filterAndWeightMobsByTier,
   runTemplateCombat,
 } from '@pocketrealm/game-engine';
-import { DURABILITY_CONSTANTS, CACHE_HEADER_CONSTANTS, formatEncounterMobDisplayName, type PotionConsumed } from '@pocketrealm/shared';
+import { CACHE_HEADER_CONSTANTS, formatEncounterMobDisplayName, type PotionConsumed } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { refundPlayerTurns } from '../services/turnBankService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
@@ -18,7 +18,7 @@ import { storePendingLoot, type PendingLootItem } from '../services/pendingLootS
 import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
 import { pickWeighted } from '../utils/pickWeighted.js';
-import { degradeEquippedDurability } from '../services/durabilityService';
+import { degradeEquippedDurability, resolveExplorationDurabilityMultiplier } from '../services/durabilityService';
 import { deductConsumedPotions } from '../services/potionService';
 import {
   ensureStarterDiscoveries,
@@ -420,9 +420,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
           allPotionsConsumed.push(consumed);
         }
 
-        const travelDurabilityMult = travelMob.mobPrefix || mobRole === 'elite'
-          ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
-          : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
+        const travelDurabilityMult = resolveExplorationDurabilityMultiplier(travelMob.mobPrefix, mobRole);
         const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', travelDurabilityMult);
         for (const d of durabilityLost) allTravelUpdatedItemIds.push(d.itemId);
 

@@ -166,10 +166,16 @@ export function getSiteName(
   return `Large ${familyName} ${nouns.siteNounLarge}`;
 }
 
-function pickBaseFamilyMember(
-  members: ZoneFamilyMember[],
+/**
+ * Pick a family member to fill an encounter-site slot of the given role. Mini-boss
+ * templates are reserved for mini-boss slots (falling back to the full pool only when
+ * no other members exist). Shared by site generation and the admin spawner so both
+ * stay on one selection rule.
+ */
+export function pickEncounterFamilyMemberForRole<TMember extends { role: string }>(
+  members: readonly TMember[],
   role: EncounterMobRole,
-): ZoneFamilyMember | null {
+): TMember | null {
   const nonMiniBossMembers = members.filter((member) => !isMiniBossFamilyRole(member.role));
   const pool = role === 'mini_boss'
     ? members
@@ -219,10 +225,10 @@ export function buildEncounterSiteMobs(
     for (let t = selectedTier; t >= 1; t--) {
       const tierMembers = membersByTier.get(t) ?? [];
       if (tierMembers.length === 0) continue;
-      const picked = pickBaseFamilyMember(tierMembers, role);
+      const picked = pickEncounterFamilyMemberForRole(tierMembers, role);
       if (picked) return picked;
     }
-    return pickBaseFamilyMember(eligibleEncounterMembers, role);
+    return pickEncounterFamilyMemberForRole(eligibleEncounterMembers, role);
   }
 
   const { rooms } = generateRoomAssignments(size);

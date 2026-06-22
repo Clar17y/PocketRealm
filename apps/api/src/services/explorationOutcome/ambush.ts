@@ -11,7 +11,6 @@ import {
   selectTierWithBleedthrough,
 } from '@pocketrealm/game-engine';
 import {
-  DURABILITY_CONSTANTS,
   formatEncounterMobDisplayName,
   type LootDrop,
   type MobTemplate,
@@ -23,7 +22,7 @@ import { broadcastRareLootActivity } from '../chatActivityService';
 import { logger } from '../../logger';
 import { buildCombatLogResult, buildPlayerTemplateCombatant, processCombatVictoryRewards } from '../combatOrchestrationService';
 import { mapTemplateCombatLog } from '../combatLogMapper';
-import { degradeEquippedDurability } from '../durabilityService';
+import { degradeEquippedDurability, resolveExplorationDurabilityMultiplier } from '../durabilityService';
 import { enrichLootWithNames } from '../lootService';
 import { setHp, enterRecoveringState } from '../hpService';
 import { persistMobHp } from '../persistedMobService';
@@ -239,9 +238,7 @@ export async function processAmbushOutcome(args: {
     allPotionsConsumed.push(consumed);
   }
 
-  const explorationDurabilityMultiplier = ambushMob.mobPrefix || mobRole === 'elite'
-    ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
-    : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
+  const explorationDurabilityMultiplier = resolveExplorationDurabilityMultiplier(ambushMob.mobPrefix, mobRole);
   const durabilityLost = buffUsesLeft.durability > 0
     ? []
     : await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', explorationDurabilityMultiplier);
