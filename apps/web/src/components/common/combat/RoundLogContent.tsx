@@ -143,7 +143,9 @@ export function RoundLogContent({ log, playerId }: RoundLogContentProps) {
           {log.phases.effectTicks.map((tick, j) => (
             <div key={j} className="text-xs ml-2">
               <span className={tick.targetType === 'mob' ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-primary)]'}>
-                <RoleAwareMobName name={tick.targetName} />
+                {tick.targetType === 'mob'
+                  ? <RoleAwareMobName name={tick.targetName} />
+                  : tick.targetName}
               </span>
               <span className="text-[var(--rpg-text-secondary)]"> takes </span>
               <span className="text-[var(--rpg-red)]">-{tick.damage} HP</span>

@@ -410,6 +410,46 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(result.materialRolls).toBe(Math.ceil(6 * expectedMultiplier));
     });
 
+    it('does not spend promoted-role material bonus rolls on consumables', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.999);
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([
+        {
+          itemTemplateId: 'copper-ore',
+          dropChance: 1,
+          minQuantity: 1,
+          maxQuantity: 1,
+          mobFamily: { name: 'Golems' },
+          itemTemplate: { name: 'Copper Ore', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'minor-health-potion',
+          dropChance: 100,
+          minQuantity: 1,
+          maxQuantity: 1,
+          mobFamily: { name: 'Golems' },
+          itemTemplate: { name: 'Minor Health Potion', itemType: 'consumable', stackable: true, maxDurability: 0 },
+        },
+      ]);
+
+      const withoutPromotedRoles = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+      });
+      const withPromotedRoles = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+        defeatedPromotedRoleCounts: { elite: 1, mini_boss: 1 },
+      });
+
+      const quantity = (loot: typeof withPromotedRoles.loot, templateId: string) =>
+        loot.find((drop) => drop.itemTemplateId === templateId)?.quantity ?? 0;
+
+      expect(quantity(withPromotedRoles.loot, 'minor-health-potion'))
+        .toBe(quantity(withoutPromotedRoles.loot, 'minor-health-potion'));
+      expect(quantity(withPromotedRoles.loot, 'copper-ore'))
+        .toBeGreaterThan(quantity(withoutPromotedRoles.loot, 'copper-ore'));
+    });
+
     it('adds extra signature resource rolls for defeated promoted roles', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([

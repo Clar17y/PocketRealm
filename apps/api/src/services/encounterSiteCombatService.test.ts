@@ -141,6 +141,7 @@ import {
   autoResolveEncounterRoom,
   resolveManualEncounterRound,
 } from './encounterSiteCombatService';
+import { countDefeatedPromotedEncounterRoles } from './encounterSiteCombatCore';
 import { trackEncounterSiteKillProgress } from './encounterSiteProgressService';
 
 beforeEach(() => {
@@ -699,6 +700,24 @@ describe('computeDefeatedMobXp', () => {
       [makeEncounterMobId(1)]: 42,
     };
     expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(57);
+  });
+});
+
+describe('countDefeatedPromotedEncounterRoles', () => {
+  it('counts only defeated elite and mini-boss mobs', () => {
+    const mobs: EncounterMobSlot[] = [
+      makeEncounterSlot(1, { role: 'elite', status: 'defeated' }),
+      makeEncounterSlot(2, { role: 'mini_boss', status: 'defeated' }),
+      makeEncounterSlot(3, { role: 'mini_boss', status: 'defeated' }),
+      makeEncounterSlot(4, { role: 'elite', status: 'alive' }),
+      makeEncounterSlot(5, { role: 'mini_boss', status: 'decayed' }),
+      makeEncounterSlot(6, { role: 'trash', status: 'defeated' }),
+    ];
+
+    expect(countDefeatedPromotedEncounterRoles(mobs)).toEqual({
+      elite: 1,
+      mini_boss: 2,
+    });
   });
 });
 

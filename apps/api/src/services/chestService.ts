@@ -202,6 +202,10 @@ function getRandomChestDropEntries(entries: ChestDropEntry[]): ChestDropEntry[] 
     : allowedEntries;
 }
 
+function getRoleBonusChestDropEntries(entries: ChestDropEntry[]): ChestDropEntry[] {
+  return entries.filter((entry) => entry.itemTemplate.itemType === 'resource');
+}
+
 function getPromotedRoleRewardBonus(counts: EncounterSiteDefeatedPromotedRoleCounts | undefined): {
   materialRollMultiplier: number;
   signatureRolls: number;
@@ -218,6 +222,15 @@ function getPromotedRoleRewardBonus(counts: EncounterSiteDefeatedPromotedRoleCou
       eliteCount * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.elite.signatureRolls
       + miniBossCount * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.mini_boss.signatureRolls,
   };
+}
+
+function remainingSlotsAfter(
+  availableSlots: number | undefined,
+  ...results: Array<DropGrantResult | null>
+): number | undefined {
+  if (availableSlots == null) return undefined;
+  const consumed = results.reduce((sum, result) => sum + (result?.slotsConsumed ?? 0), 0);
+  return Math.max(0, availableSlots - consumed);
 }
 
 async function getChestDropEntriesTx(
@@ -342,6 +355,9 @@ export async function grantEncounterSiteChestRewardsTx(
   const bonusFraction = params.totalRooms > 0
     ? params.autoResolvedBonusRooms / params.totalRooms
     : 0;
+  const baseMaterialRolls = Math.ceil(
+    baseRolls * (1 + bonusFraction * (ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_DROP_MULTIPLIER - 1))
+  );
   const materialRolls = Math.ceil(
     baseRolls * (
       1
@@ -349,20 +365,38 @@ export async function grantEncounterSiteChestRewardsTx(
       + roleRewardBonus.materialRollMultiplier
     )
   );
+  const roleMaterialRolls = Math.max(0, materialRolls - baseMaterialRolls);
 
   const dropEntries = await getChestDropEntriesTx(tx, params.mobFamilyId, chestRarity);
   const signatureEntries = await getSignatureChestDropEntriesTx(tx, params.mobFamilyId, chestRarity, dropEntries);
   const randomDropEntries = getRandomChestDropEntries(dropEntries);
+  const roleBonusDropEntries = getRoleBonusChestDropEntries(randomDropEntries);
   const signatureResult = signatureEntries.length > 0
     ? await rollAndGrantDropsTx(tx, params.playerId, signatureEntries, 1 + roleRewardBonus.signatureRolls, 'common', params.availableSlots)
     : null;
-  const remainingSlots = params.availableSlots == null || !signatureResult
-    ? params.availableSlots
-    : Math.max(0, params.availableSlots - signatureResult.slotsConsumed);
-  const randomDropResult = await rollAndGrantDropsTx(tx, params.playerId, randomDropEntries, materialRolls, 'common', remainingSlots);
-  const materialDropResult = signatureResult
-    ? mergeDropGrantResults([signatureResult, randomDropResult])
-    : randomDropResult;
+  const randomDropResult = await rollAndGrantDropsTx(
+    tx,
+    params.playerId,
+    randomDropEntries,
+    baseMaterialRolls,
+    'common',
+    remainingSlotsAfter(params.availableSlots, signatureResult),
+  );
+  const roleBonusDropResult = roleMaterialRolls > 0 && roleBonusDropEntries.length > 0
+    ? await rollAndGrantDropsTx(
+        tx,
+        params.playerId,
+        roleBonusDropEntries,
+        roleMaterialRolls,
+        'common',
+        remainingSlotsAfter(params.availableSlots, signatureResult, randomDropResult),
+      )
+    : null;
+  const materialDropResult = mergeDropGrantResults([
+    ...(signatureResult ? [signatureResult] : []),
+    randomDropResult,
+    ...(roleBonusDropResult ? [roleBonusDropResult] : []),
+  ]);
   let dropResult = materialDropResult;
 
   let recipeUnlocked: RecipeUnlockReward | null = null;
