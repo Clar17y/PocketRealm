@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.72',
+    date: '2026-06-21',
+    title: 'Docked Action Bars',
+    summary:
+      'Crafting, Gathering, and the Forge now keep their main action within easy reach. Once you pick a recipe, gathering node, or forge item, its primary controls dock to a bar pinned just above the bottom navigation, so you no longer have to scroll back down past long lists to craft, gather, or upgrade. The list and detail content scroll behind the bar, and the chat button shifts up to stay clear of it.',
+  },
+  {
     version: '0.71',
     date: '2026-06-21',
     title: 'Stronger Stamina Potions',

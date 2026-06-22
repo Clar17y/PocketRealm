@@ -25,6 +25,7 @@
   --rpg-purple: #7a4a9a;
   --rpg-bottom-nav-height: 4.5rem;
   --rpg-bottom-nav-offset: calc(var(--rpg-bottom-nav-height) + env(safe-area-inset-bottom));
+  --rpg-docked-bar-height: 0px;
   --radius: 0.5rem;
 }
 
