@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatEncounterMobDisplayName, splitEncounterMobDisplayName } from './mobUtils';
+import { getAllMobPrefixes } from '../constants/mobPrefixes';
 
 describe('formatEncounterMobDisplayName', () => {
   it('prepends the role label after the prefix', () => {
@@ -33,6 +34,16 @@ describe('splitEncounterMobDisplayName', () => {
       .toEqual({ role: null, name: 'Ancient Web Spinner' });
     expect(splitEncounterMobDisplayName('Goblin Raider'))
       .toEqual({ role: null, name: 'Goblin Raider' });
+  });
+
+  it('no mob prefix display name contains a reserved role token', () => {
+    // Prefix display names sit alongside the Elite/Mini-Boss tokens in a display name;
+    // one containing a reserved token would break the round-trip split.
+    const reserved = ['Elite', 'Mini-Boss'];
+    const offenders = getAllMobPrefixes()
+      .map((prefix) => prefix.displayName)
+      .filter((name) => reserved.some((token) => name.split(/\s+/).includes(token)));
+    expect(offenders).toEqual([]);
   });
 
   it('round-trips with formatEncounterMobDisplayName', () => {

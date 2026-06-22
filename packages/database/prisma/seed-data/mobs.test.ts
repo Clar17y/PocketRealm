@@ -12,6 +12,15 @@ import { STARTER_TARGETS } from './validation';
 describe('mob seed starter combat targets', () => {
   const starterOffHand = getAllItemTemplates().find((item) => item.id === STARTER_LOADOUT.tutorialOffHandTemplateId);
 
+  it('mob names should not contain reserved encounter role tokens', () => {
+    const reserved = ['Elite', 'Mini-Boss'];
+    const offenders = getAllMobTemplates()
+      .map((mob) => mob.name)
+      .filter((name) => reserved.some((token) => name.split(/\s+/).includes(token)));
+
+    expect(offenders).toEqual([]);
+  });
+
   it('starter loadout should seed a real tutorial off-hand item', () => {
     expect(starterOffHand).toMatchObject({
       id: STARTER_LOADOUT.tutorialOffHandTemplateId,

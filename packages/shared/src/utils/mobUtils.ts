@@ -35,7 +35,9 @@ function encounterMobRoleNamePrefix(role: EncounterMobRole | null | undefined): 
  * display name into its promoted role (if any) and the name with that role token removed.
  * Lets display-only surfaces show a role pill without the role also appearing in the name,
  * and works for persisted/historical combat logs that only stored the display name.
- * Mob names and prefixes never contain these tokens, so the match is unambiguous.
+ * Mob names and prefixes never contain these tokens (guarded by tests), so the match is
+ * unambiguous. Note: the tokens are English literals — if display names are ever localized,
+ * surfaces should carry a structured role instead of relying on this split.
  */
 export function splitEncounterMobDisplayName(displayName: string): {
   role: EncounterMobRole | null;

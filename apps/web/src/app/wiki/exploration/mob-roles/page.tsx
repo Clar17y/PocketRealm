@@ -73,9 +73,9 @@ export default function MobRolesPage() {
           Elite. Sites with{' '}
           <strong>{ROLE.MIN_ROOMS_FOR_PROMOTED_ROLES}+ rooms</strong> are
           guaranteed at least one Elite in the final room, and the final room has
-          a <strong>{pct(ROLE.MINI_BOSS_CHANCE)}</strong> chance to be led by a
-          Mini-Boss (alongside an Elite). Larger sites guarantee additional Elite
-          pressure in the closing rooms.
+          a <strong>{pct(ROLE.MINI_BOSS_CHANCE)}</strong> chance to add a
+          Mini-Boss when there is still room for that guaranteed Elite. Larger
+          sites guarantee additional Elite pressure in the closing rooms.
         </li>
       </ul>
 
