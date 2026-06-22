@@ -6,9 +6,11 @@ import type { CombatActiveEvent } from '@/lib/api';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
+import { MobRolePill } from '@/components/common/combat';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { PixelButton } from '@/components/PixelButton';
 import { formatCombatEffectDescription } from '@pocketrealm/shared/constants/combatEffectNames';
+import { splitEncounterMobDisplayName } from '@pocketrealm/shared';
 
 type Phase = 'playing' | 'finished-auto' | 'finished-manual';
 
@@ -64,6 +66,10 @@ export function CombatPlayback({
   const [revealedCount, setRevealedCount] = useState(0);
   const [phase, setPhase] = useState<Phase>('playing');
   const [shakeTarget, setShakeTarget] = useState<'combatantA' | 'combatantB' | null>(null);
+
+  // Promoted role (Elite / Mini-Boss) is encoded in the display name; surface it as a
+  // glanceable pill and drop the role word from the name to avoid duplication.
+  const { role: mobRole, name: mobNameWithoutRole } = splitEncounterMobDisplayName(mobDisplayName);
 
   const playbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,7 +207,8 @@ export function CombatPlayback({
         {mobImageSrc && (
           <img src={mobImageSrc} alt={mobDisplayName} className="w-10 h-10 rounded object-cover" />
         )}
-        {mobDisplayName}
+        {mobNameWithoutRole}
+        <MobRolePill role={mobRole} />
         {activeEvents && activeEvents.some(e => e.appliedToThisMob && !e.effectType.startsWith('player_') && e.effectType !== 'durability_shield') && (
           <EventBadges inline modifiers={activeEvents.filter(e => e.appliedToThisMob && !e.effectType.startsWith('player_') && e.effectType !== 'durability_shield').map(e => ({
             title: e.title, effectType: e.effectType, effectValue: e.effectValue, isGlobal: false,

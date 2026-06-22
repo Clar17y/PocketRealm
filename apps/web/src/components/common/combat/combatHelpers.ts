@@ -25,12 +25,15 @@ export function encounterMobRoleBadge(role: EncounterMobRole): { label: string; 
   }
 }
 
-export function encounterMobDisplayName(mob: {
-  name: string;
-  prefix: string | null;
-  role?: EncounterMobRole | null;
-}): string {
-  return formatEncounterMobDisplayName(mob);
+export function encounterMobDisplayName(
+  mob: {
+    name: string;
+    prefix: string | null;
+    role?: EncounterMobRole | null;
+  },
+  options?: { includeRole?: boolean },
+): string {
+  return formatEncounterMobDisplayName(mob, options);
 }
 
 export function isEffectDebuff(effect: BossActiveEffect): boolean {

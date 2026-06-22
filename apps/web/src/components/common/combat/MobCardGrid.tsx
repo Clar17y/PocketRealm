@@ -7,6 +7,7 @@ import { HpBar } from './HpBar';
 import { EffectPill } from './EffectPill';
 import type { ExpeditionMobInfo } from '@pocketrealm/shared';
 import { encounterMobDisplayName } from './combatHelpers';
+import { MobRolePill } from './MobRolePill';
 
 export interface MobCardGridProps {
   mobs: ExpeditionMobInfo[];
@@ -59,7 +60,8 @@ export function MobCardGrid({ mobs, myTargetMobId, targetCounts, onSetTarget, di
                     height={24}
                     className="image-rendering-pixelated"
                   />
-                  {encounterMobDisplayName(mob)}
+                  {encounterMobDisplayName(mob, { includeRole: false })}
+                  <MobRolePill role={mob.role} />
                 </span>
                 <div className="flex gap-1 items-center">
                   {count > 0 && (

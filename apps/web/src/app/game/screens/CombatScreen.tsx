@@ -34,7 +34,8 @@ import {
   resolveEncounterRound,
   abandonEncounterSite,
 } from '@/lib/api/combat';
-import { makeEncounterMobId } from '@pocketrealm/shared';
+import { makeEncounterMobId, splitEncounterMobDisplayName } from '@pocketrealm/shared';
+import { MobRolePill } from '@/components/common/combat';
 import type { CombatTemplateData, ExpeditionMobInfo, QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
 
 interface CombatScreenProps {
@@ -499,7 +500,15 @@ export function CombatScreen({
                     alt={displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                     className="w-8 h-8 rounded object-cover"
                   />
-                  Last Combat: <span className="font-almendra">{displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}</span>
+                  {(() => {
+                    const { role, name } = splitEncounterMobDisplayName(displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName);
+                    return (
+                      <>
+                        Last Combat: <span className="font-almendra">{name}</span>
+                        <MobRolePill role={role} />
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
