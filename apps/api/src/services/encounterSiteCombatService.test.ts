@@ -96,6 +96,7 @@ const serviceMocks = vi.hoisted(() => ({
   degradeEquippedDurabilityByHits: vi.fn(),
   getEquipmentStats: vi.fn(),
   getPlayerProgressionState: vi.fn(),
+  storePendingLoot: vi.fn(),
 }));
 
 // Mock DB modules so tests don't require JWT_SECRET / DB connection
@@ -110,7 +111,7 @@ vi.mock('./hpService', () => ({ getHpState: serviceMocks.getHpState }));
 vi.mock('./resourceService', () => ({ setAllResources: serviceMocks.setAllResources }));
 vi.mock('./chestService', () => ({ grantEncounterSiteChestRewardsTx: serviceMocks.grantEncounterSiteChestRewardsTx }));
 vi.mock('./inventoryService', () => ({ getInventoryState: serviceMocks.getInventoryState }));
-vi.mock('./pendingLootService', () => ({}));
+vi.mock('./pendingLootService', () => ({ storePendingLoot: serviceMocks.storePendingLoot }));
 vi.mock('./activityLogService', () => ({}));
 vi.mock('./potionService', () => ({
   deductConsumedPotions: serviceMocks.deductConsumedPotions,
@@ -168,6 +169,17 @@ beforeEach(() => {
   serviceMocks.degradeEquippedDurabilityByHits.mockResolvedValue([]);
   serviceMocks.getEquipmentStats.mockResolvedValue(makeEquipmentStats());
   serviceMocks.getPlayerProgressionState.mockResolvedValue(makeProgression());
+  serviceMocks.grantEncounterSiteChestRewardsTx.mockResolvedValue({
+    chestRarity: 'common',
+    materialRolls: 0,
+    loot: [],
+    recipeUnlocked: null,
+    overflow: [],
+    slotsConsumed: 0,
+    newItemIds: [],
+    updatedItemIds: [],
+  });
+  serviceMocks.storePendingLoot.mockResolvedValue('pending-session-1');
   combatOrchestrationMocks.preparePlayerForCombat.mockResolvedValue(makeCombatPrep());
   combatOrchestrationMocks.applyGuildCombatModifiers.mockReturnValue(undefined);
   combatOrchestrationMocks.splitAndGrantXp.mockResolvedValue([]);
@@ -992,6 +1004,36 @@ describe('autoResolveEncounterRoom', () => {
     expect(combatOrchestrationMocks.splitAndGrantXp).not.toHaveBeenCalled();
     expect(result.questProgress).toEqual([]);
   });
+
+  it('stores auto-resolved site chest overflow as pending loot', async () => {
+    const playerId = 'test-player';
+    const siteId = 'site-1';
+    const overflow = [{
+      templateId: 'goblin-crown',
+      templateName: "Goblin King's Crown",
+      rarity: 'common',
+      quantity: 1,
+      bonusStats: null,
+      currentDurability: 120,
+      maxDurability: 120,
+    }];
+    mockAutoEncounterSite(playerId, siteId, [makeEncounterSlot(1)]);
+    serviceMocks.grantEncounterSiteChestRewardsTx.mockResolvedValueOnce({
+      chestRarity: 'common',
+      materialRolls: 0,
+      loot: [],
+      recipeUnlocked: null,
+      overflow,
+      slotsConsumed: 0,
+      newItemIds: [],
+      updatedItemIds: [],
+    });
+
+    const result = await autoResolveEncounterRoom(playerId, siteId, 'Tester');
+
+    expect(serviceMocks.storePendingLoot).toHaveBeenCalledWith(playerId, overflow);
+    expect(result.pendingLootSessionId).toBe('pending-session-1');
+  });
 });
 
 describe('resolveManualEncounterRound', () => {
@@ -1168,6 +1210,86 @@ describe('resolveManualEncounterRound', () => {
     expect(progressMocks.trackProgress).not.toHaveBeenCalled();
     expect(result.questProgress).toEqual([]);
     expect(databaseMocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('stores manual site chest overflow as pending loot', async () => {
+    const playerId = 'test-player';
+    const siteId = 'site-1';
+    const mobId = makeEncounterMobId(1);
+    const actionDefinitions = { ...BASE_ACTION_DEFINITIONS };
+    const template = [{ actionId: 'defend', sortOrder: 0 }];
+    const roomMobSlots = [makeEncounterSlot(1)];
+    const overflow = [{
+      templateId: 'goblin-crown',
+      templateName: "Goblin King's Crown",
+      rarity: 'common',
+      quantity: 1,
+      bonusStats: null,
+      currentDurability: 120,
+      maxDurability: 120,
+    }];
+    const state = makeManualEncounterState({
+      playerId,
+      siteId,
+      roomMobSlots,
+      participant: makeParticipant({
+        playerId,
+        template,
+        actionDefinitions,
+        hp: 100,
+        maxHp: 100,
+        stats: makeStats({ damageMin: 0, damageMax: 0, accuracy: 1000 }),
+      }),
+      mobs: [
+        makeMob({
+          id: mobId,
+          hp: 10,
+          maxHp: 10,
+          stats: makeStats({ damageMin: 0, damageMax: 0, dodge: 0, defence: 0, magicDefence: 0 }),
+          actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+          activeEffects: [{
+            name: 'Arcane Burn',
+            stat: 'attack',
+            modifier: 0,
+            roundsRemaining: 1,
+            damagePerRound: 10,
+            dotDamageType: 'magic',
+            sourceScalingStat: 'magic',
+          }],
+        }),
+      ],
+    });
+    redisMock.get.mockResolvedValue(JSON.stringify(state));
+    combatOrchestrationMocks.fetchFreshTemplateData.mockResolvedValue({
+      playerTemplate: template,
+      actionDefinitions,
+    });
+    databaseMocks.tx.encounterSite.findFirst.mockResolvedValue({
+      id: siteId,
+      playerId,
+      mobFamilyId: 'family-1',
+      size: 'small',
+      discoveredAt: new Date(),
+      mobs: roomMobSlots,
+      currentRoom: 1,
+      totalRooms: 1,
+      roomStrategy: [],
+    });
+    serviceMocks.grantEncounterSiteChestRewardsTx.mockResolvedValueOnce({
+      chestRarity: 'common',
+      materialRolls: 0,
+      loot: [],
+      recipeUnlocked: null,
+      overflow,
+      slotsConsumed: 0,
+      newItemIds: [],
+      updatedItemIds: [],
+    });
+
+    const result = await resolveManualEncounterRound(playerId, siteId, {});
+
+    expect(serviceMocks.storePendingLoot).toHaveBeenCalledWith(playerId, overflow);
+    expect(result.pendingLootSessionId).toBe('pending-session-1');
   });
 
   it('includes current-round player effect tick damage when granting room XP', async () => {

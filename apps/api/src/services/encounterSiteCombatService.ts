@@ -34,6 +34,7 @@ import {
   buildParticipantForEncounterSite,
   resolveEncounterRoomCombat,
   countEncounterSiteHits,
+  storeEncounterChestOverflow,
   type FleeResult,
 } from './encounterSiteCombatCore';
 import { degradeEquippedDurabilityByHits } from './durabilityService';
@@ -79,6 +80,7 @@ export interface AutoResolveEncounterResult {
   totalRooms: number;
   siteCleared: boolean;
   completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
+  pendingLootSessionId: string | null;
   xpGrants: GrantXpResult[];
   questProgress: QuestProgressUpdate[];
   fleeResult: FleeResult | null;
@@ -138,7 +140,7 @@ export async function autoResolveEncounterRoom(
 
   // All remaining rooms decayed — auto-clear site with chest reward
   if (!advanceResult) {
-    const completionRewards = await handleDecayedSiteClearance(playerId, siteId, site);
+    const { completionRewards, pendingLootSessionId } = await handleDecayedSiteClearance(playerId, siteId, site);
     return {
       outcome: 'site_cleared' as const,
       roundsResolved: 0,
@@ -152,6 +154,7 @@ export async function autoResolveEncounterRoom(
       totalRooms: site.totalRooms ?? 1,
       siteCleared: true,
       completionRewards,
+      pendingLootSessionId,
       xpGrants: [],
       questProgress: [],
       fleeResult: null,
@@ -344,6 +347,7 @@ export async function autoResolveEncounterRoom(
   const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(combatResult.rounds.map(r => r.log));
   const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
   const durabilityDamagedItemIds = durabilityLost.map(d => d.itemId);
+  const pendingLootSessionId = await storeEncounterChestOverflow(playerId, txResult.completionRewards);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];
@@ -391,6 +395,7 @@ export async function autoResolveEncounterRoom(
     totalRooms: site.totalRooms ?? 1,
     siteCleared: txResult.siteCleared,
     completionRewards: txResult.completionRewards,
+    pendingLootSessionId,
     xpGrants,
     questProgress,
     fleeResult,

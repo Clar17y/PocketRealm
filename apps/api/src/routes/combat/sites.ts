@@ -324,6 +324,7 @@ export function registerSiteRoutes(router: Router): void {
           rounds: result.rounds,
           initialMobs: result.initialMobs,
           chestReward: await mapChestRewardDTO(result.completionRewards),
+          ...(result.pendingLootSessionId ? { pendingLootSessionId: result.pendingLootSessionId } : {}),
           ...(result.xpGrants.length ? { skillXpGrants: result.xpGrants.map(serializeXpGrant) } : {}),
           ...(result.questProgress.length ? { questProgress: result.questProgress } : {}),
           fleeResult: result.fleeResult,
@@ -360,6 +361,7 @@ export function registerSiteRoutes(router: Router): void {
         res.json({
           siteAutoCleared: true,
           chestReward: await mapChestRewardDTO(result.completionRewards ?? null),
+          ...(result.pendingLootSessionId ? { pendingLootSessionId: result.pendingLootSessionId } : {}),
           stateUpdates,
         });
         return;
@@ -449,6 +451,7 @@ export function registerSiteRoutes(router: Router): void {
         roomCleared: result.outcome === 'cleared' || result.outcome === 'site_cleared',
         siteCleared: result.siteCleared,
         chestReward: await mapChestRewardDTO(result.completionRewards),
+        ...(result.pendingLootSessionId ? { pendingLootSessionId: result.pendingLootSessionId } : {}),
         ...(combatEnded && result.xpGrants?.length ? { skillXpGrants: result.xpGrants.map(serializeXpGrant) } : {}),
         ...(combatEnded && result.questProgress?.length ? { questProgress: result.questProgress } : {}),
         fleeResult: result.fleeResult,
