@@ -2,6 +2,7 @@ import type { BossActiveEffect } from './worldEvent.types';
 import type { BossTargetMode, BossTemplateAction } from './bossTemplate.types';
 import type { CombatantStats, CombatPotion, PotionConsumed } from './combat.types';
 import type { ActionDefinition, SlotCondition } from './combatAction.types';
+import type { EncounterMobRole } from './encounter.types';
 
 // --- Expedition Status ---
 
@@ -23,6 +24,7 @@ export interface ExpeditionMobState {
   mobTemplateId: string;
   name: string;
   prefix: string | null;
+  role?: EncounterMobRole;
   hp: number;
   maxHp: number;
   stats: CombatantStats;
@@ -122,6 +124,7 @@ export interface ExpeditionMobInfo {
   id: string;
   name: string;
   prefix: string | null;
+  role?: EncounterMobRole;
   hp: number;
   maxHp: number;
   activeEffects: BossActiveEffect[];

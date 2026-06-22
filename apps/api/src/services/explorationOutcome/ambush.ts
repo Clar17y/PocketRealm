@@ -5,12 +5,13 @@ import {
   buildPlayerCombatStats,
   filterAndWeightMobsByTier,
   mobToTemplateCombatant,
+  rollNormalExplorationMobRole,
   rollMobPrefix,
   runTemplateCombat,
   selectTierWithBleedthrough,
 } from '@pocketrealm/game-engine';
 import {
-  DURABILITY_CONSTANTS,
+  formatEncounterMobDisplayName,
   type LootDrop,
   type MobTemplate,
   type PotionConsumed,
@@ -21,7 +22,7 @@ import { broadcastRareLootActivity } from '../chatActivityService';
 import { logger } from '../../logger';
 import { buildCombatLogResult, buildPlayerTemplateCombatant, processCombatVictoryRewards } from '../combatOrchestrationService';
 import { mapTemplateCombatLog } from '../combatLogMapper';
-import { degradeEquippedDurability } from '../durabilityService';
+import { degradeEquippedDurability, resolveExplorationDurabilityMultiplier } from '../durabilityService';
 import { enrichLootWithNames } from '../lootService';
 import { setHp, enterRecoveringState } from '../hpService';
 import { persistMobHp } from '../persistedMobService';
@@ -32,6 +33,7 @@ import { buildPveCombatOptions, calculateFleeWithGold, serializeXpGrant, toMobTe
 import type { GrantXpResult } from '../xpService';
 import type { ExplorationOutcomeContext, ExplorationTurnOutcome, AmbushProcessingResult } from './types';
 import { pickWeighted, type NarrativeEvent, type PendingAmbushCombatLog } from '../exploration/helpers';
+import { applyEncounterRoleModifiers } from '../encounterSiteMobRoleService';
 
 function hasConsumableCombatBuffUses(uses: ExplorationOutcomeContext['buffUsesLeft']): boolean {
   return uses.damage > 0 || uses.defence > 0 || uses.durability > 0;
@@ -176,6 +178,23 @@ export async function processAmbushOutcome(args: {
     prefixedMob = applyMobPrefix(modifiedMob, rollMobPrefix());
   }
 
+  const mobRole = isTutorialExplore ? 'trash' : rollNormalExplorationMobRole();
+  const roleModifiedMob = applyEncounterRoleModifiers(prefixedMob, mobRole);
+  const ambushMob = {
+    ...roleModifiedMob,
+    mobDisplayName: formatEncounterMobDisplayName({
+      name: roleModifiedMob.name,
+      prefix: roleModifiedMob.mobPrefix,
+      role: mobRole,
+    }),
+  };
+  const combatLogMob = {
+    id: ambushMob.id,
+    name: baseMob.name,
+    mobPrefix: ambushMob.mobPrefix,
+    mobDisplayName: ambushMob.mobDisplayName,
+  };
+
   const playerStats = buildPlayerCombatStats(
     currentHp,
     hpState.maxHp,
@@ -208,7 +227,7 @@ export async function processAmbushOutcome(args: {
     unlockedActions: explorationUnlockedActions,
     perActionScaling,
   });
-  const combatantB = mobToTemplateCombatant(prefixedMob);
+  const combatantB = mobToTemplateCombatant(ambushMob);
   const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
 
   for (const consumed of combatResult.potionsConsumed) {
@@ -219,9 +238,7 @@ export async function processAmbushOutcome(args: {
     allPotionsConsumed.push(consumed);
   }
 
-  const explorationDurabilityMultiplier = prefixedMob.mobPrefix
-    ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
-    : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
+  const explorationDurabilityMultiplier = resolveExplorationDurabilityMultiplier(ambushMob.mobPrefix, mobRole);
   const durabilityLost = buffUsesLeft.durability > 0
     ? []
     : await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', explorationDurabilityMultiplier);
@@ -236,7 +253,7 @@ export async function processAmbushOutcome(args: {
   }
 
   const ambushMobFamily = zoneFamilies.find((zoneFamily) =>
-    zoneFamily.mobFamily.members.some((member) => member.mobTemplate.id === prefixedMob.id),
+    zoneFamily.mobFamily.members.some((member) => member.mobTemplate.id === ambushMob.id),
   );
   const ambushEventModifiers = ambushMobFamily
     ? filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushMobFamily.mobFamilyId })
@@ -265,7 +282,7 @@ export async function processAmbushOutcome(args: {
 
     const rewards = await processCombatVictoryRewards({
       playerId,
-      mob: prefixedMob,
+      mob: ambushMob,
       attackSkill,
       damageByScalingStat: combatResult.damageByScalingStat,
       resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
@@ -295,14 +312,14 @@ export async function processAmbushOutcome(args: {
       result: buildCombatLogResult({
         zoneId,
         zoneName: zone.name,
-        mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+        mob: combatLogMob,
         source: 'exploration_ambush',
         encounterSiteId: null,
         attackSkill,
         combatResult,
         rewards: {
-          xp: prefixedMob.xpReward,
-          baseXp: prefixedMob.xpReward,
+          xp: ambushMob.xpReward,
+          baseXp: ambushMob.xpReward,
           loot,
           durabilityLost,
           skillXpGrants: xpGrants.map(serializeXpGrant),
@@ -314,12 +331,12 @@ export async function processAmbushOutcome(args: {
     events.push({
       turn: outcome.turnOccurred,
       type: 'ambush_victory',
-      description: `A ${prefixedMob.mobDisplayName} ambushed you - you defeated it! (+${xpGain} XP)`,
+      description: `A ${ambushMob.mobDisplayName} ambushed you - you defeated it! (+${xpGain} XP)`,
       details: {
-        mobTemplateId: prefixedMob.id,
+        mobTemplateId: ambushMob.id,
         mobName: baseMob.name,
-        mobPrefix: prefixedMob.mobPrefix,
-        mobDisplayName: prefixedMob.mobDisplayName,
+        mobPrefix: ambushMob.mobPrefix,
+        mobDisplayName: ambushMob.mobDisplayName,
         outcome: combatResult.outcome,
         playerMaxHp: combatResult.combatantAMaxHp,
         mobMaxHp: combatResult.combatantBMaxHp,
@@ -337,7 +354,7 @@ export async function processAmbushOutcome(args: {
 
     const fleeResult = await calculateFleeWithGold(playerId, {
       evasionLevel: progression.attributes.evasion,
-      mobLevel: prefixedMob.level,
+      mobLevel: ambushMob.level,
       maxHp: hpState.maxHp,
     });
 
@@ -352,19 +369,19 @@ export async function processAmbushOutcome(args: {
     }
 
     if (combatResult.combatantBHpRemaining > 0) {
-      await persistMobHp(playerId, prefixedMob.id, zoneId, combatResult.combatantBHpRemaining, prefixedMob.hp);
+      await persistMobHp(playerId, ambushMob.id, zoneId, combatResult.combatantBHpRemaining, ambushMob.hp);
     }
 
     const defeatDescription = fleeResult.outcome === 'knockout'
-      ? `A ${prefixedMob.mobDisplayName} ambushed you - you were defeated and knocked out!`
-      : `A ${prefixedMob.mobDisplayName} ambushed you - you were defeated but escaped with ${fleeResult.remainingHp} HP.`;
+      ? `A ${ambushMob.mobDisplayName} ambushed you - you were defeated and knocked out!`
+      : `A ${ambushMob.mobDisplayName} ambushed you - you were defeated but escaped with ${fleeResult.remainingHp} HP.`;
 
     pendingCombatLogs.push({
       turnsSpent: 0,
       result: buildCombatLogResult({
         zoneId,
         zoneName: zone.name,
-        mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+        mob: combatLogMob,
         source: 'exploration_ambush',
         encounterSiteId: null,
         attackSkill,
@@ -385,10 +402,10 @@ export async function processAmbushOutcome(args: {
       type: 'ambush_defeat',
       description: defeatDescription,
       details: {
-        mobTemplateId: prefixedMob.id,
+        mobTemplateId: ambushMob.id,
         mobName: baseMob.name,
-        mobPrefix: prefixedMob.mobPrefix,
-        mobDisplayName: prefixedMob.mobDisplayName,
+        mobPrefix: ambushMob.mobPrefix,
+        mobDisplayName: ambushMob.mobDisplayName,
         outcome: combatResult.outcome,
         playerMaxHp: combatResult.combatantAMaxHp,
         mobMaxHp: combatResult.combatantBMaxHp,

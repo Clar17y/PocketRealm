@@ -21,8 +21,29 @@ export function parseEncounterMobSlot(mobId: string): number | null {
 // ---------------------------------------------------------------------------
 
 export type EncounterSiteSize = 'small' | 'medium' | 'large';
-export type EncounterMobRole = 'trash' | 'elite' | 'boss';
+export type EncounterMobRole = 'trash' | 'elite' | 'mini_boss';
+export type LegacyEncounterMobRole = EncounterMobRole | 'boss';
 export type EncounterMobStatus = 'alive' | 'defeated' | 'decayed';
+
+export function isEncounterMobRole(value: unknown): value is EncounterMobRole {
+  return value === 'trash' || value === 'elite' || value === 'mini_boss';
+}
+
+export function normalizeEncounterMobRole(value: unknown): EncounterMobRole | null {
+  if (isEncounterMobRole(value)) return value;
+  if (value === 'boss') return 'mini_boss';
+  return null;
+}
+
+/** True if a family-member role maps to a permanent encounter-site role (trash/elite/mini_boss). */
+export function isPermanentEncounterFamilyRole(role: string): boolean {
+  return normalizeEncounterMobRole(role) !== null;
+}
+
+/** True if a family-member role is a mini-boss (or legacy 'boss'). */
+export function isMiniBossFamilyRole(role: string): boolean {
+  return normalizeEncounterMobRole(role) === 'mini_boss';
+}
 
 export interface EncounterMobSlot {
   slot: number;

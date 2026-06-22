@@ -28,143 +28,143 @@ export function getAllMobFamilies() {
   ];
 }
 
-// Links each mob template to its family with a role (trash/elite/boss)
+// Links each mob template to its family with a role (trash/elite/mini_boss)
 export function getAllMobFamilyMembers() {
   return [
     // Vermin — Forest Edge
     { mobFamilyId: f.vermin, mobTemplateId: m.forestRat, role: 'trash' },
     { mobFamilyId: f.vermin, mobTemplateId: m.fieldMouse, role: 'trash' },
     { mobFamilyId: f.vermin, mobTemplateId: m.giantRat, role: 'elite' },
-    { mobFamilyId: f.vermin, mobTemplateId: m.ratKing, role: 'boss' },
+    { mobFamilyId: f.vermin, mobTemplateId: m.ratKing, role: 'mini_boss' },
     // Vermin — Cave Entrance
     { mobFamilyId: f.vermin, mobTemplateId: m.caveRat, role: 'trash' },
     { mobFamilyId: f.vermin, mobTemplateId: m.cavernBeetle, role: 'trash' },
     { mobFamilyId: f.vermin, mobTemplateId: m.giantCaveSpider, role: 'elite' },
-    { mobFamilyId: f.vermin, mobTemplateId: m.ratMatriarch, role: 'boss' },
+    { mobFamilyId: f.vermin, mobTemplateId: m.ratMatriarch, role: 'mini_boss' },
     // Spiders — Forest Edge
     { mobFamilyId: f.spiders, mobTemplateId: m.forestSpider, role: 'trash' },
     { mobFamilyId: f.spiders, mobTemplateId: m.webSpinner, role: 'trash' },
     { mobFamilyId: f.spiders, mobTemplateId: m.venomousSpider, role: 'elite' },
-    { mobFamilyId: f.spiders, mobTemplateId: m.broodMother, role: 'boss' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.broodMother, role: 'mini_boss' },
     // Boars — Forest Edge
     { mobFamilyId: f.boars, mobTemplateId: m.wildBoar, role: 'trash' },
     { mobFamilyId: f.boars, mobTemplateId: m.tuskedBoar, role: 'elite' },
-    { mobFamilyId: f.boars, mobTemplateId: m.greatBoar, role: 'boss' },
+    { mobFamilyId: f.boars, mobTemplateId: m.greatBoar, role: 'mini_boss' },
     // Wolves — Deep Forest
     { mobFamilyId: f.wolves, mobTemplateId: m.youngWolf, role: 'trash' },
     { mobFamilyId: f.wolves, mobTemplateId: m.forestWolf, role: 'trash' },
     { mobFamilyId: f.wolves, mobTemplateId: m.direWolf, role: 'elite' },
-    { mobFamilyId: f.wolves, mobTemplateId: m.alphaWolf, role: 'boss' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.alphaWolf, role: 'mini_boss' },
     // Wolves — Whispering Plains
     { mobFamilyId: f.wolves, mobTemplateId: m.plainsWolf, role: 'trash' },
     { mobFamilyId: f.wolves, mobTemplateId: m.coyote, role: 'trash' },
     { mobFamilyId: f.wolves, mobTemplateId: m.warg, role: 'elite' },
-    { mobFamilyId: f.wolves, mobTemplateId: m.packAlpha, role: 'boss' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.packAlpha, role: 'mini_boss' },
     // Bandits — Deep Forest
     { mobFamilyId: f.bandits, mobTemplateId: m.woodlandBandit, role: 'trash' },
     { mobFamilyId: f.bandits, mobTemplateId: m.banditScout, role: 'trash' },
     { mobFamilyId: f.bandits, mobTemplateId: m.banditEnforcer, role: 'elite' },
-    { mobFamilyId: f.bandits, mobTemplateId: m.banditCaptain, role: 'boss' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.banditCaptain, role: 'mini_boss' },
     // Bandits — Whispering Plains
     { mobFamilyId: f.bandits, mobTemplateId: m.highwayBandit, role: 'trash' },
     { mobFamilyId: f.bandits, mobTemplateId: m.banditArcherPlains, role: 'trash' },
     { mobFamilyId: f.bandits, mobTemplateId: m.banditLieutenant, role: 'elite' },
-    { mobFamilyId: f.bandits, mobTemplateId: m.banditWarlord, role: 'boss' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.banditWarlord, role: 'mini_boss' },
     // Treants — Deep Forest
     { mobFamilyId: f.treants, mobTemplateId: m.twigBlight, role: 'trash' },
     { mobFamilyId: f.treants, mobTemplateId: m.barkGolem, role: 'trash' },
     { mobFamilyId: f.treants, mobTemplateId: m.darkTreant, role: 'elite' },
-    { mobFamilyId: f.treants, mobTemplateId: m.elderTreant, role: 'boss' },
+    { mobFamilyId: f.treants, mobTemplateId: m.elderTreant, role: 'mini_boss' },
     // Treants — Ancient Grove
     { mobFamilyId: f.treants, mobTemplateId: m.darkTreantGrove, role: 'trash' },
     { mobFamilyId: f.treants, mobTemplateId: m.mossGolem, role: 'trash' },
     { mobFamilyId: f.treants, mobTemplateId: m.ancientTreant, role: 'elite' },
-    { mobFamilyId: f.treants, mobTemplateId: m.treantPatriarch, role: 'boss' },
+    { mobFamilyId: f.treants, mobTemplateId: m.treantPatriarch, role: 'mini_boss' },
     // Spirits — Ancient Grove
     { mobFamilyId: f.spirits, mobTemplateId: m.forestSprite, role: 'trash' },
     { mobFamilyId: f.spirits, mobTemplateId: m.wisp, role: 'trash' },
     { mobFamilyId: f.spirits, mobTemplateId: m.dryad, role: 'elite' },
-    { mobFamilyId: f.spirits, mobTemplateId: m.ancientSpirit, role: 'boss' },
+    { mobFamilyId: f.spirits, mobTemplateId: m.ancientSpirit, role: 'mini_boss' },
     // Fae — Ancient Grove
     { mobFamilyId: f.fae, mobTemplateId: m.pixieSwarm, role: 'trash' },
     { mobFamilyId: f.fae, mobTemplateId: m.thornFairy, role: 'trash' },
     { mobFamilyId: f.fae, mobTemplateId: m.faeKnight, role: 'elite' },
-    { mobFamilyId: f.fae, mobTemplateId: m.faeQueen, role: 'boss' },
+    { mobFamilyId: f.fae, mobTemplateId: m.faeQueen, role: 'mini_boss' },
     // Bats — Cave Entrance
     { mobFamilyId: f.bats, mobTemplateId: m.caveBat, role: 'trash' },
     { mobFamilyId: f.bats, mobTemplateId: m.direBat, role: 'trash' },
     { mobFamilyId: f.bats, mobTemplateId: m.vampireBat, role: 'elite' },
-    { mobFamilyId: f.bats, mobTemplateId: m.batSwarmLord, role: 'boss' },
+    { mobFamilyId: f.bats, mobTemplateId: m.batSwarmLord, role: 'mini_boss' },
     // Goblins — Cave Entrance
     { mobFamilyId: f.goblins, mobTemplateId: m.goblin, role: 'trash' },
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinArcher, role: 'trash' },
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinWarrior, role: 'elite' },
-    { mobFamilyId: f.goblins, mobTemplateId: m.goblinShaman, role: 'boss' },
+    { mobFamilyId: f.goblins, mobTemplateId: m.goblinShaman, role: 'mini_boss' },
     // Goblins — Deep Mines
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinMiner, role: 'trash' },
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinSapper, role: 'trash' },
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinForeman, role: 'elite' },
-    { mobFamilyId: f.goblins, mobTemplateId: m.goblinChieftain, role: 'boss' },
+    { mobFamilyId: f.goblins, mobTemplateId: m.goblinChieftain, role: 'mini_boss' },
     // Goblins — Crystal Caverns
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinGemHunter, role: 'trash' },
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinTunneler, role: 'trash' },
     { mobFamilyId: f.goblins, mobTemplateId: m.goblinArtificer, role: 'elite' },
-    { mobFamilyId: f.goblins, mobTemplateId: m.goblinKingMob, role: 'boss' },
+    { mobFamilyId: f.goblins, mobTemplateId: m.goblinKingMob, role: 'mini_boss' },
     // Golems — Deep Mines
     { mobFamilyId: f.golems, mobTemplateId: m.clayGolem, role: 'trash' },
     { mobFamilyId: f.golems, mobTemplateId: m.stoneGolem, role: 'trash' },
     { mobFamilyId: f.golems, mobTemplateId: m.ironGolem, role: 'elite' },
-    { mobFamilyId: f.golems, mobTemplateId: m.crystalGolemMob, role: 'boss' },
+    { mobFamilyId: f.golems, mobTemplateId: m.crystalGolemMob, role: 'mini_boss' },
     // Golems — Crystal Caverns
     { mobFamilyId: f.golems, mobTemplateId: m.crystalGolemCav, role: 'trash' },
     { mobFamilyId: f.golems, mobTemplateId: m.gemConstruct, role: 'trash' },
     { mobFamilyId: f.golems, mobTemplateId: m.diamondGolemMob, role: 'elite' },
-    { mobFamilyId: f.golems, mobTemplateId: m.golemOverlord, role: 'boss' },
+    { mobFamilyId: f.golems, mobTemplateId: m.golemOverlord, role: 'mini_boss' },
     // Crawlers — Deep Mines
     { mobFamilyId: f.crawlers, mobTemplateId: m.rockCrawler, role: 'trash' },
     { mobFamilyId: f.crawlers, mobTemplateId: m.caveLurker, role: 'trash' },
     { mobFamilyId: f.crawlers, mobTemplateId: m.burrower, role: 'elite' },
-    { mobFamilyId: f.crawlers, mobTemplateId: m.tunnelWyrm, role: 'boss' },
+    { mobFamilyId: f.crawlers, mobTemplateId: m.tunnelWyrm, role: 'mini_boss' },
     // Harpies — Whispering Plains
     { mobFamilyId: f.harpies, mobTemplateId: m.harpy, role: 'trash' },
     { mobFamilyId: f.harpies, mobTemplateId: m.harpyScout, role: 'trash' },
     { mobFamilyId: f.harpies, mobTemplateId: m.harpyWindcaller, role: 'elite' },
-    { mobFamilyId: f.harpies, mobTemplateId: m.harpyMatriarch, role: 'boss' },
+    { mobFamilyId: f.harpies, mobTemplateId: m.harpyMatriarch, role: 'mini_boss' },
     // Undead — Haunted Marsh
     { mobFamilyId: f.undead, mobTemplateId: m.skeleton, role: 'trash' },
     { mobFamilyId: f.undead, mobTemplateId: m.zombie, role: 'trash' },
     { mobFamilyId: f.undead, mobTemplateId: m.wraith, role: 'elite' },
-    { mobFamilyId: f.undead, mobTemplateId: m.deathKnight, role: 'boss' },
+    { mobFamilyId: f.undead, mobTemplateId: m.deathKnight, role: 'mini_boss' },
     // Undead — Sunken Ruins
     { mobFamilyId: f.undead, mobTemplateId: m.drownedSailor, role: 'trash' },
     { mobFamilyId: f.undead, mobTemplateId: m.skeletalKnight, role: 'trash' },
     { mobFamilyId: f.undead, mobTemplateId: m.spectralCaptain, role: 'elite' },
-    { mobFamilyId: f.undead, mobTemplateId: m.lich, role: 'boss' },
+    { mobFamilyId: f.undead, mobTemplateId: m.lich, role: 'mini_boss' },
     // Swamp Beasts — Haunted Marsh
     { mobFamilyId: f.swampBeasts, mobTemplateId: m.bogToad, role: 'trash' },
     { mobFamilyId: f.swampBeasts, mobTemplateId: m.marshCrawlerMob, role: 'trash' },
     { mobFamilyId: f.swampBeasts, mobTemplateId: m.swampHydra, role: 'elite' },
-    { mobFamilyId: f.swampBeasts, mobTemplateId: m.ancientCrocodile, role: 'boss' },
+    { mobFamilyId: f.swampBeasts, mobTemplateId: m.ancientCrocodile, role: 'mini_boss' },
     // Witches — Haunted Marsh
     { mobFamilyId: f.witches, mobTemplateId: m.hagServant, role: 'trash' },
     { mobFamilyId: f.witches, mobTemplateId: m.cursedVillager, role: 'trash' },
     { mobFamilyId: f.witches, mobTemplateId: m.bogWitch, role: 'elite' },
-    { mobFamilyId: f.witches, mobTemplateId: m.covenMother, role: 'boss' },
+    { mobFamilyId: f.witches, mobTemplateId: m.covenMother, role: 'mini_boss' },
     // Elementals — Crystal Caverns
     { mobFamilyId: f.elementals, mobTemplateId: m.shardElemental, role: 'trash' },
     { mobFamilyId: f.elementals, mobTemplateId: m.crystalWispMob, role: 'trash' },
     { mobFamilyId: f.elementals, mobTemplateId: m.stormCrystalMob, role: 'elite' },
-    { mobFamilyId: f.elementals, mobTemplateId: m.crystalTitan, role: 'boss' },
+    { mobFamilyId: f.elementals, mobTemplateId: m.crystalTitan, role: 'mini_boss' },
     // Serpents — Sunken Ruins
     { mobFamilyId: f.serpents, mobTemplateId: m.seaSnake, role: 'trash' },
     { mobFamilyId: f.serpents, mobTemplateId: m.marshViper, role: 'trash' },
     { mobFamilyId: f.serpents, mobTemplateId: m.nagaWarrior, role: 'elite' },
-    { mobFamilyId: f.serpents, mobTemplateId: m.nagaQueenMob, role: 'boss' },
+    { mobFamilyId: f.serpents, mobTemplateId: m.nagaQueenMob, role: 'mini_boss' },
     // Abominations — Sunken Ruins
     { mobFamilyId: f.abominations, mobTemplateId: m.ooze, role: 'trash' },
     { mobFamilyId: f.abominations, mobTemplateId: m.tentacleHorror, role: 'trash' },
     { mobFamilyId: f.abominations, mobTemplateId: m.fleshGolem, role: 'elite' },
-    { mobFamilyId: f.abominations, mobTemplateId: m.eldritchAbomination, role: 'boss' },
+    { mobFamilyId: f.abominations, mobTemplateId: m.eldritchAbomination, role: 'mini_boss' },
     // Expedition: Spider Nest → Spiders family
     { mobFamilyId: f.spiders, mobTemplateId: m.expCavernSpider, role: 'expedition_trash' },
     { mobFamilyId: f.spiders, mobTemplateId: m.expWebweaver, role: 'expedition_trash' },

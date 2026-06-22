@@ -32,6 +32,7 @@ describe('useEncounterSites', () => {
     nextMobTemplateId: 'wolf',
     nextMobName: 'Wolf',
     nextMobPrefix: null,
+    nextMobRole: 'trash' as const,
     nextMobDisplayName: 'Wolf',
     discoveredAt: '2026-05-19T22:06:32.628Z',
     currentRoom: overrides.currentRoom ?? 1,
@@ -43,8 +44,8 @@ describe('useEncounterSites', () => {
       { room: 4, alive: overrides.aliveMobs ?? 2, total: 2 },
     ],
     currentRoomMobs: [
-      { slot: 9, name: 'Wolf', prefix: null, hp: 22, maxHp: 22 },
-      { slot: 10, name: 'Wolf', prefix: null, hp: 22, maxHp: 22 },
+      { slot: 9, name: 'Wolf', prefix: null, role: 'trash' as const, hp: 22, maxHp: 22 },
+      { slot: 10, name: 'Wolf', prefix: null, role: 'elite' as const, hp: 22, maxHp: 22 },
     ],
     eventModifiers: [],
     totalTurnCost: 100,

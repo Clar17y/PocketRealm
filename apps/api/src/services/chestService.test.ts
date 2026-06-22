@@ -7,7 +7,7 @@ vi.mock('./inventoryService', () => ({
 import { mockPrisma } from '../__test__/setup';
 import { grantEncounterSiteChestRewardsTx } from './chestService';
 import { addStackableItemTx } from './inventoryService';
-import { ENCOUNTER_SITE_CONSTANTS } from '@pocketrealm/shared';
+import { ENCOUNTER_SITE_CONSTANTS, ENCOUNTER_SITE_ROLE_CONSTANTS } from '@pocketrealm/shared';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -391,6 +391,91 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       // No bonus: materialRolls = baseRolls
       expect(result.materialRolls).toBeGreaterThanOrEqual(1);
       expect(result.materialRolls).toBeLessThanOrEqual(2);
+    });
+
+    it('adds material rolls for defeated promoted roles', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.999);
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+        autoResolvedBonusRooms: 0,
+        defeatedPromotedRoleCounts: { elite: 1, mini_boss: 1 },
+      });
+
+      const expectedMultiplier = 1
+        + ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.elite.materialRollMultiplier
+        + ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.mini_boss.materialRollMultiplier;
+      expect(result.materialRolls).toBe(Math.ceil(6 * expectedMultiplier));
+    });
+
+    it('does not spend promoted-role material bonus rolls on consumables', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.999);
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([
+        {
+          itemTemplateId: 'copper-ore',
+          dropChance: 1,
+          minQuantity: 1,
+          maxQuantity: 1,
+          mobFamily: { name: 'Golems' },
+          itemTemplate: { name: 'Copper Ore', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+        {
+          itemTemplateId: 'minor-health-potion',
+          dropChance: 100,
+          minQuantity: 1,
+          maxQuantity: 1,
+          mobFamily: { name: 'Golems' },
+          itemTemplate: { name: 'Minor Health Potion', itemType: 'consumable', stackable: true, maxDurability: 0 },
+        },
+      ]);
+
+      const withoutPromotedRoles = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+      });
+      const withPromotedRoles = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 3,
+        defeatedPromotedRoleCounts: { elite: 1, mini_boss: 1 },
+      });
+
+      const quantity = (loot: typeof withPromotedRoles.loot, templateId: string) =>
+        loot.find((drop) => drop.itemTemplateId === templateId)?.quantity ?? 0;
+
+      expect(quantity(withPromotedRoles.loot, 'minor-health-potion'))
+        .toBe(quantity(withoutPromotedRoles.loot, 'minor-health-potion'));
+      expect(quantity(withPromotedRoles.loot, 'copper-ore'))
+        .toBeGreaterThan(quantity(withoutPromotedRoles.loot, 'copper-ore'));
+    });
+
+    it('adds extra signature resource rolls for defeated promoted roles', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([
+        {
+          itemTemplateId: 'spider-silk',
+          dropChance: 1,
+          minQuantity: 1,
+          maxQuantity: 1,
+          mobFamily: { name: 'Spiders' },
+          itemTemplate: { name: 'Spider Silk', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+      ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        defeatedPromotedRoleCounts: { elite: 1, mini_boss: 1 },
+      });
+
+      const expectedSignatureRolls = 1
+        + ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.elite.signatureRolls
+        + ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.mini_boss.signatureRolls;
+      expect(result.loot).toContainEqual({
+        itemTemplateId: 'spider-silk',
+        quantity: expectedSignatureRolls + result.materialRolls,
+        rarity: 'common',
+      });
     });
 
     it('queries drop table with rarity matching totalRooms', async () => {

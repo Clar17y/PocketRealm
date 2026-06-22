@@ -44,6 +44,10 @@ vi.mock('@pocketrealm/game-engine', () => ({
   generateRoomAssignments: vi.fn(() => ({
     rooms: [{ roomNumber: 1, mobCount: 2 }],
   })),
+  assignEncounterRolesToRooms: vi.fn(() => [
+    { room: 1, role: 'trash' },
+    { room: 1, role: 'elite' },
+  ]),
 }));
 vi.mock('../middleware/auth', () => ({
   authenticate: vi.fn((_req: any, _res: any, next: any) => next()),
@@ -573,7 +577,7 @@ describe('admin routes', () => {
     it('creates an encounter site with mobs', async () => {
       mockPrisma.mobFamily.findUniqueOrThrow.mockResolvedValue({
         id: 'fam-1', name: 'Wolves', siteNounSmall: 'Den', siteNounMedium: 'Lair', siteNounLarge: 'Cavern',
-        members: [{ mobTemplate: { id: 'mob-1' } }],
+        members: [{ role: 'trash', mobTemplate: { id: 'mob-1' } }],
       });
       mockPrisma.encounterSite.create.mockResolvedValue({ id: 'site-1' });
 

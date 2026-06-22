@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.75',
+    date: '2026-06-22',
+    title: 'Encounter Site Elites & Mini-Bosses',
+    summary:
+      'Encounter sites now feature promoted Elites and Mini-Bosses that keep their base creature identity while gaining tougher stats, clearer role labels in combat logs, and more dangerous encounter-site abilities. Three-room and larger sites guarantee late-room Elite pressure, with Mini-Bosses appearing as final-room threats. Completing sites with promoted mobs now improves the final chest with extra material rewards, while ordinary exploration can also roll Elite variants for added variety.',
+  },
+  {
+    version: '0.74',
+    date: '2026-06-22',
+    title: 'Smarter Resting',
+    summary:
+      'Quick rest now works when HP is full but stamina or mana is still low, and it spends enough turns to refill those resources as far as your turn bank allows.',
+  },
+  {
     version: '0.73',
     date: '2026-06-21',
     title: 'Encounter Site Recipe Rewards',

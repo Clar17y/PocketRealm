@@ -1,5 +1,6 @@
 import type { EventModifierBadge, CombatActiveEvent } from '@/lib/api';
 import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
+import type { EncounterMobRole } from '@pocketrealm/shared';
 
 export type { LastCombatLogEntry };
 
@@ -46,12 +47,13 @@ export interface PendingEncounter {
   nextMobTemplateId: string | null;
   nextMobName: string | null;
   nextMobPrefix: string | null;
+  nextMobRole: EncounterMobRole | null;
   nextMobDisplayName: string | null;
   discoveredAt: string;
   currentRoom: number;
   totalRooms: number;
   roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-  currentRoomMobs: Array<{ slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
+  currentRoomMobs: Array<{ slot: number; name: string; prefix: string | null; role: EncounterMobRole; hp: number; maxHp: number }>;
   eventModifiers?: EventModifierBadge[];
   totalTurnCost: number;
 }

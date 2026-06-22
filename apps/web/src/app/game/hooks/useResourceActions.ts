@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import type { ResourceState } from '@pocketrealm/shared';
 import { trackEvent } from '@/lib/analytics';
 import { allocatePlayerAttribute, getHpState, rest, restEstimate } from '@/lib/api';
 import { TUTORIAL_STEP_ATTRIBUTE_POINTS } from '@/lib/tutorial';
@@ -10,8 +11,22 @@ import { nowStamp } from './useActivityLog';
 type AttributeType = keyof CharacterProgression['attributes'];
 type RunAction = (name: string, fn: () => Promise<void>) => Promise<void>;
 
+function calculateTurnsForRestoredAmount(amount: number, restoredPerTurn: number): number {
+  if (amount <= 0 || restoredPerTurn <= 0) return 0;
+  return Math.ceil(amount / restoredPerTurn);
+}
+
+function calculateRequestedTurnsForEffectiveTurns(effectiveTurns: number, taxRatePercent: number): number {
+  if (effectiveTurns <= 0) return 0;
+  if (taxRatePercent <= 0) return effectiveTurns;
+  if (taxRatePercent >= 100) return Number.MAX_SAFE_INTEGER;
+  return Math.ceil(effectiveTurns / (1 - taxRatePercent / 100));
+}
+
 interface UseResourceActionsParams {
   hpState: HpState;
+  staminaState: Pick<ResourceState, 'current' | 'max' | 'restHealPerTurn'>;
+  manaState: Pick<ResourceState, 'current' | 'max' | 'restHealPerTurn'>;
   turns: number;
   quickRestHealPercent: number;
   tutorialStep: number;
@@ -27,6 +42,8 @@ interface UseResourceActionsParams {
 
 export function useResourceActions({
   hpState,
+  staminaState,
+  manaState,
   turns,
   quickRestHealPercent,
   tutorialStep,
@@ -66,34 +83,53 @@ export function useResourceActions({
   ]);
 
   const handleQuickRest = useCallback(async () => {
-    if (hpState.currentHp >= hpState.maxHp || hpState.isRecovering || turns <= 0) return;
+    const hpNeedsRest = hpState.currentHp < hpState.maxHp;
+    const staminaNeedsRest = staminaState.current < staminaState.max;
+    const manaNeedsRest = manaState.current < manaState.max;
+    if ((!hpNeedsRest && !staminaNeedsRest && !manaNeedsRest) || hpState.isRecovering || turns <= 0) return;
 
     await runAction('quick_rest', async () => {
       const estimate = await restEstimate(10);
-      if (!estimate.data?.healPerTurn) return;
-      const missingHp = hpState.maxHp - hpState.currentHp;
-      const targetHeal = missingHp * (quickRestHealPercent / 100);
-      const rawTurns = Math.ceil(targetHeal / estimate.data.healPerTurn);
+      if (!estimate.data || (hpNeedsRest && !estimate.data.healPerTurn)) return;
+
+      const targetHpHeal = (hpState.maxHp - hpState.currentHp) * (quickRestHealPercent / 100);
+      const hpTurns = calculateTurnsForRestoredAmount(targetHpHeal, estimate.data.healPerTurn ?? 0);
+      const staminaTurns = calculateTurnsForRestoredAmount(
+        staminaState.max - staminaState.current,
+        staminaState.restHealPerTurn,
+      );
+      const manaTurns = calculateTurnsForRestoredAmount(
+        manaState.max - manaState.current,
+        manaState.restHealPerTurn,
+      );
+      const effectiveTurnsNeeded = Math.max(hpTurns, staminaTurns, manaTurns);
+      const rawTurns = calculateRequestedTurnsForEffectiveTurns(
+        effectiveTurnsNeeded,
+        estimate.data.taxRate ?? 0,
+      );
       const turnsToSpend = Math.max(10, Math.ceil(rawTurns / 10) * 10);
       const actualTurns = Math.min(turnsToSpend, turns);
       const result = await rest(actualTurns);
       const data = result.data;
       if (data) {
         const healed = data.currentHp - hpState.currentHp;
+        const turnsSpent = data.turnsSpent ?? actualTurns;
         setTurns(data.turns.currentTurns);
         setHpState(prev => ({ ...prev, currentHp: data.currentHp, maxHp: data.maxHp }));
         applyStateUpdates(data.stateUpdates, stateSetters);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
-        trackEvent('action', { type: 'rest', turns: actualTurns });
+        pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${turnsSpent.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
+        trackEvent('action', { type: 'rest', turns: turnsSpent });
       }
     });
   }, [
     hpState,
+    manaState,
     pushLog,
     quickRestHealPercent,
     runAction,
     setHpState,
     setTurns,
+    staminaState,
     stateSetters,
     turns,
   ]);

@@ -10,7 +10,7 @@ import type {
   ExpeditionMobState,
   CombatPotion,
 } from '@pocketrealm/shared';
-import { COMBAT_ACTION_CONSTANTS, HIT_CURVE_CONSTANTS } from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS, ENCOUNTER_SITE_ROLE_CONSTANTS, HIT_CURVE_CONSTANTS } from '@pocketrealm/shared';
 import { resolveRaidRound } from './raidRoundResolver';
 import type { RaidRoundRng } from './raidRoundResolver';
 import { calculateHitChance } from './damageCalculator';
@@ -133,6 +133,19 @@ describe('resolveRaidRound', () => {
       expect(result.mobActionResults).toHaveLength(2);
       expect(result.mobActionResults[0].damageDealt).toBeGreaterThan(0);
       expect(result.mobActionResults[1].damageDealt).toBeGreaterThan(0);
+    });
+
+    it('preserves encounter roles on surviving mobs', () => {
+      const p1 = makeParticipant({ playerId: 'p1' });
+      const mob1 = makeMob({ id: 'mob1', role: 'mini_boss' });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      expect(result.mobsAfter).toHaveLength(1);
+      expect(result.mobsAfter[0]?.role).toBe('mini_boss');
     });
   });
 
@@ -2365,6 +2378,96 @@ describe('resolveRaidRound', () => {
       const withered = effects.find(e => e.stat === 'defence');
       expect(withered).toBeDefined();
       expect(withered!.modifier).toBe(-8);
+    });
+  });
+
+  describe('encounter role spike actions', () => {
+    const roleSpikeCases = [
+      ['elite_venom_strike', 'elite', 'magic', 1.5],
+      ['elite_maul', 'elite', 'physical', 1.6],
+      ['elite_backstab', 'elite', 'physical', 1.7],
+      ['elite_crushing_blow', 'elite', 'physical', 1.7],
+      ['elite_arcane_lance', 'elite', 'magic', 1.65],
+      ['elite_draining_strike', 'elite', 'magic', 1.5],
+      ['mini_boss_execution_strike', 'mini_boss', 'physical', 2.1],
+      ['mini_boss_arcane_spike', 'mini_boss', 'magic', 2.1],
+    ] as const;
+
+    it('elite_venom_strike is an always-hit magic spike with poison pressure', () => {
+      const definition = BOSS_ACTION_DEFINITIONS.elite_venom_strike;
+
+      expect(definition).toEqual(expect.objectContaining({
+        id: 'elite_venom_strike',
+        actionType: 'damage_spell',
+        damageType: 'magic',
+        alwaysHits: true,
+        damageMultiplier: expect.any(Number),
+      }));
+      expect(definition.damageMultiplier).toBe(
+        1.5 * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS.elite.spikeDamage,
+      );
+      expect(definition.effect).toEqual(expect.objectContaining({
+        name: 'Venom-Touched',
+        stat: 'poison',
+        modifier: 0,
+        duration: 3,
+        isDebuff: true,
+        damagePerRound: 4,
+        dotDamageType: 'magic',
+      }));
+    });
+
+    it.each(roleSpikeCases)(
+      '%s is tuned by encounter role action multipliers',
+      (actionId, role, damageType, baseMultiplier) => {
+        const definition = BOSS_ACTION_DEFINITIONS[actionId];
+
+        expect(definition).toBeDefined();
+        expect(definition.alwaysHits).toBe(true);
+        expect(definition.damageMultiplier).toBe(
+          baseMultiplier * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].spikeDamage,
+        );
+        expect(definition.damageType).toBe(damageType);
+      },
+    );
+
+    it('elite_draining_strike uses whole-percent life leech semantics', () => {
+      expect(BOSS_ACTION_DEFINITIONS.elite_draining_strike.lifeLeechPercent).toBe(25);
+    });
+
+    it('elite_draining_strike heals the mob for life leech damage dealt', () => {
+      const participant = makeParticipant({
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        stats: makeStats({ magicDefence: 0, defence: 0 }),
+        hp: 100,
+        maxHp: 100,
+      });
+      const mob = makeMob({
+        id: 'drainer',
+        hp: 50,
+        maxHp: 100,
+        stats: makeStats({
+          hp: 100,
+          maxHp: 100,
+          damageMin: 20,
+          damageMax: 20,
+          damageType: 'magic',
+          accuracy: 100,
+        }),
+        actionTemplate: [{ actionId: 'elite_draining_strike', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [participant], mobs: [mob] }),
+        alwaysHitRng,
+      );
+
+      expect(result.mobActionResults[0].damageDealt).toBeGreaterThan(0);
+      const expectedHeal = Math.floor(
+        result.mobActionResults[0].damageDealt * BOSS_ACTION_DEFINITIONS.elite_draining_strike.lifeLeechPercent! / 100,
+      );
+      expect(result.mobActionResults[0].healingDone).toBe(expectedHeal);
+      expect(result.mobsAfter[0].hp).toBe(50 + expectedHeal);
     });
   });
 

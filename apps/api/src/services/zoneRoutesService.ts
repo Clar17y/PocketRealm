@@ -4,12 +4,13 @@ import {
   buildPlayerCombatStats,
   applyMobPrefix,
   rollMobPrefix,
+  rollNormalExplorationMobRole,
   simulateTravelAmbushes,
   mobToTemplateCombatant,
   filterAndWeightMobsByTier,
   runTemplateCombat,
 } from '@pocketrealm/game-engine';
-import { DURABILITY_CONSTANTS, CACHE_HEADER_CONSTANTS, type PotionConsumed } from '@pocketrealm/shared';
+import { CACHE_HEADER_CONSTANTS, formatEncounterMobDisplayName, type PotionConsumed } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { refundPlayerTurns } from '../services/turnBankService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
@@ -17,7 +18,7 @@ import { storePendingLoot, type PendingLootItem } from '../services/pendingLootS
 import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
 import { pickWeighted } from '../utils/pickWeighted.js';
-import { degradeEquippedDurability } from '../services/durabilityService';
+import { degradeEquippedDurability, resolveExplorationDurabilityMultiplier } from '../services/durabilityService';
 import { deductConsumedPotions } from '../services/potionService';
 import {
   ensureStarterDiscoveries,
@@ -39,6 +40,7 @@ import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone }
 import { buildTrackableMobFamiliesByZone } from '../services/explorationTrackingService';
 import { buildProspectableResourceNodesByZone } from '../services/resourceProspectingService';
 import { invalidateZoneIdCache } from '../services/zoneService';
+import { applyEncounterRoleModifiers } from './encounterSiteMobRoleService';
 import {
   routeJson,
   withHeaders,
@@ -367,6 +369,16 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
         const rawMob = pickWeighted(tieredMobs, m => m.encounterWeight) ?? tieredMobs[0]!;
         const baseMob = toMobTemplate(rawMob);
         const prefixedMob = applyMobPrefix(baseMob, rollMobPrefix());
+        const mobRole = rollNormalExplorationMobRole();
+        const roleModifiedMob = applyEncounterRoleModifiers(prefixedMob, mobRole);
+        const travelMob = {
+          ...roleModifiedMob,
+          mobDisplayName: formatEncounterMobDisplayName({
+            name: roleModifiedMob.name,
+            prefix: roleModifiedMob.mobPrefix,
+            role: mobRole,
+          }),
+        };
 
         const playerStats = buildPlayerCombatStats(
           currentHp,
@@ -394,7 +406,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
           unlockedActions,
           perActionScaling,
         });
-        const combatantB = mobToTemplateCombatant(prefixedMob);
+        const combatantB = mobToTemplateCombatant(travelMob);
         const combatOptions = buildPveCombatOptions(potionPool);
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
@@ -408,14 +420,12 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
           allPotionsConsumed.push(consumed);
         }
 
-        const travelDurabilityMult = prefixedMob.mobPrefix
-          ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
-          : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
+        const travelDurabilityMult = resolveExplorationDurabilityMultiplier(travelMob.mobPrefix, mobRole);
         const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', travelDurabilityMult);
         for (const d of durabilityLost) allTravelUpdatedItemIds.push(d.itemId);
 
         // Resolve mob family for event badges + achievement tracking (pre-fetched)
-        const travelMobFamilyId = mobToFamilyMap.get(prefixedMob.id) ?? null;
+        const travelMobFamilyId = mobToFamilyMap.get(travelMob.id) ?? null;
         const travelMobBadges = travelMobFamilyId
           ? filterEventModifiers(travelZoneEvents, travelWorldEvents, { mobFamilyId: travelMobFamilyId })
           : [];
@@ -423,7 +433,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
         if (combatResult.outcome === 'victory') {
           const rewards = await processCombatVictoryRewards({
             playerId,
-            mob: prefixedMob,
+            mob: travelMob,
             attackSkill,
             damageByScalingStat: combatResult.damageByScalingStat,
             resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
@@ -448,14 +458,14 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
             result: buildCombatLogResult({
               zoneId: currentZoneId,
               zoneName: currentZone.name,
-              mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+              mob: { id: travelMob.id, name: baseMob.name, mobPrefix: travelMob.mobPrefix, mobDisplayName: travelMob.mobDisplayName },
               source: 'travel_ambush',
               encounterSiteId: null,
               attackSkill,
               combatResult,
               rewards: {
-                xp: prefixedMob.xpReward,
-                baseXp: prefixedMob.xpReward,
+                xp: travelMob.xpReward,
+                baseXp: travelMob.xpReward,
                 loot,
                 durabilityLost,
                 skillXpGrants: rewards.xpGrants.map(serializeXpGrant),
@@ -467,10 +477,11 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
           events.push({
             turn: ambush.turnOccurred,
             type: 'ambush_victory',
-            description: `Ambushed by ${prefixedMob.mobDisplayName}! You defeated it. (+${xpGain} XP)`,
+            description: `Ambushed by ${travelMob.mobDisplayName}! You defeated it. (+${xpGain} XP)`,
             details: {
               mobName: baseMob.name,
-              mobDisplayName: prefixedMob.mobDisplayName,
+              mobDisplayName: travelMob.mobDisplayName,
+              mobRole,
               outcome: combatResult.outcome,
               playerMaxHp: combatResult.combatantAMaxHp,
               mobMaxHp: combatResult.combatantBMaxHp,
@@ -484,7 +495,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
           // Player lost — calculate flee result and deduct gold loss
           const fleeResult = await calculateFleeWithGold(playerId, {
             evasionLevel: progression.attributes.evasion,
-            mobLevel: prefixedMob.level,
+            mobLevel: travelMob.level,
             maxHp: hpState.maxHp,
           });
 
@@ -500,7 +511,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
               result: buildCombatLogResult({
                 zoneId: currentZoneId,
                 zoneName: currentZone.name,
-                mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+                mob: { id: travelMob.id, name: baseMob.name, mobPrefix: travelMob.mobPrefix, mobDisplayName: travelMob.mobDisplayName },
                 source: 'travel_ambush',
                 encounterSiteId: null,
                 attackSkill,
@@ -513,10 +524,11 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
             events.push({
               turn: ambush.turnOccurred,
               type: 'ambush_defeat',
-              description: `Ambushed by ${prefixedMob.mobDisplayName}! You were knocked out.`,
+              description: `Ambushed by ${travelMob.mobDisplayName}! You were knocked out.`,
               details: {
                 mobName: baseMob.name,
-                mobDisplayName: prefixedMob.mobDisplayName,
+                mobDisplayName: travelMob.mobDisplayName,
+                mobRole,
                 outcome: combatResult.outcome,
                 playerMaxHp: combatResult.combatantAMaxHp,
                 mobMaxHp: combatResult.combatantBMaxHp,
@@ -561,7 +573,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
               result: buildCombatLogResult({
                 zoneId: currentZoneId,
                 zoneName: currentZone.name,
-                mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+                mob: { id: travelMob.id, name: baseMob.name, mobPrefix: travelMob.mobPrefix, mobDisplayName: travelMob.mobDisplayName },
                 source: 'travel_ambush',
                 encounterSiteId: null,
                 attackSkill,
@@ -574,10 +586,11 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
             events.push({
               turn: ambush.turnOccurred,
               type: 'ambush_defeat',
-              description: `Ambushed by ${prefixedMob.mobDisplayName}! You escaped with ${currentHp} HP.`,
+              description: `Ambushed by ${travelMob.mobDisplayName}! You escaped with ${currentHp} HP.`,
               details: {
                 mobName: baseMob.name,
-                mobDisplayName: prefixedMob.mobDisplayName,
+                mobDisplayName: travelMob.mobDisplayName,
+                mobRole,
                 outcome: combatResult.outcome,
                 playerMaxHp: combatResult.combatantAMaxHp,
                 mobMaxHp: combatResult.combatantBMaxHp,

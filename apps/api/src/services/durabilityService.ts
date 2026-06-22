@@ -1,9 +1,24 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import { DURABILITY_CONSTANTS, type CombatLogEntry, type CombatActor, type DurabilityLoss } from '@pocketrealm/shared';
+import { DURABILITY_CONSTANTS, type CombatLogEntry, type CombatActor, type DurabilityLoss, type EncounterMobRole } from '@pocketrealm/shared';
 import { invalidateEquipmentCache } from './equipmentService';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Resolve the durability degradation multiplier for a single-mob exploration fight
+ * (ambushes and travel ambushes). Mini-bosses degrade gear fastest, elites and any
+ * prefixed mob degrade faster than trash. Keeps both exploration paths on one formula.
+ */
+export function resolveExplorationDurabilityMultiplier(
+  prefix: string | null | undefined,
+  role: EncounterMobRole,
+): number {
+  const { DEGRADATION_MULTIPLIER } = DURABILITY_CONSTANTS;
+  if (role === 'mini_boss') return DEGRADATION_MULTIPLIER.mini_boss;
+  if (role === 'elite' || prefix) return DEGRADATION_MULTIPLIER.elite;
+  return DEGRADATION_MULTIPLIER.default;
 }
 
 type CombatHitEntry = Pick<CombatLogEntry, 'actor' | 'damage' | 'evaded'>;

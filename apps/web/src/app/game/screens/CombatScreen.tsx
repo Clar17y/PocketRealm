@@ -21,7 +21,7 @@ import { CopyButton } from '@/components/common/CopyButton';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
-import { getMobPrefixDefinition, HP_CONSTANTS, TUTORIAL_STEP_COMBAT } from '@pocketrealm/shared';
+import { HP_CONSTANTS, TUTORIAL_STEP_COMBAT } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
 import type { RefreshPendingEncounterOptions } from '../hooks/useEncounterSites';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
@@ -34,7 +34,8 @@ import {
   resolveEncounterRound,
   abandonEncounterSite,
 } from '@/lib/api/combat';
-import { makeEncounterMobId } from '@pocketrealm/shared';
+import { makeEncounterMobId, splitEncounterMobDisplayName } from '@pocketrealm/shared';
+import { MobRolePill } from '@/components/common/combat';
 import type { CombatTemplateData, ExpeditionMobInfo, QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
 
 interface CombatScreenProps {
@@ -202,6 +203,7 @@ export function CombatScreen({
       id: makeEncounterMobId(m.slot),
       name: m.name,
       prefix: m.prefix,
+      role: m.role,
       hp: m.hp,
       maxHp: m.maxHp,
       activeEffects: [],
@@ -498,7 +500,15 @@ export function CombatScreen({
                     alt={displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                     className="w-8 h-8 rounded object-cover"
                   />
-                  Last Combat: <span className="font-almendra">{displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}</span>
+                  {(() => {
+                    const { role, name } = splitEncounterMobDisplayName(displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName);
+                    return (
+                      <>
+                        Last Combat: <span className="font-almendra">{name}</span>
+                        <MobRolePill role={role} />
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
@@ -605,10 +615,7 @@ export function CombatScreen({
             {!pendingEncountersError && !pendingEncountersLoading && pendingEncounters.length > 0 && (
               <div className="space-y-2">
                 {pendingEncounters.map((e) => {
-                  const prefix = getMobPrefixDefinition(e.nextMobPrefix);
-                  const nextMobLabel = e.nextMobName
-                    ? (prefix ? `${prefix.displayName} ${e.nextMobName}` : e.nextMobName)
-                    : null;
+                  const nextMobLabel = e.nextMobDisplayName ?? e.nextMobName;
                   const isWrongZone = Boolean(currentZoneId) && e.zoneId !== currentZoneId;
                   const isExpeditionLocked = isActivityLocked && activityLockReason === 'expedition';
                   const isDisabled = isOverEncumbered || hpState.isRecovering || isExpeditionLocked || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData || isOffline;

@@ -3,6 +3,7 @@ import { redis } from '../redis';
 import {
   COMBAT_CONSTANTS,
   makeEncounterMobId,
+  type EncounterMobRole,
   type RaidRoundInput,
   type RaidParticipant,
   type RaidThreatEntry,
@@ -43,6 +44,7 @@ import {
   loadRoomMobsAsRaidState,
   handleEncounterDefeat,
   computeDefeatedMobXp,
+  countDefeatedPromotedEncounterRoles,
   markEncounterRoomMobsDefeated,
   buildParticipantForEncounterSite,
   countEncounterSiteHits,
@@ -82,8 +84,8 @@ interface ManualCombatState {
   zoneId: string;
   zoneName: string;
   mobFamilyName: string;
-  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
-  mobXpByTemplateId: Record<string, number>;
+  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; role: EncounterMobRole; hp: number; maxHp: number }>;
+  mobXpByEncounterMobId: Record<string, number>;
   roomMobSlots: EncounterMobSlot[];
   attackSkill: AttackSkill;
   guildXpBoost: number;
@@ -163,6 +165,7 @@ export interface StartManualRoomResult {
     mobId: string;
     name: string;
     prefix: string | null;
+    role: EncounterMobRole;
     hp: number;
     maxHp: number;
   }>;
@@ -201,6 +204,7 @@ export async function startManualEncounterRoom(
         mobId: m.id,
         name: m.name,
         prefix: m.prefix,
+        role: m.role ?? 'trash',
         hp: m.hp,
         maxHp: m.maxHp,
       })),
@@ -270,7 +274,12 @@ export async function startManualEncounterRoom(
   const { currentRoom, roomMobs } = advanceResult;
 
   // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
-  const { mobs: expeditionMobs, mobXpByTemplateId } = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
+  const { mobs: expeditionMobs, mobXpByEncounterMobId } = await loadRoomMobsAsRaidState(
+    roomMobs,
+    site.zoneId,
+    site.mobFamilyId,
+    site.mobFamily.name,
+  );
   if (expeditionMobs.length === 0) {
     throw new AppError(410, 'No valid mobs in encounter room', 'SITE_DECAYED');
   }
@@ -304,7 +313,7 @@ export async function startManualEncounterRoom(
     zoneName: site.zone.name,
     mobFamilyName: site.mobFamily.name,
     initialMobs: toInitialMobSnapshot(expeditionMobs),
-    mobXpByTemplateId,
+    mobXpByEncounterMobId,
     roomMobSlots: roomMobs,
     attackSkill,
     guildXpBoost,
@@ -318,6 +327,7 @@ export async function startManualEncounterRoom(
       mobId: m.id,
       name: m.name,
       prefix: m.prefix,
+      role: m.role ?? 'trash',
       hp: m.hp,
       maxHp: m.maxHp,
     })),
@@ -341,7 +351,7 @@ export interface ManualRoundResult {
   playerMaxStamina: number;
   playerManaAfter: number;
   playerMaxMana: number;
-  mobs: Array<{ mobId: string; alive: boolean; hpRemaining: number; maxHp: number; activeEffects: BossActiveEffect[] }>;
+  mobs: Array<{ mobId: string; alive: boolean; hpRemaining: number; maxHp: number; role: EncounterMobRole; activeEffects: BossActiveEffect[] }>;
   outcome: 'ongoing' | 'cleared' | 'defeated' | 'site_cleared';
   siteCleared: boolean;
   completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
@@ -439,6 +449,7 @@ export async function resolveManualEncounterRound(
     alive: m.hp > 0,
     hpRemaining: m.hp,
     maxHp: m.maxHp,
+    role: m.role ?? 'trash',
     activeEffects: m.activeEffects,
   }));
 
@@ -508,7 +519,7 @@ export async function resolveManualEncounterRound(
       ? computeDefeatedMobXp(
           new Set(newlyDefeatedMobs.map(s => makeEncounterMobId(s.slot))),
           newlyDefeatedMobs,
-          state.mobXpByTemplateId,
+          state.mobXpByEncounterMobId,
         )
       : 0;
 
@@ -541,6 +552,7 @@ export async function resolveManualEncounterRound(
         mobFamilyId: freshSite.mobFamilyId,
         totalRooms: totalRoomsCount,
         autoResolvedBonusRooms: autoResolvedCount,
+        defeatedPromotedRoleCounts: countDefeatedPromotedEncounterRoles(mobs),
         availableSlots: chestAvailableSlots,
       });
       await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });

@@ -1,6 +1,8 @@
 export { HpBar } from './HpBar';
 export { EffectPill } from './EffectPill';
-export { roomTypeBadge, isEffectDebuff, effectDetail } from './combatHelpers';
+export { roomTypeBadge, encounterMobRoleBadge, isEffectDebuff, effectDetail } from './combatHelpers';
+export { MobRolePill } from './MobRolePill';
+export { RoleAwareMobName } from './RoleAwareMobName';
 export { RoomProgressBar } from './RoomProgressBar';
 export type { RoomProgressBarProps } from './RoomProgressBar';
 export { MobCardGrid } from './MobCardGrid';

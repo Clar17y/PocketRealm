@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Prisma, prisma } from '@pocketrealm/database';
-import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
+import { EXPLORATION_CONSTANTS, normalizeEncounterMobRole } from '@pocketrealm/shared';
 import type { PotionConsumed, EncounterSiteSize, EncounterMobRole, EncounterMobStatus, EncounterMobSlot } from '@pocketrealm/shared';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { grantSkillXp } from '../../services/xpService';
@@ -47,7 +47,7 @@ export function parseEncounterSiteMobs(raw: unknown): EncounterMobSlot[] {
     const row = item as Record<string, unknown>;
     const slot = typeof row.slot === 'number' ? Math.floor(row.slot) : null;
     const mobTemplateId = typeof row.mobTemplateId === 'string' ? row.mobTemplateId : null;
-    const role = row.role === 'trash' || row.role === 'elite' || row.role === 'boss' ? row.role : null;
+    const role = normalizeEncounterMobRole(row.role);
     const status = row.status === 'alive' || row.status === 'defeated' || row.status === 'decayed' ? row.status : null;
     const prefix = typeof row.prefix === 'string' ? row.prefix : null;
     const room = typeof row.room === 'number' ? Math.floor(row.room) : 1;

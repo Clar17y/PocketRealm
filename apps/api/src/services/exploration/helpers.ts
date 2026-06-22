@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import {
+  isMiniBossFamilyRole,
+  isPermanentEncounterFamilyRole,
+  normalizeEncounterMobRole,
   resolveZoneTiers,
   getHighestUnlockedTier,
   type EncounterSiteSize,
@@ -8,6 +11,7 @@ import {
   type EncounterMobSlot,
 } from '@pocketrealm/shared';
 import {
+  assignEncounterRolesToRooms,
   generateRoomAssignments,
   rollMobPrefix,
   selectTierWithBleedthrough,
@@ -163,25 +167,28 @@ export function getSiteName(
   return `Large ${familyName} ${nouns.siteNounLarge}`;
 }
 
-function pickFamilyMemberByRole(
-  members: ZoneFamilyMember[],
+/**
+ * Pick a family member to fill an encounter-site slot of the given role. Promoted
+ * instance roles reuse base encounter templates when available; legacy elite and
+ * mini-boss template rows are only fallbacks for old family data with no base rows.
+ * Shared by site generation and the admin spawner so both stay on one selection rule.
+ */
+export function pickEncounterFamilyMemberForRole<TMember extends { role: string }>(
+  members: readonly TMember[],
   role: EncounterMobRole,
-  fallback: EncounterMobRole[] = []
-): ZoneFamilyMember | null {
-  const byRole = members.filter((member) => member.role === role);
-  if (byRole.length > 0) {
-    return byRole[randomIntInclusive(0, byRole.length - 1)] ?? null;
+): TMember | null {
+  const baseMembers = members.filter((member) => normalizeEncounterMobRole(member.role) === 'trash');
+  if (baseMembers.length > 0) {
+    return baseMembers[randomIntInclusive(0, baseMembers.length - 1)] ?? null;
   }
 
-  for (const fbRole of fallback) {
-    const fallbackMembers = members.filter((member) => member.role === fbRole);
-    if (fallbackMembers.length > 0) {
-      return fallbackMembers[randomIntInclusive(0, fallbackMembers.length - 1)] ?? null;
-    }
-  }
+  const nonMiniBossMembers = members.filter((member) => !isMiniBossFamilyRole(member.role));
+  const pool = role === 'mini_boss'
+    ? members
+    : (nonMiniBossMembers.length > 0 ? nonMiniBossMembers : members);
 
-  if (members.length === 0) return null;
-  return members[randomIntInclusive(0, members.length - 1)] ?? null;
+  if (pool.length === 0) return null;
+  return pool[randomIntInclusive(0, pool.length - 1)] ?? null;
 }
 
 export function buildEncounterSiteMobs(
@@ -205,11 +212,12 @@ export function buildEncounterSiteMobs(
   const eligibleZoneMembers = zoneMembers.filter(
     (member) => (member.mobTemplate.explorationTier ?? 1) <= currentTier,
   );
-  if (eligibleZoneMembers.length === 0) return [];
+  const eligibleEncounterMembers = eligibleZoneMembers.filter((member) => isPermanentEncounterFamilyRole(member.role));
+  if (eligibleEncounterMembers.length === 0) return [];
 
   // Group members by tier
   const membersByTier = new Map<number, ZoneFamilyMember[]>();
-  for (const member of eligibleZoneMembers) {
+  for (const member of eligibleEncounterMembers) {
     const tier = member.mobTemplate.explorationTier ?? 1;
     if (!membersByTier.has(tier)) membersByTier.set(tier, []);
     membersByTier.get(tier)!.push(member);
@@ -218,65 +226,42 @@ export function buildEncounterSiteMobs(
   // Pick a member at a bleedthrough-selected tier, falling back to lower tiers
   function pickMemberWithBleedthrough(
     role: EncounterMobRole,
-    fallbackRoles: EncounterMobRole[],
   ): ZoneFamilyMember | null {
     const selectedTier = selectTierWithBleedthrough(currentTier, tiers);
     for (let t = selectedTier; t >= 1; t--) {
       const tierMembers = membersByTier.get(t) ?? [];
       if (tierMembers.length === 0) continue;
-      const picked = pickFamilyMemberByRole(tierMembers, role, fallbackRoles);
+      const picked = pickEncounterFamilyMemberForRole(tierMembers, role);
       if (picked) return picked;
     }
-    return pickFamilyMemberByRole(eligibleZoneMembers, role, fallbackRoles);
+    return pickEncounterFamilyMemberForRole(eligibleEncounterMembers, role);
   }
 
-  const { rooms, totalMobs } = generateRoomAssignments(size);
-
-  // Role composition based on total mobs and site size
-  let bossCount = 0;
-  let eliteCount = 0;
-  if (size === 'medium') eliteCount = 1;
-  else if (size === 'large') { bossCount = 1; eliteCount = 2; }
-
-  const trashCount = Math.max(0, totalMobs - eliteCount - bossCount);
-
-  // Build role queue — trash first, elites/bosses last so they land in final rooms
-  const roleQueue: EncounterMobRole[] = [
-    ...Array(trashCount).fill('trash' as const),
-    ...Array(eliteCount).fill('elite' as const),
-    ...Array(bossCount).fill('boss' as const),
-  ];
+  const { rooms } = generateRoomAssignments(size);
+  const roleAssignments = assignEncounterRolesToRooms(rooms);
 
   // Assign mobs to rooms sequentially
   const mobs: EncounterMobSlot[] = [];
   let slot = 0;
-  let roleIndex = 0;
 
-  for (const room of rooms) {
-    for (let i = 0; i < room.mobCount && roleIndex < roleQueue.length; i++) {
-      const role = roleQueue[roleIndex]!;
-      const fallbacks: EncounterMobRole[] = role === 'trash'
-        ? ['elite', 'boss'] : role === 'elite'
-        ? ['trash', 'boss'] : ['elite', 'trash'];
+  for (const assignment of roleAssignments) {
+    const member = pickMemberWithBleedthrough(assignment.role);
+    if (!member) continue;
 
-      const member = pickMemberWithBleedthrough(role, fallbacks);
-      if (!member) { roleIndex++; continue; }
-
-      mobs.push({
-        slot: slot++,
-        mobTemplateId: member.mobTemplate.id,
-        role,
-        prefix: rollMobPrefix(),
-        status: 'alive',
-        room: room.roomNumber,
-      });
-      roleIndex++;
-    }
+    mobs.push({
+      slot: slot++,
+      mobTemplateId: member.mobTemplate.id,
+      role: assignment.role,
+      prefix: rollMobPrefix(),
+      status: 'alive',
+      room: assignment.room,
+    });
   }
 
-  // Fallback: if no mobs were generated
-  if (mobs.length === 0 && eligibleZoneMembers.length > 0) {
-    const member = eligibleZoneMembers[0]!;
+  // Fallback: if no mobs were generated, use an encounter-eligible member
+  // (never an expedition-only member from eligibleZoneMembers).
+  if (mobs.length === 0 && eligibleEncounterMembers.length > 0) {
+    const member = eligibleEncounterMembers[0]!;
     mobs.push({
       slot: 0,
       mobTemplateId: member.mobTemplate.id,
