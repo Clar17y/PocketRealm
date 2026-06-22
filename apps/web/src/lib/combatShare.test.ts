@@ -3,9 +3,11 @@ import {
   resolvePlayerMaxHp,
   resolveMobMaxHp,
   formatCombatShareText,
+  formatEncounterSiteShareText,
   type ShareCombatLogEntry,
   type CombatShareInput,
 } from './combatShare';
+import type { ExpeditionRoundLog } from '@pocketrealm/shared';
 
 describe('resolvePlayerMaxHp', () => {
   it('returns explicit value when provided and > 0', () => {
@@ -161,5 +163,163 @@ describe('formatCombatShareText', () => {
 
     const text = formatCombatShareText(input);
     expect(text).toContain('tpl-ore');
+  });
+});
+
+describe('formatEncounterSiteShareText', () => {
+  it('formats encounter room logs with enemy damage rolls', () => {
+    const round: ExpeditionRoundLog = {
+      round: 1,
+      roomIndex: 0,
+      phases: {
+        playerAttacks: [
+          {
+            playerId: 'self',
+            username: 'Hero',
+            actionId: 'light_attack',
+            actionLabel: 'Light Attack',
+            targetMobId: 'mob-1',
+            targetMobName: 'Goblin',
+            hitChance: 0.8,
+            hitRollValue: 0.2,
+            attackerHitScore: 12,
+            defenderAvoidScore: 4,
+            hit: true,
+            crit: false,
+            damageRoll: 9,
+            totalDamage: 7,
+            staminaCost: 2,
+            manaCost: 0,
+          },
+        ],
+        defences: [],
+        mobActions: [
+          {
+            mobId: 'mob-1',
+            mobName: 'Goblin',
+            actionId: 'claw',
+            actionLabel: 'Claw',
+            targetMode: 'single_target',
+            wasTelegraphed: false,
+            targets: [
+              {
+                playerId: 'self',
+                username: 'Hero',
+                damageTaken: 5,
+                blocked: false,
+                dodged: false,
+                knockedOut: false,
+                damageRoll: 8,
+              },
+            ],
+          },
+        ],
+        healing: [],
+        effectTicks: [],
+        outcome: {
+          mobsAlive: 1,
+          mobsKilled: 0,
+          playersAlive: 1,
+          playersKnockedOut: 0,
+          roomCleared: false,
+          wipe: false,
+        },
+      },
+      telegraphs: [],
+    };
+
+    const text = formatEncounterSiteShareText({
+      outcome: 'Cleared',
+      siteName: 'Goblin Camp',
+      zoneName: 'Greenwood',
+      room: 1,
+      totalRooms: 3,
+      rounds: [round],
+      rewards: { xp: 25 },
+    });
+
+    expect(text).toContain('PocketRealm Encounter Site Combat Log');
+    expect(text).toContain('Site: Goblin Camp');
+    expect(text).toContain('Room: 1/3');
+    expect(text).toContain('R1 Hero -> Goblin: HIT 7 dmg (roll 9 raw)');
+    expect(text).toContain('R1 Goblin -> Hero: 5 dmg (roll 8 raw)');
+    expect(text).toContain('XP: 25');
+  });
+
+  it('includes defensive actions from encounter room logs', () => {
+    const round: ExpeditionRoundLog = {
+      round: 2,
+      roomIndex: 0,
+      phases: {
+        playerAttacks: [],
+        defences: [
+          {
+            entryType: 'defensive',
+            playerId: 'self',
+            username: 'Hero',
+            actionId: 'defend',
+            actionLabel: 'Defend',
+          },
+        ],
+        mobActions: [],
+        healing: [],
+        effectTicks: [],
+        outcome: {
+          mobsAlive: 1,
+          mobsKilled: 0,
+          playersAlive: 1,
+          playersKnockedOut: 0,
+          roomCleared: false,
+          wipe: false,
+        },
+      },
+      telegraphs: [],
+    };
+
+    const text = formatEncounterSiteShareText({
+      outcome: 'In Progress',
+      rounds: [round],
+      rewards: { xp: 0 },
+    });
+
+    expect(text).toContain('R2 Hero: Defend');
+  });
+
+  it('includes live encounter chest materials and recipe in share text', () => {
+    const text = formatEncounterSiteShareText({
+      outcome: 'Victory',
+      rounds: [],
+      rewards: { xp: 0 },
+      chestReward: {
+        rarity: 'rare',
+        materials: [
+          { itemTemplateId: 'iron-ore', name: 'Iron Ore', quantity: 3 },
+        ],
+        recipe: { recipeId: 'recipe-1', name: 'Iron Sword' },
+      },
+    });
+
+    expect(text).toContain('Rare Chest');
+    expect(text).toContain('- Iron Ore x3');
+    expect(text).toContain('Recipe: Iron Sword');
+  });
+
+  it('includes saved encounter chest loot and recipe in share text', () => {
+    const text = formatEncounterSiteShareText({
+      outcome: 'Victory',
+      rounds: [],
+      rewards: { xp: 0 },
+      chestReward: {
+        chestRarity: 'common',
+        loot: [
+          { itemTemplateId: 'oak-log', itemName: 'Oak Log', quantity: 2 },
+        ],
+        recipeUnlocked: { recipeName: 'Oak Bow' },
+      },
+    });
+
+    expect(text).toContain('Common Chest');
+    expect(text).toContain('- Oak Log x2');
+    expect(text).toContain('Recipe: Oak Bow');
   });
 });

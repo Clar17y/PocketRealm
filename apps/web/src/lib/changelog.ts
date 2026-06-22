@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.76',
+    date: '2026-06-22',
+    title: 'Encounter Site Combat Log Clarity',
+    summary:
+      'Encounter site combat logs are easier to audit and share. Copy Log now works for encounter site rooms in live fights and combat history, enemy attacks expose their raw damage rolls, and copied encounter logs include defensive turns, chest rewards, recipes, XP, and loot details so shared transcripts match what happened in the room.',
+  },
+  {
     version: '0.75',
     date: '2026-06-22',
     title: 'Encounter Site Elites & Mini-Bosses',
