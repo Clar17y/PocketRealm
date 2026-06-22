@@ -61,7 +61,11 @@ export function ResourceStatusBar({
   compact,
 }: ResourceStatusBarProps) {
   const hpRatio = maxHp > 0 ? currentHp / maxHp : 0;
-  const showRestButton = onQuickRest && currentHp < maxHp && !isRecovering;
+  const hasRestorableResource =
+    currentHp < maxHp ||
+    currentStamina < maxStamina ||
+    currentMana < maxMana;
+  const showRestButton = onQuickRest && hasRestorableResource && !isRecovering;
   const showRecoverButton = onRecover && isRecovering;
 
   const hpColor = isRecovering

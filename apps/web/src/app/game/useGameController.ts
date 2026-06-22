@@ -629,6 +629,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const resourceActions = useResourceActions({
     hpState,
+    staminaState,
+    manaState,
     turns,
     quickRestHealPercent,
     tutorialStep,
