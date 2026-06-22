@@ -6,9 +6,11 @@ import { ENCOUNTER_SITE_ROLE_CONSTANTS, DURABILITY_CONSTANTS } from '@pocketreal
 const ROLE = ENCOUNTER_SITE_ROLE_CONSTANTS;
 const STATS = ROLE.ROLE_STAT_MULTIPLIERS;
 const ACTIONS = ROLE.ROLE_ACTION_MULTIPLIERS;
+const REWARDS = ROLE.ROLE_REWARD_BONUSES;
 const DEGRADE = DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER;
 
 const pct = (value: number) => `${(value * 100).toFixed(0)}%`;
+const bonusPct = (value: number) => `+${pct(value)}`;
 const mult = (value: number) => `${value}x`;
 
 export const metadata: Metadata = {
@@ -142,8 +144,20 @@ export default function MobRolesPage() {
         They also wear your gear down faster: durability degradation is multiplied
         by <strong>{mult(DEGRADE.elite)}</strong> against Elites and{' '}
         <strong>{mult(DEGRADE.mini_boss)}</strong> against Mini-Bosses, versus{' '}
-        {mult(DEGRADE.default)} for a normal mob. Loot drop tables are unchanged —
-        promotion affects difficulty and XP, not which items a mob can drop.
+        {mult(DEGRADE.default)} for a normal mob.
+      </p>
+      <p>
+        In completed encounter sites, defeated promoted mobs also improve the
+        final chest. Each defeated Elite adds a{' '}
+        <strong>{bonusPct(REWARDS.elite.materialRollMultiplier)}</strong>{' '}
+        material-roll bonus and{' '}
+        <strong>{REWARDS.elite.signatureRolls}</strong> extra signature material
+        roll. Each defeated Mini-Boss adds a{' '}
+        <strong>{bonusPct(REWARDS.mini_boss.materialRollMultiplier)}</strong>{' '}
+        material-roll bonus and{' '}
+        <strong>{REWARDS.mini_boss.signatureRolls}</strong> extra signature
+        material rolls. These promoted-role bonuses improve site materials, not
+        potion rewards or ordinary open-world mob drops.
       </p>
 
       <h2>Bestiary</h2>
@@ -179,6 +193,26 @@ export default function MobRolesPage() {
             name: 'MIN_ROOMS_FOR_PROMOTED_ROLES',
             value: ROLE.MIN_ROOMS_FOR_PROMOTED_ROLES,
             description: 'Minimum site room count before guaranteed Elite / Mini-Boss placement applies',
+          },
+          {
+            name: 'ROLE_REWARD_BONUSES.elite.materialRollMultiplier',
+            value: bonusPct(REWARDS.elite.materialRollMultiplier),
+            description: 'Final chest material-roll bonus per defeated encounter-site Elite',
+          },
+          {
+            name: 'ROLE_REWARD_BONUSES.elite.signatureRolls',
+            value: REWARDS.elite.signatureRolls,
+            description: 'Extra final chest signature material rolls per defeated encounter-site Elite',
+          },
+          {
+            name: 'ROLE_REWARD_BONUSES.mini_boss.materialRollMultiplier',
+            value: bonusPct(REWARDS.mini_boss.materialRollMultiplier),
+            description: 'Final chest material-roll bonus per defeated encounter-site Mini-Boss',
+          },
+          {
+            name: 'ROLE_REWARD_BONUSES.mini_boss.signatureRolls',
+            value: REWARDS.mini_boss.signatureRolls,
+            description: 'Extra final chest signature material rolls per defeated encounter-site Mini-Boss',
           },
           {
             name: 'DEGRADATION_MULTIPLIER.elite',

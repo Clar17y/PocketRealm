@@ -6,11 +6,14 @@ import {
   EXPLORATION_CONSTANTS,
   EXPLORATION_TRACKING_CONSTANTS,
   ENCOUNTER_SITE_CONSTANTS,
+  ENCOUNTER_SITE_ROLE_CONSTANTS,
   CHEST_CONSTANTS,
   COMBAT_CONSTANTS,
 } from '@pocketrealm/shared';
 
 const { Var, Out, Const, Op, Comment } = FormulaBlock;
+const ROLE_REWARDS = ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES;
+const bonusPct = (value: number) => `+${(value * 100).toFixed(0)}%`;
 
 export const metadata: Metadata = {
   title: 'Encounter Sites - Pocketrealm Wiki',
@@ -241,6 +244,19 @@ export default function EncounterSitesPage() {
         A site where every room was auto-resolved receives the full multiplier;
         partially auto-resolved sites receive a proportional share.
       </p>
+      <p>
+        Promoted-role bonus: defeating Elites and Mini-Bosses inside the site
+        also improves the final chest. Each defeated Elite adds a{' '}
+        <Const>{bonusPct(ROLE_REWARDS.elite.materialRollMultiplier)}</Const>{' '}
+        material-roll bonus and{' '}
+        <Const>{ROLE_REWARDS.elite.signatureRolls}</Const> extra signature
+        material roll. Each defeated Mini-Boss adds a{' '}
+        <Const>{bonusPct(ROLE_REWARDS.mini_boss.materialRollMultiplier)}</Const>{' '}
+        material-roll bonus and{' '}
+        <Const>{ROLE_REWARDS.mini_boss.signatureRolls}</Const> extra signature
+        material rolls. These role bonuses improve site materials and do not
+        increase potion rewards.
+      </p>
 
       <h2>Activity Lockout</h2>
       <p>
@@ -282,6 +298,16 @@ export default function EncounterSitesPage() {
             name: 'AUTO_RESOLVE_RECIPE_MULTIPLIER',
             value: `${ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_RECIPE_MULTIPLIER}x`,
             description: 'Maximum recipe chance multiplier from auto-resolving all rooms',
+          },
+          {
+            name: 'ROLE_REWARD_BONUSES.elite.materialRollMultiplier',
+            value: bonusPct(ROLE_REWARDS.elite.materialRollMultiplier),
+            description: 'Final chest material-roll bonus per defeated encounter-site Elite',
+          },
+          {
+            name: 'ROLE_REWARD_BONUSES.mini_boss.materialRollMultiplier',
+            value: bonusPct(ROLE_REWARDS.mini_boss.materialRollMultiplier),
+            description: 'Final chest material-roll bonus per defeated encounter-site Mini-Boss',
           },
         ]}
       />
