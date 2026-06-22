@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.74',
+    date: '2026-06-22',
+    title: 'Smarter Resting',
+    summary:
+      'Quick rest now works when HP is full but stamina or mana is still low, and it spends enough turns to refill those resources as far as your turn bank allows.',
+  },
+  {
     version: '0.73',
     date: '2026-06-21',
     title: 'Encounter Site Recipe Rewards',
