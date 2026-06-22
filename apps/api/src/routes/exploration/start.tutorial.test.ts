@@ -37,6 +37,7 @@ vi.mock('../../services/xpService', () => ({
 }));
 vi.mock('../../services/durabilityService', () => ({
   degradeEquippedDurability: vi.fn().mockResolvedValue([]),
+  resolveExplorationDurabilityMultiplier: vi.fn().mockReturnValue(1),
 }));
 vi.mock('../../services/equipmentService', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({ attack: 5, accuracy: 5, defence: 5, magicDefence: 0, speed: 0, critChance: 0, critDamage: 1 }),
