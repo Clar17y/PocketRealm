@@ -126,11 +126,14 @@ export async function getGuildProjects(guildId: string) {
 // Contribute Turns
 // ---------------------------------------------------------------------------
 
+type TurnContributionSource = 'player' | 'guild';
+
 export async function contributeTurns(
   playerId: string,
   guildId: string,
   projectId: string,
   amount: number,
+  options: { source?: TurnContributionSource } = {},
 ) {
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new AppError(400, 'Amount must be a positive integer', 'INVALID_AMOUNT');
@@ -141,31 +144,44 @@ export async function contributeTurns(
     throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
   }
 
-  const project = await prisma.guildProject.findFirst({
-    where: { id: projectId, guildId, status: 'active' },
-  });
-  if (!project) {
-    throw new AppError(404, 'Project not found or not active', 'PROJECT_NOT_ACTIVE');
-  }
+  const source = options.source ?? 'player';
 
-  // Check per-project turn cap
-  const contribution = await prisma.guildProjectContribution.findUnique({
-    where: { projectId_playerId: { projectId, playerId } },
-  });
-  const contributedTurns = contribution?.turnsContributed ?? 0;
-  if (contributedTurns + amount > GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP) {
-    throw new AppError(400, `Exceeds per-project turn contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP})`, 'CONTRIBUTION_CAP_EXCEEDED');
-  }
+  const { project: updated, def } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT id FROM "guild_projects" WHERE id = ${projectId} AND "guild_id" = ${guildId} AND status = 'active' FOR UPDATE`;
 
-  const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === project.projectKey);
+    const project = await tx.guildProject.findFirst({
+      where: { id: projectId, guildId, status: 'active' },
+    });
+    if (!project) {
+      throw new AppError(404, 'Project not found or not active', 'PROJECT_NOT_ACTIVE');
+    }
 
-  // Cap to remaining needed
-  const remaining = (def?.memberTurnGoal ?? Infinity) - project.turnsContributed;
-  const effectiveAmount = Math.min(amount, remaining);
+    if (source === 'guild' && project.projectKey !== 'war_room') {
+      throw new AppError(400, 'Guild turn bank can only fund the War Room', 'INVALID_TURN_SOURCE');
+    }
 
-  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // Spend player turns
-    await spendPlayerTurnsTx(tx, playerId, effectiveAmount);
+    const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === project.projectKey);
+    const remaining = (def?.memberTurnGoal ?? Infinity) - project.turnsContributed;
+    if (remaining <= 0) {
+      throw new AppError(400, 'Project turn goal already met', 'TURN_GOAL_COMPLETE');
+    }
+    const effectiveAmount = Math.min(amount, remaining);
+
+    await tx.$queryRaw`SELECT id FROM "guild_project_contributions" WHERE "project_id" = ${projectId} AND "player_id" = ${playerId} FOR UPDATE`;
+
+    const contribution = await tx.guildProjectContribution.findUnique({
+      where: { projectId_playerId: { projectId, playerId } },
+    });
+    const contributedTurns = contribution?.turnsContributed ?? 0;
+    if (contributedTurns + amount > GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP) {
+      throw new AppError(400, `Exceeds per-project turn contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP})`, 'CONTRIBUTION_CAP_EXCEEDED');
+    }
+
+    if (source === 'guild') {
+      await spendGuildTurnsTx(tx, guildId, effectiveAmount);
+    } else {
+      await spendPlayerTurnsTx(tx, playerId, effectiveAmount);
+    }
 
     // Update project
     const updatedProject = await tx.guildProject.update({
@@ -184,14 +200,33 @@ export async function contributeTurns(
     await checkAndCompleteProject(tx, updatedProject, def, guildId);
 
     // Re-fetch to get final state
-    return tx.guildProject.findUnique({ where: { id: projectId } });
+    const finalProject = await tx.guildProject.findUnique({ where: { id: projectId } });
+    if (!finalProject) {
+      throw new AppError(404, 'Project not found or not active', 'PROJECT_NOT_ACTIVE');
+    }
+    return { project: finalProject, def };
   });
 
-  if (updated!.status === 'completed') {
+  if (updated.status === 'completed') {
     await invalidateGuildModifiersForGuild(guildId);
   }
 
-  return toProjectData(updated!, def);
+  return toProjectData(updated, def);
+}
+
+async function spendGuildTurnsTx(
+  tx: Prisma.TransactionClient,
+  guildId: string,
+  amount: number,
+) {
+  const updated = await tx.guild.updateMany({
+    where: { id: guildId, treasuryTurns: { gte: amount } },
+    data: { treasuryTurns: { decrement: amount } },
+  });
+
+  if (updated.count === 0) {
+    throw new AppError(400, 'Insufficient guild turn bank turns', 'INSUFFICIENT_GUILD_TURNS');
+  }
 }
 
 // ---------------------------------------------------------------------------

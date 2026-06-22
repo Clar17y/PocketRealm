@@ -168,6 +168,8 @@ export interface GuildProjectsListResponse {
   available: GuildProjectAvailableResponse[];
 }
 
+export type GuildProjectTurnContributionSource = 'player' | 'guild';
+
 // --- Specialization ---
 
 export interface SpecializationTierBonusResponse {
@@ -304,10 +306,15 @@ export async function startGuildProject(guildId: string, projectKey: string) {
   });
 }
 
-export async function contributeProjectTurns(guildId: string, projectId: string, amount: number) {
+export async function contributeProjectTurns(
+  guildId: string,
+  projectId: string,
+  amount: number,
+  source: GuildProjectTurnContributionSource = 'player',
+) {
   return fetchApi<GuildProjectContributeResponse>(`/api/v1/guild/${guildId}/projects/${projectId}/contribute/turns`, {
     method: 'POST',
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({ amount, source }),
   });
 }
 
