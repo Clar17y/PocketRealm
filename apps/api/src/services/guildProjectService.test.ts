@@ -298,6 +298,53 @@ describe('contributeTurns', () => {
     expect(db.turnBank.updateMany).not.toHaveBeenCalled();
   });
 
+  it('allows a clamped War Room guild-bank contribution that reaches the per-player turn cap', async () => {
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
+    });
+    db.guildProject.findFirst.mockResolvedValue({
+      id: 'proj-1',
+      guildId: GUILD_ID,
+      projectKey: 'war_room',
+      turnsContributed: 149_500,
+      materialsProgress: {},
+      status: 'active',
+    });
+    db.guildProjectContribution.findUnique.mockResolvedValue({
+      turnsContributed: GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP - 500,
+      materialsContributed: {},
+    });
+    db.$transaction.mockImplementation(async (fn: any) => fn(db));
+    db.guild.updateMany.mockResolvedValue({ count: 1 });
+    db.guildProject.update.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'war_room',
+      turnsContributed: 150_000, materialsProgress: {},
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+    db.guildProjectContribution.upsert.mockResolvedValue({});
+    db.guildProject.findUnique.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'war_room',
+      turnsContributed: 150_000, materialsProgress: {},
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+
+    const result = await contributeTurns(PLAYER_ID, GUILD_ID, 'proj-1', 1_000, { source: 'guild' });
+
+    expect(result.turnsContributed).toBe(150_000);
+    expect(db.guild.updateMany).toHaveBeenCalledWith({
+      where: { id: GUILD_ID, treasuryTurns: { gte: 500 } },
+      data: { treasuryTurns: { decrement: 500 } },
+    });
+    expect(db.guildProject.update).toHaveBeenCalledWith({
+      where: { id: 'proj-1' },
+      data: { turnsContributed: { increment: 500 } },
+    });
+    expect(db.guildProjectContribution.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ turnsContributed: 500 }),
+      update: { turnsContributed: { increment: 500 } },
+    }));
+  });
+
   it('does not update project progress when the guild turn bank has insufficient turns', async () => {
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',

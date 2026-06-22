@@ -173,7 +173,7 @@ export async function contributeTurns(
       where: { projectId_playerId: { projectId, playerId } },
     });
     const contributedTurns = contribution?.turnsContributed ?? 0;
-    if (contributedTurns + amount > GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP) {
+    if (contributedTurns + effectiveAmount > GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP) {
       throw new AppError(400, `Exceeds per-project turn contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP})`, 'CONTRIBUTION_CAP_EXCEEDED');
     }
 
