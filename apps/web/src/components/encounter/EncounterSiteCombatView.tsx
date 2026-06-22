@@ -128,8 +128,9 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
         skillXpGrants: xpGrants,
         loot: [],
       },
+      chestReward,
     });
-  }, [currentRoom, outcome, props.siteName, props.totalRooms, roundLogs, xpGrants]);
+  }, [chestReward, currentRoom, outcome, props.siteName, props.totalRooms, roundLogs, xpGrants]);
 
   // Auto-playback state
   const [playbackRounds, setPlaybackRounds] = useState<EncounterRoundSnapshot[]>([]);

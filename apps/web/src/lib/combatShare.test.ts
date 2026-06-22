@@ -245,4 +245,81 @@ describe('formatEncounterSiteShareText', () => {
     expect(text).toContain('R1 Goblin -> Hero: 5 dmg (roll 8 raw)');
     expect(text).toContain('XP: 25');
   });
+
+  it('includes defensive actions from encounter room logs', () => {
+    const round: ExpeditionRoundLog = {
+      round: 2,
+      roomIndex: 0,
+      phases: {
+        playerAttacks: [],
+        defences: [
+          {
+            entryType: 'defensive',
+            playerId: 'self',
+            username: 'Hero',
+            actionId: 'defend',
+            actionLabel: 'Defend',
+          },
+        ],
+        mobActions: [],
+        healing: [],
+        effectTicks: [],
+        outcome: {
+          mobsAlive: 1,
+          mobsKilled: 0,
+          playersAlive: 1,
+          playersKnockedOut: 0,
+          roomCleared: false,
+          wipe: false,
+        },
+      },
+      telegraphs: [],
+    };
+
+    const text = formatEncounterSiteShareText({
+      outcome: 'In Progress',
+      rounds: [round],
+      rewards: { xp: 0 },
+    });
+
+    expect(text).toContain('R2 Hero: Defend');
+  });
+
+  it('includes live encounter chest materials and recipe in share text', () => {
+    const text = formatEncounterSiteShareText({
+      outcome: 'Victory',
+      rounds: [],
+      rewards: { xp: 0 },
+      chestReward: {
+        rarity: 'rare',
+        materials: [
+          { itemTemplateId: 'iron-ore', name: 'Iron Ore', quantity: 3 },
+        ],
+        recipe: { recipeId: 'recipe-1', name: 'Iron Sword' },
+      },
+    });
+
+    expect(text).toContain('Rare Chest');
+    expect(text).toContain('- Iron Ore x3');
+    expect(text).toContain('Recipe: Iron Sword');
+  });
+
+  it('includes saved encounter chest loot and recipe in share text', () => {
+    const text = formatEncounterSiteShareText({
+      outcome: 'Victory',
+      rounds: [],
+      rewards: { xp: 0 },
+      chestReward: {
+        chestRarity: 'common',
+        loot: [
+          { itemTemplateId: 'oak-log', itemName: 'Oak Log', quantity: 2 },
+        ],
+        recipeUnlocked: { recipeName: 'Oak Bow' },
+      },
+    });
+
+    expect(text).toContain('Common Chest');
+    expect(text).toContain('- Oak Log x2');
+    expect(text).toContain('Recipe: Oak Bow');
+  });
 });

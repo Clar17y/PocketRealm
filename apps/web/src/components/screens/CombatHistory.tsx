@@ -291,6 +291,7 @@ export function CombatHistory() {
         createdAt: fullTimestamp(selectedEntry.createdAt),
         rounds: selectedDetail.rounds ?? [],
         rewards: selectedDetail.rewards,
+        chestReward: selectedDetail.chestReward,
       });
     }
     if (!selectedDetail.rewards || !selectedDetail.log) return '';

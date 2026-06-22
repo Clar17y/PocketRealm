@@ -51,6 +51,7 @@ export interface EncounterSiteShareInput {
   room?: number | null;
   totalRooms?: number | null;
   createdAt?: string;
+  chestReward?: unknown;
 }
 
 function hpWithMax(current: number | undefined, max: number | undefined): string {
@@ -137,6 +138,59 @@ function extractRoundLog(value: unknown): ExpeditionRoundLog | null {
   return null;
 }
 
+function readString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function readQuantity(record: Record<string, unknown>): number | undefined {
+  const value = record.quantity;
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatChestRewardLines(chestReward: unknown): string[] {
+  if (!isObject(chestReward)) return [];
+
+  const rarity = readString(chestReward, 'rarity') ?? readString(chestReward, 'chestRarity');
+  const dropsSource = Array.isArray(chestReward.materials)
+    ? chestReward.materials
+    : Array.isArray(chestReward.loot)
+      ? chestReward.loot
+      : [];
+  const recipe = isObject(chestReward.recipe)
+    ? readString(chestReward.recipe, 'name')
+    : isObject(chestReward.recipeUnlocked)
+      ? readString(chestReward.recipeUnlocked, 'recipeName')
+      : undefined;
+  const lines: string[] = [];
+
+  if (rarity) {
+    lines.push(`${capitalize(rarity)} Chest`);
+  } else if (dropsSource.length > 0 || recipe) {
+    lines.push('Chest Reward');
+  }
+
+  for (const drop of dropsSource) {
+    if (!isObject(drop)) continue;
+    const templateId = readString(drop, 'itemTemplateId');
+    const quantity = readQuantity(drop);
+    if (!templateId || quantity === undefined) continue;
+
+    const name = readString(drop, 'itemName') ?? readString(drop, 'name') ?? templateId;
+    lines.push(`- ${name}${quantity > 1 ? ` x${quantity}` : ''}`);
+  }
+
+  if (recipe) {
+    lines.push(`Recipe: ${recipe}`);
+  }
+
+  return lines;
+}
+
 function formatPlayerRoundAction(round: number, attack: PlayerRoundActionEntry): string[] {
   if (attack.entryType === 'exhausted') {
     return [`R${round} ${attack.username}: ${attack.intendedActionLabel} -> ${attack.fallbackActionLabel} (exhausted)`];
@@ -184,6 +238,10 @@ export function formatEncounterSiteShareText(input: EncounterSiteShareInput): st
       lines.push(...formatPlayerRoundAction(log.round, attack));
     }
 
+    for (const defence of log.phases.defences) {
+      lines.push(`R${log.round} ${defence.username}: ${defence.actionLabel}`);
+    }
+
     for (const mobAction of log.phases.mobActions) {
       for (const target of mobAction.targets) {
         const outcome = target.blocked
@@ -221,6 +279,8 @@ export function formatEncounterSiteShareText(input: EncounterSiteShareInput): st
       lines.push(`- ${name}${drop.quantity > 1 ? ` x${drop.quantity}` : ''}`);
     }
   }
+
+  lines.push(...formatChestRewardLines(input.chestReward));
 
   return lines.join('\n');
 }
