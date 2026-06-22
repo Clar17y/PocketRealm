@@ -12,7 +12,7 @@ import {
   type CombatResultResponse,
   type EncounterSiteFightSummary,
 } from '@/lib/api';
-import { formatCombatShareText, resolveMobMaxHp, resolvePlayerMaxHp } from '@/lib/combatShare';
+import { formatCombatShareText, formatEncounterSiteShareText, resolveMobMaxHp, resolvePlayerMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
@@ -280,7 +280,18 @@ export function CombatHistory() {
 
   const shareText = useMemo(() => {
     if (!selectedEntry || !selectedDetail) return '';
-    if (selectedEntry.source === 'encounter_site_room') return '';
+    if (selectedEntry.source === 'encounter_site_room') {
+      return formatEncounterSiteShareText({
+        outcome: formatOutcome(selectedEntry.outcome),
+        siteName: selectedEntry.siteName,
+        zoneName: selectedEntry.zoneName,
+        room: selectedEntry.siteRoom,
+        totalRooms: selectedEntry.siteTotalRooms,
+        createdAt: fullTimestamp(selectedEntry.createdAt),
+        rounds: selectedDetail.rounds ?? [],
+        rewards: selectedDetail.rewards,
+      });
+    }
     if (!selectedDetail.rewards || !selectedDetail.log) return '';
     return formatCombatShareText({
       outcome: formatOutcome(selectedDetail.outcome),

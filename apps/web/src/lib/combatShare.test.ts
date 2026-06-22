@@ -3,9 +3,11 @@ import {
   resolvePlayerMaxHp,
   resolveMobMaxHp,
   formatCombatShareText,
+  formatEncounterSiteShareText,
   type ShareCombatLogEntry,
   type CombatShareInput,
 } from './combatShare';
+import type { ExpeditionRoundLog } from '@pocketrealm/shared';
 
 describe('resolvePlayerMaxHp', () => {
   it('returns explicit value when provided and > 0', () => {
@@ -161,5 +163,86 @@ describe('formatCombatShareText', () => {
 
     const text = formatCombatShareText(input);
     expect(text).toContain('tpl-ore');
+  });
+});
+
+describe('formatEncounterSiteShareText', () => {
+  it('formats encounter room logs with enemy damage rolls', () => {
+    const round: ExpeditionRoundLog = {
+      round: 1,
+      roomIndex: 0,
+      phases: {
+        playerAttacks: [
+          {
+            playerId: 'self',
+            username: 'Hero',
+            actionId: 'light_attack',
+            actionLabel: 'Light Attack',
+            targetMobId: 'mob-1',
+            targetMobName: 'Goblin',
+            hitChance: 0.8,
+            hitRollValue: 0.2,
+            attackerHitScore: 12,
+            defenderAvoidScore: 4,
+            hit: true,
+            crit: false,
+            damageRoll: 9,
+            totalDamage: 7,
+            staminaCost: 2,
+            manaCost: 0,
+          },
+        ],
+        defences: [],
+        mobActions: [
+          {
+            mobId: 'mob-1',
+            mobName: 'Goblin',
+            actionId: 'claw',
+            actionLabel: 'Claw',
+            targetMode: 'single_target',
+            wasTelegraphed: false,
+            targets: [
+              {
+                playerId: 'self',
+                username: 'Hero',
+                damageTaken: 5,
+                blocked: false,
+                dodged: false,
+                knockedOut: false,
+                damageRoll: 8,
+              },
+            ],
+          },
+        ],
+        healing: [],
+        effectTicks: [],
+        outcome: {
+          mobsAlive: 1,
+          mobsKilled: 0,
+          playersAlive: 1,
+          playersKnockedOut: 0,
+          roomCleared: false,
+          wipe: false,
+        },
+      },
+      telegraphs: [],
+    };
+
+    const text = formatEncounterSiteShareText({
+      outcome: 'Cleared',
+      siteName: 'Goblin Camp',
+      zoneName: 'Greenwood',
+      room: 1,
+      totalRooms: 3,
+      rounds: [round],
+      rewards: { xp: 25 },
+    });
+
+    expect(text).toContain('PocketRealm Encounter Site Combat Log');
+    expect(text).toContain('Site: Goblin Camp');
+    expect(text).toContain('Room: 1/3');
+    expect(text).toContain('R1 Hero -> Goblin: HIT 7 dmg (roll 9 raw)');
+    expect(text).toContain('R1 Goblin -> Hero: 5 dmg (roll 8 raw)');
+    expect(text).toContain('XP: 25');
   });
 });

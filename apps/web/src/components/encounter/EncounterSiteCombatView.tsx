@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { CopyButton } from '@/components/common/CopyButton';
 import {
   RoomProgressBar,
   MobCardGrid,
@@ -12,6 +13,7 @@ import {
   CombatRoundLog,
 } from '@/components/common/combat';
 import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
+import { formatEncounterSiteShareText } from '@/lib/combatShare';
 import type {
   EncounterAutoResolveResponse,
   EncounterStartRoomResponse,
@@ -98,6 +100,27 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const [respawnedTo, setRespawnedTo] = useState<string | null>(null);
   const [hasDecayedMobs, setHasDecayedMobs] = useState(props.hasDecayedMobs);
   const [xpGrants, setXpGrants] = useState<EncounterAutoResolveResponse['skillXpGrants']>([]);
+
+  const shareText = useMemo(() => {
+    if (roundLogs.length === 0) return '';
+
+    return formatEncounterSiteShareText({
+      outcome: outcome === 'defeated'
+        ? 'Defeat'
+        : outcome === 'cleared' || outcome === 'site_cleared'
+          ? 'Victory'
+          : 'In Progress',
+      siteName: props.siteName,
+      room: currentRoom,
+      totalRooms: props.totalRooms,
+      rounds: roundLogs,
+      rewards: {
+        xp: xpGrants.reduce((sum, grant) => sum + grant.xpAfterEfficiency, 0),
+        skillXpGrants: xpGrants,
+        loot: [],
+      },
+    });
+  }, [currentRoom, outcome, props.siteName, props.totalRooms, roundLogs, xpGrants]);
 
   // Auto-playback state
   const [playbackRounds, setPlaybackRounds] = useState<EncounterRoundSnapshot[]>([]);
@@ -536,7 +559,12 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
 
       {/* Round logs */}
       {roundLogs.length > 0 && (
-        <CombatRoundLog roundLogs={roundLogs} playerId="self" />
+        <div className="space-y-2">
+          <div className="flex justify-end">
+            <CopyButton text={shareText} />
+          </div>
+          <CombatRoundLog roundLogs={roundLogs} playerId="self" />
+        </div>
       )}
     </div>
   );
