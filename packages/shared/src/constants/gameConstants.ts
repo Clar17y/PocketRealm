@@ -900,6 +900,85 @@ export const ENCOUNTER_SITE_CONSTANTS = {
   AUTO_RESOLVE_MAX_ROUNDS: 100,
 } as const;
 
+export const ENCOUNTER_SITE_ROLE_CONSTANTS = {
+  MIN_ROOMS_FOR_PROMOTED_ROLES: 3,
+  NORMAL_EXPLORATION_ELITE_CHANCE: 0.05,
+  ENCOUNTER_SITE_ELITE_CHANCE: 0.10,
+  MINI_BOSS_CHANCE: 0.35,
+  ROLE_STAT_MULTIPLIERS: {
+    trash: {
+      hp: 1,
+      damageMin: 1,
+      damageMax: 1,
+      accuracy: 1,
+      defence: 1,
+      magicDefence: 1,
+      evasion: 1,
+      xp: 1,
+    },
+    elite: {
+      hp: 1.6,
+      damageMin: 1.15,
+      damageMax: 1.15,
+      accuracy: 1.08,
+      defence: 1.08,
+      magicDefence: 1.08,
+      evasion: 1,
+      xp: 1.4,
+    },
+    mini_boss: {
+      hp: 2.4,
+      damageMin: 1.3,
+      damageMax: 1.3,
+      accuracy: 1.12,
+      defence: 1.12,
+      magicDefence: 1.12,
+      evasion: 1.05,
+      xp: 2,
+    },
+  },
+  ROLE_ACTION_MULTIPLIERS: {
+    trash: {
+      specialDamage: 1,
+      spikeDamage: 1,
+      debuffModifier: 1,
+    },
+    elite: {
+      specialDamage: 1.25,
+      spikeDamage: 1.5,
+      debuffModifier: 1,
+    },
+    mini_boss: {
+      specialDamage: 1.45,
+      spikeDamage: 1.9,
+      debuffModifier: 1.25,
+    },
+  },
+  ROLE_REWARD_BONUSES: {
+    trash: {
+      materialRollMultiplier: 0,
+      signatureRolls: 0,
+    },
+    elite: {
+      materialRollMultiplier: 0.2,
+      signatureRolls: 1,
+    },
+    mini_boss: {
+      materialRollMultiplier: 0.5,
+      signatureRolls: 2,
+    },
+  },
+  /** Keyword lists used to infer a mob family's combat theme for role-based action rotations. */
+  FAMILY_THEME_KEYWORDS: {
+    spider: ['spider', 'web', 'venom'],
+    wolf: ['wolf', 'warg', 'coyote'],
+    bandit: ['bandit', 'goblin'],
+    treant: ['treant', 'golem', 'bark'],
+    spirit: ['spirit', 'fae', 'wisp', 'witch'],
+    undead: ['undead', 'skeleton', 'wraith', 'lich'],
+  },
+} as const;
+
 // =============================================================================
 // LEADERBOARD
 // =============================================================================

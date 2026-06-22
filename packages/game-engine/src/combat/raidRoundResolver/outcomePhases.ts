@@ -492,6 +492,7 @@ export function resolveRaidOutcomePhases({
       mobTemplateId: mob.mobTemplateId,
       name: mob.name,
       prefix: mob.prefix,
+      ...(mob.role ? { role: mob.role } : {}),
       hp: mob.hp,
       maxHp: mob.maxHp,
       stats: mob.stats,

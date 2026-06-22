@@ -17,7 +17,8 @@ import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
-import { RoundLogContent } from '@/components/common/combat';
+import { RoundLogContent, MobRolePill } from '@/components/common/combat';
+import { splitEncounterMobDisplayName } from '@pocketrealm/shared';
 import type { ExpeditionRoundLog } from '@pocketrealm/shared';
 import { EventBadges } from '@/components/common/EventBadge';
 import { CopyButton } from '@/components/common/CopyButton';
@@ -415,13 +416,25 @@ export function CombatHistory() {
                             className="w-8 h-8 rounded object-cover shrink-0"
                           />
                         )}
-                        <span className="truncate">
-                          <span className={outcomeColor(entry.outcome)}>{outcomeIcon(entry.outcome)}</span>
-                          {' '}
-                          {entry.source === 'encounter_site' && entry.fightCount > 1
+                        {(() => {
+                          const isMultiFight = entry.source === 'encounter_site' && entry.fightCount > 1;
+                          const rawLabel = isMultiFight
                             ? (entry.mobFamilyName ?? entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')
-                            : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')}
-                        </span>
+                            : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob');
+                          const { role, name } = isMultiFight
+                            ? { role: null, name: rawLabel }
+                            : splitEncounterMobDisplayName(rawLabel);
+                          return (
+                            <>
+                              <span className="truncate">
+                                <span className={outcomeColor(entry.outcome)}>{outcomeIcon(entry.outcome)}</span>
+                                {' '}
+                                {name}
+                              </span>
+                              <MobRolePill role={role} />
+                            </>
+                          );
+                        })()}
                         {entry.source === 'encounter_site' && entry.fightCount > 1 && (
                           <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)] font-pixel font-normal">
                             {entry.fightCount} fights
@@ -474,7 +487,17 @@ export function CombatHistory() {
               )}
               {selectedEntry.source === 'encounter_site_room'
                 ? `${selectedEntry.siteName ?? 'Encounter Site'} — Room ${selectedEntry.siteRoom}/${selectedEntry.siteTotalRooms}`
-                : `${selectedDetail?.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Combat'} Log`}
+                : (() => {
+                    const { role, name } = splitEncounterMobDisplayName(
+                      selectedDetail?.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Combat',
+                    );
+                    return (
+                      <>
+                        <span>{name} Log</span>
+                        <MobRolePill role={role} />
+                      </>
+                    );
+                  })()}
               {selectedDetail?.eventModifiers && selectedDetail.eventModifiers.length > 0 && (
                 <EventBadges inline modifiers={selectedDetail.eventModifiers} />
               )}

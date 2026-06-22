@@ -96,6 +96,7 @@ export const wikiNavigation: WikiNavSection[] = [
     icon: '/assets/ui/ui_explore-pixelated-128.webp',
     items: [
       { label: 'Encounter Sites', href: '/wiki/exploration/encounter-sites' },
+      { label: 'Elites & Mini-Bosses', href: '/wiki/exploration/mob-roles', aliases: ['elite', 'mini-boss', 'miniboss', 'champion', 'role'] },
       { label: 'Probability Model', href: '/wiki/exploration/probability' },
       { label: 'Room Generation', href: '/wiki/exploration/rooms' },
       { label: 'Mob Tier Filtering', href: '/wiki/exploration/mob-tiers' },

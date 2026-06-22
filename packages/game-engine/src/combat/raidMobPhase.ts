@@ -305,6 +305,13 @@ export function resolveMobActions(params: {
         targetState.hp = Math.max(0, targetState.hp - damage);
         mobResult.damageDealt += damage;
 
+        if (mActionDef.lifeLeechPercent && mActionDef.lifeLeechPercent > 0) {
+          const healAmount = Math.floor(damage * mActionDef.lifeLeechPercent / 100);
+          const actualHeal = Math.min(healAmount, mob.maxHp - mob.hp);
+          mob.hp += actualHeal;
+          mobResult.healingDone += actualHeal;
+        }
+
         mobLogEntry.targets.push({
           playerId: targetId,
           username: getUsername(targetId),

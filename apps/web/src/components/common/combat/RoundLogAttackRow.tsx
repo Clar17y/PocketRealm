@@ -6,6 +6,7 @@ import type {
   PlayerRoundActionEntry,
 } from '@pocketrealm/shared';
 import { formatHitBreakdown } from '../../combat/combatLogEntryUtils';
+import { RoleAwareMobName } from './RoleAwareMobName';
 
 function isExhaustedActionEntry(action: PlayerRoundActionEntry): action is ExhaustedActionEntry {
   return action.entryType === 'exhausted';
@@ -51,7 +52,7 @@ function AttackDetail({ attack }: { attack: PlayerAttackEntry }) {
             return (
               <div key={i} className="ml-1 border-l border-[var(--rpg-border)] pl-1.5">
                 <div>
-                  Splash {i + 1} {'>'} {c.targetMobName} |{' '}
+                  Splash {i + 1} {'>'} <RoleAwareMobName name={c.targetMobName} /> |{' '}
                   {c.hit ? (
                     <>
                       <span className={c.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
@@ -137,7 +138,7 @@ export function RoundLogAttackRow({
         <span className="text-[var(--rpg-text-secondary)]">MISS</span>
         <span className="text-[var(--rpg-text-secondary)]"> {'>'} </span>
         <span className={cascadeHit.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
-          {cascadeHit.targetMobName}
+          <RoleAwareMobName name={cascadeHit.targetMobName} />
         </span>
         {cascadeHit.totalDamage !== undefined && (
           <span className="text-[var(--rpg-red)]"> {cascadeHit.totalDamage} dmg</span>
@@ -178,7 +179,7 @@ export function RoundLogAttackRow({
         {attack.targetMobName && (
           <>
             {' \u2192 '}
-            <span className="text-[var(--rpg-text-primary)]">{attack.targetMobName}</span>
+            <RoleAwareMobName name={attack.targetMobName} className="text-[var(--rpg-text-primary)]" />
           </>
         )}
         {' | '}

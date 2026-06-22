@@ -1,8 +1,21 @@
 import type { ActionDefinition } from '../types/combatAction.types';
 import type { BossTemplateDefinition } from '../types/bossTemplate.types';
+import { ENCOUNTER_SITE_ROLE_CONSTANTS } from './gameConstants';
 
 // Boss action definitions — all zero-cost (mobs don't manage resources)
 const BOSS_ZERO_COST = { stamina: 0, mana: 0 } as const;
+
+function roleSpikeMultiplier(role: 'elite' | 'mini_boss', base: number): number {
+  return base * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].spikeDamage;
+}
+
+function roleSpecialMultiplier(role: 'elite' | 'mini_boss', base: number): number {
+  return base * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].specialDamage;
+}
+
+function roleDebuffValue(role: 'elite' | 'mini_boss', base: number): number {
+  return Math.round(base * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].debuffModifier);
+}
 
 const bossPhysicalAttack: ActionDefinition = {
   id: 'boss_physical_attack',
@@ -53,7 +66,7 @@ const bossArcaneStorm: ActionDefinition = {
 const bossWeaken: ActionDefinition = {
   id: 'boss_weaken',
   name: 'Weaken',
-  description: 'Reduces all players\' attack for 3 rounds.',
+  description: 'Reduces target attack for 3 rounds.',
   actionType: 'debuff_spell',
   category: 'offensive',
   cost: BOSS_ZERO_COST,
@@ -346,6 +359,202 @@ const bossFrenzy: ActionDefinition = {
   },
 };
 
+const eliteVenomStrike: ActionDefinition = {
+  id: 'elite_venom_strike',
+  name: 'Venom Strike',
+  description: 'A precise venomous strike that leaves poison behind.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.5),
+  damageType: 'magic',
+  alwaysHits: true,
+  effect: {
+    name: 'Venom-Touched',
+    stat: 'poison',
+    modifier: 0,
+    duration: 3,
+    isDebuff: true,
+    damagePerRound: 4,
+    dotDamageType: 'magic',
+  },
+};
+
+const eliteMaul: ActionDefinition = {
+  id: 'elite_maul',
+  name: 'Maul',
+  description: 'A brutal tearing strike.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.6),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const eliteBackstab: ActionDefinition = {
+  id: 'elite_backstab',
+  name: 'Backstab',
+  description: 'A precise strike from a blind angle.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.7),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const eliteCrushingBlow: ActionDefinition = {
+  id: 'elite_crushing_blow',
+  name: 'Crushing Blow',
+  description: 'A heavy blow that lands with crushing force.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.7),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const eliteArcaneLance: ActionDefinition = {
+  id: 'elite_arcane_lance',
+  name: 'Arcane Lance',
+  description: 'A focused lance of arcane force.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.65),
+  damageType: 'magic',
+  alwaysHits: true,
+};
+
+const eliteDrainingStrike: ActionDefinition = {
+  id: 'elite_draining_strike',
+  name: 'Draining Strike',
+  description: 'A draining strike that restores the attacker.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('elite', 1.5),
+  damageType: 'magic',
+  alwaysHits: true,
+  lifeLeechPercent: 25,
+};
+
+const miniBossWeaken: ActionDefinition = {
+  ...bossWeaken,
+  id: 'mini_boss_weaken',
+  name: 'Crushing Weaken',
+  description: 'Heavily reduces target attack for 3 rounds.',
+  effect: {
+    ...bossWeaken.effect!,
+    modifier: roleDebuffValue('mini_boss', bossWeaken.effect!.modifier),
+  },
+};
+
+const miniBossSmokeBomb: ActionDefinition = {
+  ...bossSmokeBomb,
+  id: 'mini_boss_smoke_bomb',
+  name: 'Blinding Smoke Bomb',
+  description: 'Heavily obscures vision, reducing accuracy.',
+  effect: {
+    ...bossSmokeBomb.effect!,
+    modifier: roleDebuffValue('mini_boss', bossSmokeBomb.effect!.modifier),
+  },
+};
+
+const miniBossWither: ActionDefinition = {
+  ...bossWither,
+  id: 'mini_boss_wither',
+  name: 'Crippling Wither',
+  description: 'Drains vitality, heavily weakening defences.',
+  effect: {
+    ...bossWither.effect!,
+    modifier: roleDebuffValue('mini_boss', bossWither.effect!.modifier),
+  },
+};
+
+const miniBossRoot: ActionDefinition = {
+  ...bossRoot,
+  id: 'mini_boss_root',
+  name: 'Crushing Root',
+  description: 'Roots the target in place for longer.',
+  effect: {
+    ...bossRoot.effect!,
+    duration: 3,
+  },
+};
+
+const miniBossVenomStrike: ActionDefinition = {
+  ...eliteVenomStrike,
+  id: 'mini_boss_venom_strike',
+  name: 'Venomous Rupture',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.5),
+  effect: {
+    ...eliteVenomStrike.effect!,
+    damagePerRound: roleDebuffValue('mini_boss', eliteVenomStrike.effect!.damagePerRound!),
+  },
+};
+
+const miniBossMaul: ActionDefinition = {
+  ...eliteMaul,
+  id: 'mini_boss_maul',
+  name: 'Rending Maul',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.6),
+};
+
+const miniBossBackstab: ActionDefinition = {
+  ...eliteBackstab,
+  id: 'mini_boss_backstab',
+  name: 'Execution Backstab',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.7),
+};
+
+const miniBossCrushingBlow: ActionDefinition = {
+  ...eliteCrushingBlow,
+  id: 'mini_boss_crushing_blow',
+  name: 'Shattering Blow',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.7),
+};
+
+const miniBossArcaneLance: ActionDefinition = {
+  ...eliteArcaneLance,
+  id: 'mini_boss_arcane_lance',
+  name: 'Arcane Lance Barrage',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.65),
+};
+
+const miniBossDrainingStrike: ActionDefinition = {
+  ...eliteDrainingStrike,
+  id: 'mini_boss_draining_strike',
+  name: 'Devouring Strike',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.5),
+};
+
+const miniBossExecutionStrike: ActionDefinition = {
+  id: 'mini_boss_execution_strike',
+  name: 'Execution Strike',
+  description: 'A telegraphed execution strike aimed at one target.',
+  actionType: 'heavy_attack',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('mini_boss', 2.1),
+  damageType: 'physical',
+  alwaysHits: true,
+};
+
+const miniBossArcaneSpike: ActionDefinition = {
+  id: 'mini_boss_arcane_spike',
+  name: 'Arcane Spike',
+  description: 'A telegraphed arcane spike aimed at one target.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  cost: BOSS_ZERO_COST,
+  damageMultiplier: roleSpikeMultiplier('mini_boss', 2.1),
+  damageType: 'magic',
+  alwaysHits: true,
+};
+
 const bossBarkShield: ActionDefinition = {
   id: 'boss_bark_shield',
   name: 'Bark Shield',
@@ -524,6 +733,24 @@ export const BOSS_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   boss_root: bossRoot,
   boss_fear_howl: bossFearHowl,
   boss_frenzy: bossFrenzy,
+  elite_venom_strike: eliteVenomStrike,
+  elite_maul: eliteMaul,
+  elite_backstab: eliteBackstab,
+  elite_crushing_blow: eliteCrushingBlow,
+  elite_arcane_lance: eliteArcaneLance,
+  elite_draining_strike: eliteDrainingStrike,
+  mini_boss_weaken: miniBossWeaken,
+  mini_boss_smoke_bomb: miniBossSmokeBomb,
+  mini_boss_wither: miniBossWither,
+  mini_boss_root: miniBossRoot,
+  mini_boss_venom_strike: miniBossVenomStrike,
+  mini_boss_maul: miniBossMaul,
+  mini_boss_backstab: miniBossBackstab,
+  mini_boss_crushing_blow: miniBossCrushingBlow,
+  mini_boss_arcane_lance: miniBossArcaneLance,
+  mini_boss_draining_strike: miniBossDrainingStrike,
+  mini_boss_execution_strike: miniBossExecutionStrike,
+  mini_boss_arcane_spike: miniBossArcaneSpike,
   boss_bark_shield: bossBarkShield,
   boss_rally: bossRally,
   boss_shield_wall: bossShieldWall,

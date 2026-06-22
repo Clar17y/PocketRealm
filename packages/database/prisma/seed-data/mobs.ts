@@ -2,6 +2,13 @@ import { IDS } from './ids';
 
 type MobRow = {
   id: string;
+  /**
+   * Display name. Must NOT contain the standalone words "Elite" or "Mini-Boss":
+   * those are reserved role tokens injected into display names by
+   * formatEncounterMobDisplayName and parsed back out by splitEncounterMobDisplayName
+   * (packages/shared/src/utils/mobUtils.ts). A name containing one would corrupt the
+   * role pill / name round-trip on combat surfaces.
+   */
   name: string;
   zoneId: string;
   level: number;

@@ -1,15 +1,26 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@pocketrealm/shared';
+import {
+  COMBAT_CONSTANTS,
+  formatEncounterMobDisplayName,
+  type EncounterMobRole,
+} from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination, serializeXpGrant } from '../../utils/routeHelpers.js';
-import { getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
+import {
+  computeZoneModifiers,
+  filterEventModifiers,
+  getActiveEventsForZone,
+  getActiveWorldWideEvents,
+  type EventModifierBadge,
+} from '../../services/worldEventService';
 import {
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
 } from '../../services/combat/helpers';
+import { buildEncounterSiteMobPreview } from '../../services/encounterSiteMobRoleService';
 import {
   autoResolveEncounterRoom,
   startManualEncounterRoom,
@@ -102,11 +113,12 @@ export function registerSiteRoutes(router: Router): void {
         decayedMobs: number;
         nextMobTemplateId: string | null;
         nextMobPrefix: string | null;
+        nextMobRole: EncounterMobRole | null;
         discoveredAt: string;
         currentRoom: number;
         totalRooms: number;
         roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; prefix: string | null; status: string }>;
+        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; role: EncounterMobRole; prefix: string | null; status: string }>;
       }> = [];
 
       for (const site of sites) {
@@ -131,7 +143,13 @@ export function registerSiteRoutes(router: Router): void {
         const currentRoomNumber = site.currentRoom ?? 1;
         const currentRoomMobs = decayed.mobs
           .filter(m => (m.room ?? 1) === currentRoomNumber && m.status === 'alive')
-          .map(m => ({ slot: m.slot, mobTemplateId: m.mobTemplateId, prefix: m.prefix ?? null, status: m.status }));
+          .map(m => ({
+            slot: m.slot,
+            mobTemplateId: m.mobTemplateId,
+            role: m.role,
+            prefix: m.prefix ?? null,
+            status: m.status,
+          }));
 
         activeSites.push({
           encounterSiteId: site.id,
@@ -147,6 +165,7 @@ export function registerSiteRoutes(router: Router): void {
           decayedMobs: decayed.state.decayed,
           nextMobTemplateId: decayed.nextMob?.mobTemplateId ?? null,
           nextMobPrefix: decayed.nextMob?.prefix ?? null,
+          nextMobRole: decayed.nextMob?.role ?? null,
           discoveredAt: site.discoveredAt.toISOString(),
           currentRoom: currentRoomNumber,
           totalRooms: site.totalRooms ?? roomNumbers.length,
@@ -187,21 +206,42 @@ export function registerSiteRoutes(router: Router): void {
         .map(([id, name]) => ({ id, name }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      const badgeCache = new Map<string, EventModifierBadge[]>();
-      for (const site of pageItems) {
-        const key = `${site.zoneId}:${site.mobFamilyId}`;
-        if (!badgeCache.has(key)) {
-          badgeCache.set(key, await getEventModifiersForEntity(site.zoneId, { mobFamilyId: site.mobFamilyId }));
+      const modifierCache = new Map<string, { badges: EventModifierBadge[]; mobHpMultiplier: number }>();
+      if (pageItems.length > 0) {
+        const uniqueZoneIds = [...new Set(pageItems.map((site) => site.zoneId))];
+        const [worldEvents, zoneEventEntries] = await Promise.all([
+          getActiveWorldWideEvents(),
+          Promise.all(uniqueZoneIds.map(async (zoneId) => [
+            zoneId,
+            await getActiveEventsForZone(zoneId),
+          ] as const)),
+        ]);
+        const zoneEventsById = new Map(zoneEventEntries);
+
+        for (const site of pageItems) {
+          const key = `${site.zoneId}:${site.mobFamilyId}`;
+          if (modifierCache.has(key)) continue;
+
+          const zoneEvents = zoneEventsById.get(site.zoneId) ?? [];
+          const context = { mobFamilyId: site.mobFamilyId };
+          const badges = filterEventModifiers(zoneEvents, worldEvents, context);
+          const modifiers = computeZoneModifiers(zoneEvents, worldEvents, context);
+          modifierCache.set(key, { badges, mobHpMultiplier: modifiers.mobHpMultiplier });
         }
       }
 
       res.json({
         encounterSites: pageItems.map((site) => {
           const nextMobName = site.nextMobTemplateId ? nextMobNameById.get(site.nextMobTemplateId) ?? null : null;
-          const prefixDefinition = getMobPrefixDefinition(site.nextMobPrefix);
           const nextMobDisplayName = nextMobName
-            ? (prefixDefinition ? `${prefixDefinition.displayName} ${nextMobName}` : nextMobName)
+            ? formatEncounterMobDisplayName({
+                name: nextMobName,
+                prefix: site.nextMobPrefix,
+                role: site.nextMobRole,
+              })
             : null;
+          const modifierKey = `${site.zoneId}:${site.mobFamilyId}`;
+          const modifiers = modifierCache.get(modifierKey);
 
           return {
             encounterSiteId: site.encounterSiteId,
@@ -218,6 +258,7 @@ export function registerSiteRoutes(router: Router): void {
             nextMobTemplateId: site.nextMobTemplateId,
             nextMobName,
             nextMobPrefix: site.nextMobPrefix,
+            nextMobRole: site.nextMobRole,
             nextMobDisplayName,
             discoveredAt: site.discoveredAt,
             totalRooms: site.totalRooms,
@@ -225,15 +266,9 @@ export function registerSiteRoutes(router: Router): void {
             roomMobCounts: site.roomMobCounts,
             currentRoomMobs: site.currentRoomMobs.map(m => {
               const template = mobTemplateById.get(m.mobTemplateId);
-              return {
-                slot: m.slot,
-                name: template?.name ?? 'Unknown',
-                prefix: m.prefix,
-                hp: template?.hp ?? 0,
-                maxHp: template?.hp ?? 0,
-              };
+              return buildEncounterSiteMobPreview(m, template, modifiers?.mobHpMultiplier ?? 1);
             }),
-            eventModifiers: badgeCache.get(`${site.zoneId}:${site.mobFamilyId}`) ?? [],
+            eventModifiers: modifiers?.badges ?? [],
             totalTurnCost: site.aliveMobs * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
           };
         }),
@@ -408,6 +443,7 @@ export function registerSiteRoutes(router: Router): void {
         slot: parseEncounterMobSlot(m.mobId) ?? 0,
         hp: m.hpRemaining,
         maxHp: m.maxHp,
+        role: m.role,
         alive: m.alive,
         activeEffects: m.activeEffects ?? [],
       }));

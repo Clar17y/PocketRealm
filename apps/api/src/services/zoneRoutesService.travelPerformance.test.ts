@@ -9,14 +9,15 @@ vi.mock('@pocketrealm/game-engine', () => ({
   })),
   buildPlayerCombatStats: vi.fn(() => ({ damageMin: 1, damageMax: 3, defence: 1 })),
   filterAndWeightMobsByTier: vi.fn((mobs: unknown[]) => mobs),
-  mobToTemplateCombatant: vi.fn(() => ({ id: 'mob-1' })),
+  mobToTemplateCombatant: vi.fn((mob: Record<string, unknown>) => ({ id: 'mob-1', mob })),
   pickWeighted: vi.fn(),
+  rollNormalExplorationMobRole: vi.fn(() => 'trash'),
   rollMobPrefix: vi.fn(() => null),
-  runTemplateCombat: vi.fn(() => ({
+  runTemplateCombat: vi.fn((_combatantA: unknown, combatantB: { mob?: { hp?: number } }) => ({
     outcome: 'victory',
     combatantAHpRemaining: 97,
     combatantAMaxHp: 100,
-    combatantBMaxHp: 12,
+    combatantBMaxHp: combatantB.mob?.hp ?? 12,
     combatantBHpRemaining: 0,
     combatantAStaminaRemaining: 91,
     combatantAManaRemaining: 42,
@@ -66,6 +67,7 @@ vi.mock('./combatOrchestrationService', () => ({
 }));
 vi.mock('./durabilityService', () => ({
   degradeEquippedDurability: vi.fn().mockResolvedValue([]),
+  resolveExplorationDurabilityMultiplier: vi.fn().mockReturnValue(1),
 }));
 vi.mock('./expeditionLockoutService', () => ({
   checkActivityLockout: vi.fn().mockResolvedValue(undefined),
@@ -120,6 +122,13 @@ vi.mock('./staticDataCacheService', () => ({
       zoneId: 'zone-a',
       level: 1,
       hp: 12,
+      accuracy: 8,
+      defence: 4,
+      magicDefence: 3,
+      evasion: 2,
+      damageMin: 2,
+      damageMax: 4,
+      damageType: 'physical',
       xpReward: 6,
       encounterWeight: 100,
       explorationTier: 1,
@@ -161,10 +170,22 @@ vi.mock('../utils/routeHelpers.js', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
+import {
+  mobToTemplateCombatant,
+  rollNormalExplorationMobRole,
+  simulateTravelAmbushes,
+} from '@pocketrealm/game-engine';
 import { createActivityLog } from './activityLogService';
 import { processCombatVictoryRewards } from './combatOrchestrationService';
 import { setHp } from './hpService';
 import { travelToZone } from './zoneRoutesService';
+
+interface TravelResponseBody {
+  events: Array<{
+    description: string;
+    details?: Record<string, unknown>;
+  }>;
+}
 
 describe('travelToZone performance-sensitive ambush persistence', () => {
   beforeEach(() => {
@@ -219,5 +240,41 @@ describe('travelToZone performance-sensitive ambush persistence', () => {
     expect(processCombatVictoryRewards).toHaveBeenCalledWith(
       expect.objectContaining({ guildXpBoost: 0.15 }),
     );
+  });
+
+  it('applies elite role scaling and display names to travel ambushes', async () => {
+    vi.mocked(simulateTravelAmbushes).mockReturnValueOnce([{ turnOccurred: 1 }]);
+    vi.mocked(rollNormalExplorationMobRole).mockReturnValueOnce('elite');
+
+    const result = await travelToZone({
+      body: { zoneId: '00000000-0000-0000-0000-000000000002' },
+      player: { playerId: 'p1', username: 'Traveler' } as never,
+    });
+
+    const eliteMob = expect.objectContaining({
+      hp: 19,
+      accuracy: 9,
+      defence: 4,
+      magicDefence: 3,
+      damageMin: 2,
+      damageMax: 5,
+      xpReward: 8,
+      mobDisplayName: 'Elite Forest Rat',
+    });
+    expect(rollNormalExplorationMobRole).toHaveBeenCalled();
+    expect(mobToTemplateCombatant).toHaveBeenCalledWith(eliteMob);
+    expect(processCombatVictoryRewards).toHaveBeenCalledWith(
+      expect.objectContaining({ mob: eliteMob }),
+    );
+    const body = result.body as TravelResponseBody;
+    expect(body.events).toHaveLength(1);
+    expect(body.events[0]).toEqual(expect.objectContaining({
+      description: expect.stringContaining('Elite Forest Rat'),
+      details: expect.objectContaining({
+        mobDisplayName: 'Elite Forest Rat',
+        mobMaxHp: 19,
+        mobRole: 'elite',
+      }),
+    }));
   });
 });

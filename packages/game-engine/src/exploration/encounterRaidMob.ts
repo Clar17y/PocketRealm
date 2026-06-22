@@ -16,7 +16,7 @@ export interface MobTemplateForConversion {
   damageMin: number;
   damageMax: number;
   damageType: DamageType;
-  actionTemplate: Pick<BossTemplateAction, 'actionId' | 'targetMode'>[];
+  actionTemplate: BossTemplateAction[];
   critChance?: number;
   critMultiplier?: number;
 }
@@ -34,6 +34,7 @@ export function buildEncounterRaidMob(
     mobTemplateId: template.id,
     name: template.name,
     prefix: slot.prefix,
+    role: slot.role,
     hp: template.hp,
     maxHp: template.hp,
     stats: {
@@ -52,7 +53,7 @@ export function buildEncounterRaidMob(
       critChance: template.critChance,
       critDamage: template.critMultiplier,
     },
-    actionTemplate: template.actionTemplate as BossTemplateAction[],
+    actionTemplate: template.actionTemplate,
     activeEffects: [],
   };
 }

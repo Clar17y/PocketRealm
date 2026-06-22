@@ -1,7 +1,11 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import { generateRoomAssignments, rollMobPrefix } from '@pocketrealm/game-engine';
+import { assignEncounterRolesToRooms, generateRoomAssignments, rollMobPrefix } from '@pocketrealm/game-engine';
+import {
+  isPermanentEncounterFamilyRole,
+} from '@pocketrealm/shared';
 import { teleportPlayer } from '../zoneService';
 import { adminAudit } from './adminAuditService';
+import { pickEncounterFamilyMemberForRole } from '../exploration/helpers';
 
 export async function listAdminZones() {
   return prisma.zone.findMany({
@@ -67,8 +71,17 @@ export async function spawnAdminEncounter(
     };
   }
 
+  const encounterMembers = family.members.filter((member) => isPermanentEncounterFamilyRole(member.role));
+  if (encounterMembers.length === 0) {
+    return {
+      ok: false as const,
+      status: 400,
+      error: { message: 'Mob family has no encounter-site members', code: 'NO_ENCOUNTER_MEMBERS' },
+    };
+  }
+
   const roomAssignments = generateRoomAssignments(input.size);
-  const pickMember = () => family.members[Math.floor(Math.random() * family.members.length)];
+  const roleAssignments = assignEncounterRolesToRooms(roomAssignments.rooms);
   const mobs: Array<{
     slot: number;
     room: number;
@@ -79,64 +92,18 @@ export async function spawnAdminEncounter(
   }> = [];
 
   let slot = 0;
-  for (const room of roomAssignments.rooms) {
-    const isLastRoom = room.roomNumber === roomAssignments.rooms.length;
+  for (const assignment of roleAssignments) {
+    const member = pickEncounterFamilyMemberForRole(encounterMembers, assignment.role);
+    if (!member) continue;
 
-    if (isLastRoom && input.size === 'large') {
-      const boss = pickMember();
-      mobs.push({
-        slot: slot++,
-        room: room.roomNumber,
-        mobTemplateId: boss.mobTemplate.id,
-        role: 'boss',
-        prefix: rollMobPrefix(),
-        status: 'alive',
-      });
-      for (let index = 1; index < room.mobCount; index += 1) {
-        const elite = pickMember();
-        mobs.push({
-          slot: slot++,
-          room: room.roomNumber,
-          mobTemplateId: elite.mobTemplate.id,
-          role: 'elite',
-          prefix: rollMobPrefix(),
-          status: 'alive',
-        });
-      }
-    } else if (isLastRoom && input.size === 'medium') {
-      const elite = pickMember();
-      mobs.push({
-        slot: slot++,
-        room: room.roomNumber,
-        mobTemplateId: elite.mobTemplate.id,
-        role: 'elite',
-        prefix: rollMobPrefix(),
-        status: 'alive',
-      });
-      for (let index = 1; index < room.mobCount; index += 1) {
-        const trash = pickMember();
-        mobs.push({
-          slot: slot++,
-          room: room.roomNumber,
-          mobTemplateId: trash.mobTemplate.id,
-          role: 'trash',
-          prefix: rollMobPrefix(),
-          status: 'alive',
-        });
-      }
-    } else {
-      for (let index = 0; index < room.mobCount; index += 1) {
-        const trash = pickMember();
-        mobs.push({
-          slot: slot++,
-          room: room.roomNumber,
-          mobTemplateId: trash.mobTemplate.id,
-          role: 'trash',
-          prefix: rollMobPrefix(),
-          status: 'alive',
-        });
-      }
-    }
+    mobs.push({
+      slot: slot++,
+      room: assignment.room,
+      mobTemplateId: member.mobTemplate.id,
+      role: assignment.role,
+      prefix: rollMobPrefix(),
+      status: 'alive',
+    });
   }
 
   const sizeNounField = input.size === 'small'

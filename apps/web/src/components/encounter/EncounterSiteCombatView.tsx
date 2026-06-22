@@ -21,7 +21,7 @@ import type {
   EncounterFleeResult,
 } from '@/lib/api/combat';
 import { parseEncounterMobSlot } from '@pocketrealm/shared';
-import type { ExpeditionMobInfo, ExpeditionRoundLog, CombatTemplateData } from '@pocketrealm/shared';
+import type { EncounterMobRole, ExpeditionMobInfo, ExpeditionRoundLog, CombatTemplateData } from '@pocketrealm/shared';
 
 type CombatState = 'room_preview' | 'auto_playback' | 'manual_combat' | 'room_result';
 
@@ -67,17 +67,25 @@ function updateMobsFromSnapshot(
     const slot = parseMobSlot(mob.id);
     const ms = mobStates.find(s => s.slot === slot);
     if (!ms) return { ...mob, hp: 0, activeEffects: [] }; // Not in response = dead
-    return { ...mob, hp: ms.hp, maxHp: ms.maxHp, activeEffects: ms.activeEffects };
+    return { ...mob, role: ms.role ?? mob.role, hp: ms.hp, maxHp: ms.maxHp, activeEffects: ms.activeEffects };
   });
 }
 
 function startRoomMobsToExpeditionMobs(
-  mobs: EncounterStartRoomResponse['mobs'],
+  mobs: ReadonlyArray<{
+    mobId: string;
+    name: string;
+    prefix: string | null;
+    role: EncounterMobRole;
+    hp: number;
+    maxHp: number;
+  }>,
 ): ExpeditionMobInfo[] {
   return mobs.map(m => ({
     id: m.mobId,
     name: m.name,
     prefix: m.prefix,
+    role: m.role,
     hp: m.hp,
     maxHp: m.maxHp,
     activeEffects: [],
@@ -150,14 +158,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
 
       // Seed mob list from auto-resolve response (mobs weren't loaded in preview)
       if (result.initialMobs) {
-        setMobs(result.initialMobs.map(m => ({
-          id: m.mobId,
-          name: m.name,
-          prefix: m.prefix,
-          hp: m.hp,
-          maxHp: m.maxHp,
-          activeEffects: [],
-        })));
+        setMobs(startRoomMobsToExpeditionMobs(result.initialMobs));
       }
 
       setPlaybackRounds(result.rounds);
