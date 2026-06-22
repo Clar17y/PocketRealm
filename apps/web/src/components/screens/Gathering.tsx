@@ -23,6 +23,7 @@ import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { DockedActionBar } from '../common/DockedActionBar';
 
 const GATHERING_NPC_MAP: Record<string, NpcKey> = {
   mining: 'rowan-mining',
@@ -230,7 +231,7 @@ export function Gathering({
   }) : null;
 
   return (
-    <ScreenContainer>
+    <ScreenContainer bottomInset>
       {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
 
       {/* Knockout Banner */}
@@ -445,28 +446,43 @@ export function Gathering({
         </PixelCard>
       )}
 
-      {/* Start Button */}
+      {/* Gathering Log */}
+      <ActivityLog entries={activityLog} maxHeight="max-h-48" />
+
+      {/* Docked Start action */}
       {selectedNode && (() => {
         const selectedWouldStack = ownedResourceNames?.has(selectedNode.name) ?? false;
         const selectedBlockedByFull = backpackFull && !selectedWouldStack;
         return (
-          <PixelButton
-            variant="gold"
-            size="lg"
-            className="w-full"
-            onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
-            disabled={isOverEncumbered || isRecovering || isActivityLocked || selectedBlockedByFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <Pickaxe size={20} />
-              {isActivityLocked ? (activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition') : isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : selectedBlockedByFull ? 'Backpack Full' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
+          <DockedActionBar>
+            <div className="flex items-center gap-3">
+              <div className="text-right shrink-0">
+                <div className="text-[18px] text-[var(--rpg-gold)] font-pixel leading-none">
+                  {turnInvestment[0]}
+                  <span className="text-xs text-[var(--rpg-text-secondary)] ml-1">turns</span>
+                </div>
+                {guildTaxRate > 0 && (
+                  <div className="text-[10px] text-[var(--rpg-text-secondary)]">
+                    {calcEffectiveTurns(turnInvestment[0], guildTaxRate)} effective ({guildTaxRate}% tax)
+                  </div>
+                )}
+              </div>
+              <PixelButton
+                variant="gold"
+                size="lg"
+                className="flex-1"
+                onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
+                disabled={isOverEncumbered || isRecovering || isActivityLocked || selectedBlockedByFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Pickaxe size={20} />
+                  {isActivityLocked ? (activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition') : isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : selectedBlockedByFull ? 'Backpack Full' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
+                </div>
+              </PixelButton>
             </div>
-          </PixelButton>
+          </DockedActionBar>
         );
       })()}
-
-      {/* Gathering Log */}
-      <ActivityLog entries={activityLog} maxHeight="max-h-48" />
     </ScreenContainer>
   );
 }

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
 import { handleSupportThreadAction } from '../support/threadActions.js';
-import { handleAnnouncementCommand } from './announcementCommand.js';
+import { handleAnnouncementCommand, handleAnnouncementModalSubmit } from './announcementCommand.js';
 import { handleDuelButton, handleDuelCommand } from './duelCommand.js';
 import { routeInteraction } from './interactionRouter.js';
 import { handleLinkCommand } from './linkCommand.js';
@@ -18,6 +18,10 @@ vi.mock('../support/threadActions.js', () => ({
 
 vi.mock('./announcementCommand.js', () => ({
   handleAnnouncementCommand: vi.fn(),
+  handleAnnouncementModalSubmit: vi.fn(),
+  isAnnouncementModalCustomId: vi.fn(
+    (customId: string) => customId === 'announcement:0' || customId === 'announcement:1',
+  ),
 }));
 
 vi.mock('./duelCommand.js', () => ({
@@ -311,6 +315,45 @@ describe('routeInteraction', () => {
     await routeInteraction(interaction, { api, config: routerConfig });
 
     expect(handleReportModalSubmit).toHaveBeenCalledWith(interaction, api, routerConfig);
+  });
+
+  it('routes announcement modal submissions to the announcement submit handler', async () => {
+    const interaction = {
+      isChatInputCommand: () => false,
+      isButton: () => false,
+      isModalSubmit: () => true,
+      customId: 'announcement:0',
+    } as unknown as ModalSubmitInteraction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleAnnouncementModalSubmit).toHaveBeenCalledWith(interaction, {
+      config: routerConfig,
+    });
+  });
+
+  it('treats malformed announcement modal ids as unsupported interactions', async () => {
+    const reply = vi.fn<ModalSubmitInteraction['reply']>();
+    const interaction = {
+      isChatInputCommand: () => false,
+      isButton: () => false,
+      isModalSubmit: () => true,
+      isRepliable: () => true,
+      customId: 'announcement:bad',
+      replied: false,
+      deferred: false,
+      reply,
+    } as unknown as ModalSubmitInteraction;
+    const api = createApi(null);
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleAnnouncementModalSubmit).not.toHaveBeenCalledWith(interaction, expect.anything());
+    const payload = reply.mock.calls[0]?.[0];
+    expect(payload).toEqual(expect.objectContaining({ ephemeral: true }));
+    expectV2Card(payload);
+    expect(cardText(payload)).toContain('This interaction is no longer supported. Try the command again.');
   });
 
   it('replies ephemerally to unknown chat input commands', async () => {

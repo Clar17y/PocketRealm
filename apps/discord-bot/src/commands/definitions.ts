@@ -79,8 +79,7 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
       .addStringOption((option) =>
         option
           .setName('message')
-          .setDescription('Announcement message to post.')
-          .setRequired(true),
+          .setDescription('Optional one-line message. Omit to open the multi-line editor.'),
       )
       .addBooleanOption((option) =>
         option
