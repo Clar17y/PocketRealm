@@ -954,6 +954,20 @@ export const ENCOUNTER_SITE_ROLE_CONSTANTS = {
       debuffModifier: 1.25,
     },
   },
+  ROLE_REWARD_BONUSES: {
+    trash: {
+      materialRollMultiplier: 0,
+      signatureRolls: 0,
+    },
+    elite: {
+      materialRollMultiplier: 0.2,
+      signatureRolls: 1,
+    },
+    mini_boss: {
+      materialRollMultiplier: 0.5,
+      signatureRolls: 2,
+    },
+  },
   /** Keyword lists used to infer a mob family's combat theme for role-based action rotations. */
   FAMILY_THEME_KEYWORDS: {
     spider: ['spider', 'web', 'venom'],

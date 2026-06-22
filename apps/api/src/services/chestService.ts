@@ -6,7 +6,7 @@ import {
   rollChestMaterialRollsByRoomCount,
   type ChestRarity,
 } from '@pocketrealm/game-engine';
-import { ENCOUNTER_SITE_CONSTANTS, type LootDrop } from '@pocketrealm/shared';
+import { ENCOUNTER_SITE_CONSTANTS, ENCOUNTER_SITE_ROLE_CONSTANTS, type EncounterMobRole, type LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import {
   createLootAccumulator,
@@ -53,6 +53,8 @@ interface EncounterSiteChestRewards extends GrantedItemIds {
   overflow: DropGrantResult['overflow'];
   slotsConsumed: number;
 }
+
+export type EncounterSiteDefeatedPromotedRoleCounts = Partial<Record<Exclude<EncounterMobRole, 'trash'>, number>>;
 
 const CHEST_DROP_ENTRY_INCLUDE = {
   mobFamily: {
@@ -200,6 +202,24 @@ function getRandomChestDropEntries(entries: ChestDropEntry[]): ChestDropEntry[] 
     : allowedEntries;
 }
 
+function getPromotedRoleRewardBonus(counts: EncounterSiteDefeatedPromotedRoleCounts | undefined): {
+  materialRollMultiplier: number;
+  signatureRolls: number;
+} {
+  if (!counts) return { materialRollMultiplier: 0, signatureRolls: 0 };
+
+  const eliteCount = Math.max(0, counts.elite ?? 0);
+  const miniBossCount = Math.max(0, counts.mini_boss ?? 0);
+  return {
+    materialRollMultiplier:
+      eliteCount * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.elite.materialRollMultiplier
+      + miniBossCount * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.mini_boss.materialRollMultiplier,
+    signatureRolls:
+      eliteCount * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.elite.signatureRolls
+      + miniBossCount * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_REWARD_BONUSES.mini_boss.signatureRolls,
+  };
+}
+
 async function getChestDropEntriesTx(
   tx: Prisma.TransactionClient,
   mobFamilyId: string,
@@ -311,24 +331,30 @@ export async function grantEncounterSiteChestRewardsTx(
     totalRooms: number;
     autoResolvedBonusRooms: number;
     availableSlots?: number;
+    defeatedPromotedRoleCounts?: EncounterSiteDefeatedPromotedRoleCounts;
   }
 ): Promise<EncounterSiteChestRewards> {
   const chestRarity = getChestRarityForRoomCount(params.totalRooms);
   const baseRolls = rollChestMaterialRollsByRoomCount(params.totalRooms);
+  const roleRewardBonus = getPromotedRoleRewardBonus(params.defeatedPromotedRoleCounts);
 
   // Auto-resolve proportional multiplier
   const bonusFraction = params.totalRooms > 0
     ? params.autoResolvedBonusRooms / params.totalRooms
     : 0;
   const materialRolls = Math.ceil(
-    baseRolls * (1 + bonusFraction * (ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_DROP_MULTIPLIER - 1))
+    baseRolls * (
+      1
+      + bonusFraction * (ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_DROP_MULTIPLIER - 1)
+      + roleRewardBonus.materialRollMultiplier
+    )
   );
 
   const dropEntries = await getChestDropEntriesTx(tx, params.mobFamilyId, chestRarity);
   const signatureEntries = await getSignatureChestDropEntriesTx(tx, params.mobFamilyId, chestRarity, dropEntries);
   const randomDropEntries = getRandomChestDropEntries(dropEntries);
   const signatureResult = signatureEntries.length > 0
-    ? await rollAndGrantDropsTx(tx, params.playerId, signatureEntries, 1, 'common', params.availableSlots)
+    ? await rollAndGrantDropsTx(tx, params.playerId, signatureEntries, 1 + roleRewardBonus.signatureRolls, 'common', params.availableSlots)
     : null;
   const remainingSlots = params.availableSlots == null || !signatureResult
     ? params.availableSlots

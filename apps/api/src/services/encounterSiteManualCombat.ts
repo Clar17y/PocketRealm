@@ -44,6 +44,7 @@ import {
   loadRoomMobsAsRaidState,
   handleEncounterDefeat,
   computeDefeatedMobXp,
+  countDefeatedPromotedEncounterRoles,
   markEncounterRoomMobsDefeated,
   buildParticipantForEncounterSite,
   countEncounterSiteHits,
@@ -551,6 +552,7 @@ export async function resolveManualEncounterRound(
         mobFamilyId: freshSite.mobFamilyId,
         totalRooms: totalRoomsCount,
         autoResolvedBonusRooms: autoResolvedCount,
+        defeatedPromotedRoleCounts: countDefeatedPromotedEncounterRoles(mobs),
         availableSlots: chestAvailableSlots,
       });
       await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });

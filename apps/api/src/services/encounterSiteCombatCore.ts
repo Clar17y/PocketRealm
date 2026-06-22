@@ -44,8 +44,9 @@ import {
 } from './worldEventService';
 import {
   getAllAliveMobsInRoom,
+  parseEncounterSiteMobs,
 } from './combat/helpers';
-import { grantEncounterSiteChestRewardsTx } from './chestService';
+import { grantEncounterSiteChestRewardsTx, type EncounterSiteDefeatedPromotedRoleCounts } from './chestService';
 import {
   applyEncounterRoleModifiers,
   resolveEncounterRoleActionTemplate,
@@ -387,6 +388,18 @@ export async function storeEncounterChestOverflow(
   return storePendingLoot(playerId, completionRewards.overflow);
 }
 
+export function countDefeatedPromotedEncounterRoles(
+  mobs: readonly EncounterMobSlot[],
+): EncounterSiteDefeatedPromotedRoleCounts {
+  const counts: EncounterSiteDefeatedPromotedRoleCounts = {};
+  for (const mob of mobs) {
+    if (mob.status !== 'defeated') continue;
+    if (mob.role === 'elite') counts.elite = (counts.elite ?? 0) + 1;
+    if (mob.role === 'mini_boss') counts.mini_boss = (counts.mini_boss ?? 0) + 1;
+  }
+  return counts;
+}
+
 // ---------------------------------------------------------------------------
 // Shared private helpers
 // ---------------------------------------------------------------------------
@@ -425,18 +438,20 @@ export async function advanceToFirstAliveRoom(
 export async function handleDecayedSiteClearance(
   playerId: string,
   siteId: string,
-  site: { mobFamilyId: string; totalRooms: number | null; roomStrategy: unknown },
+  site: { mobFamilyId: string; totalRooms: number | null; roomStrategy: unknown; mobs: unknown },
 ): Promise<{ completionRewards: EncounterSiteChestRewards; pendingLootSessionId: string | null }> {
   const { availableSlots } = await getInventoryState(playerId);
   const totalRoomsCount = site.totalRooms ?? 1;
   const existingStrategy = (Array.isArray(site.roomStrategy) ? site.roomStrategy : []) as unknown as RoomStrategyEntry[];
   const autoResolvedCount = existingStrategy.filter((e: RoomStrategyEntry) => e.mode === 'auto').length;
+  const defeatedPromotedRoleCounts = countDefeatedPromotedEncounterRoles(parseEncounterSiteMobs(site.mobs));
   const completionRewards = await prisma.$transaction(async (tx) => {
     const rewards = await grantEncounterSiteChestRewardsTx(tx, {
       playerId,
       mobFamilyId: site.mobFamilyId,
       totalRooms: totalRoomsCount,
       autoResolvedBonusRooms: autoResolvedCount,
+      defeatedPromotedRoleCounts,
       availableSlots,
     });
     await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });

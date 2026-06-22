@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { ExpeditionRoundLog, MobActionLogEntry } from '@pocketrealm/shared';
 import { formatHitBreakdown } from '../../combat/combatLogEntryUtils';
 import { RoundLogAttackRow } from './RoundLogAttackRow';
+import { RoleAwareMobName } from './RoleAwareMobName';
 
 function MobTargetRow({ target }: { target: MobActionLogEntry['targets'][number] }) {
   const [expanded, setExpanded] = useState(false);
@@ -109,7 +110,7 @@ export function RoundLogContent({ log, playerId }: RoundLogContentProps) {
               }`}
             >
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-[var(--rpg-red)] font-bold">{ma.mobName}</span>
+                <RoleAwareMobName name={ma.mobName} className="text-[var(--rpg-red)] font-bold" />
                 <span className="text-[var(--rpg-text-secondary)]">uses</span>
                 <span className="text-[var(--rpg-text-primary)]">{ma.actionLabel}</span>
                 {ma.wasTelegraphed && (
@@ -142,7 +143,7 @@ export function RoundLogContent({ log, playerId }: RoundLogContentProps) {
           {log.phases.effectTicks.map((tick, j) => (
             <div key={j} className="text-xs ml-2">
               <span className={tick.targetType === 'mob' ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-primary)]'}>
-                {tick.targetName}
+                <RoleAwareMobName name={tick.targetName} />
               </span>
               <span className="text-[var(--rpg-text-secondary)]"> takes </span>
               <span className="text-[var(--rpg-red)]">-{tick.damage} HP</span>

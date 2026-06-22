@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEncounterMobDisplayName, splitEncounterMobDisplayName } from './mobUtils';
+import { formatEncounterMobDisplayName, mobDisplayName, splitEncounterMobDisplayName } from './mobUtils';
 import { getAllMobPrefixes } from '../constants/mobPrefixes';
 
 describe('formatEncounterMobDisplayName', () => {
@@ -18,6 +18,15 @@ describe('formatEncounterMobDisplayName', () => {
   it('shows no role label for trash or missing role', () => {
     expect(formatEncounterMobDisplayName({ name: 'Wolf', prefix: null, role: 'trash' })).toBe('Wolf');
     expect(formatEncounterMobDisplayName({ name: 'Wolf', prefix: null })).toBe('Wolf');
+  });
+});
+
+describe('mobDisplayName', () => {
+  it('includes encounter role labels for promoted mobs', () => {
+    expect(mobDisplayName({ name: 'Cave Bat', prefix: null, role: 'mini_boss' }))
+      .toBe('Mini-Boss Cave Bat');
+    expect(mobDisplayName({ name: 'Web Spinner', prefix: 'ancient', role: 'elite' }))
+      .toBe('Ancient Elite Web Spinner');
   });
 });
 
