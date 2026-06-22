@@ -586,6 +586,7 @@ export interface EncounterAutoResolveResponse {
     materials: Array<{ itemTemplateId: string; name: string; quantity: number }>;
     recipe?: { recipeId: string; name: string } | null;
   };
+  pendingLootSessionId?: string | null;
   fleeResult?: EncounterFleeResult | null;
   respawnedTo?: { townId: string; townName: string } | null;
   questProgress?: QuestProgressUpdate[];
@@ -618,6 +619,7 @@ export interface EncounterStartRoomResponse {
   /** True when all remaining rooms decayed — site auto-cleared with chest reward. */
   siteAutoCleared?: boolean;
   chestReward?: unknown;
+  pendingLootSessionId?: string | null;
   stateUpdates?: StateUpdates;
 }
 
@@ -630,6 +632,7 @@ export interface EncounterManualRoundResponse {
   siteCleared: boolean;
   chestReward?: EncounterAutoResolveResponse['chestReward'];
   completionRewards?: Record<string, unknown>;
+  pendingLootSessionId?: string | null;
   fleeResult?: EncounterFleeResult | null;
   respawnedTo?: { townId: string; townName: string } | null;
   questProgress?: QuestProgressUpdate[];

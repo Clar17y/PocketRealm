@@ -42,6 +42,7 @@ import {
   getAllAliveMobsInRoom,
 } from './combat/helpers';
 import { grantEncounterSiteChestRewardsTx } from './chestService';
+import { storePendingLoot } from './pendingLootService';
 
 /** Shared flee result shape used by both auto-resolve and manual combat. */
 export interface FleeResult {
@@ -367,6 +368,16 @@ export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): { playe
   return { playerHitsLanded, mobHitsLanded };
 }
 
+export type EncounterSiteChestRewards = Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>>;
+
+export async function storeEncounterChestOverflow(
+  playerId: string,
+  completionRewards: EncounterSiteChestRewards | null,
+): Promise<string | null> {
+  if (!completionRewards || completionRewards.overflow.length === 0) return null;
+  return storePendingLoot(playerId, completionRewards.overflow);
+}
+
 // ---------------------------------------------------------------------------
 // Shared private helpers
 // ---------------------------------------------------------------------------
@@ -406,12 +417,12 @@ export async function handleDecayedSiteClearance(
   playerId: string,
   siteId: string,
   site: { mobFamilyId: string; totalRooms: number | null; roomStrategy: unknown },
-): Promise<Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>>> {
+): Promise<{ completionRewards: EncounterSiteChestRewards; pendingLootSessionId: string | null }> {
   const { availableSlots } = await getInventoryState(playerId);
   const totalRoomsCount = site.totalRooms ?? 1;
   const existingStrategy = (Array.isArray(site.roomStrategy) ? site.roomStrategy : []) as unknown as RoomStrategyEntry[];
   const autoResolvedCount = existingStrategy.filter((e: RoomStrategyEntry) => e.mode === 'auto').length;
-  return prisma.$transaction(async (tx) => {
+  const completionRewards = await prisma.$transaction(async (tx) => {
     const rewards = await grantEncounterSiteChestRewardsTx(tx, {
       playerId,
       mobFamilyId: site.mobFamilyId,
@@ -423,6 +434,10 @@ export async function handleDecayedSiteClearance(
     await tx.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
     return rewards;
   });
+  return {
+    completionRewards,
+    pendingLootSessionId: await storeEncounterChestOverflow(playerId, completionRewards),
+  };
 }
 
 /**

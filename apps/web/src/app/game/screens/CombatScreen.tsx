@@ -103,6 +103,7 @@ interface CombatScreenProps {
   onStateUpdates?: (updates: StateUpdates) => void;
   updateQuestProgress?: (updates?: QuestProgressUpdate[]) => void;
   refreshPendingEncounters?: (options?: RefreshPendingEncounterOptions) => Promise<PendingEncounter[] | undefined>;
+  activatePendingLoot?: (sessionId: string) => Promise<void>;
   setError?: (msg: string | null) => void;
   activeEncounterSiteId?: string | null;
   onActiveEncounterSiteIdChange?: (id: string | null) => void;
@@ -152,6 +153,7 @@ export function CombatScreen({
   onStateUpdates,
   updateQuestProgress,
   refreshPendingEncounters,
+  activatePendingLoot,
   setError,
   activeEncounterSiteId: externalActiveEncounterSiteId,
   onActiveEncounterSiteIdChange,
@@ -348,18 +350,21 @@ export function CombatScreen({
               const result = await autoResolveEncounterRoom(activeSiteCombat.siteId);
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
               updateQuestProgress?.(result.questProgress);
+              if (result.pendingLootSessionId) await activatePendingLoot?.(result.pendingLootSessionId);
               return result;
             }}
             onStartRoom={async () => {
               const result = await startEncounterRoom(activeSiteCombat.siteId);
               onActiveEncounterSiteIdChange?.(activeSiteCombat.siteId);
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              if (result.pendingLootSessionId) await activatePendingLoot?.(result.pendingLootSessionId);
               return result;
             }}
             onResolveRound={async (action) => {
               const result = await resolveEncounterRound(activeSiteCombat.siteId, action);
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
               updateQuestProgress?.(result.questProgress);
+              if (result.pendingLootSessionId) await activatePendingLoot?.(result.pendingLootSessionId);
               return result;
             }}
             onAbandon={async () => {

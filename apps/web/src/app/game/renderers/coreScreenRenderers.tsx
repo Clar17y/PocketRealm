@@ -318,6 +318,7 @@ export function CombatScreenRenderer({ gc, player }: SharedCoreRendererProps) {
       onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
       updateQuestProgress={gc.updateQuestProgress}
       refreshPendingEncounters={gc.refreshPendingEncounters}
+      activatePendingLoot={gc.activatePendingLoot}
       setError={gc.setActionError}
       onPendingEncounterPageChange={gc.handlePendingEncounterPageChange}
       onPendingEncounterZoneFilterChange={gc.handlePendingEncounterZoneFilterChange}
