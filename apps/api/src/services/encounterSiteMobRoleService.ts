@@ -75,9 +75,9 @@ export function resolveEncounterRoleActionTemplate(input: {
     : { actionId: 'mini_boss_execution_strike', targetMode: 'single_target', isTelegraphed: true, label: 'EXECUTION STRIKE' };
 
   return [
-    resolveMiniBossSetupAction(theme, input.damageType),
     basicAction,
     resolveMiniBossSpecial(theme, input.damageType),
+    resolveMiniBossSetupAction(theme, input.damageType),
     basicAction,
     finisher,
   ];

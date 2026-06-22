@@ -146,7 +146,7 @@ describe('resolveEncounterRoleActionTemplate', () => {
     });
   });
 
-  it('builds mini-bosses with setup, basic, special, basic, and finisher actions', () => {
+  it('builds mini-bosses with basic, special, setup, basic, and finisher actions', () => {
     const actions = resolveEncounterRoleActionTemplate({
       role: 'mini_boss',
       damageType: 'physical',
@@ -155,9 +155,9 @@ describe('resolveEncounterRoleActionTemplate', () => {
     });
 
     expect(actions.map(action => action.actionId)).toEqual([
-      'mini_boss_root',
       'boss_physical_attack',
       'mini_boss_crushing_blow',
+      'mini_boss_root',
       'boss_physical_attack',
       'mini_boss_execution_strike',
     ]);
@@ -170,7 +170,7 @@ describe('resolveEncounterRoleActionTemplate', () => {
       familyName: 'Wolves',
       mobName: 'Dire Wolf',
     });
-    const special = actions[2]!;
+    const special = actions.find(action => action.actionId === 'mini_boss_maul')!;
     const definition = BOSS_ACTION_DEFINITIONS[special.actionId]!;
 
     expect(special.actionId).toBe('mini_boss_maul');
