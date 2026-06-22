@@ -26,6 +26,7 @@ import { parseEncounterMobSlot } from '@pocketrealm/shared';
 import type { ExpeditionMobInfo, ExpeditionRoundLog, CombatTemplateData } from '@pocketrealm/shared';
 
 type CombatState = 'room_preview' | 'auto_playback' | 'manual_combat' | 'room_result';
+type EncounterSkillXpGrants = NonNullable<EncounterAutoResolveResponse['skillXpGrants']>;
 
 export interface EncounterSiteCombatViewProps {
   siteId: string;
@@ -99,7 +100,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const [fleeResult, setFleeResult] = useState<EncounterFleeResult | null>(null);
   const [respawnedTo, setRespawnedTo] = useState<string | null>(null);
   const [hasDecayedMobs, setHasDecayedMobs] = useState(props.hasDecayedMobs);
-  const [xpGrants, setXpGrants] = useState<EncounterAutoResolveResponse['skillXpGrants']>([]);
+  const [xpGrants, setXpGrants] = useState<EncounterSkillXpGrants>([]);
 
   const shareText = useMemo(() => {
     if (roundLogs.length === 0) return '';
