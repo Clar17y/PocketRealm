@@ -95,7 +95,7 @@ describe('spawnAdminEncounter', () => {
     expect(mockGenerateRoomAssignments).toHaveBeenCalledWith('large');
   });
 
-  it('does not use permanent mini boss templates for trash or elite admin slots when alternatives exist', async () => {
+  it('uses base templates for promoted admin slots when alternatives exist', async () => {
     mockPrisma.mobFamily.findUniqueOrThrow.mockResolvedValueOnce({
       id: 'family-spider',
       name: 'Spiders',
@@ -131,7 +131,7 @@ describe('spawnAdminEncounter', () => {
           mobs: [
             { slot: 0, room: 1, mobTemplateId: 'web-spinner', role: 'trash', prefix: null, status: 'alive' },
             { slot: 1, room: 2, mobTemplateId: 'web-spinner', role: 'elite', prefix: null, status: 'alive' },
-            { slot: 2, room: 3, mobTemplateId: 'web-matron', role: 'mini_boss', prefix: null, status: 'alive' },
+            { slot: 2, room: 3, mobTemplateId: 'web-spinner', role: 'mini_boss', prefix: null, status: 'alive' },
           ],
         },
       }),

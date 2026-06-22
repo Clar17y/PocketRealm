@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { MobTemplate } from '@pocketrealm/shared';
+import {
+  ENCOUNTER_SITE_ROLE_CONSTANTS,
+  type MobTemplate,
+} from '@pocketrealm/shared';
+import { BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared/constants/bossTemplateDefinitions';
 import {
   applyEncounterRoleModifiers,
   buildEncounterSiteMobPreview,
@@ -151,12 +155,29 @@ describe('resolveEncounterRoleActionTemplate', () => {
     });
 
     expect(actions.map(action => action.actionId)).toEqual([
-      'boss_root',
+      'mini_boss_root',
       'boss_physical_attack',
-      'elite_crushing_blow',
+      'mini_boss_crushing_blow',
       'boss_physical_attack',
       'mini_boss_execution_strike',
     ]);
+  });
+
+  it('uses mini-boss-specific special actions with mini-boss special tuning', () => {
+    const actions = resolveEncounterRoleActionTemplate({
+      role: 'mini_boss',
+      damageType: 'physical',
+      familyName: 'Wolves',
+      mobName: 'Dire Wolf',
+    });
+    const special = actions[2]!;
+    const definition = BOSS_ACTION_DEFINITIONS[special.actionId]!;
+
+    expect(special.actionId).toBe('mini_boss_maul');
+    expect(special.actionId).not.toBe('elite_maul');
+    expect(definition.damageMultiplier).toBe(
+      1.6 * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS.mini_boss.specialDamage,
+    );
   });
 });
 

@@ -20,7 +20,7 @@ vi.mock('@pocketrealm/game-engine', async (importOriginal) => {
   };
 });
 
-import { buildEncounterSiteMobs } from './helpers';
+import { buildEncounterSiteMobs, pickEncounterFamilyMemberForRole } from './helpers';
 
 const ZONE_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -221,5 +221,42 @@ describe('buildEncounterSiteMobs', () => {
       'web-spinner',
     ]);
     expect(mobs.map((mob) => mob.role)).toEqual(['trash', 'trash', 'elite']);
+  });
+});
+
+describe('pickEncounterFamilyMemberForRole', () => {
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('uses base encounter templates for promoted instance roles when available', () => {
+    const trash = webSpinnerMember();
+    const elite: EncounterFamilyMember = {
+      role: 'elite',
+      mobTemplate: {
+        id: 'giant-web-spinner',
+        name: 'Giant Web Spinner',
+        zoneId: ZONE_ID,
+        explorationTier: 3,
+      },
+    };
+    const miniBoss: EncounterFamilyMember = {
+      role: 'mini_boss',
+      mobTemplate: {
+        id: 'web-queen',
+        name: 'Web Queen',
+        zoneId: ZONE_ID,
+        explorationTier: 3,
+      },
+    };
+
+    expect(pickEncounterFamilyMemberForRole([trash, elite, miniBoss], 'elite')?.mobTemplate.id)
+      .toBe('web-spinner');
+    expect(pickEncounterFamilyMemberForRole([trash, elite, miniBoss], 'mini_boss')?.mobTemplate.id)
+      .toBe('web-spinner');
   });
 });

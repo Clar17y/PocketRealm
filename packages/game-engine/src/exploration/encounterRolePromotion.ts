@@ -68,6 +68,7 @@ export function assignEncounterRolesToRooms(
     ensureEliteCount(assignments, lastRoom.roomNumber, 2);
   }
 
+  moveEarlyElitesIntoFinalRoomCapacity(assignments, finalIndexes);
   ensureSingleEliteIsInFinalRoom(assignments, finalIndexes);
 
   return assignments;
@@ -140,6 +141,36 @@ function ensureSingleEliteIsInFinalRoom(
 
   assignments[eliteIndexes[0]!]!.role = 'trash';
   assignments[finalTarget]!.role = 'elite';
+}
+
+function moveEarlyElitesIntoFinalRoomCapacity(
+  assignments: EncounterRoleAssignment[],
+  finalIndexes: readonly number[],
+): void {
+  if (finalIndexes.length === 0) return;
+
+  const finalRoom = assignments[finalIndexes[0]!]!.room;
+  while (true) {
+    const finalTarget = findLatestTrashIndex(finalIndexes, assignments);
+    if (finalTarget === undefined) return;
+
+    const earlyElite = findLatestEliteBeforeRoom(assignments, finalRoom);
+    if (earlyElite === undefined) return;
+
+    assignments[earlyElite]!.role = 'trash';
+    assignments[finalTarget]!.role = 'elite';
+  }
+}
+
+function findLatestEliteBeforeRoom(
+  assignments: readonly EncounterRoleAssignment[],
+  roomNumber: number,
+): number | undefined {
+  for (let index = assignments.length - 1; index >= 0; index -= 1) {
+    const assignment = assignments[index]!;
+    if (assignment.room < roomNumber && assignment.role === 'elite') return index;
+  }
+  return undefined;
 }
 
 function countRoles(

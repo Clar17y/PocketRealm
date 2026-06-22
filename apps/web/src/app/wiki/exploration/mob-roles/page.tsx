@@ -106,11 +106,12 @@ export default function MobRolesPage() {
 
       <h2>Combat Rotations</h2>
       <p>
-        Promoted mobs do not just have bigger numbers — they fight differently.
-        Elites and Mini-Bosses run a family-themed rotation (spider, wolf, bandit,
-        treant, spirit, undead, or caster) with a setup move, a damage spike, and,
-        for Mini-Bosses, a telegraphed finisher. Their special and spike actions
-        are amplified relative to a normal mob:
+        In encounter sites, promoted mobs do not just have bigger numbers — they
+        fight differently. Encounter-site Elites and Mini-Bosses run a
+        family-themed rotation (spider, wolf, bandit, treant, spirit, undead, or
+        caster) with a setup move, a damage spike, and, for Mini-Bosses, a
+        telegraphed finisher. Their special and spike actions are amplified
+        relative to a normal mob:
       </p>
       <table className="wiki-table">
         <thead>
@@ -129,6 +130,9 @@ export default function MobRolesPage() {
       <p>
         A Mini-Boss telegraphs its finisher a round in advance, giving you a
         window to defend, heal, or burst it down before the hit lands.
+        Exploration and travel Elites use the same base combat pattern as their
+        underlying mob, with only the role stat, XP, durability, and display
+        changes applied.
       </p>
 
       <h2>Rewards &amp; Costs</h2>

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   isMiniBossFamilyRole,
   isPermanentEncounterFamilyRole,
+  normalizeEncounterMobRole,
   resolveZoneTiers,
   getHighestUnlockedTier,
   type EncounterSiteSize,
@@ -167,15 +168,20 @@ export function getSiteName(
 }
 
 /**
- * Pick a family member to fill an encounter-site slot of the given role. Mini-boss
- * templates are reserved for mini-boss slots (falling back to the full pool only when
- * no other members exist). Shared by site generation and the admin spawner so both
- * stay on one selection rule.
+ * Pick a family member to fill an encounter-site slot of the given role. Promoted
+ * instance roles reuse base encounter templates when available; legacy elite and
+ * mini-boss template rows are only fallbacks for old family data with no base rows.
+ * Shared by site generation and the admin spawner so both stay on one selection rule.
  */
 export function pickEncounterFamilyMemberForRole<TMember extends { role: string }>(
   members: readonly TMember[],
   role: EncounterMobRole,
 ): TMember | null {
+  const baseMembers = members.filter((member) => normalizeEncounterMobRole(member.role) === 'trash');
+  if (baseMembers.length > 0) {
+    return baseMembers[randomIntInclusive(0, baseMembers.length - 1)] ?? null;
+  }
+
   const nonMiniBossMembers = members.filter((member) => !isMiniBossFamilyRole(member.role));
   const pool = role === 'mini_boss'
     ? members

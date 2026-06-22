@@ -9,6 +9,14 @@ function roleSpikeMultiplier(role: 'elite' | 'mini_boss', base: number): number 
   return base * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].spikeDamage;
 }
 
+function roleSpecialMultiplier(role: 'elite' | 'mini_boss', base: number): number {
+  return base * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].specialDamage;
+}
+
+function roleDebuffValue(role: 'elite' | 'mini_boss', base: number): number {
+  return Math.round(base * ENCOUNTER_SITE_ROLE_CONSTANTS.ROLE_ACTION_MULTIPLIERS[role].debuffModifier);
+}
+
 const bossPhysicalAttack: ActionDefinition = {
   id: 'boss_physical_attack',
   name: 'Attack',
@@ -433,6 +441,96 @@ const eliteDrainingStrike: ActionDefinition = {
   lifeLeechPercent: 25,
 };
 
+const miniBossWeaken: ActionDefinition = {
+  ...bossWeaken,
+  id: 'mini_boss_weaken',
+  name: 'Crushing Weaken',
+  description: 'Heavily reduces target attack for 3 rounds.',
+  effect: {
+    ...bossWeaken.effect!,
+    modifier: roleDebuffValue('mini_boss', bossWeaken.effect!.modifier),
+  },
+};
+
+const miniBossSmokeBomb: ActionDefinition = {
+  ...bossSmokeBomb,
+  id: 'mini_boss_smoke_bomb',
+  name: 'Blinding Smoke Bomb',
+  description: 'Heavily obscures vision, reducing accuracy.',
+  effect: {
+    ...bossSmokeBomb.effect!,
+    modifier: roleDebuffValue('mini_boss', bossSmokeBomb.effect!.modifier),
+  },
+};
+
+const miniBossWither: ActionDefinition = {
+  ...bossWither,
+  id: 'mini_boss_wither',
+  name: 'Crippling Wither',
+  description: 'Drains vitality, heavily weakening defences.',
+  effect: {
+    ...bossWither.effect!,
+    modifier: roleDebuffValue('mini_boss', bossWither.effect!.modifier),
+  },
+};
+
+const miniBossRoot: ActionDefinition = {
+  ...bossRoot,
+  id: 'mini_boss_root',
+  name: 'Crushing Root',
+  description: 'Roots the target in place for longer.',
+  effect: {
+    ...bossRoot.effect!,
+    duration: 3,
+  },
+};
+
+const miniBossVenomStrike: ActionDefinition = {
+  ...eliteVenomStrike,
+  id: 'mini_boss_venom_strike',
+  name: 'Venomous Rupture',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.5),
+  effect: {
+    ...eliteVenomStrike.effect!,
+    damagePerRound: roleDebuffValue('mini_boss', eliteVenomStrike.effect!.damagePerRound!),
+  },
+};
+
+const miniBossMaul: ActionDefinition = {
+  ...eliteMaul,
+  id: 'mini_boss_maul',
+  name: 'Rending Maul',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.6),
+};
+
+const miniBossBackstab: ActionDefinition = {
+  ...eliteBackstab,
+  id: 'mini_boss_backstab',
+  name: 'Execution Backstab',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.7),
+};
+
+const miniBossCrushingBlow: ActionDefinition = {
+  ...eliteCrushingBlow,
+  id: 'mini_boss_crushing_blow',
+  name: 'Shattering Blow',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.7),
+};
+
+const miniBossArcaneLance: ActionDefinition = {
+  ...eliteArcaneLance,
+  id: 'mini_boss_arcane_lance',
+  name: 'Arcane Lance Barrage',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.65),
+};
+
+const miniBossDrainingStrike: ActionDefinition = {
+  ...eliteDrainingStrike,
+  id: 'mini_boss_draining_strike',
+  name: 'Devouring Strike',
+  damageMultiplier: roleSpecialMultiplier('mini_boss', 1.5),
+};
+
 const miniBossExecutionStrike: ActionDefinition = {
   id: 'mini_boss_execution_strike',
   name: 'Execution Strike',
@@ -641,6 +739,16 @@ export const BOSS_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   elite_crushing_blow: eliteCrushingBlow,
   elite_arcane_lance: eliteArcaneLance,
   elite_draining_strike: eliteDrainingStrike,
+  mini_boss_weaken: miniBossWeaken,
+  mini_boss_smoke_bomb: miniBossSmokeBomb,
+  mini_boss_wither: miniBossWither,
+  mini_boss_root: miniBossRoot,
+  mini_boss_venom_strike: miniBossVenomStrike,
+  mini_boss_maul: miniBossMaul,
+  mini_boss_backstab: miniBossBackstab,
+  mini_boss_crushing_blow: miniBossCrushingBlow,
+  mini_boss_arcane_lance: miniBossArcaneLance,
+  mini_boss_draining_strike: miniBossDrainingStrike,
   mini_boss_execution_strike: miniBossExecutionStrike,
   mini_boss_arcane_spike: miniBossArcaneSpike,
   boss_bark_shield: bossBarkShield,

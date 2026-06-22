@@ -169,6 +169,25 @@ describe('assignEncounterRolesToRooms', () => {
     expectNoEliteBeforeLaterAllTrashRoom(assignments);
   });
 
+  it('moves early elite pressure into open final-room slots before leaving early elites', () => {
+    const assignments = assignEncounterRolesToRooms(
+      [
+        { roomNumber: 1, mobCount: 1 },
+        { roomNumber: 2, mobCount: 1 },
+        { roomNumber: 3, mobCount: 2 },
+      ],
+      { rng: rollSequence([0, 1, 0, 1, 1]), eliteChance: 0.5, miniBossChance: 0 },
+    );
+
+    expect(assignments).toEqual([
+      { room: 1, role: 'trash' },
+      { room: 2, role: 'trash' },
+      { room: 3, role: 'elite' },
+      { room: 3, role: 'elite' },
+    ]);
+    expectNoEliteBeforeLaterAllTrashRoom(assignments);
+  });
+
   it('promotes the last occupied room to elite when the final room has no mob slots', () => {
     const rooms: EncounterRoleRoomLayout[] = [
       { roomNumber: 1, mobCount: 1 },
