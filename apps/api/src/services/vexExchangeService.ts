@@ -21,7 +21,6 @@ export interface VexPurchaseServiceResult {
 }
 
 type VexClient = Prisma.TransactionClient | typeof prisma;
-const JSON_NULL = null as unknown as Prisma.NullableJsonNullValueInput;
 
 type TargetItem = NonNullable<Awaited<ReturnType<Prisma.TransactionClient['item']['findUnique']>>> & {
   template: {
@@ -40,7 +39,7 @@ type TargetItem = NonNullable<Awaited<ReturnType<Prisma.TransactionClient['item'
 export async function listVexExchanges(playerId: string): Promise<VexExchangeListResponse> {
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { gold: true },
+    select: { gold: true, seasonId: true },
   });
 
   if (!player) {
@@ -50,7 +49,7 @@ export async function listVexExchanges(playerId: string): Promise<VexExchangeLis
   const exchanges = await Promise.all(
     [...VEX_EXCHANGES]
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((exchange) => toExchangeView(playerId, player.gold, exchange)),
+      .map((exchange) => toExchangeView(playerId, player.gold, player.seasonId, exchange)),
   );
 
   return { exchanges, gold: player.gold };
@@ -67,7 +66,15 @@ export async function purchaseVexExchange(
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const purchaseResult = await applyExchangeEffect(tx, playerId, exchange, params);
+    const player = await tx.player.findUnique({
+      where: { id: playerId },
+      select: { seasonId: true },
+    });
+    if (!player) {
+      throw new AppError(404, 'Player not found', 'NOT_FOUND');
+    }
+
+    const purchaseResult = await applyExchangeEffect(tx, playerId, player.seasonId, exchange, params);
 
     const goldUpdate = await tx.player.updateMany({
       where: { id: playerId, gold: { gte: exchange.goldCost } },
@@ -78,7 +85,7 @@ export async function purchaseVexExchange(
     }
 
     for (const requirement of exchange.requiredItems) {
-      const template = await findTemplateByName(tx, requirement.itemTemplateName);
+      const template = await findTemplateByName(tx, requirement.itemTemplateName, player.seasonId);
       await consumeItemsByTemplateTx(tx, playerId, template.id, requirement.quantity);
     }
 
@@ -101,11 +108,12 @@ export async function purchaseVexExchange(
 async function toExchangeView(
   playerId: string,
   playerGold: number,
+  seasonId: string | null,
   exchange: VexExchangeDefinition,
 ): Promise<VexExchangeView> {
   const requiredItems = await Promise.all(
     exchange.requiredItems.map(async (requirement) => {
-      const template = await findTemplateByName(prisma, requirement.itemTemplateName);
+      const template = await findTemplateByName(prisma, requirement.itemTemplateName, seasonId);
       const ownedQuantity = await getTotalQuantityByTemplate(playerId, template.id);
       return {
         itemTemplateName: requirement.itemTemplateName,
@@ -140,6 +148,7 @@ async function getTargetOptions(playerId: string, targetRule: VexTargetRule): Pr
 
   const ownedItems = await prisma.item.findMany({
     where: { ownerId: playerId, quantity: 1 },
+    orderBy: [{ createdAt: 'asc' }],
     include: {
       template: true,
       itemAugments: true,
@@ -214,13 +223,14 @@ function hasAugment(item: { itemAugments?: Array<{ augmentType: string }> }, aug
 async function applyExchangeEffect(
   tx: Prisma.TransactionClient,
   playerId: string,
+  seasonId: string | null,
   exchange: VexExchangeDefinition,
   params: PurchaseParams,
 ): Promise<{ message: string; invalidatesEquipment: boolean; commit: () => Promise<void> }> {
   switch (exchange.effect.type) {
     case 'create_item': {
       const effect = exchange.effect;
-      const template = await findTemplateByName(tx, effect.itemTemplateName);
+      const template = await findTemplateByName(tx, effect.itemTemplateName, seasonId);
       return {
         message: `Created ${template.name}`,
         invalidatesEquipment: false,
@@ -234,7 +244,6 @@ async function applyExchangeEffect(
               maxDurability: template.maxDurability,
               currentDurability: template.maxDurability,
               isSoulbound: effect.soulbound,
-              bonusStats: JSON_NULL,
             },
           });
         },
@@ -250,23 +259,31 @@ async function applyExchangeEffect(
       ) {
         throw new AppError(400, 'Invalid target item', 'INVALID_TARGET');
       }
-      const toTemplate = await findTemplateByName(tx, effect.toTemplateName);
+      const toTemplate = await findTemplateByName(tx, effect.toTemplateName, seasonId);
       const invalidatesEquipment = isEquipped(target);
 
       return {
         message: `Created ${toTemplate.name}`,
         invalidatesEquipment,
         commit: async () => {
-          await tx.item.update({
-            where: { id: target.id },
+          const updated = await tx.item.updateMany({
+            where: {
+              id: target.id,
+              ownerId: playerId,
+              templateId: target.template.id,
+              quantity: 1,
+            },
             data: {
               templateId: toTemplate.id,
               maxDurability: toTemplate.maxDurability,
               currentDurability: toTemplate.maxDurability,
-              bonusStats: JSON_NULL,
+              bonusStats: Prisma.DbNull,
               isSoulbound: effect.soulbound,
             },
           });
+          if (updated.count !== 1) {
+            throw new AppError(400, 'Invalid target item', 'INVALID_TARGET');
+          }
         },
       };
     }
@@ -294,14 +311,21 @@ async function applyExchangeEffect(
             where: { id: target.id },
             data: { maxDurability: newMaxDurability, currentDurability: newMaxDurability },
           });
-          await tx.itemAugment.create({
-            data: {
-              itemId: target.id,
-              augmentType: effect.augmentType,
-              sourceKey: exchange.key,
-              metadata: { previousMaxDurability, newMaxDurability },
-            },
-          });
+          try {
+            await tx.itemAugment.create({
+              data: {
+                itemId: target.id,
+                augmentType: effect.augmentType,
+                sourceKey: exchange.key,
+                metadata: { previousMaxDurability, newMaxDurability },
+              },
+            });
+          } catch (error: unknown) {
+            if (isPrismaUniqueViolation(error)) {
+              throw new AppError(400, 'Item has already been tempered', 'AUGMENT_ALREADY_APPLIED');
+            }
+            throw error;
+          }
         },
       };
     }
@@ -331,14 +355,21 @@ async function applyExchangeEffect(
             where: { id: target.id },
             data: { bonusStats: mergedStats as Prisma.InputJsonObject },
           });
-          await tx.itemAugment.create({
-            data: {
-              itemId: target.id,
-              augmentType: effect.augmentType,
-              sourceKey: exchange.key,
-              metadata: { bonusStats: effect.bonusStats as Prisma.InputJsonObject },
-            },
-          });
+          try {
+            await tx.itemAugment.create({
+              data: {
+                itemId: target.id,
+                augmentType: effect.augmentType,
+                sourceKey: exchange.key,
+                metadata: { bonusStats: effect.bonusStats as Prisma.InputJsonObject },
+              },
+            });
+          } catch (error: unknown) {
+            if (isPrismaUniqueViolation(error)) {
+              throw new AppError(400, 'Item already has a boss stone', 'AUGMENT_ALREADY_APPLIED');
+            }
+            throw error;
+          }
         },
       };
     }
@@ -370,13 +401,23 @@ async function requireTargetItem(
   return target as TargetItem;
 }
 
-async function findTemplateByName(client: VexClient, name: string): Promise<{
+async function findTemplateByName(client: VexClient, name: string, seasonId: string | null): Promise<{
   id: string;
   name: string;
   maxDurability: number;
 }> {
+  if (seasonId) {
+    const seasonTemplate = await client.itemTemplate.findFirst({
+      where: { name, seasonId },
+      select: { id: true, name: true, maxDurability: true },
+    });
+    if (seasonTemplate) {
+      return seasonTemplate;
+    }
+  }
+
   const template = await client.itemTemplate.findFirst({
-    where: { name },
+    where: { name, seasonId: null },
     select: { id: true, name: true, maxDurability: true },
   });
 
@@ -385,6 +426,15 @@ async function findTemplateByName(client: VexClient, name: string): Promise<{
   }
 
   return template;
+}
+
+function isPrismaUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
 }
 
 function isEquipped(item: { equipment?: Array<{ playerId: string; slot: string }> }): boolean {

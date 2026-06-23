@@ -24,6 +24,7 @@ type Template = {
   tier: number;
   baseStats: Record<string, number>;
   maxDurability: number;
+  seasonId: string | null;
   stackable?: boolean;
 };
 
@@ -43,6 +44,7 @@ type ItemRow = {
 };
 
 const playerId = 'player-1';
+const seasonId = 'season-1';
 
 const templates: Template[] = [
   template('tpl-fang', 'Alpha Wolf Fang', 'resource', null, 1, {}, 0, true),
@@ -66,8 +68,9 @@ function template(
   baseStats: Record<string, number>,
   maxDurability: number,
   stackable = false,
+  templateSeasonId: string | null = seasonId,
 ): Template {
-  return { id, name, itemType, slot, tier, baseStats, maxDurability, stackable };
+  return { id, name, itemType, slot, tier, baseStats, maxDurability, seasonId: templateSeasonId, stackable };
 }
 
 function item(overrides: Partial<ItemRow> & { id: string; template: Template }): ItemRow {
@@ -96,9 +99,12 @@ function byName(name: string): Template {
 }
 
 function setupTemplateLookup(): void {
-  mockPrisma.itemTemplate.findFirst.mockImplementation(async ({ where }: { where?: { name?: string } }) => {
+  mockPrisma.itemTemplate.findFirst.mockImplementation(async ({ where }: { where?: { name?: string; seasonId?: string | null } }) => {
     if (!where?.name) return null;
-    return templates.find((candidate) => candidate.name === where.name) ?? null;
+    return templates.find((candidate) => (
+      candidate.name === where.name &&
+      (!('seasonId' in where) || candidate.seasonId === where.seasonId)
+    )) ?? null;
   });
 }
 
@@ -117,7 +123,7 @@ beforeEach(() => {
   mockPrisma.itemAugment ??= { create: vi.fn() };
   mockPrisma.itemAugment.create.mockReset();
   setupTemplateLookup();
-  mockPrisma.player.findUnique.mockResolvedValue({ id: playerId, gold: 6000 });
+  mockPrisma.player.findUnique.mockResolvedValue({ id: playerId, gold: 6000, seasonId });
   mockPrisma.item.findMany.mockResolvedValue([]);
   vi.mocked(getTotalQuantityByTemplate).mockResolvedValue(99);
 });
@@ -132,6 +138,14 @@ describe('listVexExchanges', () => {
 
     const result = await listVexExchanges(playerId);
 
+    expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
+      where: { id: playerId },
+      select: { gold: true, seasonId: true },
+    });
+    expect(mockPrisma.itemTemplate.findFirst).toHaveBeenCalledWith({
+      where: { name: 'Alpha Wolf Fang', seasonId },
+      select: { id: true, name: true, maxDurability: true },
+    });
     expect(result.gold).toBe(6000);
     expect(result.exchanges.map((exchange) => exchange.key)).toEqual(
       VEX_EXCHANGES.map((exchange) => exchange.key),
@@ -174,6 +188,9 @@ describe('listVexExchanges', () => {
       canPurchase: false,
       blockedReason: 'No eligible target item without this augment',
     });
+    expect(mockPrisma.item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ createdAt: 'asc' }] }),
+    );
   });
 
   it('tier-filters Vex Temper target options using minTier and maxTier', async () => {
@@ -276,8 +293,12 @@ describe('purchaseVexExchange', () => {
         maxDurability: 80,
         currentDurability: 80,
         isSoulbound: true,
-        bonusStats: null,
       }),
+    });
+    expect(mockPrisma.item.create.mock.calls[0][0].data).not.toHaveProperty('bonusStats');
+    expect(mockPrisma.itemTemplate.findFirst).toHaveBeenCalledWith({
+      where: { name: 'Wayfarer Aegis', seasonId },
+      select: { id: true, name: true, maxDurability: true },
     });
     expect(result).toEqual({
       exchangeKey: 'wayfarer_aegis',
@@ -296,22 +317,37 @@ describe('purchaseVexExchange', () => {
         equipment: [{ playerId, slot: 'off_hand' }],
       }),
     );
-    mockPrisma.item.update.mockResolvedValue({ id: 'aegis-1' });
+    mockPrisma.item.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await purchaseVexExchange(playerId, 'spiritbound_aegis', { targetItemId: 'aegis-1' });
 
-    expect(mockPrisma.item.update).toHaveBeenCalledWith({
-      where: { id: 'aegis-1' },
-      data: {
+    expect(mockPrisma.item.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'aegis-1',
+        ownerId: playerId,
+        templateId: byName('Wayfarer Aegis').id,
+        quantity: 1,
+      },
+      data: expect.objectContaining({
         templateId: byName('Spiritbound Aegis').id,
         maxDurability: 140,
         currentDurability: 140,
-        bonusStats: null,
         isSoulbound: true,
-      },
+      }),
     });
+    expect(mockPrisma.item.updateMany.mock.calls[0][0].data).toHaveProperty('bonusStats');
     expect(result.invalidatesEquipment).toBe(true);
     expect(invalidateEquipmentCache).toHaveBeenCalledWith(playerId);
+  });
+
+  it('rejects transform when the guarded target update no longer matches', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(item({ id: 'aegis-1', template: byName('Wayfarer Aegis') }));
+    mockPrisma.item.updateMany.mockResolvedValue({ count: 0 });
+
+    await expectAppCode(
+      purchaseVexExchange(playerId, 'spiritbound_aegis', { targetItemId: 'aegis-1' }),
+      'INVALID_TARGET',
+    );
   });
 
   it('reinforces Vex Temper durability, records an augment, and restores current durability', async () => {
@@ -361,6 +397,16 @@ describe('purchaseVexExchange', () => {
     );
   });
 
+  it('maps duplicate Vex Temper augment writes to the expected AppError', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(item({ id: 'iron-1', template: byName('Iron Sword') }));
+    mockPrisma.itemAugment.create.mockRejectedValueOnce({ code: 'P2002' });
+
+    await expectAppCode(
+      purchaseVexExchange(playerId, 'vex_temper_tier_1_3', { targetItemId: 'iron-1' }),
+      'AUGMENT_ALREADY_APPLIED',
+    );
+  });
+
   it('applies Fangstone bonus stats only to eligible boss-crafted templates and prevents duplicates', async () => {
     mockPrisma.item.findUnique.mockResolvedValueOnce(
       item({
@@ -402,6 +448,16 @@ describe('purchaseVexExchange', () => {
     await expectAppCode(
       purchaseVexExchange(playerId, 'fangstone', { targetItemId: 'wrong-template' }),
       'INVALID_TARGET',
+    );
+  });
+
+  it('maps duplicate boss-stone augment writes to the expected AppError', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(item({ id: 'wolfsbane-1', template: byName('Wolfsbane Blade') }));
+    mockPrisma.itemAugment.create.mockRejectedValueOnce({ code: 'P2002' });
+
+    await expectAppCode(
+      purchaseVexExchange(playerId, 'fangstone', { targetItemId: 'wolfsbane-1' }),
+      'AUGMENT_ALREADY_APPLIED',
     );
   });
 
