@@ -314,6 +314,8 @@ export type { QuestsResponse, ClaimRewardResponse, ClaimBonusResponse, RerollQue
 export { getShopItems, purchaseShopItem, getPlayerBuffs } from './shop';
 export type { ShopListResponse, BuffsResponse } from './shop';
 
+export { getVexExchanges, purchaseVexExchange } from './vex';
+
 export { getSkillPointState, allocateSkillPoint, respecSkillPoints } from './skillPoints';
 export type { SkillPointState } from './skillPoints';
 export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, getRouletteStats } from './casino';
