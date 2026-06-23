@@ -109,8 +109,7 @@ describe('VexScreen', () => {
 
     await screen.findByText('Spiritbound Aegis');
 
-    const purchaseButtons = screen.getAllByRole('button', { name: 'Trade' });
-    const spiritButton = purchaseButtons[1];
+    const spiritButton = screen.getByRole('button', { name: 'Trade Spiritbound Aegis' });
     expect(spiritButton).toHaveProperty('disabled', true);
     expect(screen.getByText('Choose an item first.')).toBeTruthy();
 
@@ -137,7 +136,7 @@ describe('VexScreen', () => {
     render(<VexScreen onStateUpdates={onStateUpdates} showNpcDialogue={false} />);
 
     await screen.findByText('Wayfarer Aegis');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Trade' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Trade Wayfarer Aegis' }));
 
     await waitFor(() => expect(apiMocks.purchaseVexExchange).toHaveBeenCalledWith('wayfarer_aegis', undefined));
     expect(onStateUpdates).toHaveBeenCalledWith(stateUpdates);
@@ -155,7 +154,7 @@ describe('VexScreen', () => {
     fireEvent.change(screen.getByLabelText('Target item for Spiritbound Aegis'), {
       target: { value: 'aegis-1' },
     });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Trade' })[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Trade Spiritbound Aegis' }));
 
     await waitFor(() => expect(apiMocks.purchaseVexExchange).toHaveBeenCalledWith(
       'spiritbound_aegis',
@@ -170,9 +169,9 @@ describe('VexScreen', () => {
     render(<VexScreen onStateUpdates={vi.fn()} showNpcDialogue={false} />);
 
     await screen.findByText('Wayfarer Aegis');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Trade' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Trade Wayfarer Aegis' }));
 
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This season has ended.');
-    expect(screen.getAllByRole('button', { name: 'Trade' })[0]).toHaveProperty('disabled', false);
+    expect(screen.getByRole('button', { name: 'Trade Wayfarer Aegis' })).toHaveProperty('disabled', false);
   });
 });

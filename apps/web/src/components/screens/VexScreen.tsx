@@ -136,6 +136,7 @@ function ExchangeCard({
           type="button"
           variant="gold"
           size="sm"
+          aria-label={`Trade ${exchange.name}`}
           disabled={purchaseDisabled}
           onClick={() => onPurchase(exchange)}
         >
