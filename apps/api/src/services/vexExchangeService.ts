@@ -148,7 +148,7 @@ async function getTargetOptions(playerId: string, targetRule: VexTargetRule): Pr
 
   const ownedItems = await prisma.item.findMany({
     where: { ownerId: playerId, quantity: 1 },
-    orderBy: [{ createdAt: 'asc' }],
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     include: {
       template: true,
       itemAugments: true,
@@ -416,8 +416,10 @@ async function findTemplateByName(client: VexClient, name: string, seasonId: str
     }
   }
 
-  const template = await client.itemTemplate.findFirst({
+  const [template] = await client.itemTemplate.findMany({
     where: { name, seasonId: null },
+    orderBy: [{ id: 'asc' }],
+    take: 1,
     select: { id: true, name: true, maxDurability: true },
   });
 

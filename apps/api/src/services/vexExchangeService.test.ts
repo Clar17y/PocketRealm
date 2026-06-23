@@ -189,7 +189,7 @@ describe('listVexExchanges', () => {
       blockedReason: 'No eligible target item without this augment',
     });
     expect(mockPrisma.item.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: [{ createdAt: 'asc' }] }),
+      expect.objectContaining({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
     );
   });
 
@@ -306,6 +306,37 @@ describe('purchaseVexExchange', () => {
       invalidatesEquipment: false,
     });
     expect(invalidateEquipmentCache).not.toHaveBeenCalled();
+  });
+
+  it('uses deterministic global template fallback when a season template is missing', async () => {
+    mockPrisma.itemTemplate.findFirst.mockImplementation(async ({ where }: { where?: { name?: string; seasonId?: string | null } }) => {
+      if (where?.name === 'Wayfarer Aegis' && where.seasonId === seasonId) return null;
+      if (!where?.name) return null;
+      return templates.find((candidate) => (
+        candidate.name === where.name &&
+        (!('seasonId' in where) || candidate.seasonId === where.seasonId)
+      )) ?? null;
+    });
+    mockPrisma.itemTemplate.findMany.mockResolvedValue([
+      { id: 'global-wayfarer-a', name: 'Wayfarer Aegis', maxDurability: 75 },
+      { id: 'global-wayfarer-b', name: 'Wayfarer Aegis', maxDurability: 80 },
+    ]);
+
+    await purchaseVexExchange(playerId, 'wayfarer_aegis', {});
+
+    expect(mockPrisma.itemTemplate.findMany).toHaveBeenCalledWith({
+      where: { name: 'Wayfarer Aegis', seasonId: null },
+      orderBy: [{ id: 'asc' }],
+      take: 1,
+      select: { id: true, name: true, maxDurability: true },
+    });
+    expect(mockPrisma.item.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        templateId: 'global-wayfarer-a',
+        maxDurability: 75,
+        currentDurability: 75,
+      }),
+    });
   });
 
   it('transforms Spiritbound Aegis in place and invalidates equipment when equipped', async () => {
