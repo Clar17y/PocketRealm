@@ -385,7 +385,7 @@ export function WorldEventsScreenRenderer({ gc, player }: SharedCoreRendererProp
       currentZoneId={gc.activeZoneId}
       currentZoneName={gc.currentZone?.name ?? null}
       playerId={player?.id ?? null}
-      onNavigate={(screen) => gc.setActiveScreen(screen as Screen)}
+      onNavigate={gc.handleNavigate}
     />
   );
 }
