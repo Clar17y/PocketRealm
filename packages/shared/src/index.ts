@@ -16,6 +16,14 @@ export * from './types/casino.types';
 export * from './types/quest.types';
 export * from './types/expedition.types';
 export type { ShopItemData, PlayerBuffData, ShopPurchaseResult } from './types/shop.types';
+export type {
+  VexExchangeCategory,
+  VexExchangeListResponse,
+  VexExchangeView,
+  VexPurchaseResponse,
+  VexRequiredItem,
+  VexTargetOption,
+} from './types/vex.types';
 export * from './types/friend.types';
 export * from './types/stateUpdates.types';
 
