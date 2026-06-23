@@ -18,13 +18,17 @@ describe('vex API client', () => {
 
   it('purchases a Vex exchange with optional target item', async () => {
     const params = { targetItemId: 'item-1' };
+    const exchangeKey = 'weapon/vex?rare';
     vi.mocked(fetchApi).mockResolvedValue({ data: { success: true } });
 
-    await purchaseVexExchange('weapon-vex', params);
+    await purchaseVexExchange(exchangeKey, params);
 
-    expect(fetchApi).toHaveBeenCalledWith('/api/v1/vex/exchanges/weapon-vex/purchase', {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
+    expect(fetchApi).toHaveBeenCalledWith(
+      `/api/v1/vex/exchanges/${encodeURIComponent(exchangeKey)}/purchase`,
+      {
+        method: 'POST',
+        body: JSON.stringify(params),
+      },
+    );
   });
 });

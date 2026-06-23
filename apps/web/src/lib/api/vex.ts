@@ -6,7 +6,7 @@ export async function getVexExchanges() {
 }
 
 export async function purchaseVexExchange(exchangeKey: string, params?: { targetItemId?: string }) {
-  return fetchApi<VexPurchaseResponse>(`/api/v1/vex/exchanges/${exchangeKey}/purchase`, {
+  return fetchApi<VexPurchaseResponse>(`/api/v1/vex/exchanges/${encodeURIComponent(exchangeKey)}/purchase`, {
     method: 'POST',
     body: params ? JSON.stringify(params) : undefined,
   });
