@@ -193,6 +193,58 @@ describe('listVexExchanges', () => {
       expect.objectContaining({ itemId: 'boss-staff', itemName: 'Spirit Staff' }),
     ]);
   });
+
+  it('sorts exchanges by sortOrder even when definitions are declared out of order', async () => {
+    const unsortedExchanges = [
+      {
+        key: 'third',
+        name: 'Third',
+        description: 'Third by sort order',
+        category: 'item',
+        goldCost: 0,
+        requiredItems: [],
+        targetRule: { type: 'none' },
+        effect: { type: 'create_item', itemTemplateName: 'Third Item', soulbound: true },
+        sortOrder: 30,
+      },
+      {
+        key: 'first',
+        name: 'First',
+        description: 'First by sort order',
+        category: 'item',
+        goldCost: 0,
+        requiredItems: [],
+        targetRule: { type: 'none' },
+        effect: { type: 'create_item', itemTemplateName: 'First Item', soulbound: true },
+        sortOrder: 10,
+      },
+      {
+        key: 'second',
+        name: 'Second',
+        description: 'Second by sort order',
+        category: 'item',
+        goldCost: 0,
+        requiredItems: [],
+        targetRule: { type: 'none' },
+        effect: { type: 'create_item', itemTemplateName: 'Second Item', soulbound: true },
+        sortOrder: 20,
+      },
+    ];
+
+    vi.resetModules();
+    vi.doMock('./vexExchangeDefinitions', () => ({ VEX_EXCHANGES: unsortedExchanges }));
+
+    try {
+      const { listVexExchanges: listWithMockedDefinitions } = await import('./vexExchangeService.js');
+
+      const result = await listWithMockedDefinitions(playerId);
+
+      expect(result.exchanges.map((exchange) => exchange.key)).toEqual(['first', 'second', 'third']);
+    } finally {
+      vi.doUnmock('./vexExchangeDefinitions');
+      vi.resetModules();
+    }
+  });
 });
 
 describe('purchaseVexExchange', () => {
