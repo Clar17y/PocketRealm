@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./core', () => ({
   fetchApi: vi.fn(),
@@ -8,6 +8,10 @@ import { fetchApi } from './core';
 import { getVexExchanges, purchaseVexExchange } from './vex';
 
 describe('vex API client', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('fetches available Vex exchanges', async () => {
     vi.mocked(fetchApi).mockResolvedValue({ data: { exchanges: [] } });
 
