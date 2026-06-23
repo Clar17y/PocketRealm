@@ -167,19 +167,19 @@ export async function contributeTurns(
     }
     const effectiveAmount = Math.min(amount, remaining);
 
-    await tx.$queryRaw`SELECT id FROM "guild_project_contributions" WHERE "project_id" = ${projectId} AND "player_id" = ${playerId} FOR UPDATE`;
-
-    const contribution = await tx.guildProjectContribution.findUnique({
-      where: { projectId_playerId: { projectId, playerId } },
-    });
-    const contributedTurns = contribution?.turnsContributed ?? 0;
-    if (contributedTurns + effectiveAmount > GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP) {
-      throw new AppError(400, `Exceeds per-project turn contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP})`, 'CONTRIBUTION_CAP_EXCEEDED');
-    }
-
     if (source === 'guild') {
       await spendGuildTurnsTx(tx, guildId, effectiveAmount);
     } else {
+      await tx.$queryRaw`SELECT id FROM "guild_project_contributions" WHERE "project_id" = ${projectId} AND "player_id" = ${playerId} FOR UPDATE`;
+
+      const contribution = await tx.guildProjectContribution.findUnique({
+        where: { projectId_playerId: { projectId, playerId } },
+      });
+      const contributedTurns = contribution?.turnsContributed ?? 0;
+      if (contributedTurns + effectiveAmount > GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP) {
+        throw new AppError(400, `Exceeds per-project turn contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP})`, 'CONTRIBUTION_CAP_EXCEEDED');
+      }
+
       await spendPlayerTurnsTx(tx, playerId, effectiveAmount);
     }
 
@@ -189,12 +189,13 @@ export async function contributeTurns(
       data: { turnsContributed: { increment: effectiveAmount } },
     });
 
-    // Upsert contribution
-    await tx.guildProjectContribution.upsert({
-      where: { projectId_playerId: { projectId, playerId } },
-      create: { projectId, playerId, turnsContributed: effectiveAmount, materialsContributed: {} },
-      update: { turnsContributed: { increment: effectiveAmount } },
-    });
+    if (source === 'player') {
+      await tx.guildProjectContribution.upsert({
+        where: { projectId_playerId: { projectId, playerId } },
+        create: { projectId, playerId, turnsContributed: effectiveAmount, materialsContributed: {} },
+        update: { turnsContributed: { increment: effectiveAmount } },
+      });
+    }
 
     // Check for completion
     await checkAndCompleteProject(tx, updatedProject, def, guildId);
