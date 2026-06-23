@@ -276,6 +276,10 @@ describe('purchaseVexExchange', () => {
 
   it('creates Wayfarer Aegis by spending gold/materials and creating a soulbound full-durability item', async () => {
     mockPrisma.item.create.mockResolvedValue({ id: 'created-aegis', template: byName('Wayfarer Aegis') });
+    vi.mocked(consumeItemsByTemplateTx).mockResolvedValue({
+      fullyConsumedIds: ['fang-stack-empty'],
+      partiallyConsumedIds: ['fang-stack-remaining'],
+    });
 
     const result = await purchaseVexExchange(playerId, 'wayfarer_aegis', {});
 
@@ -304,6 +308,9 @@ describe('purchaseVexExchange', () => {
       exchangeKey: 'wayfarer_aegis',
       message: expect.stringContaining('Wayfarer Aegis'),
       invalidatesEquipment: false,
+      addedItemIds: ['created-aegis'],
+      updatedItemIds: ['fang-stack-remaining'],
+      removedItemIds: ['fang-stack-empty'],
     });
     expect(invalidateEquipmentCache).not.toHaveBeenCalled();
   });
@@ -368,6 +375,9 @@ describe('purchaseVexExchange', () => {
     });
     expect(mockPrisma.item.updateMany.mock.calls[0][0].data).toHaveProperty('bonusStats');
     expect(result.invalidatesEquipment).toBe(true);
+    expect(result.addedItemIds).toEqual([]);
+    expect(result.updatedItemIds).toEqual(['aegis-1']);
+    expect(result.removedItemIds).toEqual([]);
     expect(invalidateEquipmentCache).toHaveBeenCalledWith(playerId);
   });
 
@@ -406,6 +416,9 @@ describe('purchaseVexExchange', () => {
       },
     });
     expect(result.invalidatesEquipment).toBe(false);
+    expect(result.addedItemIds).toEqual([]);
+    expect(result.updatedItemIds).toEqual(['iron-1']);
+    expect(result.removedItemIds).toEqual([]);
   });
 
   it('rejects Vex Temper when already applied or outside the exchange tier range', async () => {
@@ -462,6 +475,9 @@ describe('purchaseVexExchange', () => {
       },
     });
     expect(result.message).toContain('Fangstone');
+    expect(result.addedItemIds).toEqual([]);
+    expect(result.updatedItemIds).toEqual(['wolfsbane-1']);
+    expect(result.removedItemIds).toEqual([]);
 
     mockPrisma.item.findUnique.mockResolvedValueOnce(
       item({

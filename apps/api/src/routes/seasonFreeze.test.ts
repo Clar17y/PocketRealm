@@ -41,18 +41,24 @@ vi.mock('../services/vexExchangeService', () => ({
     exchangeKey: 'wayfarer_aegis',
     message: 'Created Wayfarer Aegis',
     invalidatesEquipment: false,
+    addedItemIds: ['created-aegis'],
+    updatedItemIds: ['fang-stack-remaining'],
+    removedItemIds: ['fang-stack-empty'],
   }),
 }));
 
 vi.mock('../services/stateUpdateHelpers', () => ({
   buildStateUpdates: vi.fn().mockResolvedValue({}),
   fetchEquipmentMap: vi.fn().mockResolvedValue({}),
+  fetchItemDTOs: vi.fn().mockImplementation((ids: string[]) => Promise.resolve(
+    ids.map((id) => ({ id, ownerId: 'player-1', template: { name: id } })),
+  )),
 }));
 
 import { claimDailyBonus } from '../services/questService';
 import { purchaseItem } from '../services/questShopService';
 import { listVexExchanges, purchaseVexExchange } from '../services/vexExchangeService';
-import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { buildStateUpdates, fetchItemDTOs } from '../services/stateUpdateHelpers';
 import { errorHandler } from '../middleware/errorHandler';
 import { questsRouter } from './quests';
 import { shopRouter } from './shop';
@@ -154,10 +160,17 @@ describe('season freeze route protection', () => {
       'inventoryCapacity',
       'materialTotals',
     ]);
+    expect(fetchItemDTOs).toHaveBeenCalledWith(['created-aegis']);
+    expect(fetchItemDTOs).toHaveBeenCalledWith(['fang-stack-remaining']);
     expect(vexRes.body).toEqual({
       exchangeKey: 'wayfarer_aegis',
       message: 'Created Wayfarer Aegis',
-      stateUpdates: {},
+      stateUpdates: {
+        inventoryAdded: [{ id: 'created-aegis', ownerId: 'player-1', template: { name: 'created-aegis' } }],
+        inventoryUpdated: [{ id: 'fang-stack-remaining', ownerId: 'player-1', template: { name: 'fang-stack-remaining' } }],
+        inventoryRemoved: ['fang-stack-empty'],
+      },
     });
+    expect(vexRes.body).not.toHaveProperty('invalidatesEquipment');
   });
 });

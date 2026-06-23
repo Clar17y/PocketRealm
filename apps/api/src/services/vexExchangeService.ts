@@ -18,9 +18,18 @@ export interface VexPurchaseServiceResult {
   exchangeKey: string;
   message: string;
   invalidatesEquipment: boolean;
+  addedItemIds: string[];
+  updatedItemIds: string[];
+  removedItemIds: string[];
 }
 
 type VexClient = Prisma.TransactionClient | typeof prisma;
+
+interface ItemChangeIds {
+  addedItemIds: string[];
+  updatedItemIds: string[];
+  removedItemIds: string[];
+}
 
 type TargetItem = NonNullable<Awaited<ReturnType<Prisma.TransactionClient['item']['findUnique']>>> & {
   template: {
@@ -75,6 +84,11 @@ export async function purchaseVexExchange(
     }
 
     const purchaseResult = await applyExchangeEffect(tx, playerId, player.seasonId, exchange, params);
+    const consumedItemChanges: ItemChangeIds = {
+      addedItemIds: [],
+      updatedItemIds: [],
+      removedItemIds: [],
+    };
 
     const goldUpdate = await tx.player.updateMany({
       where: { id: playerId, gold: { gte: exchange.goldCost } },
@@ -86,15 +100,19 @@ export async function purchaseVexExchange(
 
     for (const requirement of exchange.requiredItems) {
       const template = await findTemplateByName(tx, requirement.itemTemplateName, player.seasonId);
-      await consumeItemsByTemplateTx(tx, playerId, template.id, requirement.quantity);
+      const consumeResult = await consumeItemsByTemplateTx(tx, playerId, template.id, requirement.quantity);
+      consumedItemChanges.updatedItemIds.push(...consumeResult.partiallyConsumedIds);
+      consumedItemChanges.removedItemIds.push(...consumeResult.fullyConsumedIds);
     }
 
-    await purchaseResult.commit();
+    const effectItemChanges = await purchaseResult.commit();
+    const itemChanges = normalizeItemChangeIds(consumedItemChanges, effectItemChanges);
 
     return {
       exchangeKey: exchange.key,
       message: purchaseResult.message,
       invalidatesEquipment: purchaseResult.invalidatesEquipment,
+      ...itemChanges,
     };
   });
 
@@ -226,7 +244,7 @@ async function applyExchangeEffect(
   seasonId: string | null,
   exchange: VexExchangeDefinition,
   params: PurchaseParams,
-): Promise<{ message: string; invalidatesEquipment: boolean; commit: () => Promise<void> }> {
+): Promise<{ message: string; invalidatesEquipment: boolean; commit: () => Promise<ItemChangeIds> }> {
   switch (exchange.effect.type) {
     case 'create_item': {
       const effect = exchange.effect;
@@ -235,7 +253,7 @@ async function applyExchangeEffect(
         message: `Created ${template.name}`,
         invalidatesEquipment: false,
         commit: async () => {
-          await tx.item.create({
+          const created = await tx.item.create({
             data: {
               ownerId: playerId,
               templateId: template.id,
@@ -246,6 +264,7 @@ async function applyExchangeEffect(
               isSoulbound: effect.soulbound,
             },
           });
+          return { addedItemIds: [created.id], updatedItemIds: [], removedItemIds: [] };
         },
       };
     }
@@ -284,6 +303,7 @@ async function applyExchangeEffect(
           if (updated.count !== 1) {
             throw new AppError(400, 'Invalid target item', 'INVALID_TARGET');
           }
+          return { addedItemIds: [], updatedItemIds: [target.id], removedItemIds: [] };
         },
       };
     }
@@ -326,6 +346,7 @@ async function applyExchangeEffect(
             }
             throw error;
           }
+          return { addedItemIds: [], updatedItemIds: [target.id], removedItemIds: [] };
         },
       };
     }
@@ -370,10 +391,34 @@ async function applyExchangeEffect(
             }
             throw error;
           }
+          return { addedItemIds: [], updatedItemIds: [target.id], removedItemIds: [] };
         },
       };
     }
   }
+}
+
+function normalizeItemChangeIds(...changes: ItemChangeIds[]): ItemChangeIds {
+  const added = new Set<string>();
+  const updated = new Set<string>();
+  const removed = new Set<string>();
+
+  for (const change of changes) {
+    for (const id of change.addedItemIds) added.add(id);
+    for (const id of change.updatedItemIds) updated.add(id);
+    for (const id of change.removedItemIds) removed.add(id);
+  }
+
+  for (const id of removed) {
+    added.delete(id);
+    updated.delete(id);
+  }
+
+  return {
+    addedItemIds: [...added],
+    updatedItemIds: [...updated],
+    removedItemIds: [...removed],
+  };
 }
 
 async function requireTargetItem(
