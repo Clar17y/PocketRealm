@@ -23,45 +23,88 @@ describe('item seed combat data', () => {
 
   it('boss-crafted item templates have target combat stats', () => {
     const templates = new Map(getAllItemTemplates().map((item) => [item.name, item]));
+    const wolfsbaneBlade = templates.get('Wolfsbane Blade');
+    const alphaPeltChest = templates.get('Alpha Pelt Chest');
+    const spiritStaff = templates.get('Spirit Staff');
+    const etherealRobes = templates.get('Ethereal Robes');
 
-    expect(templates.get('Wolfsbane Blade')).toMatchObject({
+    expect({
+      itemType: wolfsbaneBlade?.itemType,
+      slot: wolfsbaneBlade?.slot,
+      tier: wolfsbaneBlade?.tier,
+      requiredLevel: wolfsbaneBlade?.requiredLevel,
+      maxDurability: wolfsbaneBlade?.maxDurability,
+    }).toEqual({
       itemType: 'weapon',
       slot: 'main_hand',
       tier: 2,
       requiredLevel: 8,
       maxDurability: 110,
-      baseStats: { attack: 13, accuracy: 4, critChance: 0.03 },
     });
-    expect(templates.get('Alpha Pelt Chest')).toMatchObject({
+    expect(wolfsbaneBlade?.baseStats).toEqual({ attack: 13, accuracy: 4, critChance: 0.03 });
+
+    expect({
+      itemType: alphaPeltChest?.itemType,
+      slot: alphaPeltChest?.slot,
+      tier: alphaPeltChest?.tier,
+      requiredLevel: alphaPeltChest?.requiredLevel,
+      maxDurability: alphaPeltChest?.maxDurability,
+    }).toEqual({
       itemType: 'armor',
       slot: 'chest',
       tier: 2,
       requiredLevel: 8,
       maxDurability: 120,
-      baseStats: { armor: 7, health: 8, dodge: 3 },
     });
-    expect(templates.get('Spirit Staff')).toMatchObject({
+    expect(alphaPeltChest?.baseStats).toEqual({ armor: 7, health: 8, dodge: 3 });
+
+    expect({
+      itemType: spiritStaff?.itemType,
+      slot: spiritStaff?.slot,
+      tier: spiritStaff?.tier,
+      requiredLevel: spiritStaff?.requiredLevel,
+      maxDurability: spiritStaff?.maxDurability,
+    }).toEqual({
       itemType: 'weapon',
       slot: 'main_hand',
       tier: 4,
       requiredLevel: 16,
       maxDurability: 130,
-      baseStats: { magicPower: 24, accuracy: 4, critChance: 0.04 },
     });
-    expect(templates.get('Ethereal Robes')).toMatchObject({
+    expect(spiritStaff?.baseStats).toEqual({ magicPower: 24, accuracy: 4, critChance: 0.04 });
+
+    expect({
+      itemType: etherealRobes?.itemType,
+      slot: etherealRobes?.slot,
+      tier: etherealRobes?.tier,
+      requiredLevel: etherealRobes?.requiredLevel,
+      maxDurability: etherealRobes?.maxDurability,
+    }).toEqual({
       itemType: 'armor',
       slot: 'chest',
       tier: 4,
       requiredLevel: 16,
       maxDurability: 140,
-      baseStats: { magicDefence: 12, health: 12, dodge: 4, magicPower: 3 },
     });
+    expect(etherealRobes?.baseStats).toEqual({ magicDefence: 12, health: 12, dodge: 4, magicPower: 3 });
   });
 
   it('defines Vex Aegis off-hand templates', () => {
     const templates = new Map(getAllItemTemplates().map((item) => [item.name, item]));
+    const wayfarerAegis = templates.get('Wayfarer Aegis');
+    const spiritboundAegis = templates.get('Spiritbound Aegis');
 
-    expect(templates.get('Wayfarer Aegis')).toMatchObject({
+    expect({
+      itemType: wayfarerAegis?.itemType,
+      weightClass: wayfarerAegis?.weightClass,
+      slot: wayfarerAegis?.slot,
+      tier: wayfarerAegis?.tier,
+      requiredSkill: wayfarerAegis?.requiredSkill,
+      requiredLevel: wayfarerAegis?.requiredLevel,
+      maxDurability: wayfarerAegis?.maxDurability,
+      stackable: wayfarerAegis?.stackable,
+      sellPrice: wayfarerAegis?.sellPrice,
+    }).toEqual({
       itemType: 'armor',
       weightClass: 'medium',
       slot: 'off_hand',
@@ -71,9 +114,20 @@ describe('item seed combat data', () => {
       maxDurability: 100,
       stackable: false,
       sellPrice: 0,
-      baseStats: { accuracy: 10, armor: 4, health: 8 },
     });
-    expect(templates.get('Spiritbound Aegis')).toMatchObject({
+    expect(wayfarerAegis?.baseStats).toEqual({ accuracy: 10, armor: 4, health: 8 });
+
+    expect({
+      itemType: spiritboundAegis?.itemType,
+      weightClass: spiritboundAegis?.weightClass,
+      slot: spiritboundAegis?.slot,
+      tier: spiritboundAegis?.tier,
+      requiredSkill: spiritboundAegis?.requiredSkill,
+      requiredLevel: spiritboundAegis?.requiredLevel,
+      maxDurability: spiritboundAegis?.maxDurability,
+      stackable: spiritboundAegis?.stackable,
+      sellPrice: spiritboundAegis?.sellPrice,
+    }).toEqual({
       itemType: 'armor',
       weightClass: 'medium',
       slot: 'off_hand',
@@ -83,8 +137,8 @@ describe('item seed combat data', () => {
       maxDurability: 140,
       stackable: false,
       sellPrice: 0,
-      baseStats: { accuracy: 14, magicDefence: 8, armor: 5, health: 12 },
     });
+    expect(spiritboundAegis?.baseStats).toEqual({ accuracy: 14, magicDefence: 8, armor: 5, health: 12 });
   });
 
   it('max-dodge PvP loadouts remain evasive but counterable by high-accuracy builds', () => {
