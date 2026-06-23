@@ -195,6 +195,7 @@ WAITING ──(scheduled start)──→ ACTIVE ──(all rounds resolved)─�
 - **Specialization**: warfare/crafting/gathering etc., costs treasury to select/respec
 - **Contracts**: weekly rotation, expire at deadline, reward treasury on completion
 - **Projects**: treasury cost to start, players contribute turns/materials, completion grants rewards
+- **War Room guild-bank funding**: guild treasury turns can fund War Room project turn progress without counting against any individual member's per-project turn cap
 
 ## World Events
 

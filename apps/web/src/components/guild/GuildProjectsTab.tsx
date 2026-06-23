@@ -261,6 +261,12 @@ function ActiveProjectCard({
     (c) => (project.materialsProgress[c.category] ?? 0) < c.quantity,
   );
   const canUseGuildTurnBank = project.projectKey === 'war_room';
+  const isGuildTurnSource = canUseGuildTurnBank && turnSource === 'guild';
+  const remainingTurns = Math.max(0, project.memberTurnGoal - project.turnsContributed);
+  const turnAmountMax = isGuildTurnSource
+    ? Math.min(remainingTurns, guildTreasuryTurns ?? remainingTurns)
+    : Math.min(remainingTurns, GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP);
+  const canContributeTurns = turnAmountMax > 0;
 
   return (
     <PixelCard>
@@ -379,19 +385,20 @@ function ActiveProjectCard({
             <div className="flex gap-2 items-end">
               <div className="flex-1">
                 <label htmlFor="contribute-turns-amount" className="text-xs text-[var(--rpg-text-secondary)]">
-                  Amount (max {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per project)
+                  Amount (max {formatNumber(turnAmountMax)} {isGuildTurnSource ? 'from guild bank' : 'per project'})
                 </label>
                 <input
                   id="contribute-turns-amount"
                   type="number"
                   value={turnAmount}
                   onChange={(e) => setTurnAmount(e.target.value)}
-                  min={1}
-                  max={GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP}
+                  min={canContributeTurns ? 1 : 0}
+                  max={turnAmountMax}
+                  disabled={!canContributeTurns}
                   className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
                 />
               </div>
-              <PixelButton onClick={onContributeTurns} disabled={actionLoading}>
+              <PixelButton onClick={onContributeTurns} disabled={actionLoading || !canContributeTurns}>
                 {actionLoading ? '...' : 'Contribute'}
               </PixelButton>
             </div>
