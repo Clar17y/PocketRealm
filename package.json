@@ -24,7 +24,7 @@
     "start:discord-bot": "npm run start -w apps/discord-bot",
     "typecheck": "npm run build -w packages/database && tsc -b --force",
     "lint": "eslint . --ext .ts,.tsx",
-    "test": "npm run test --workspaces --if-present",
+    "test": "node scripts/run-tests.mjs",
     "test:engine": "npm run build -w @pocketrealm/shared && npm run test -w packages/game-engine",
     "test:api": "npm run test -w apps/api",
     "support:export-new": "npm --silent run support:export-new -w apps/api --",
