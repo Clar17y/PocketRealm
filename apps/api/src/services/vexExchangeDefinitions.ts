@@ -10,7 +10,13 @@ export type VexExchangeEffect =
 
 export type VexTargetRule =
   | { type: 'none' }
-  | { type: 'equipment'; itemTypes: Array<'weapon' | 'armor'>; augmentType: VexAugmentType }
+  | {
+      type: 'equipment';
+      itemTypes: Array<'weapon' | 'armor'>;
+      augmentType: VexAugmentType;
+      minTier: number;
+      maxTier: number;
+    }
   | { type: 'template'; templateNames: string[]; augmentType?: VexAugmentType };
 
 export interface VexExchangeDefinition {
@@ -60,7 +66,13 @@ export const VEX_EXCHANGES: VexExchangeDefinition[] = [
     category: 'service',
     goldCost: 1000,
     requiredItems: [{ itemTemplateName: 'Alpha Wolf Fang', quantity: 2 }],
-    targetRule: { type: 'equipment', itemTypes: ['weapon', 'armor'], augmentType: 'durability_reinforcement' },
+    targetRule: {
+      type: 'equipment',
+      itemTypes: ['weapon', 'armor'],
+      augmentType: 'durability_reinforcement',
+      minTier: 1,
+      maxTier: 3,
+    },
     effect: { type: 'reinforce_durability', augmentType: 'durability_reinforcement', bonusPercent: 0.2 },
     sortOrder: 30,
   },
@@ -71,7 +83,13 @@ export const VEX_EXCHANGES: VexExchangeDefinition[] = [
     category: 'service',
     goldCost: 3000,
     requiredItems: [{ itemTemplateName: 'Spirit Essence', quantity: 2 }],
-    targetRule: { type: 'equipment', itemTypes: ['weapon', 'armor'], augmentType: 'durability_reinforcement' },
+    targetRule: {
+      type: 'equipment',
+      itemTypes: ['weapon', 'armor'],
+      augmentType: 'durability_reinforcement',
+      minTier: 4,
+      maxTier: 5,
+    },
     effect: { type: 'reinforce_durability', augmentType: 'durability_reinforcement', bonusPercent: 0.2 },
     sortOrder: 40,
   },
