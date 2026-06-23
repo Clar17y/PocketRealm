@@ -32,6 +32,19 @@ interface ResourceItem {
   category: string;
 }
 
+function getTurnContributionMax(
+  project: GuildProjectResponse,
+  source: GuildProjectTurnContributionSource,
+  guildTreasuryTurns: number | undefined,
+) {
+  const remainingTurns = Math.max(0, project.memberTurnGoal - project.turnsContributed);
+  const isGuildTurnSource = project.projectKey === 'war_room' && source === 'guild';
+  if (isGuildTurnSource) {
+    return Math.min(remainingTurns, guildTreasuryTurns ?? remainingTurns);
+  }
+  return Math.min(remainingTurns, GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP);
+}
+
 export function GuildProjectsTab({
   guildId,
   myRole,
@@ -90,8 +103,12 @@ export function GuildProjectsTab({
     const amount = parseInt(turnAmount);
     if (!amount || amount <= 0) return;
     const project = data?.projects.find((p) => p.id === projectId);
-    const source = project?.projectKey === 'war_room' ? turnSource : 'player';
-    action.run(() => contributeProjectTurns(guildId, projectId, amount, source), (data) => {
+    if (!project) return;
+    const source = project.projectKey === 'war_room' ? turnSource : 'player';
+    const turnAmountMax = getTurnContributionMax(project, source, guildTreasuryTurns);
+    const effectiveAmount = Math.min(amount, turnAmountMax);
+    if (effectiveAmount <= 0) return;
+    action.run(() => contributeProjectTurns(guildId, projectId, effectiveAmount, source), (data) => {
       if (data?.stateUpdates) onStateUpdates?.(data.stateUpdates);
       if (source === 'guild') onGuildUpdated?.();
       void loadProjects();
@@ -262,10 +279,7 @@ function ActiveProjectCard({
   );
   const canUseGuildTurnBank = project.projectKey === 'war_room';
   const isGuildTurnSource = canUseGuildTurnBank && turnSource === 'guild';
-  const remainingTurns = Math.max(0, project.memberTurnGoal - project.turnsContributed);
-  const turnAmountMax = isGuildTurnSource
-    ? Math.min(remainingTurns, guildTreasuryTurns ?? remainingTurns)
-    : Math.min(remainingTurns, GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP);
+  const turnAmountMax = getTurnContributionMax(project, turnSource, guildTreasuryTurns);
   const canContributeTurns = turnAmountMax > 0;
 
   return (

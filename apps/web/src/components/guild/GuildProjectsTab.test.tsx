@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GuildProjectResponse, GuildProjectsListResponse } from '@/lib/api/guild';
 
@@ -73,5 +73,25 @@ describe('GuildProjectsTab', () => {
     expect(screen.getByText('Amount (max 0 from guild bank)')).toBeTruthy();
     expect((screen.getByLabelText(/Amount \(max 0 from guild bank\)/i) as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: /^Contribute$/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('submits the displayed guild-bank max when the current turn amount is higher', async () => {
+    apiMocks.contributeProjectTurns.mockResolvedValue({ data: activeWarRoom, error: null });
+
+    render(
+      <GuildProjectsTab
+        guildId="guild-1"
+        myRole="leader"
+        guildTreasuryTurns={500}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Contribute Turns' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guild bank' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Contribute$/ }));
+
+    await waitFor(() => {
+      expect(apiMocks.contributeProjectTurns).toHaveBeenCalledWith('guild-1', 'project-1', 500, 'guild');
+    });
   });
 });
