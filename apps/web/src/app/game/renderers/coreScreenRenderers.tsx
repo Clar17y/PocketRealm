@@ -9,6 +9,7 @@ import { Exploration } from '@/components/screens/Exploration';
 import { ZoneMap } from '@/components/screens/ZoneMap';
 import { Bestiary } from '@/components/screens/Bestiary';
 import { Rest } from '@/components/screens/Rest';
+import { VexScreen } from '@/components/screens/VexScreen';
 import { WorldEvents } from '@/components/screens/WorldEvents';
 import { PREMIUM_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@pocketrealm/shared';
 import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
@@ -385,6 +386,15 @@ export function WorldEventsScreenRenderer({ gc, player }: SharedCoreRendererProp
       currentZoneName={gc.currentZone?.name ?? null}
       playerId={player?.id ?? null}
       onNavigate={(screen) => gc.setActiveScreen(screen as Screen)}
+    />
+  );
+}
+
+export function VexScreenRenderer({ gc }: { gc: GameControllerState }) {
+  return (
+    <VexScreen
+      onStateUpdates={(updates) => void gc.handleStateUpdates(updates)}
+      showNpcDialogue={gc.showNpcDialogue}
     />
   );
 }

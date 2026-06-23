@@ -20,6 +20,7 @@ export type Screen =
   | 'rest'
   | 'arena'
   | 'worldEvents'
+  | 'vex'
   | 'achievements'
   | 'leaderboard'
   | 'guild'

@@ -357,6 +357,7 @@ describe('useGameController', () => {
     ['skills', 'inventory'],
     ['bestiary', 'combat'],
     ['worldEvents', 'explore'],
+    ['vex', 'explore'],
     ['casino', 'explore'],
     ['training', 'explore'],
   ] as const)('groups %s under the %s bottom tab', (screen, tab) => {
