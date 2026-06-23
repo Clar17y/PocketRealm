@@ -731,6 +731,34 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
     },
   },
 
+  'vex-collector': {
+    name: 'Vex',
+    location: 'A travelling camp near the World Events board',
+    personality: 'Patient, dry, and more interested in trophies than coin.',
+    lines: {
+      greeting: [
+        'Boss trophies, broken relics, strange stones. Lay them out. I will tell you which ones still have a use.',
+        'You brought proof of a hard fight. Good. Most people bring stories. Stories weigh nothing and buy less.',
+        'The beasts leave marks on the world when they fall. I collect the parts that keep remembering.',
+      ],
+      idle: [
+        'Gold is useful. Trophies are honest. A fang does not pretend it came from somewhere safe.',
+        'Every shield wants a second life. Every blade wants a better story. I arrange introductions.',
+        'World bosses are wasteful creatures. They die carrying things they never understood.',
+      ],
+      buy: [
+        'There. The trophy remembers the fight, and now your gear does too.',
+        'A fair trade. The dead beast keeps its pride. You keep the useful part.',
+        'Done. Do not call it luck when it saves you later. Luck is less reliable than craft.',
+      ],
+      farewell: [
+        'Bring back what the wilds refuse to surrender willingly.',
+        'If the ground shakes, follow the brave. Then bring me what is left.',
+        'Do not polish the trophies. Dirt is provenance.',
+      ],
+    },
+  },
+
   'mysterious-stranger': {
     name: 'The Stranger',
     location: 'Appears rarely in unexpected places',

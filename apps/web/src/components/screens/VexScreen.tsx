@@ -13,7 +13,7 @@ import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
 
 type VexFilter = 'all' | VexExchangeCategory;
-const VEX_NPC_KEY = 'vex-collector' as NpcKey;
+const VEX_NPC_KEY: NpcKey = 'vex-collector';
 
 interface VexScreenProps {
   onStateUpdates?: (updates: StateUpdates) => void;
