@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameBootstrap } from './useGameBootstrap';
-import { getZoneEvents, getZones } from '@/lib/api';
+import { getInventory, getZoneEvents, getZones } from '@/lib/api';
 
 const apiMocks = vi.hoisted(() => ({
   getCraftingRecipes: vi.fn(),
@@ -126,5 +126,40 @@ describe('useGameBootstrap', () => {
     expect(getZones).toHaveBeenCalledTimes(1);
     expect(options.setZones).not.toHaveBeenCalled();
     expect(getZoneEvents).not.toHaveBeenCalled();
+  });
+
+  it('refreshes inventory state from the inventory endpoint', async () => {
+    const options = createOptions();
+    const item = {
+      id: 'item-fang',
+      quantity: 2,
+      rarity: 'common',
+      template: {
+        id: 'template-fang',
+        name: 'Alpha Wolf Fang',
+        itemType: 'resource',
+      },
+    };
+    vi.mocked(getInventory).mockResolvedValue({
+      data: {
+        items: [item],
+        capacity: 32,
+        usedSlots: 4,
+        materialTotals: { 'template-fang': 2 },
+      },
+      error: null,
+    } as never);
+
+    const { result } = renderHook(() => useGameBootstrap(options));
+
+    await act(async () => {
+      await result.current.refreshInventory();
+    });
+
+    expect(getInventory).toHaveBeenCalledTimes(1);
+    expect(options.setInventory).toHaveBeenCalledWith([item]);
+    expect(options.setInventoryCapacity).toHaveBeenCalledWith(32);
+    expect(options.setInventoryUsedSlots).toHaveBeenCalledWith(4);
+    expect(options.setMaterialTotals).toHaveBeenCalledWith({ 'template-fang': 2 });
   });
 });

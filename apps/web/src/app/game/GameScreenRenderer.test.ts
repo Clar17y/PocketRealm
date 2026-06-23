@@ -212,6 +212,7 @@ function createBaseGc() {
     advanceTutorial: vi.fn(),
     starterWeaponType: null,
     loadAll: vi.fn(),
+    refreshInventory: vi.fn(),
     activeBuffs: [],
     combatLogPrefetch: null,
     inventoryCapacity: 24,
