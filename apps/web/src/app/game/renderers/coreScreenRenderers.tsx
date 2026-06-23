@@ -385,6 +385,7 @@ export function WorldEventsScreenRenderer({ gc, player }: SharedCoreRendererProp
       currentZoneName={gc.currentZone?.name ?? null}
       playerId={player?.id ?? null}
       onNavigate={(screen) => gc.setActiveScreen(screen as Screen)}
+      onBossRewardsLoaded={gc.refreshInventory}
     />
   );
 }
