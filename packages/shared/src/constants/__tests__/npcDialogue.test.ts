@@ -46,6 +46,7 @@ describe('getNpcName', () => {
     expect(getNpcName('millbrook-guild-recruiter')).toBe('Gavrik Stoneshoulder');
     expect(getNpcName('thornwall-merchant')).toBe('Lira Caravel');
     expect(getNpcName('wandering-merchant')).toBe('Vex');
+    expect(getNpcName('vex-collector')).toBe('Vex');
     expect(getNpcName('mysterious-stranger')).toBe('The Stranger');
     expect(getNpcName('town-guard')).toBe('Captain Fen Darrow');
   });
@@ -79,6 +80,7 @@ describe('NPC_DIALOGUE completeness', () => {
       'millbrook-guild-recruiter',
       'thornwall-merchant',
       'wandering-merchant',
+      'vex-collector',
       'mysterious-stranger',
       'town-guard',
     ];
@@ -109,8 +111,8 @@ describe('NPC_DIALOGUE completeness', () => {
     expect(getNpcName('rowan-foraging')).toBe('Rowan Delk');
   });
 
-  it('has expected number of NPC entries (18 base + 16 zone-specific)', () => {
-    expect(Object.keys(NPC_DIALOGUE).length).toBe(34);
+  it('has expected number of NPC entries (19 base + 16 zone-specific)', () => {
+    expect(Object.keys(NPC_DIALOGUE).length).toBe(35);
   });
 
   it('each NPC has at least 8 lines per populated event', () => {
