@@ -152,10 +152,15 @@ describe('consumeItemsByTemplate', () => {
 
     await consumeItemsByTemplateTx(mockPrisma as never, 'p1', 'tpl-1', 3);
 
+    const lockQuery = mockPrisma.$queryRaw.mock.calls[0][0];
+    expect(lockQuery.strings.join('')).toContain('ORDER BY created_at ASC, id ASC');
     expect(mockPrisma.$queryRaw).toHaveBeenCalledWith(
       expect.objectContaining({
         strings: expect.arrayContaining([expect.stringContaining('FOR UPDATE')]),
       }),
+    );
+    expect(mockPrisma.item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
     );
     expect(mockPrisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       mockPrisma.item.findMany.mock.invocationCallOrder[0],

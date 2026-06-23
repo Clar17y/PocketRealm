@@ -122,7 +122,7 @@ async function consumeItemsByTemplateWithClient(
 
   const items = await client.item.findMany({
     where: { ownerId: playerId, templateId: itemTemplateId },
-    orderBy: [{ createdAt: 'asc' }],
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { id: true, quantity: true },
   });
 
@@ -168,7 +168,7 @@ async function lockItemsForConsumption(
     FROM items
     WHERE owner_id = ${playerId}
       AND template_id = ${itemTemplateId}
-    ORDER BY created_at ASC
+    ORDER BY created_at ASC, id ASC
     FOR UPDATE
   `);
 }
