@@ -64,14 +64,14 @@ function ExchangeCard({
   exchange,
   selectedTargetId,
   purchasing,
-  disabled,
+  controlsDisabled,
   onTargetChange,
   onPurchase,
 }: {
   exchange: VexExchangeView;
   selectedTargetId: string;
   purchasing: boolean;
-  disabled: boolean;
+  controlsDisabled: boolean;
   onTargetChange: (exchangeKey: string, itemId: string) => void;
   onPurchase: (exchange: VexExchangeView) => void;
 }) {
@@ -79,7 +79,7 @@ function ExchangeCard({
   const requiresTarget = exchange.targetOptions.length > 0;
   const selectedTarget = exchange.targetOptions.find((target) => target.itemId === selectedTargetId);
   const needsTarget = requiresTarget && !selectedTarget;
-  const purchaseDisabled = disabled || !exchange.canPurchase || needsTarget || selectedTarget?.alreadyApplied;
+  const purchaseDisabled = controlsDisabled || !exchange.canPurchase || needsTarget || selectedTarget?.alreadyApplied;
 
   return (
     <PixelCard padding="md" className="space-y-3">
@@ -120,7 +120,7 @@ function ExchangeCard({
             value={selectedTargetId}
             onChange={(event) => onTargetChange(exchange.key, event.target.value)}
             aria-label={`Target item for ${exchange.name}`}
-            disabled={disabled}
+            disabled={controlsDisabled}
           >
             <option value="">Choose an item</option>
             {exchange.targetOptions.map((target) => (
@@ -185,13 +185,14 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
       : exchanges.filter((exchange) => exchange.category === activeFilter),
     [activeFilter, exchanges],
   );
+  const purchaseInProgress = purchasingKey !== null;
 
   const handleTargetChange = (exchangeKey: string, itemId: string) => {
     setSelectedTargets((prev) => ({ ...prev, [exchangeKey]: itemId }));
   };
 
   const handlePurchase = async (exchange: VexExchangeView) => {
-    if (purchasingKey !== null) return;
+    if (purchaseInProgress) return;
 
     const targetItemId = selectedTargets[exchange.key];
     const params = exchange.targetOptions.length > 0 ? { targetItemId } : undefined;
@@ -262,7 +263,7 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
                 exchange={exchange}
                 selectedTargetId={selectedTargets[exchange.key] ?? ''}
                 purchasing={purchasingKey === exchange.key}
-                disabled={purchasingKey !== null}
+                controlsDisabled={purchaseInProgress}
                 onTargetChange={handleTargetChange}
                 onPurchase={(selectedExchange) => void handlePurchase(selectedExchange)}
               />
