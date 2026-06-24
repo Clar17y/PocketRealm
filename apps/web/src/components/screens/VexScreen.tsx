@@ -64,12 +64,14 @@ function ExchangeCard({
   exchange,
   selectedTargetId,
   purchasing,
+  disabled,
   onTargetChange,
   onPurchase,
 }: {
   exchange: VexExchangeView;
   selectedTargetId: string;
   purchasing: boolean;
+  disabled: boolean;
   onTargetChange: (exchangeKey: string, itemId: string) => void;
   onPurchase: (exchange: VexExchangeView) => void;
 }) {
@@ -77,7 +79,7 @@ function ExchangeCard({
   const requiresTarget = exchange.targetOptions.length > 0;
   const selectedTarget = exchange.targetOptions.find((target) => target.itemId === selectedTargetId);
   const needsTarget = requiresTarget && !selectedTarget;
-  const purchaseDisabled = purchasing || !exchange.canPurchase || needsTarget || selectedTarget?.alreadyApplied;
+  const purchaseDisabled = disabled || !exchange.canPurchase || needsTarget || selectedTarget?.alreadyApplied;
 
   return (
     <PixelCard padding="md" className="space-y-3">
@@ -118,6 +120,7 @@ function ExchangeCard({
             value={selectedTargetId}
             onChange={(event) => onTargetChange(exchange.key, event.target.value)}
             aria-label={`Target item for ${exchange.name}`}
+            disabled={disabled}
           >
             <option value="">Choose an item</option>
             {exchange.targetOptions.map((target) => (
@@ -188,6 +191,8 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
   };
 
   const handlePurchase = async (exchange: VexExchangeView) => {
+    if (purchasingKey !== null) return;
+
     const targetItemId = selectedTargets[exchange.key];
     const params = exchange.targetOptions.length > 0 ? { targetItemId } : undefined;
 
@@ -243,7 +248,7 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
 
         {loading && <PixelCard className="text-sm text-[var(--rpg-text-secondary)]">Loading Vex exchanges...</PixelCard>}
 
-        {!loading && visibleExchanges.length === 0 && (
+        {!loading && !error && visibleExchanges.length === 0 && (
           <PixelCard className="text-sm text-[var(--rpg-text-secondary)]">
             Vex has nothing to trade right now.
           </PixelCard>
@@ -257,6 +262,7 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
                 exchange={exchange}
                 selectedTargetId={selectedTargets[exchange.key] ?? ''}
                 purchasing={purchasingKey === exchange.key}
+                disabled={purchasingKey !== null}
                 onTargetChange={handleTargetChange}
                 onPurchase={(selectedExchange) => void handlePurchase(selectedExchange)}
               />

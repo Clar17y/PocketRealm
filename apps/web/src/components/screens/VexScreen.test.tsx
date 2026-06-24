@@ -104,6 +104,14 @@ function mockList(response: VexExchangeListResponse = listResponse) {
   apiMocks.getVexExchanges.mockResolvedValue({ data: response });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('VexScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -150,6 +158,18 @@ describe('VexScreen', () => {
     expect(spiritButton).toHaveProperty('disabled', false);
   });
 
+  it('filters exchanges by category', async () => {
+    render(<VexScreen onStateUpdates={vi.fn()} showNpcDialogue={false} />);
+
+    await screen.findByText('Wayfarer Aegis');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Boss Stones' }));
+
+    expect(screen.getByText('Fangstone')).toBeTruthy();
+    expect(screen.queryByText('Wayfarer Aegis')).toBeNull();
+    expect(screen.queryByText('Spiritbound Aegis')).toBeNull();
+  });
+
   it('purchases an exchange, applies state updates, shows success, and refreshes exchanges', async () => {
     const onStateUpdates = vi.fn();
     const stateUpdates: StateUpdates = {
@@ -173,6 +193,31 @@ describe('VexScreen', () => {
     expect(dialogueMocks.triggerDialogueEvent).toHaveBeenCalledWith('buy');
     expect(await screen.findByText('Created Wayfarer Aegis')).toBeTruthy();
     expect(apiMocks.getVexExchanges).toHaveBeenCalledTimes(2);
+  });
+
+  it('disables all trade controls while a purchase is in flight', async () => {
+    const pendingPurchase = deferred<{ data: VexPurchaseResponse }>();
+    apiMocks.purchaseVexExchange.mockReturnValue(pendingPurchase.promise);
+    render(<VexScreen onStateUpdates={vi.fn()} showNpcDialogue={false} />);
+
+    await screen.findByText('Spiritbound Aegis');
+    fireEvent.change(screen.getByLabelText('Target item for Spiritbound Aegis'), {
+      target: { value: 'aegis-1' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trade Wayfarer Aegis' }));
+
+    await waitFor(() => expect(apiMocks.purchaseVexExchange).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Trade Wayfarer Aegis' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Trade Spiritbound Aegis' })).toHaveProperty('disabled', true);
+    expect(screen.getByLabelText('Target item for Spiritbound Aegis')).toHaveProperty('disabled', true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trade Spiritbound Aegis' }));
+
+    expect(apiMocks.purchaseVexExchange).toHaveBeenCalledTimes(1);
+    pendingPurchase.resolve({
+      data: { exchangeKey: 'wayfarer_aegis', message: 'Created Wayfarer Aegis' },
+    });
   });
 
   it('passes selected target item when purchasing a targeted exchange', async () => {
@@ -205,5 +250,16 @@ describe('VexScreen', () => {
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This season has ended.');
     expect(screen.getByRole('button', { name: 'Trade Wayfarer Aegis' })).toHaveProperty('disabled', false);
     expect(dialogueMocks.triggerDialogueEvent).not.toHaveBeenCalled();
+  });
+
+  it('shows list loading errors without an empty stock message', async () => {
+    apiMocks.getVexExchanges.mockResolvedValue({
+      error: { message: 'Vex is away from camp.', code: 'VEX_UNAVAILABLE' },
+    });
+
+    render(<VexScreen onStateUpdates={vi.fn()} showNpcDialogue={false} />);
+
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Vex is away from camp.');
+    expect(screen.queryByText('Vex has nothing to trade right now.')).toBeNull();
   });
 });
