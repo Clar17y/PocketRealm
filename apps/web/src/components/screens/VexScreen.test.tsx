@@ -2,10 +2,23 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VexExchangeListResponse, VexPurchaseResponse, StateUpdates } from '@pocketrealm/shared';
+import type { DialogueEvent, NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
+
+interface NpcDialogueBannerMockProps {
+  npcKey: NpcKey;
+  event: DialogueEvent;
+  showDialogue?: boolean;
+}
 
 const apiMocks = vi.hoisted(() => ({
   getVexExchanges: vi.fn(),
   purchaseVexExchange: vi.fn(),
+}));
+
+const dialogueMocks = vi.hoisted(() => ({
+  triggerDialogueEvent: vi.fn(),
+  useNpcDialogue: vi.fn(),
+  npcDialogueBanner: vi.fn(),
 }));
 
 vi.mock('@/lib/api', async () => {
@@ -17,8 +30,15 @@ vi.mock('@/lib/api', async () => {
   };
 });
 
+vi.mock('@/hooks/useNpcDialogue', () => ({
+  useNpcDialogue: dialogueMocks.useNpcDialogue,
+}));
+
 vi.mock('@/components/common/NpcDialogueBanner', () => ({
-  NpcDialogueBanner: () => <div data-testid="vex-dialogue" />,
+  NpcDialogueBanner: (props: NpcDialogueBannerMockProps) => {
+    dialogueMocks.npcDialogueBanner(props);
+    return <div data-testid="vex-dialogue" />;
+  },
 }));
 
 import { VexScreen } from './VexScreen';
@@ -87,6 +107,10 @@ function mockList(response: VexExchangeListResponse = listResponse) {
 describe('VexScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dialogueMocks.useNpcDialogue.mockReturnValue({
+      dialogueEvent: 'idle',
+      triggerDialogueEvent: dialogueMocks.triggerDialogueEvent,
+    });
     mockList();
   });
 
@@ -102,6 +126,12 @@ describe('VexScreen', () => {
     expect(screen.getByText('Alpha Wolf Fang: 5 / 4')).toBeTruthy();
     expect(screen.getByText('Not enough Alpha Wolf Fang')).toBeTruthy();
     expect(screen.getByTestId('vex-dialogue')).toBeTruthy();
+    expect(dialogueMocks.useNpcDialogue).toHaveBeenCalledWith('vex-collector');
+    expect(dialogueMocks.npcDialogueBanner).toHaveBeenLastCalledWith({
+      npcKey: 'vex-collector',
+      event: 'idle',
+      showDialogue: true,
+    });
   });
 
   it('requires target selection for target-based exchanges', async () => {
@@ -140,6 +170,7 @@ describe('VexScreen', () => {
 
     await waitFor(() => expect(apiMocks.purchaseVexExchange).toHaveBeenCalledWith('wayfarer_aegis', undefined));
     expect(onStateUpdates).toHaveBeenCalledWith(stateUpdates);
+    expect(dialogueMocks.triggerDialogueEvent).toHaveBeenCalledWith('buy');
     expect(await screen.findByText('Created Wayfarer Aegis')).toBeTruthy();
     expect(apiMocks.getVexExchanges).toHaveBeenCalledTimes(2);
   });
@@ -173,5 +204,6 @@ describe('VexScreen', () => {
 
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This season has ended.');
     expect(screen.getByRole('button', { name: 'Trade Wayfarer Aegis' })).toHaveProperty('disabled', false);
+    expect(dialogueMocks.triggerDialogueEvent).not.toHaveBeenCalled();
   });
 });

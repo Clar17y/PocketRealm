@@ -11,6 +11,7 @@ import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 
 type VexFilter = 'all' | VexExchangeCategory;
 const VEX_NPC_KEY: NpcKey = 'vex-collector';
@@ -156,6 +157,7 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [purchasingKey, setPurchasingKey] = useState<string | null>(null);
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(VEX_NPC_KEY);
 
   const loadExchanges = useCallback(async () => {
     setLoading(true);
@@ -203,6 +205,7 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
     if (response.data?.stateUpdates) {
       onStateUpdates?.(response.data.stateUpdates);
     }
+    triggerDialogueEvent('buy');
     setSuccess(response.data?.message ?? 'Trade complete.');
     setSelectedTargets((prev) => ({ ...prev, [exchange.key]: '' }));
     setPurchasingKey(null);
@@ -211,7 +214,7 @@ export function VexScreen({ onStateUpdates, showNpcDialogue = true }: VexScreenP
 
   return (
     <ScreenContainer>
-      <NpcDialogueBanner npcKey={VEX_NPC_KEY} event={success ? 'buy' : 'greeting'} showDialogue={showNpcDialogue} />
+      <NpcDialogueBanner npcKey={VEX_NPC_KEY} event={dialogueEvent} showDialogue={showNpcDialogue} />
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
