@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/common/ErrorBanner';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
+  type GuildProjectTurnContributionSource,
 } from '@/lib/api/guild';
 import { PerkBadges } from '@/components/common/PerkBadges';
 import { getInventory } from '@/lib/api/items';
@@ -19,7 +20,9 @@ import { formatNumber } from '@/lib/format';
 interface GuildProjectsTabProps {
   guildId: string;
   myRole: string;
+  guildTreasuryTurns?: number;
   onStateUpdates?: (updates: StateUpdates) => void;
+  onGuildUpdated?: () => void;
 }
 
 interface ResourceItem {
@@ -29,12 +32,32 @@ interface ResourceItem {
   category: string;
 }
 
-export function GuildProjectsTab({ guildId, myRole, onStateUpdates }: GuildProjectsTabProps) {
+function getTurnContributionMax(
+  project: GuildProjectResponse,
+  source: GuildProjectTurnContributionSource,
+  guildTreasuryTurns: number | undefined,
+) {
+  const remainingTurns = Math.max(0, project.memberTurnGoal - project.turnsContributed);
+  const isGuildTurnSource = project.projectKey === 'war_room' && source === 'guild';
+  if (isGuildTurnSource) {
+    return Math.min(remainingTurns, guildTreasuryTurns ?? remainingTurns);
+  }
+  return Math.min(remainingTurns, GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP);
+}
+
+export function GuildProjectsTab({
+  guildId,
+  myRole,
+  guildTreasuryTurns,
+  onStateUpdates,
+  onGuildUpdated,
+}: GuildProjectsTabProps) {
   const [data, setData] = useState<GuildProjectsListResponse | null>(null);
   const load = useAsyncAction();
   const action = useAsyncAction();
   const resourceLoad = useAsyncAction();
   const [turnAmount, setTurnAmount] = useState('1000');
+  const [turnSource, setTurnSource] = useState<GuildProjectTurnContributionSource>('player');
   const [showContribute, setShowContribute] = useState<string | null>(null);
   const [resourceItems, setResourceItems] = useState<ResourceItem[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -79,8 +102,15 @@ export function GuildProjectsTab({ guildId, myRole, onStateUpdates }: GuildProje
   const handleContributeTurns = (projectId: string) => {
     const amount = parseInt(turnAmount);
     if (!amount || amount <= 0) return;
-    action.run(() => contributeProjectTurns(guildId, projectId, amount), (data) => {
+    const project = data?.projects.find((p) => p.id === projectId);
+    if (!project) return;
+    const source = project.projectKey === 'war_room' ? turnSource : 'player';
+    const turnAmountMax = getTurnContributionMax(project, source, guildTreasuryTurns);
+    const effectiveAmount = Math.min(amount, turnAmountMax);
+    if (effectiveAmount <= 0) return;
+    action.run(() => contributeProjectTurns(guildId, projectId, effectiveAmount, source), (data) => {
       if (data?.stateUpdates) onStateUpdates?.(data.stateUpdates);
+      if (source === 'guild') onGuildUpdated?.();
       void loadProjects();
     });
   };
@@ -127,6 +157,9 @@ export function GuildProjectsTab({ guildId, myRole, onStateUpdates }: GuildProje
           }}
           turnAmount={turnAmount}
           setTurnAmount={setTurnAmount}
+          turnSource={turnSource}
+          setTurnSource={setTurnSource}
+          guildTreasuryTurns={guildTreasuryTurns}
           actionLoading={action.loading}
           onContributeTurns={() => handleContributeTurns(activeProject.id)}
           resourceItems={resourceItems}
@@ -211,6 +244,9 @@ function ActiveProjectCard({
   setShowContribute,
   turnAmount,
   setTurnAmount,
+  turnSource,
+  setTurnSource,
+  guildTreasuryTurns,
   actionLoading,
   onContributeTurns,
   resourceItems,
@@ -225,6 +261,9 @@ function ActiveProjectCard({
   setShowContribute: (id: string | null) => void;
   turnAmount: string;
   setTurnAmount: (v: string) => void;
+  turnSource: GuildProjectTurnContributionSource;
+  setTurnSource: (v: GuildProjectTurnContributionSource) => void;
+  guildTreasuryTurns?: number;
   actionLoading: boolean;
   onContributeTurns: () => void;
   resourceItems: ResourceItem[];
@@ -238,6 +277,10 @@ function ActiveProjectCard({
   const hasMaterialsNeeded = project.materialCosts.some(
     (c) => (project.materialsProgress[c.category] ?? 0) < c.quantity,
   );
+  const canUseGuildTurnBank = project.projectKey === 'war_room';
+  const isGuildTurnSource = canUseGuildTurnBank && turnSource === 'guild';
+  const turnAmountMax = getTurnContributionMax(project, turnSource, guildTreasuryTurns);
+  const canContributeTurns = turnAmountMax > 0;
 
   return (
     <PixelCard>
@@ -326,22 +369,50 @@ function ActiveProjectCard({
 
         {showContribute === 'turns' && (
           <div className="mt-3 p-3 bg-[var(--rpg-background)] rounded border border-[var(--rpg-border)]">
+            {canUseGuildTurnBank && (
+              <div className="mb-3">
+                <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Turn source</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['player', 'guild'] as const).map((source) => (
+                    <button
+                      key={source}
+                      type="button"
+                      onClick={() => setTurnSource(source)}
+                      className={`px-2 py-1.5 rounded border text-xs transition-colors ${
+                        turnSource === source
+                          ? 'border-[var(--rpg-gold)] text-[var(--rpg-gold)] bg-[var(--rpg-gold)]/10'
+                          : 'border-[var(--rpg-border)] text-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)]'
+                      }`}
+                      aria-pressed={turnSource === source}
+                    >
+                      {source === 'player' ? 'Personal' : 'Guild bank'}
+                    </button>
+                  ))}
+                </div>
+                {turnSource === 'guild' && guildTreasuryTurns !== undefined && (
+                  <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
+                    Available: {formatNumber(guildTreasuryTurns)} turns
+                  </p>
+                )}
+              </div>
+            )}
             <div className="flex gap-2 items-end">
               <div className="flex-1">
                 <label htmlFor="contribute-turns-amount" className="text-xs text-[var(--rpg-text-secondary)]">
-                  Amount (max {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per project)
+                  Amount (max {formatNumber(turnAmountMax)} {isGuildTurnSource ? 'from guild bank' : 'per project'})
                 </label>
                 <input
                   id="contribute-turns-amount"
                   type="number"
                   value={turnAmount}
                   onChange={(e) => setTurnAmount(e.target.value)}
-                  min={1}
-                  max={GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP}
+                  min={canContributeTurns ? 1 : 0}
+                  max={turnAmountMax}
+                  disabled={!canContributeTurns}
                   className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
                 />
               </div>
-              <PixelButton onClick={onContributeTurns} disabled={actionLoading}>
+              <PixelButton onClick={onContributeTurns} disabled={actionLoading || !canContributeTurns}>
                 {actionLoading ? '...' : 'Contribute'}
               </PixelButton>
             </div>

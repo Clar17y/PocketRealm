@@ -99,9 +99,10 @@ interface WorldEventsProps {
   currentZoneName: string | null;
   playerId?: string | null;
   onNavigate: (screen: string) => void;
+  onBossRewardsLoaded?: () => void | boolean | Promise<void | boolean>;
 }
 
-export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNavigate }: WorldEventsProps) {
+export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNavigate, onBossRewardsLoaded }: WorldEventsProps) {
   const [events, setEvents] = useState<WorldEventResponse[]>([]);
   const [bosses, setBosses] = useState<BossEncounterResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,6 +168,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
           playerId={playerId ?? undefined}
           onClose={() => setSelectedBossId(null)}
           onNavigate={onNavigate}
+          onRewardsLoaded={onBossRewardsLoaded}
         />
       )}
 

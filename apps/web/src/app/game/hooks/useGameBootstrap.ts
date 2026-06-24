@@ -102,6 +102,8 @@ type LootRevealItem = {
   imageSrc?: string;
 };
 
+type InventoryResponseData = NonNullable<Awaited<ReturnType<typeof getInventory>>['data']>;
+
 interface LoadedPlayerData extends ServerSettingsPayload, Record<string, unknown> {
   characterXp: number;
   characterLevel: number;
@@ -263,6 +265,56 @@ export function useGameBootstrap({
     }
   }, [setTemplates]);
 
+  const applyInventoryData = useCallback((data: InventoryResponseData) => {
+    setInventory(data.items);
+    setInventoryCapacity(data.capacity ?? 24);
+    setInventoryUsedSlots(data.usedSlots ?? 0);
+
+    if (data.materialTotals) {
+      setMaterialTotals(data.materialTotals);
+    }
+
+    if (hasLoadedOnceRef.current && lootRevealRarityRef.current !== 'none') {
+      const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? 1;
+      const notableItems = data.items.filter(
+        (item) => !prevInventoryIdsRef.current.has(item.id) && RARITY_RANK[item.rarity] >= minRank,
+      );
+
+      if (notableItems.length > 0) {
+        setLootRevealItems(
+          notableItems.map((item) => ({
+            name: item.template.name,
+            rarity: item.rarity as LootRevealItem['rarity'],
+            quantity: item.quantity,
+            imageSrc: itemImageSrc(item.template.name, item.template.itemType),
+          })),
+        );
+      }
+    }
+
+    prevInventoryIdsRef.current = new Set(data.items.map((item) => item.id));
+    hasLoadedOnceRef.current = true;
+  }, [
+    hasLoadedOnceRef,
+    lootRevealRarityRef,
+    prevInventoryIdsRef,
+    setInventory,
+    setInventoryCapacity,
+    setInventoryUsedSlots,
+    setLootRevealItems,
+    setMaterialTotals,
+  ]);
+
+  const refreshInventory = useCallback(async (): Promise<boolean> => {
+    const response = await getInventory();
+    if (!response.data) {
+      return false;
+    }
+
+    applyInventoryData(response.data);
+    return true;
+  }, [applyInventoryData]);
+
   const applyZonesData = useCallback((data: {
     zones: ZoneState;
     connections: ZoneConnections;
@@ -388,34 +440,7 @@ export function useGameBootstrap({
     }
 
     if (inventoryResponse.data) {
-      setInventory(inventoryResponse.data.items);
-      setInventoryCapacity(inventoryResponse.data.capacity ?? 24);
-      setInventoryUsedSlots(inventoryResponse.data.usedSlots ?? 0);
-
-      if (inventoryResponse.data.materialTotals) {
-        setMaterialTotals(inventoryResponse.data.materialTotals);
-      }
-
-      if (hasLoadedOnceRef.current && lootRevealRarityRef.current !== 'none') {
-        const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? 1;
-        const notableItems = inventoryResponse.data.items.filter(
-          (item) => !prevInventoryIdsRef.current.has(item.id) && RARITY_RANK[item.rarity] >= minRank,
-        );
-
-        if (notableItems.length > 0) {
-          setLootRevealItems(
-            notableItems.map((item) => ({
-              name: item.template.name,
-              rarity: item.rarity as LootRevealItem['rarity'],
-              quantity: item.quantity,
-              imageSrc: itemImageSrc(item.template.name, item.template.itemType),
-            })),
-          );
-        }
-      }
-
-      prevInventoryIdsRef.current = new Set(inventoryResponse.data.items.map((item) => item.id));
-      hasLoadedOnceRef.current = true;
+      applyInventoryData(inventoryResponse.data);
     }
 
     if (equipmentResponse.data) {
@@ -450,11 +475,9 @@ export function useGameBootstrap({
       .catch(() => setGuildTaxRate(0));
   }, [
     applyZonesData,
-    hasLoadedOnceRef,
+    applyInventoryData,
     initSettingsFromServer,
-    lootRevealRarityRef,
     playerCreatedAtRef,
-    prevInventoryIdsRef,
     refreshCraftingRecipes,
     setActionError,
     setActiveBuffs,
@@ -465,12 +488,7 @@ export function useGameBootstrap({
     setGuildTaxRate,
     setHasActiveExpedition,
     setHpState,
-    setInventory,
-    setInventoryCapacity,
-    setInventoryUsedSlots,
-    setLootRevealItems,
     setManaState,
-    setMaterialTotals,
     setSkillPointState,
     setSkills,
     setShowChangelog,
@@ -482,6 +500,7 @@ export function useGameBootstrap({
 
   return {
     refreshCraftingRecipes,
+    refreshInventory,
     handleLoadSkillPoints,
     handleAllocateSkillPoint,
     handleRespecSkillPoints,

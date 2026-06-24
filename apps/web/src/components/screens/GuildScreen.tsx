@@ -163,7 +163,13 @@ export function GuildScreen({
         <GuildContractsTab guildId={guildData.guild.id} />
       )}
       {activeTab === 'projects' && (
-        <GuildProjectsTab guildId={guildData.guild.id} myRole={guildData.role} onStateUpdates={onStateUpdates} />
+        <GuildProjectsTab
+          guildId={guildData.guild.id}
+          myRole={guildData.role}
+          guildTreasuryTurns={guildData.guild.treasuryTurns}
+          onStateUpdates={onStateUpdates}
+          onGuildUpdated={refreshGuild}
+        />
       )}
       {activeTab === 'expeditions' && (
         <GuildExpeditionsTab

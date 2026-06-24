@@ -4,11 +4,13 @@ import { useState } from 'react';
 import type { ExpeditionRoundLog, MobActionLogEntry } from '@pocketrealm/shared';
 import { formatHitBreakdown } from '../../combat/combatLogEntryUtils';
 import { RoundLogAttackRow } from './RoundLogAttackRow';
+import { handleKeyActivate } from '@/lib/utils';
 import { RoleAwareMobName } from './RoleAwareMobName';
 
 function MobTargetRow({ target }: { target: MobActionLogEntry['targets'][number] }) {
   const [expanded, setExpanded] = useState(false);
-  const hasDetail = target.hitChance !== undefined || target.blocked;
+  const hasDetail = target.hitChance !== undefined || target.blocked || target.damageRoll !== undefined;
+  const toggleExpanded = () => setExpanded((prev) => !prev);
 
   const hitText = !target.blocked ? formatHitBreakdown({
     hitChance: target.hitChance,
@@ -20,7 +22,10 @@ function MobTargetRow({ target }: { target: MobActionLogEntry['targets'][number]
   return (
     <div
       className={`text-[var(--rpg-text-secondary)] ${hasDetail ? 'cursor-pointer hover:bg-[var(--rpg-surface)]/50 rounded px-1 -mx-1' : ''}`}
-      onClick={hasDetail ? () => setExpanded(!expanded) : undefined}
+      onClick={hasDetail ? toggleExpanded : undefined}
+      onKeyDown={hasDetail ? handleKeyActivate(toggleExpanded) : undefined}
+      role={hasDetail ? 'button' : undefined}
+      tabIndex={hasDetail ? 0 : undefined}
     >
       <div className="flex items-center gap-0.5">
         <span>

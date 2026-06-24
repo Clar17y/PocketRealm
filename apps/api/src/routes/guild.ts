@@ -213,6 +213,7 @@ const startProjectSchema = z.object({
 
 const contributeTurnsSchema = z.object({
   amount: z.number().int().positive(),
+  source: z.enum(['player', 'guild']).optional(),
 });
 
 const contributeMaterialsSchema = z.object({
@@ -239,11 +240,16 @@ guildRouter.post('/:id/projects/start', asyncHandler(async (req, res) => {
 guildRouter.post('/:id/projects/:projectId/contribute/turns', asyncHandler(async (req, res) => {
   const body = contributeTurnsSchema.parse(req.body);
   const playerId = req.player!.playerId;
+  const source = body.source ?? 'player';
   const result = await contributeTurns(
-    playerId, req.params.id, req.params.projectId, body.amount,
+    playerId, req.params.id, req.params.projectId, body.amount, { source },
   );
-  const stateUpdates = await buildStateUpdates(playerId, ['resources']);
-  res.json({ ...result, stateUpdates });
+  if (source === 'player') {
+    const stateUpdates = await buildStateUpdates(playerId, ['resources']);
+    res.json({ ...result, stateUpdates });
+    return;
+  }
+  res.json(result);
 }));
 
 // POST /:id/projects/:projectId/contribute/materials

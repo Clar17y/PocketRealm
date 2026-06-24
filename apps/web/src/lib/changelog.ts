@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.77',
+    date: '2026-06-24',
+    title: 'Vex Trophy Exchanges',
+    summary:
+      'Vex has set up camp at the World Events board. Trade world boss trophies for new boss-themed gear, permanent one-time item tempering, max durability boosts, and boss stones that enhance boss-crafted equipment. The Vex screen includes category filters, target item selection, and new dialogue so world boss rewards have a clearer upgrade path.',
+  },
+  {
+    version: '0.76',
+    date: '2026-06-22',
+    title: 'Encounter Site Combat Log Clarity',
+    summary:
+      'Encounter site combat logs are easier to audit and share. Copy Log now works for encounter site rooms in live fights and combat history, enemy attacks expose their raw damage rolls, and copied encounter logs include defensive turns, chest rewards, recipes, XP, and loot details so shared transcripts match what happened in the room.',
+  },
+  {
     version: '0.75',
     date: '2026-06-22',
     title: 'Encounter Site Elites & Mini-Bosses',
