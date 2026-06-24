@@ -139,6 +139,7 @@ import {
   rebuildEncounterSiteXpContributionsFromRoundLogs,
   createEncounterSiteXpContributions,
   autoResolveEncounterRoom,
+  startManualEncounterRoom,
   resolveManualEncounterRound,
 } from './encounterSiteCombatService';
 import { countDefeatedPromotedEncounterRoles } from './encounterSiteCombatCore';
@@ -189,6 +190,8 @@ beforeEach(() => {
   combatOrchestrationMocks.applyGuildCombatModifiers.mockReturnValue(undefined);
   combatOrchestrationMocks.splitAndGrantXp.mockResolvedValue([]);
   progressMocks.trackProgress.mockResolvedValue([]);
+  redisMock.get.mockResolvedValue(null);
+  redisMock.set.mockResolvedValue('OK');
   redisMock.del.mockResolvedValue(1);
 });
 
@@ -1080,7 +1083,29 @@ describe('autoResolveEncounterRoom', () => {
   });
 });
 
+describe('startManualEncounterRoom', () => {
+  it('fails when Redis cannot persist the manual combat session', async () => {
+    const playerId = 'test-player';
+    const siteId = 'site-1';
+    mockAutoEncounterSite(playerId, siteId, [makeEncounterSlot(1)]);
+    redisMock.set.mockRejectedValueOnce(new Error('ERR monthly request limit exceeded'));
+
+    await expect(startManualEncounterRoom(playerId, siteId, 'Tester'))
+      .rejects.toThrow('Combat session storage is unavailable. Try again shortly.');
+  });
+});
+
 describe('resolveManualEncounterRound', () => {
+  it('fails when Redis cannot read the manual combat session', async () => {
+    const playerId = 'test-player';
+    const siteId = 'site-1';
+    redisMock.get.mockRejectedValueOnce(new Error('ERR monthly request limit exceeded'));
+
+    await expect(resolveManualEncounterRound(playerId, siteId, {}))
+      .rejects.toThrow('Combat session storage is unavailable. Try again shortly.');
+    expect(databaseMocks.prisma.player.update).not.toHaveBeenCalled();
+  });
+
   it('tracks quest progress for the mob killed when clearing a manual room', async () => {
     const playerId = 'test-player';
     const siteId = 'site-1';
