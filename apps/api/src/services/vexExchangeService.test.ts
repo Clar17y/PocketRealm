@@ -39,6 +39,7 @@ type ItemRow = {
   maxDurability: number | null;
   bonusStats: Record<string, number> | null;
   isSoulbound?: boolean;
+  inStash?: boolean;
   itemAugments: Array<{ augmentType: string }>;
   equipment: Array<{ playerId: string; slot: string }>;
 };
@@ -85,6 +86,7 @@ function item(overrides: Partial<ItemRow> & { id: string; template: Template }):
     maxDurability: overrides.maxDurability === undefined ? overrides.template.maxDurability : overrides.maxDurability,
     bonusStats: overrides.bonusStats ?? null,
     isSoulbound: overrides.isSoulbound ?? false,
+    inStash: overrides.inStash ?? false,
     itemAugments: overrides.itemAugments ?? [],
     equipment: overrides.equipment ?? [],
   };
@@ -547,6 +549,14 @@ describe('purchaseVexExchange', () => {
     await expectAppCode(
       purchaseVexExchange(playerId, 'spiritbound_aegis', { targetItemId: 'wrong-aegis' }),
       'INVALID_TARGET',
+    );
+
+    mockPrisma.item.findUnique.mockResolvedValueOnce(
+      item({ id: 'stashed-aegis', template: byName('Wayfarer Aegis'), inStash: true }),
+    );
+    await expectAppCode(
+      purchaseVexExchange(playerId, 'spiritbound_aegis', { targetItemId: 'stashed-aegis' }),
+      'ITEM_STASHED',
     );
   });
 

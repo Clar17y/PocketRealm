@@ -165,7 +165,7 @@ async function getTargetOptions(playerId: string, targetRule: VexTargetRule): Pr
   }
 
   const ownedItems = await prisma.item.findMany({
-    where: { ownerId: playerId, quantity: 1 },
+    where: { ownerId: playerId, quantity: 1, inStash: false },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     include: {
       template: true,
@@ -441,6 +441,10 @@ async function requireTargetItem(
 
   if (!target || target.ownerId !== playerId) {
     throw new AppError(404, 'Item not found', 'NOT_FOUND');
+  }
+
+  if (target.inStash) {
+    throw new AppError(400, 'Cannot modify stashed items', 'ITEM_STASHED');
   }
 
   return target as TargetItem;
