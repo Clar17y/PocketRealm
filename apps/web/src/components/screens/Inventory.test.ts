@@ -116,6 +116,71 @@ describe('Inventory', () => {
     });
   });
 
+  it('filters stash items by name only', async () => {
+    getStash.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 'stash-staff',
+            quantity: 1,
+            rarity: 'rare',
+            currentDurability: 6,
+            maxDurability: 10,
+            template: {
+              id: 'staff-template',
+              name: 'Oak Staff',
+              itemType: 'weapon',
+              maxDurability: 10,
+              sellPrice: 12,
+            },
+          },
+          {
+            id: 'stash-ring',
+            quantity: 1,
+            rarity: 'uncommon',
+            currentDurability: null,
+            maxDurability: null,
+            template: {
+              id: 'ring-template',
+              name: 'Silver Ring',
+              itemType: 'trinket',
+              maxDurability: null,
+              sellPrice: 18,
+            },
+          },
+        ],
+      },
+    });
+
+    render(
+      React.createElement(Inventory, {
+        items: [],
+        capacity: 10,
+        usedSlots: 1,
+        gold: 100,
+        isInTown: true,
+        showNpcDialogue: false,
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^stash$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Stash (2 items)')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText(/search stash/i), { target: { value: 'staff' } });
+
+    expect(screen.getByTitle('Oak Staff')).toBeTruthy();
+    expect(screen.queryByTitle('Silver Ring')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/search stash/i), { target: { value: 'sword' } });
+
+    expect(screen.queryByTitle('Oak Staff')).toBeNull();
+    expect(screen.queryByTitle('Silver Ring')).toBeNull();
+    expect(screen.getByText('No stash items match your search.')).toBeTruthy();
+  });
+
   it('opens a backpack item modal and sells the selected item', async () => {
     const onSell = vi.fn().mockResolvedValue(undefined);
 
