@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -44,6 +45,14 @@ interface StashPanelProps {
   };
 }
 
+function removeHiddenSelections(batchMode: BatchMode, visibleItemIds: ReadonlySet<string>) {
+  for (const id of batchMode.selection) {
+    if (!visibleItemIds.has(id)) {
+      batchMode.toggle(id);
+    }
+  }
+}
+
 export function StashPanel({
   items,
   loading,
@@ -54,6 +63,36 @@ export function StashPanel({
   batch,
   actions,
 }: StashPanelProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const visibleItems = useMemo(() => {
+    if (normalizedSearchQuery.length === 0) {
+      return items;
+    }
+
+    return items.filter((item) => item.name.toLowerCase().includes(normalizedSearchQuery));
+  }, [items, normalizedSearchQuery]);
+  const visibleItemIds = useMemo(() => visibleItems.map((item) => item.id), [visibleItems]);
+  const visibleItemIdSet = useMemo(() => new Set(visibleItemIds), [visibleItemIds]);
+  const visibleSellableIds = useMemo(
+    () => batch.sellableIds.filter((id) => visibleItemIdSet.has(id)),
+    [batch.sellableIds, visibleItemIdSet]
+  );
+  const visibleSalvageableIds = useMemo(
+    () => batch.salvageableIds.filter((id) => visibleItemIdSet.has(id)),
+    [batch.salvageableIds, visibleItemIdSet]
+  );
+  const hasSearch = normalizedSearchQuery.length > 0;
+  const showSearch = items.length > 0 || searchQuery.length > 0;
+  const visibleItemCountText = `${visibleItems.length} ${visibleItems.length === 1 ? 'item' : 'items'}`;
+  const stashCountLabel = hasSearch ? `${visibleItemCountText} of ${items.length}` : visibleItemCountText;
+
+  useEffect(() => {
+    removeHiddenSelections(batch.withdraw, visibleItemIdSet);
+    removeHiddenSelections(batch.sell, visibleItemIdSet);
+    removeHiddenSelections(batch.salvage, visibleItemIdSet);
+  }, [batch.salvage, batch.sell, batch.withdraw, visibleItemIdSet]);
+
   return (
     <div className="space-y-2">
       <StashTutorial />
@@ -62,7 +101,7 @@ export function StashPanel({
         <BatchActionBar
           batch={batch.withdraw}
           limit={batch.batchLimit}
-          eligibleIds={items.map((item) => item.id)}
+          eligibleIds={visibleItemIds}
           actionLabel="Withdraw Selected"
           disabledLabel="Backpack Full"
           actionDisabled={usedSlots >= capacity}
@@ -82,7 +121,7 @@ export function StashPanel({
         <BatchActionBar
           batch={batch.sell}
           limit={batch.batchLimit}
-          eligibleIds={batch.sellableIds}
+          eligibleIds={visibleSellableIds}
           actionLabel="Sell Selected"
           counterSuffix={
             batch.sell.selection.size > 0 && batch.totalSellGold > 0
@@ -105,7 +144,7 @@ export function StashPanel({
         <BatchActionBar
           batch={batch.salvage}
           limit={batch.salvageLimit}
-          eligibleIds={batch.salvageableIds}
+          eligibleIds={visibleSalvageableIds}
           actionLabel="Salvage All"
           counterSuffix={
             batch.salvage.selection.size > 0
@@ -157,16 +196,36 @@ export function StashPanel({
       ) : null}
 
       <div className="space-y-2">
+        {showSearch && (
+          <div className="space-y-1">
+            <label
+              htmlFor="stash-search"
+              className="block text-xs font-semibold text-[var(--rpg-text-secondary)]"
+            >
+              Search stash
+            </label>
+            <input
+              id="stash-search"
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Item name..."
+              className="w-full rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] px-3 py-2 text-sm text-[var(--rpg-text-primary)] placeholder:text-[var(--rpg-text-secondary)] focus:border-[var(--rpg-gold)] focus:outline-none"
+            />
+          </div>
+        )}
         <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
-          Stash ({items.length} {items.length === 1 ? 'item' : 'items'})
+          Stash ({stashCountLabel})
         </div>
         {loading ? (
           <div className="text-sm text-[var(--rpg-text-secondary)]">Loading stash...</div>
         ) : items.length === 0 ? (
           <div className="text-sm text-[var(--rpg-text-secondary)]">Your stash is empty. Deposit items from your backpack.</div>
+        ) : visibleItems.length === 0 ? (
+          <div className="text-sm text-[var(--rpg-text-secondary)]">No stash items match your search.</div>
         ) : (
           <div className="grid grid-cols-6 gap-2">
-            {items.map((item) => {
+            {visibleItems.map((item) => {
               const isSellable = batch.sell.active && item.sellPrice != null && item.sellPrice > 0;
               const isSalvageable = batch.salvage.active && item.salvageCost !== null;
               const isSelectable = batch.withdraw.active || isSellable || isSalvageable;
