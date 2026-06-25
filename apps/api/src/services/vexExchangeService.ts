@@ -2,7 +2,7 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import type { ItemStats, VexExchangeListResponse, VexExchangeView, VexTargetOption } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { invalidateEquipmentCache } from './equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from './inventoryService';
+import { consumeItemsByTemplateTx, getInventoryState, getTotalQuantityByTemplate } from './inventoryService';
 import {
   VEX_EXCHANGES,
   type VexAugmentType,
@@ -219,7 +219,10 @@ function getBlockedReason(
   return null;
 }
 
-function matchesTargetRule(item: { template: { name: string; itemType: string; tier: number } }, targetRule: VexTargetRule): boolean {
+function matchesTargetRule(
+  item: { template: { name: string; itemType: string; tier: number; maxDurability: number } },
+  targetRule: VexTargetRule,
+): boolean {
   if (targetRule.type === 'none') {
     return false;
   }
@@ -230,6 +233,7 @@ function matchesTargetRule(item: { template: { name: string; itemType: string; t
 
   return (
     targetRule.itemTypes.includes(item.template.itemType as 'weapon' | 'armor') &&
+    item.template.maxDurability > 0 &&
     item.template.tier >= targetRule.minTier &&
     item.template.tier <= targetRule.maxTier
   );
@@ -249,6 +253,10 @@ async function applyExchangeEffect(
   switch (exchange.effect.type) {
     case 'create_item': {
       const effect = exchange.effect;
+      const { availableSlots } = await getInventoryState(playerId);
+      if (availableSlots < 1) {
+        throw new AppError(400, 'Backpack is full. Make space before trading with Vex.', 'BACKPACK_FULL');
+      }
       const template = await findTemplateByName(tx, effect.itemTemplateName, seasonId);
       return {
         message: `Created ${template.name}`,

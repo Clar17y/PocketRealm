@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./inventoryService', () => ({
   consumeItemsByTemplateTx: vi.fn(),
+  getInventoryState: vi.fn(),
   getTotalQuantityByTemplate: vi.fn(),
 }));
 
@@ -12,7 +13,7 @@ vi.mock('./equipmentService', () => ({
 import { mockPrisma } from '../__test__/setup';
 import { AppError } from '../middleware/errorHandler';
 import { invalidateEquipmentCache } from './equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from './inventoryService';
+import { consumeItemsByTemplateTx, getInventoryState, getTotalQuantityByTemplate } from './inventoryService';
 import { VEX_EXCHANGES } from './vexExchangeDefinitions';
 import { listVexExchanges, purchaseVexExchange } from './vexExchangeService';
 
@@ -52,6 +53,7 @@ const templates: Template[] = [
   template('tpl-essence', 'Spirit Essence', 'resource', null, 1, {}, 0, true),
   template('tpl-wayfarer', 'Wayfarer Aegis', 'armor', 'off_hand', 2, { accuracy: 4 }, 80),
   template('tpl-spiritbound', 'Spiritbound Aegis', 'armor', 'off_hand', 4, { accuracy: 8, magicDefence: 3 }, 140),
+  template('tpl-satchel', 'Cloth Satchel', 'armor', 'backpack', 1, { inventorySlots: 8 }, 0),
   template('tpl-iron', 'Iron Sword', 'weapon', 'main_hand', 2, { attack: 5 }, 100),
   template('tpl-mythril', 'Mythril Sword', 'weapon', 'main_hand', 4, { attack: 12 }, 150),
   template('tpl-wolfsbane', 'Wolfsbane Blade', 'weapon', 'main_hand', 3, { attack: 10 }, 120),
@@ -127,6 +129,7 @@ beforeEach(() => {
   setupTemplateLookup();
   mockPrisma.player.findUnique.mockResolvedValue({ id: playerId, gold: 6000, seasonId });
   mockPrisma.item.findMany.mockResolvedValue([]);
+  vi.mocked(getInventoryState).mockResolvedValue({ usedSlots: 0, capacity: 24, availableSlots: 24 });
   vi.mocked(getTotalQuantityByTemplate).mockResolvedValue(99);
 });
 
@@ -205,6 +208,7 @@ describe('listVexExchanges', () => {
 
   it('tier-filters Vex Temper target options using minTier and maxTier', async () => {
     mockPrisma.item.findMany.mockResolvedValue([
+      item({ id: 'zero-durability-pack', template: byName('Cloth Satchel') }),
       item({ id: 'tier-2-sword', template: byName('Iron Sword') }),
       item({ id: 'tier-4-sword', template: byName('Mythril Sword') }),
       item({ id: 'boss-staff', template: byName('Spirit Staff') }),
@@ -323,6 +327,16 @@ describe('purchaseVexExchange', () => {
       removedItemIds: ['fang-stack-empty'],
     });
     expect(invalidateEquipmentCache).not.toHaveBeenCalled();
+  });
+
+  it('rejects created Vex gear when the backpack has no free slots', async () => {
+    vi.mocked(getInventoryState).mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
+
+    await expectAppCode(purchaseVexExchange(playerId, 'wayfarer_aegis', {}), 'BACKPACK_FULL');
+
+    expect(mockPrisma.player.updateMany).not.toHaveBeenCalled();
+    expect(consumeItemsByTemplateTx).not.toHaveBeenCalled();
+    expect(mockPrisma.item.create).not.toHaveBeenCalled();
   });
 
   it('uses deterministic global template fallback when a season template is missing', async () => {
@@ -447,6 +461,12 @@ describe('purchaseVexExchange', () => {
     mockPrisma.item.findUnique.mockResolvedValueOnce(item({ id: 'tier-4', template: byName('Mythril Sword') }));
     await expectAppCode(
       purchaseVexExchange(playerId, 'vex_temper_tier_1_3', { targetItemId: 'tier-4' }),
+      'INVALID_TARGET',
+    );
+
+    mockPrisma.item.findUnique.mockResolvedValueOnce(item({ id: 'zero-durability-pack', template: byName('Cloth Satchel') }));
+    await expectAppCode(
+      purchaseVexExchange(playerId, 'vex_temper_tier_1_3', { targetItemId: 'zero-durability-pack' }),
       'INVALID_TARGET',
     );
   });
