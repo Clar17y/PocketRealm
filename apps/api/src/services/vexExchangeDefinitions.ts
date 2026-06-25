@@ -85,7 +85,7 @@ export const VEX_EXCHANGES: VexExchangeDefinition[] = [
     preview: {
       summary: 'Permanently restores and raises max durability by 20%.',
       details: [
-        'Works on tier 1-3 weapons and armour.',
+        'Works on tier 1-3 weapons and armor.',
         'Can only be applied once per item.',
         'Repairs the item to its new maximum durability.',
       ],
@@ -110,7 +110,7 @@ export const VEX_EXCHANGES: VexExchangeDefinition[] = [
     preview: {
       summary: 'Permanently restores and raises max durability by 20%.',
       details: [
-        'Works on tier 4-5 weapons and armour.',
+        'Works on tier 4-5 weapons and armor.',
         'Can only be applied once per item.',
         'Repairs the item to its new maximum durability.',
       ],
