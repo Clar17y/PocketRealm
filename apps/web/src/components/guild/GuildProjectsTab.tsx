@@ -10,7 +10,7 @@ import { ErrorBanner } from '@/components/common/ErrorBanner';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
-  type GuildProjectTurnContributionSource,
+  type GuildProjectContributionResponse, type GuildProjectTurnContributionSource,
 } from '@/lib/api/guild';
 import { PerkBadges } from '@/components/common/PerkBadges';
 import { getInventory } from '@/lib/api/items';
@@ -20,6 +20,7 @@ import { formatNumber } from '@/lib/format';
 interface GuildProjectsTabProps {
   guildId: string;
   myRole: string;
+  playerId?: string | null;
   guildTreasuryTurns?: number;
   onStateUpdates?: (updates: StateUpdates) => void;
   onGuildUpdated?: () => void;
@@ -32,22 +33,76 @@ interface ResourceItem {
   category: string;
 }
 
+const POSITIVE_INTEGER_PATTERN = /^\d+$/;
+
+function getPlayerContribution(
+  project: GuildProjectResponse,
+  playerId: string | null | undefined,
+): GuildProjectContributionResponse | undefined {
+  if (!playerId) return undefined;
+  return project.contributions?.find((contribution) => contribution.playerId === playerId);
+}
+
+function parsePositiveIntegerInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === '' || !POSITIVE_INTEGER_PATTERN.test(trimmed)) return null;
+  const amount = Number(trimmed);
+  return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
+}
+
+function clampContributionAmount(value: string, max: number): number {
+  const amount = parsePositiveIntegerInput(value);
+  if (amount === null || max <= 0) return 0;
+  return Math.min(amount, max);
+}
+
+function clampContributionInput(value: string, max: number): string {
+  if (value.trim() === '') return '';
+  const amount = parsePositiveIntegerInput(value);
+  if (amount === null || max <= 0) return '';
+  return String(Math.min(amount, max));
+}
+
 function getTurnContributionMax(
   project: GuildProjectResponse,
+  playerId: string | null | undefined,
   source: GuildProjectTurnContributionSource,
   guildTreasuryTurns: number | undefined,
-) {
-  const remainingTurns = Math.max(0, project.memberTurnGoal - project.turnsContributed);
-  const isGuildTurnSource = project.projectKey === 'war_room' && source === 'guild';
-  if (isGuildTurnSource) {
-    return Math.min(remainingTurns, guildTreasuryTurns ?? remainingTurns);
-  }
-  return Math.min(remainingTurns, GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP);
+): number {
+  if (!playerId) return 0;
+
+  const playerContribution = getPlayerContribution(project, playerId);
+  const playerCapRemaining = GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP - (playerContribution?.turnsContributed ?? 0);
+  const projectRemaining = project.memberTurnGoal - project.turnsContributed;
+  const sourceRemaining = source === 'guild' && guildTreasuryTurns !== undefined
+    ? guildTreasuryTurns
+    : Number.POSITIVE_INFINITY;
+
+  return Math.max(0, Math.floor(Math.min(playerCapRemaining, projectRemaining, sourceRemaining)));
+}
+
+function getMaterialContributionMax(
+  project: GuildProjectResponse,
+  playerId: string | null | undefined,
+  item: ResourceItem | undefined,
+): number {
+  if (!playerId || !item) return 0;
+
+  const cost = project.materialCosts.find((materialCost) => materialCost.category === item.category);
+  if (!cost) return 0;
+
+  const projectRemaining = cost.quantity - (project.materialsProgress[item.category] ?? 0);
+  const playerContribution = getPlayerContribution(project, playerId);
+  const playerCategoryTotal = playerContribution?.materialsContributed[item.category] ?? 0;
+  const playerCapRemaining = GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP - playerCategoryTotal;
+
+  return Math.max(0, Math.floor(Math.min(item.quantity, projectRemaining, playerCapRemaining)));
 }
 
 export function GuildProjectsTab({
   guildId,
   myRole,
+  playerId,
   guildTreasuryTurns,
   onStateUpdates,
   onGuildUpdated,
@@ -63,14 +118,28 @@ export function GuildProjectsTab({
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [materialQuantity, setMaterialQuantity] = useState('10');
   const [showStartConfirm, setShowStartConfirm] = useState<string | null>(null);
+  const [projectRefreshPending, setProjectRefreshPending] = useState(false);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
+  const applyProjects = useCallback((nextData?: GuildProjectsListResponse | null) => {
+    if (nextData) setData(nextData);
+  }, []);
+
   const loadProjects = useCallback(() => {
-    load.run(() => getGuildProjects(guildId), (data) => { if (data) setData(data); });
-  }, [guildId, load.run]);
+    return load.run(() => getGuildProjects(guildId), applyProjects);
+  }, [applyProjects, guildId, load.run]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
+
+  const refreshProjectsAfterContribution = useCallback(async () => {
+    setProjectRefreshPending(true);
+    try {
+      await loadProjects();
+    } finally {
+      setProjectRefreshPending(false);
+    }
+  }, [loadProjects]);
 
   // Load resource items when materials contribute panel opens
   const loadResourceItems = useCallback((neededCategories: string[]) => {
@@ -90,25 +159,25 @@ export function GuildProjectsTab({
         }
       }
       setResourceItems(resources);
-      if (resources.length > 0 && !selectedTemplateId) {
-        setSelectedTemplateId(resources[0].templateId);
-      }
+      setSelectedTemplateId((current) => (
+        resources.some((resource) => resource.templateId === current)
+          ? current
+          : resources[0]?.templateId ?? ''
+      ));
     });
-  }, [selectedTemplateId, resourceLoad.run]);
+  }, [resourceLoad.run]);
 
   const handleStartProject = (projectKey: string) =>
     action.run(() => startGuildProject(guildId, projectKey), () => void loadProjects());
 
   const handleContributeTurns = (projectId: string) => {
-    const amount = parseInt(turnAmount);
-    if (!amount || amount <= 0) return;
     const project = data?.projects.find((p) => p.id === projectId);
     if (!project) return;
     const source = project.projectKey === 'war_room' ? turnSource : 'player';
-    const turnAmountMax = getTurnContributionMax(project, source, guildTreasuryTurns);
-    const effectiveAmount = Math.min(amount, turnAmountMax);
-    if (effectiveAmount <= 0) return;
-    action.run(() => contributeProjectTurns(guildId, projectId, effectiveAmount, source), (data) => {
+    const maxAmount = getTurnContributionMax(project, playerId, source, guildTreasuryTurns);
+    const amount = clampContributionAmount(turnAmount, maxAmount);
+    if (amount <= 0) return;
+    action.run(() => contributeProjectTurns(guildId, projectId, amount, source), (data) => {
       if (data?.stateUpdates) onStateUpdates?.(data.stateUpdates);
       if (source === 'guild') onGuildUpdated?.();
       void loadProjects();
@@ -116,16 +185,23 @@ export function GuildProjectsTab({
   };
 
   const handleContributeMaterials = (projectId: string) => {
-    const qty = parseInt(materialQuantity);
-    if (!qty || qty <= 0 || !selectedTemplateId) return;
-    action.run(() => contributeProjectMaterials(guildId, projectId, selectedTemplateId, qty), () => {
-      void loadProjects();
-      const activeProject = data?.projects.find((p) => p.status === 'active');
-      if (activeProject) {
-        const neededCategories = activeProject.materialCosts
-          .filter((c) => (activeProject.materialsProgress[c.category] ?? 0) < c.quantity)
+    const project = data?.projects.find((p) => p.id === projectId);
+    const selectedResource = resourceItems.find((item) => item.templateId === selectedTemplateId);
+    if (!project || !selectedResource) return;
+    const maxQuantity = getMaterialContributionMax(project, playerId, selectedResource);
+    const qty = clampContributionAmount(materialQuantity, maxQuantity);
+    if (qty <= 0) return;
+    action.run(() => contributeProjectMaterials(guildId, projectId, selectedTemplateId, qty), (response) => {
+      if (response?.stateUpdates) onStateUpdates?.(response.stateUpdates);
+      void refreshProjectsAfterContribution();
+      if (response?.status === 'active') {
+        const neededCategories = response.materialCosts
+          .filter((c) => (response.materialsProgress[c.category] ?? 0) < c.quantity)
           .map((c) => c.category);
         void loadResourceItems(neededCategories);
+      } else {
+        setResourceItems([]);
+        setSelectedTemplateId('');
       }
     });
   };
@@ -159,8 +235,10 @@ export function GuildProjectsTab({
           setTurnAmount={setTurnAmount}
           turnSource={turnSource}
           setTurnSource={setTurnSource}
+          playerId={playerId}
           guildTreasuryTurns={guildTreasuryTurns}
           actionLoading={action.loading}
+          contributionDisabled={projectRefreshPending}
           onContributeTurns={() => handleContributeTurns(activeProject.id)}
           resourceItems={resourceItems}
           selectedTemplateId={selectedTemplateId}
@@ -246,8 +324,10 @@ function ActiveProjectCard({
   setTurnAmount,
   turnSource,
   setTurnSource,
+  playerId,
   guildTreasuryTurns,
   actionLoading,
+  contributionDisabled,
   onContributeTurns,
   resourceItems,
   selectedTemplateId,
@@ -263,8 +343,10 @@ function ActiveProjectCard({
   setTurnAmount: (v: string) => void;
   turnSource: GuildProjectTurnContributionSource;
   setTurnSource: (v: GuildProjectTurnContributionSource) => void;
+  playerId?: string | null;
   guildTreasuryTurns?: number;
   actionLoading: boolean;
+  contributionDisabled: boolean;
   onContributeTurns: () => void;
   resourceItems: ResourceItem[];
   selectedTemplateId: string;
@@ -279,8 +361,31 @@ function ActiveProjectCard({
   );
   const canUseGuildTurnBank = project.projectKey === 'war_room';
   const isGuildTurnSource = canUseGuildTurnBank && turnSource === 'guild';
-  const turnAmountMax = getTurnContributionMax(project, turnSource, guildTreasuryTurns);
-  const canContributeTurns = turnAmountMax > 0;
+  const activeTurnSource = isGuildTurnSource ? 'guild' : 'player';
+  const playerContribution = getPlayerContribution(project, playerId);
+  const playerTurnsContributed = playerContribution?.turnsContributed ?? 0;
+  const maxTurnContribution = getTurnContributionMax(project, playerId, activeTurnSource, guildTreasuryTurns);
+  const canContributeTurns = maxTurnContribution > 0;
+  const turnInputContext = isGuildTurnSource ? 'from guild bank' : 'now';
+  const selectedResourceItem = resourceItems.find((item) => item.templateId === selectedTemplateId);
+  const selectedMaterialContributed = selectedResourceItem
+    ? playerContribution?.materialsContributed[selectedResourceItem.category] ?? 0
+    : 0;
+  const maxMaterialContribution = getMaterialContributionMax(project, playerId, selectedResourceItem);
+
+  useEffect(() => {
+    const clamped = clampContributionInput(turnAmount, maxTurnContribution);
+    if (turnAmount !== clamped) setTurnAmount(clamped);
+  }, [maxTurnContribution, setTurnAmount, turnAmount]);
+
+  useEffect(() => {
+    if (maxMaterialContribution <= 0) {
+      if (selectedResourceItem && materialQuantity !== '') setMaterialQuantity('');
+      return;
+    }
+    const clamped = clampContributionInput(materialQuantity, maxMaterialContribution);
+    if (materialQuantity !== clamped) setMaterialQuantity(clamped);
+  }, [materialQuantity, maxMaterialContribution, selectedResourceItem, setMaterialQuantity]);
 
   return (
     <PixelCard>
@@ -399,20 +504,23 @@ function ActiveProjectCard({
             <div className="flex gap-2 items-end">
               <div className="flex-1">
                 <label htmlFor="contribute-turns-amount" className="text-xs text-[var(--rpg-text-secondary)]">
-                  Amount (max {formatNumber(turnAmountMax)} {isGuildTurnSource ? 'from guild bank' : 'per project'})
+                  Amount (max {formatNumber(maxTurnContribution)} {turnInputContext}; {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per person)
                 </label>
                 <input
                   id="contribute-turns-amount"
                   type="number"
                   value={turnAmount}
-                  onChange={(e) => setTurnAmount(e.target.value)}
+                  onChange={(e) => setTurnAmount(clampContributionInput(e.target.value, maxTurnContribution))}
                   min={canContributeTurns ? 1 : 0}
-                  max={turnAmountMax}
-                  disabled={!canContributeTurns}
+                  max={maxTurnContribution}
+                  disabled={actionLoading || contributionDisabled || !canContributeTurns}
                   className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
                 />
+                <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
+                  You: {formatNumber(playerTurnsContributed)} / {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} turns
+                </p>
               </div>
-              <PixelButton onClick={onContributeTurns} disabled={actionLoading || !canContributeTurns}>
+              <PixelButton onClick={onContributeTurns} disabled={actionLoading || contributionDisabled || !canContributeTurns}>
                 {actionLoading ? '...' : 'Contribute'}
               </PixelButton>
             </div>
@@ -442,17 +550,25 @@ function ActiveProjectCard({
                 </div>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <label htmlFor="contribute-material-quantity" className="text-xs text-[var(--rpg-text-secondary)]">Quantity</label>
+                    <label htmlFor="contribute-material-quantity" className="text-xs text-[var(--rpg-text-secondary)]">
+                      Quantity (max {formatNumber(maxMaterialContribution)} now; {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP)} per person/category)
+                    </label>
                     <input
                       id="contribute-material-quantity"
                       type="number"
                       value={materialQuantity}
-                      onChange={(e) => setMaterialQuantity(e.target.value)}
+                      onChange={(e) => setMaterialQuantity(clampContributionInput(e.target.value, maxMaterialContribution))}
                       min={1}
+                      max={maxMaterialContribution}
                       className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
                     />
+                    {selectedResourceItem && (
+                      <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
+                        You: {formatNumber(selectedMaterialContributed)} / {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP)} {selectedResourceItem.category}
+                      </p>
+                    )}
                   </div>
-                  <PixelButton onClick={onContributeMaterials} disabled={actionLoading}>
+                  <PixelButton onClick={onContributeMaterials} disabled={actionLoading || contributionDisabled || maxMaterialContribution <= 0}>
                     {actionLoading ? '...' : 'Contribute'}
                   </PixelButton>
                 </div>

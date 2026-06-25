@@ -166,6 +166,7 @@ export function GuildScreen({
         <GuildProjectsTab
           guildId={guildData.guild.id}
           myRole={guildData.role}
+          playerId={playerId}
           guildTreasuryTurns={guildData.guild.treasuryTurns}
           onStateUpdates={onStateUpdates}
           onGuildUpdated={refreshGuild}

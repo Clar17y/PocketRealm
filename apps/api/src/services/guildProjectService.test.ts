@@ -4,6 +4,20 @@ vi.mock('./guildUpgradeService', () => ({
   invalidateGuildModifiersForGuild: vi.fn(),
 }));
 
+const stateUpdateMocks = vi.hoisted(() => ({
+  fetchItemDTOs: vi.fn(),
+  fetchInventoryMeta: vi.fn(),
+  fetchMaterialTotals: vi.fn(),
+  buildInventoryStateUpdates: vi.fn(),
+}));
+
+vi.mock('./stateUpdateHelpers', () => ({
+  fetchItemDTOs: stateUpdateMocks.fetchItemDTOs,
+  fetchInventoryMeta: stateUpdateMocks.fetchInventoryMeta,
+  fetchMaterialTotals: stateUpdateMocks.fetchMaterialTotals,
+  buildInventoryStateUpdates: stateUpdateMocks.buildInventoryStateUpdates,
+}));
+
 import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma as db } from '../__test__/setup';
 
@@ -29,6 +43,15 @@ function makeMember(role: string, guild: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  stateUpdateMocks.fetchItemDTOs.mockResolvedValue([]);
+  stateUpdateMocks.fetchInventoryMeta.mockResolvedValue({ inventoryUsedSlots: 0 });
+  stateUpdateMocks.fetchMaterialTotals.mockResolvedValue({});
+  stateUpdateMocks.buildInventoryStateUpdates.mockImplementation((opts) => ({
+    ...(opts.removed?.length ? { inventoryRemoved: opts.removed } : {}),
+    ...(opts.updated?.length ? { inventoryUpdated: opts.updated } : {}),
+    inventoryUsedSlots: opts.inventoryUsedSlots,
+    ...(opts.materialTotals ? { materialTotals: opts.materialTotals } : {}),
+  }));
 });
 
 describe('startProject', () => {
@@ -489,6 +512,58 @@ describe('contributeMaterials', () => {
     expect(result.materialsProgress).toEqual({ ore: 550 });
   });
 
+  it('returns inventory state updates for consumed materials', async () => {
+    const updatedItem = {
+      id: 'item-1',
+      templateId: 'tpl-iron-ore',
+      ownerId: PLAYER_ID,
+      quantity: 50,
+    };
+    const materialTotals = { 'tpl-iron-ore': 50 };
+    stateUpdateMocks.fetchItemDTOs.mockResolvedValue([updatedItem]);
+    stateUpdateMocks.fetchInventoryMeta.mockResolvedValue({ inventoryUsedSlots: 3 });
+    stateUpdateMocks.fetchMaterialTotals.mockResolvedValue(materialTotals);
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
+    });
+    db.guildProject.findFirst.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 500 },
+      status: 'active',
+    });
+    db.itemTemplate.findUnique.mockResolvedValue({
+      id: 'tpl-iron-ore', name: 'Iron Ore', itemType: 'resource',
+    });
+    db.guildProjectContribution.findUnique.mockResolvedValue(null);
+    db.$transaction.mockImplementation(async (fn: any) => fn(db));
+    db.item.findMany.mockResolvedValue([
+      { id: 'item-1', quantity: 100, createdAt: new Date() },
+    ]);
+    db.item.update.mockResolvedValue({});
+    db.guildProject.update.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 550 },
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+    db.guildProjectContribution.upsert.mockResolvedValue({});
+    db.guildProject.findUnique.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 550 },
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+
+    const result = await contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 50);
+
+    expect(stateUpdateMocks.fetchItemDTOs).toHaveBeenCalledWith(['item-1']);
+    expect(stateUpdateMocks.fetchInventoryMeta).toHaveBeenCalledWith(PLAYER_ID);
+    expect(stateUpdateMocks.fetchMaterialTotals).toHaveBeenCalledWith(PLAYER_ID);
+    expect(result.stateUpdates).toEqual({
+      inventoryUpdated: [updatedItem],
+      inventoryUsedSlots: 3,
+      materialTotals,
+    });
+  });
+
   it('throws if template is not in a required category', async () => {
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
@@ -580,6 +655,59 @@ describe('contributeMaterials', () => {
     expect(result.materialsProgress.ore).toBe(1000);
   });
 
+  it('uses locked material progress before consuming inventory', async () => {
+    let inTransaction = false;
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
+    });
+    db.guildProject.findFirst.mockImplementation(() => Promise.resolve({
+      id: 'proj-1',
+      guildId: GUILD_ID,
+      projectKey: 'guild_forge',
+      turnsContributed: 0,
+      materialsProgress: { ore: inTransaction ? 990 : 900 },
+      status: 'active',
+    }));
+    db.itemTemplate.findUnique.mockResolvedValue({
+      id: 'tpl-iron-ore', name: 'Iron Ore', itemType: 'resource',
+    });
+    db.guildProjectContribution.findUnique.mockResolvedValue(null);
+    db.$transaction.mockImplementation(async (fn: any) => {
+      inTransaction = true;
+      try {
+        return await fn(db);
+      } finally {
+        inTransaction = false;
+      }
+    });
+    db.item.findMany.mockResolvedValue([
+      { id: 'item-1', quantity: 100, createdAt: new Date() },
+    ]);
+    db.item.update.mockResolvedValue({});
+    db.guildProject.update.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 1000 },
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+    db.guildProjectContribution.upsert.mockResolvedValue({});
+    db.guildProject.findUnique.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 1000 },
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+
+    await contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 50);
+
+    expect(db.item.update).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: { quantity: 90 },
+    });
+    expect(db.guildProject.update).toHaveBeenCalledWith({
+      where: { id: 'proj-1' },
+      data: { materialsProgress: { ore: 1000 } },
+    });
+  });
+
   it('throws if category already fully contributed', async () => {
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
@@ -593,6 +721,7 @@ describe('contributeMaterials', () => {
       id: 'tpl-iron-ore', name: 'Iron Ore', itemType: 'resource',
     });
     db.guildProjectContribution.findUnique.mockResolvedValue(null);
+    db.$transaction.mockImplementation(async (fn: any) => fn(db));
 
     await expect(contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 50))
       .rejects.toThrow('already fully contributed');
@@ -614,9 +743,63 @@ describe('contributeMaterials', () => {
       turnsContributed: 0,
       materialsContributed: { ore: GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP - 10 },
     });
+    db.$transaction.mockImplementation(async (fn: any) => fn(db));
 
     await expect(contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 50))
       .rejects.toThrow('per-project material contribution cap');
+  });
+
+  it('checks material cap against the locked contribution row before consuming inventory', async () => {
+    let inTransaction = false;
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
+    });
+    db.guildProject.findFirst.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 100 },
+      status: 'active',
+    });
+    db.itemTemplate.findUnique.mockResolvedValue({
+      id: 'tpl-iron-ore', name: 'Iron Ore', itemType: 'resource',
+    });
+    db.guildProjectContribution.findUnique.mockImplementation(() => Promise.resolve({
+      turnsContributed: 0,
+      materialsContributed: {
+        ore: inTransaction ? GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP - 5 : 0,
+      },
+    }));
+    db.$transaction.mockImplementation(async (fn: any) => {
+      inTransaction = true;
+      try {
+        return await fn(db);
+      } finally {
+        inTransaction = false;
+      }
+    });
+    db.item.findMany.mockResolvedValue([
+      { id: 'item-1', quantity: 100, createdAt: new Date() },
+    ]);
+    db.item.update.mockResolvedValue({});
+    db.guildProject.update.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 110 },
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+    db.guildProjectContribution.upsert.mockResolvedValue({});
+    db.guildProject.findUnique.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 110 },
+      status: 'active', startedAt: new Date(), completedAt: null,
+    });
+
+    await expect(contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 10))
+      .rejects.toThrow('per-project material contribution cap');
+
+    expect(db.item.findMany).not.toHaveBeenCalled();
+    expect(db.item.update).not.toHaveBeenCalled();
+    expect(db.item.delete).not.toHaveBeenCalled();
+    expect(db.guildProject.update).not.toHaveBeenCalled();
+    expect(db.guildProjectContribution.upsert).not.toHaveBeenCalled();
   });
 });
 

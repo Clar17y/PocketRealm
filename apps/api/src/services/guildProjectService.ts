@@ -12,6 +12,12 @@ import { consumeItemsByTemplateTx } from './inventoryService';
 import { addGuildXp } from './guildService';
 import { invalidateGuildModifiersForGuild } from './guildUpgradeService';
 import { materialsProgressSchema } from '../utils/jsonColumnSchemas';
+import {
+  buildInventoryStateUpdates,
+  fetchInventoryMeta,
+  fetchItemDTOs,
+  fetchMaterialTotals,
+} from './stateUpdateHelpers';
 
 // ---------------------------------------------------------------------------
 // Start Project
@@ -250,59 +256,63 @@ export async function contributeMaterials(
     throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
   }
 
-  const project = await prisma.guildProject.findFirst({
-    where: { id: projectId, guildId, status: 'active' },
-  });
-  if (!project) {
-    throw new AppError(404, 'Project not found or not active', 'PROJECT_NOT_ACTIVE');
-  }
+  const { project: updated, def, consumeResult } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT id FROM "guild_projects" WHERE id = ${projectId} AND "guild_id" = ${guildId} AND status = 'active' FOR UPDATE`;
 
-  const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === project.projectKey);
-  if (!def) throw new AppError(500, 'Project definition not found', 'INTERNAL_ERROR');
+    const project = await tx.guildProject.findFirst({
+      where: { id: projectId, guildId, status: 'active' },
+    });
+    if (!project) {
+      throw new AppError(404, 'Project not found or not active', 'PROJECT_NOT_ACTIVE');
+    }
 
-  // Resolve template name to category
-  const template = await prisma.itemTemplate.findUnique({ where: { id: templateId } });
-  if (!template) throw new AppError(404, 'Item template not found', 'NOT_FOUND');
+    const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === project.projectKey);
+    if (!def) throw new AppError(500, 'Project definition not found', 'INTERNAL_ERROR');
 
-  const category = getCategoryForTemplate(template.name);
-  if (!category) {
-    throw new AppError(400, 'This material is not needed for this project', 'INVALID_MATERIAL');
-  }
+    // Resolve template name to category
+    const template = await tx.itemTemplate.findUnique({ where: { id: templateId } });
+    if (!template) throw new AppError(404, 'Item template not found', 'NOT_FOUND');
 
-  // Check category is needed by this project
-  const requiredCost = def.materialCosts.find((c) => c.category === category);
-  if (!requiredCost) {
-    throw new AppError(400, 'This material is not needed for this project', 'INVALID_MATERIAL');
-  }
+    const category = getCategoryForTemplate(template.name);
+    if (!category) {
+      throw new AppError(400, 'This material is not needed for this project', 'INVALID_MATERIAL');
+    }
 
-  // Check per-project material cap for this player
-  const existingContribution = await prisma.guildProjectContribution.findUnique({
-    where: { projectId_playerId: { projectId, playerId } },
-  });
-  const contributedMaterials = materialsProgressSchema.catch({}).parse(existingContribution?.materialsContributed ?? {});
-  const playerCategoryTotal = contributedMaterials[category] ?? 0;
-  if (playerCategoryTotal + quantity > GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP) {
-    throw new AppError(
-      400,
-      `Exceeds per-project material contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP} per category)`,
-      'CONTRIBUTION_CAP_EXCEEDED',
-    );
-  }
+    // Check category is needed by this project
+    const requiredCost = def.materialCosts.find((c) => c.category === category);
+    if (!requiredCost) {
+      throw new AppError(400, 'This material is not needed for this project', 'INVALID_MATERIAL');
+    }
 
-  // Check category not already fully contributed
-  const progress = materialsProgressSchema.catch({}).parse(project.materialsProgress ?? {});
-  const currentProgress = progress[category] ?? 0;
-  if (currentProgress >= requiredCost.quantity) {
-    throw new AppError(400, `${category} materials already fully contributed`, 'CATEGORY_COMPLETE');
-  }
+    // Check category not already fully contributed
+    const progress = materialsProgressSchema.catch({}).parse(project.materialsProgress ?? {});
+    const currentProgress = progress[category] ?? 0;
+    if (currentProgress >= requiredCost.quantity) {
+      throw new AppError(400, `${category} materials already fully contributed`, 'CATEGORY_COMPLETE');
+    }
 
-  // Cap to remaining needed
-  const remaining = requiredCost.quantity - currentProgress;
-  const effectiveQuantity = Math.min(quantity, remaining);
+    // Cap to remaining needed
+    const remaining = requiredCost.quantity - currentProgress;
+    const effectiveQuantity = Math.min(quantity, remaining);
 
-  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT id FROM "guild_project_contributions" WHERE "project_id" = ${projectId} AND "player_id" = ${playerId} FOR UPDATE`;
+
+    // Check per-project material cap for this player
+    const existingContribution = await tx.guildProjectContribution.findUnique({
+      where: { projectId_playerId: { projectId, playerId } },
+    });
+    const contributedMaterials = materialsProgressSchema.catch({}).parse(existingContribution?.materialsContributed ?? {});
+    const playerCategoryTotal = contributedMaterials[category] ?? 0;
+    if (playerCategoryTotal + effectiveQuantity > GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP) {
+      throw new AppError(
+        400,
+        `Exceeds per-project material contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP} per category)`,
+        'CONTRIBUTION_CAP_EXCEEDED',
+      );
+    }
+
     // Consume items
-    await consumeItemsByTemplateTx(tx, playerId, templateId, effectiveQuantity);
+    const consumeResult = await consumeItemsByTemplateTx(tx, playerId, templateId, effectiveQuantity);
 
     // Update materials progress
     const newProgress = { ...progress, [category]: currentProgress + effectiveQuantity };
@@ -312,13 +322,9 @@ export async function contributeMaterials(
     });
 
     // Upsert contribution
-    const existingContrib = await tx.guildProjectContribution.findUnique({
-      where: { projectId_playerId: { projectId, playerId } },
-    });
-    const existingMaterials = materialsProgressSchema.catch({}).parse(existingContrib?.materialsContributed ?? {});
     const newMaterialsContrib = {
-      ...existingMaterials,
-      [category]: (existingMaterials[category] ?? 0) + effectiveQuantity,
+      ...contributedMaterials,
+      [category]: playerCategoryTotal + effectiveQuantity,
     };
 
     await tx.guildProjectContribution.upsert({
@@ -331,14 +337,33 @@ export async function contributeMaterials(
     await checkAndCompleteProject(tx, updatedProject, def, guildId);
 
     // Re-fetch to get final state
-    return tx.guildProject.findUnique({ where: { id: projectId } });
+    const finalProject = await tx.guildProject.findUnique({ where: { id: projectId } });
+    return { project: finalProject, def, consumeResult };
   });
 
-  if (updated!.status === 'completed') {
+  if (!updated) {
+    throw new AppError(404, 'Project not found or not active', 'PROJECT_NOT_ACTIVE');
+  }
+
+  if (updated.status === 'completed') {
     await invalidateGuildModifiersForGuild(guildId);
   }
 
-  return toProjectData(updated!, def);
+  const [updatedItems, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs(consumeResult.partiallyConsumedIds),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+
+  return {
+    ...toProjectData(updated, def),
+    stateUpdates: buildInventoryStateUpdates({
+      removed: consumeResult.fullyConsumedIds,
+      updated: updatedItems,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------
