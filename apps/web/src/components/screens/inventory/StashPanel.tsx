@@ -45,6 +45,14 @@ interface StashPanelProps {
   };
 }
 
+function removeHiddenSelections(batchMode: BatchMode, visibleItemIds: ReadonlySet<string>) {
+  for (const id of batchMode.selection) {
+    if (!visibleItemIds.has(id)) {
+      batchMode.toggle(id);
+    }
+  }
+}
+
 export function StashPanel({
   items,
   loading,
@@ -80,15 +88,9 @@ export function StashPanel({
   const stashCountLabel = hasSearch ? `${visibleItemCountText} of ${items.length}` : visibleItemCountText;
 
   useEffect(() => {
-    for (const id of batch.withdraw.selection) {
-      if (!visibleItemIdSet.has(id)) batch.withdraw.toggle(id);
-    }
-    for (const id of batch.sell.selection) {
-      if (!visibleItemIdSet.has(id)) batch.sell.toggle(id);
-    }
-    for (const id of batch.salvage.selection) {
-      if (!visibleItemIdSet.has(id)) batch.salvage.toggle(id);
-    }
+    removeHiddenSelections(batch.withdraw, visibleItemIdSet);
+    removeHiddenSelections(batch.sell, visibleItemIdSet);
+    removeHiddenSelections(batch.salvage, visibleItemIdSet);
   }, [batch.salvage, batch.sell, batch.withdraw, visibleItemIdSet]);
 
   return (
