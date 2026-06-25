@@ -360,10 +360,13 @@ function ActiveProjectCard({
     (c) => (project.materialsProgress[c.category] ?? 0) < c.quantity,
   );
   const canUseGuildTurnBank = project.projectKey === 'war_room';
-  const activeTurnSource = canUseGuildTurnBank ? turnSource : 'player';
+  const isGuildTurnSource = canUseGuildTurnBank && turnSource === 'guild';
+  const activeTurnSource = isGuildTurnSource ? 'guild' : 'player';
   const playerContribution = getPlayerContribution(project, playerId);
   const playerTurnsContributed = playerContribution?.turnsContributed ?? 0;
   const maxTurnContribution = getTurnContributionMax(project, playerId, activeTurnSource, guildTreasuryTurns);
+  const canContributeTurns = maxTurnContribution > 0;
+  const turnInputContext = isGuildTurnSource ? 'from guild bank' : 'now';
   const selectedResourceItem = resourceItems.find((item) => item.templateId === selectedTemplateId);
   const selectedMaterialContributed = selectedResourceItem
     ? playerContribution?.materialsContributed[selectedResourceItem.category] ?? 0
@@ -501,22 +504,23 @@ function ActiveProjectCard({
             <div className="flex gap-2 items-end">
               <div className="flex-1">
                 <label htmlFor="contribute-turns-amount" className="text-xs text-[var(--rpg-text-secondary)]">
-                  Amount (max {formatNumber(maxTurnContribution)} now; {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per person)
+                  Amount (max {formatNumber(maxTurnContribution)} {turnInputContext}; {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per person)
                 </label>
                 <input
                   id="contribute-turns-amount"
                   type="number"
                   value={turnAmount}
                   onChange={(e) => setTurnAmount(clampContributionInput(e.target.value, maxTurnContribution))}
-                  min={1}
+                  min={canContributeTurns ? 1 : 0}
                   max={maxTurnContribution}
+                  disabled={actionLoading || contributionDisabled || !canContributeTurns}
                   className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
                 />
                 <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
                   You: {formatNumber(playerTurnsContributed)} / {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} turns
                 </p>
               </div>
-              <PixelButton onClick={onContributeTurns} disabled={actionLoading || contributionDisabled || maxTurnContribution <= 0}>
+              <PixelButton onClick={onContributeTurns} disabled={actionLoading || contributionDisabled || !canContributeTurns}>
                 {actionLoading ? '...' : 'Contribute'}
               </PixelButton>
             </div>

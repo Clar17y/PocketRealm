@@ -411,6 +411,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const {
     refreshCraftingRecipes,
+    refreshInventory,
     handleLoadSkillPoints,
     handleAllocateSkillPoint,
     handleRespecSkillPoints,
@@ -860,6 +861,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleMine: gatheringActions.handleMine,
     handleCraft: craftingActions.handleCraft,
     ...inventoryActions,
+    refreshInventory,
     handleAllocateAttribute: resourceActions.handleAllocateAttribute,
     loadAll,
     loadPvpNotificationCount,

@@ -26,7 +26,11 @@ interface BossEncounterPanelProps {
   playerId?: string;
   onClose?: () => void;
   onNavigate?: (screen: string) => void;
+  onRewardsLoaded?: () => void | boolean | Promise<void | boolean>;
 }
+
+const REWARD_SYNC_RETRY_DELAY_MS = 5_000;
+const REWARD_SYNC_MAX_RETRIES = 3;
 
 function bossStatusLabel(status: BossEncounterResponse['status']): string {
   switch (status) {
@@ -41,7 +45,7 @@ function bossStatusLabel(status: BossEncounterResponse['status']): string {
   }
 }
 
-export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate }: BossEncounterPanelProps) {
+export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate, onRewardsLoaded }: BossEncounterPanelProps) {
   const [encounter, setEncounter] = useState<BossEncounterResponse | null>(null);
   const [participants, setParticipants] = useState<BossParticipantResponse[]>([]);
   const [myRewards, setMyRewards] = useState<BossPlayerReward | null>(null);
@@ -50,6 +54,12 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   const [autoSignUp, setAutoSignUp] = useState(false);
   const [signupError, setSignupError] = useState('');
   const autoSignUpInitRef = useRef(false);
+  const syncedRewardsKeyRef = useRef<string | null>(null);
+  const syncingRewardsKeyRef = useRef<string | null>(null);
+  const rewardSyncRetryCountsRef = useRef<Map<string, number>>(new Map());
+  const rewardSyncRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rewardSyncMountedRef = useRef(true);
+  const [rewardSyncRetryTick, setRewardSyncRetryTick] = useState(0);
 
   // Active template state
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null);
@@ -72,6 +82,63 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   }, [encounterId, startLoad, endLoad]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const scheduleRewardSyncRetry = useCallback((rewardsKey: string) => {
+    if (!rewardSyncMountedRef.current) return;
+
+    const retries = rewardSyncRetryCountsRef.current.get(rewardsKey) ?? 0;
+    if (retries >= REWARD_SYNC_MAX_RETRIES) return;
+
+    rewardSyncRetryCountsRef.current.set(rewardsKey, retries + 1);
+    if (rewardSyncRetryTimeoutRef.current) {
+      clearTimeout(rewardSyncRetryTimeoutRef.current);
+    }
+    rewardSyncRetryTimeoutRef.current = setTimeout(() => {
+      rewardSyncRetryTimeoutRef.current = null;
+      setRewardSyncRetryTick((tick) => tick + 1);
+    }, REWARD_SYNC_RETRY_DELAY_MS);
+  }, []);
+
+  useEffect(() => {
+    rewardSyncMountedRef.current = true;
+
+    return () => {
+      rewardSyncMountedRef.current = false;
+      if (rewardSyncRetryTimeoutRef.current) {
+        clearTimeout(rewardSyncRetryTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!myRewards || encounter?.status !== 'defeated') return;
+
+    const rewardsKey = `${encounterId}:${JSON.stringify(myRewards)}`;
+    if (syncedRewardsKeyRef.current === rewardsKey) return;
+    if (syncingRewardsKeyRef.current === rewardsKey) return;
+
+    syncingRewardsKeyRef.current = rewardsKey;
+    void Promise.resolve()
+      .then(() => onRewardsLoaded?.())
+      .then((success) => {
+        if (!rewardSyncMountedRef.current) return;
+
+        syncingRewardsKeyRef.current = null;
+        if (success === false) {
+          scheduleRewardSyncRetry(rewardsKey);
+          return;
+        }
+
+        syncedRewardsKeyRef.current = rewardsKey;
+        rewardSyncRetryCountsRef.current.delete(rewardsKey);
+      })
+      .catch(() => {
+        if (!rewardSyncMountedRef.current) return;
+
+        syncingRewardsKeyRef.current = null;
+        scheduleRewardSyncRetry(rewardsKey);
+      });
+  }, [encounter?.status, encounterId, myRewards, onRewardsLoaded, rewardSyncRetryTick, scheduleRewardSyncRetry]);
 
   // Fetch active template on mount
   useEffect(() => {

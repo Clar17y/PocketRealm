@@ -51,6 +51,22 @@ const activeProject: GuildProjectResponse = {
   ],
 };
 
+const activeWarRoom: GuildProjectResponse = {
+  id: 'project-1',
+  projectKey: 'war_room',
+  name: 'War Room',
+  description: 'A strategic planning center that sharpens combat skills.',
+  level: 1,
+  status: 'active',
+  materialCosts: [],
+  materialsProgress: {},
+  memberTurnGoal: 150_000,
+  turnsContributed: 50_000,
+  perks: [{ effectType: 'xpBoost', value: 0.05 }],
+  startedAt: '2026-06-23T08:00:00.000Z',
+  completedAt: null,
+};
+
 function projectsResponse(project: GuildProjectResponse = activeProject): GuildProjectsListResponse {
   return { projects: [project], available: [] };
 }
@@ -212,6 +228,40 @@ describe('GuildProjectsTab', () => {
 
     await waitFor(() => {
       expect((screen.getByRole('button', { name: /^Contribute$/ }) as HTMLButtonElement).disabled).toBe(false);
+    });
+  });
+
+  it('disables guild-bank turn contribution when the guild treasury has no turns', async () => {
+    apiMocks.getGuildProjects.mockResolvedValue({ data: projectsResponse(activeWarRoom), error: null });
+
+    renderProjectsTab({
+      myRole: 'leader',
+      guildTreasuryTurns: 0,
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Contribute Turns' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guild bank' }));
+
+    expect(screen.getByText('Amount (max 0 from guild bank; 50,000 per person)')).toBeTruthy();
+    expect((screen.getByLabelText(/Amount \(max 0 from guild bank/i) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /^Contribute$/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('submits the displayed guild-bank max when the current turn amount is higher', async () => {
+    apiMocks.getGuildProjects.mockResolvedValue({ data: projectsResponse(activeWarRoom), error: null });
+    apiMocks.contributeProjectTurns.mockResolvedValue({ data: activeWarRoom, error: null });
+
+    renderProjectsTab({
+      myRole: 'leader',
+      guildTreasuryTurns: 500,
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Contribute Turns' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guild bank' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Contribute$/ }));
+
+    await waitFor(() => {
+      expect(apiMocks.contributeProjectTurns).toHaveBeenCalledWith('guild-1', 'project-1', 500, 'guild');
     });
   });
 });
