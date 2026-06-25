@@ -9,6 +9,11 @@ export interface VexRequiredItem {
   ownedQuantity: number;
 }
 
+export interface VexExchangePreview {
+  summary: string;
+  details: string[];
+}
+
 export interface VexTargetOption {
   itemId: string;
   itemName: string;
@@ -25,6 +30,7 @@ export interface VexExchangeView {
   key: string;
   name: string;
   description: string;
+  preview: VexExchangePreview;
   category: VexExchangeCategory;
   goldCost: number;
   playerGold: number;

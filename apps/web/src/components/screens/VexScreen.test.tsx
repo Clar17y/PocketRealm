@@ -50,6 +50,10 @@ const listResponse: VexExchangeListResponse = {
       key: 'wayfarer_aegis',
       name: 'Wayfarer Aegis',
       description: 'Trade Alpha Wolf trophies for an accuracy off-hand.',
+      preview: {
+        summary: 'Creates a soulbound tier 2 off-hand shield.',
+        details: ['Accuracy +10, Armor +4, Health +8', 'Required level 8', 'Max durability 100'],
+      },
       category: 'item',
       goldCost: 750,
       playerGold: 5000,
@@ -63,6 +67,10 @@ const listResponse: VexExchangeListResponse = {
       key: 'spiritbound_aegis',
       name: 'Spiritbound Aegis',
       description: 'Upgrade a Wayfarer Aegis with Spirit Essence.',
+      preview: {
+        summary: 'Transforms a Wayfarer Aegis into a stronger tier 4 off-hand.',
+        details: ['Accuracy +14, Armor +5, Magic Defence +8, Health +12', 'Required level 16', 'Max durability 140'],
+      },
       category: 'upgrade',
       goldCost: 2500,
       playerGold: 5000,
@@ -88,6 +96,10 @@ const listResponse: VexExchangeListResponse = {
       key: 'fangstone',
       name: 'Fangstone',
       description: 'Set Alpha Wolf pressure into a boss-crafted item.',
+      preview: {
+        summary: 'Adds a one-time Alpha Wolf boss stone to eligible boss-crafted gear.',
+        details: ['Attack +2, Accuracy +2, Armor +1, Health +3', 'Works on Wolfsbane Blade and Alpha Pelt Chest'],
+      },
       category: 'boss_stone',
       goldCost: 1500,
       playerGold: 5000,
@@ -131,6 +143,8 @@ describe('VexScreen', () => {
     expect(await screen.findByText('Vex, Collector of Trophies')).toBeTruthy();
     expect(screen.getByText('Gold: 5,000')).toBeTruthy();
     expect(screen.getByText('Wayfarer Aegis')).toBeTruthy();
+    expect(screen.getByText('Creates a soulbound tier 2 off-hand shield.')).toBeTruthy();
+    expect(screen.getByText('Accuracy +10, Armor +4, Health +8')).toBeTruthy();
     expect(screen.getByText('Alpha Wolf Fang: 5 / 4')).toBeTruthy();
     expect(screen.getByText('Not enough Alpha Wolf Fang')).toBeTruthy();
     expect(screen.getByTestId('vex-dialogue')).toBeTruthy();

@@ -155,9 +155,17 @@ describe('listVexExchanges', () => {
     expect(result.exchanges[0]).toMatchObject({
       key: 'wayfarer_aegis',
       playerGold: 6000,
+      preview: {
+        summary: 'Creates a soulbound tier 2 off-hand shield.',
+        details: expect.arrayContaining(['Accuracy +10, Armor +4, Health +8']),
+      },
       requiredItems: [{ itemTemplateName: 'Alpha Wolf Fang', quantity: 4, ownedQuantity: 7 }],
       canPurchase: true,
       blockedReason: null,
+    });
+    expect(result.exchanges.find((exchange) => exchange.key === 'fangstone')?.preview).toMatchObject({
+      summary: 'Adds a one-time Alpha Wolf boss stone to eligible boss-crafted gear.',
+      details: expect.arrayContaining(['Attack +2, Accuracy +2, Armor +1, Health +3']),
     });
     expect(result.exchanges.find((exchange) => exchange.key === 'spiritbound_aegis')).toMatchObject({
       canPurchase: false,

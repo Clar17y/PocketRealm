@@ -148,6 +148,7 @@ async function toExchangeView(
     key: exchange.key,
     name: exchange.name,
     description: exchange.description,
+    preview: exchange.preview,
     category: exchange.category,
     goldCost: exchange.goldCost,
     playerGold,

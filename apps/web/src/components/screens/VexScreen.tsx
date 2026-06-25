@@ -60,6 +60,23 @@ function RequirementLine({ requirement }: { requirement: VexExchangeView['requir
   );
 }
 
+function ExchangePreview({ preview }: { preview: VexExchangeView['preview'] }) {
+  return (
+    <div className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]/40 px-3 py-2">
+      <p className="text-sm font-semibold text-[var(--rpg-text-primary)]">What you get</p>
+      <p className="mt-1 text-sm text-[var(--rpg-text-secondary)]">{preview.summary}</p>
+      <ul className="mt-2 grid gap-1 text-xs text-[var(--rpg-text-secondary)] sm:grid-cols-2">
+        {preview.details.map((detail) => (
+          <li key={detail} className="flex gap-2">
+            <span className="mt-[0.35rem] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--rpg-gold)]" />
+            <span>{detail}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ExchangeCard({
   exchange,
   selectedTargetId,
@@ -111,6 +128,8 @@ function ExchangeCard({
           </span>
         ))}
       </div>
+
+      <ExchangePreview preview={exchange.preview} />
 
       {requiresTarget && (
         <label className="block text-sm text-[var(--rpg-text-secondary)]">

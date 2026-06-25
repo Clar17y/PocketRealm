@@ -19,6 +19,7 @@ export type { ShopItemData, PlayerBuffData, ShopPurchaseResult } from './types/s
 export type {
   VexExchangeCategory,
   VexExchangeListResponse,
+  VexExchangePreview,
   VexExchangeView,
   VexPurchaseResponse,
   VexRequiredItem,
