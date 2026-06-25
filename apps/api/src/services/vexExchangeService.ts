@@ -74,6 +74,8 @@ export async function purchaseVexExchange(
     throw new AppError(400, 'Invalid Vex exchange', 'INVALID_EXCHANGE');
   }
 
+  await assertBackpackHasRoomForCreatedItem(playerId, exchange);
+
   const result = await prisma.$transaction(async (tx) => {
     const player = await tx.player.findUnique({
       where: { id: playerId },
@@ -121,6 +123,17 @@ export async function purchaseVexExchange(
   }
 
   return result;
+}
+
+async function assertBackpackHasRoomForCreatedItem(playerId: string, exchange: VexExchangeDefinition): Promise<void> {
+  if (exchange.effect.type !== 'create_item') {
+    return;
+  }
+
+  const { availableSlots } = await getInventoryState(playerId);
+  if (availableSlots < 1) {
+    throw new AppError(400, 'Backpack is full. Make space before trading with Vex.', 'BACKPACK_FULL');
+  }
 }
 
 async function toExchangeView(
@@ -253,10 +266,6 @@ async function applyExchangeEffect(
   switch (exchange.effect.type) {
     case 'create_item': {
       const effect = exchange.effect;
-      const { availableSlots } = await getInventoryState(playerId);
-      if (availableSlots < 1) {
-        throw new AppError(400, 'Backpack is full. Make space before trading with Vex.', 'BACKPACK_FULL');
-      }
       const template = await findTemplateByName(tx, effect.itemTemplateName, seasonId);
       return {
         message: `Created ${template.name}`,
