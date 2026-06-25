@@ -5,7 +5,7 @@ import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
 import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
-import { createEndpointLimiter } from './middleware/rateLimiter';
+import { createLocalEndpointLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
 import { sentryContext } from './middleware/sentryContext';
 import { apiLatencyRecorder } from './middleware/apiLatencyRecorder';
@@ -47,6 +47,7 @@ import { notificationsRouter } from './routes/notifications';
 import { premiumRouter } from './routes/premium';
 import { supportRouter } from './routes/support';
 import { discordRouter } from './routes/discord';
+import { gameRouter } from './routes/game';
 
 interface CorsOriginCheckerOptions {
   isProduction?: boolean;
@@ -125,7 +126,7 @@ export function createApp({ isAllowedCorsOrigin }: CreateAppOptions): express.Ex
   // to the real client IP rather than the reverse proxy's address.
   app.set('trust proxy', 1);
 
-  app.use('/api/v1/', createEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.GLOBAL_MAX, {
+  app.use('/api/v1/', createLocalEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.GLOBAL_MAX, {
     skip: (req) => req.method === 'OPTIONS' || req.path === '/premium/webhook/stripe',
   }));
 
@@ -135,6 +136,7 @@ export function createApp({ isAllowedCorsOrigin }: CreateAppOptions): express.Ex
   app.use(express.json({ limit: '100kb' }));
 
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/game', gameRouter);
   app.use('/api/v1/turns', turnsRouter);
   app.use('/api/v1/player', playerRouter);
   app.use('/api/v1/exploration', explorationRouter);

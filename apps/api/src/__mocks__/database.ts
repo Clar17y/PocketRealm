@@ -27,6 +27,7 @@ function mockModel() {
     delete: vi.fn(),
     deleteMany: vi.fn(),
     aggregate: vi.fn(),
+    groupBy: vi.fn(),
     count: vi.fn(),
   };
 }
@@ -56,7 +57,7 @@ export const prisma = {
   playerNpcActivityReaction: mockModel(),
   playerStats: mockModel(),
   playerAchievement: mockModel(),
-  playerCrown: { ...mockModel(), groupBy: vi.fn() },
+  playerCrown: mockModel(),
   premiumPurchase: mockModel(),
   mobFamily: mockModel(),
   activityLog: mockModel(),

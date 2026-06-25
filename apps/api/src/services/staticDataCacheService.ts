@@ -3,6 +3,19 @@ import { CACHE_TTL_CONSTANTS } from '@pocketrealm/shared';
 import { redis } from '../redis';
 
 const TTL = CACHE_TTL_CONSTANTS.STATIC_DATA_TTL;
+const TTL_MS = TTL * 1000;
+const REDIS_TTL_FALLBACK_MS = Math.min(TTL_MS, 60_000);
+
+interface StaticMemoryEntry {
+  expiresAt: number;
+  value: unknown;
+}
+
+const staticMemoryCache = new Map<string, StaticMemoryEntry>();
+
+export function clearStaticMemoryCache(): void {
+  staticMemoryCache.clear();
+}
 
 function getStaticCacheNamespace(): string {
   const databaseUrl = process.env.DATABASE_URL ?? process.env.DIRECT_DATABASE_URL ?? '';
@@ -23,6 +36,17 @@ function getStaticCacheKey(key: string): string {
   return `static:${getStaticCacheNamespace()}:${key}`;
 }
 
+async function getRedisHitMemoryExpiresAt(key: string, now: number): Promise<number> {
+  try {
+    const remainingTtlSeconds = await redis.ttl(key);
+    if (remainingTtlSeconds > 0) return now + remainingTtlSeconds * 1000;
+    if (remainingTtlSeconds === -1) return now + TTL_MS;
+    return now;
+  } catch {
+    return now + REDIS_TTL_FALLBACK_MS;
+  }
+}
+
 /**
  * Cache-through helper for static data. Like cachedQuery but also tracks
  * keys in a Redis Set so invalidateStaticCache can delete them without KEYS.
@@ -30,15 +54,36 @@ function getStaticCacheKey(key: string): string {
 async function staticCachedQuery<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   const namespacedKey = getStaticCacheKey(key);
   const indexKey = getStaticCacheKey('__index');
+  const now = Date.now();
+  const cachedInMemory = staticMemoryCache.get(namespacedKey);
+
+  if (cachedInMemory && cachedInMemory.expiresAt > now) {
+    return cachedInMemory.value as T;
+  }
+
+  if (cachedInMemory) {
+    staticMemoryCache.delete(namespacedKey);
+  }
 
   try {
     const cached = await redis.get(namespacedKey);
-    if (cached !== null) return JSON.parse(cached) as T;
+    if (cached !== null) {
+      const parsed = JSON.parse(cached) as T;
+      staticMemoryCache.set(namespacedKey, {
+        expiresAt: await getRedisHitMemoryExpiresAt(namespacedKey, now),
+        value: parsed,
+      });
+      return parsed;
+    }
   } catch {
     // Redis unavailable — fall through
   }
 
   const result = await fetcher();
+  staticMemoryCache.set(namespacedKey, {
+    expiresAt: Date.now() + TTL_MS,
+    value: result,
+  });
 
   try {
     await Promise.all([
@@ -147,6 +192,7 @@ export function getCachedCraftingRecipes() {
 // ---------------------------------------------------------------------------
 
 export async function invalidateStaticCache(): Promise<void> {
+  clearStaticMemoryCache();
   const indexKey = getStaticCacheKey('__index');
 
   try {

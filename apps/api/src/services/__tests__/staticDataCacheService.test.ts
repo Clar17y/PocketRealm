@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../../redis', () => ({
   redis: {
     get: vi.fn(),
+    ttl: vi.fn(),
     set: vi.fn(),
     del: vi.fn(),
     sadd: vi.fn(),
@@ -23,6 +24,7 @@ import {
   getCachedExpeditionMobTemplates,
   getCachedCraftingRecipes,
   getCachedZoneMobFamilies,
+  clearStaticMemoryCache,
   invalidateStaticCache,
 } from '../staticDataCacheService';
 
@@ -37,6 +39,7 @@ const originalDatabaseUrl = process.env.DATABASE_URL;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearStaticMemoryCache();
   process.env.DATABASE_URL = TEST_DATABASE_URL;
 });
 
@@ -63,6 +66,48 @@ describe('staticDataCacheService', () => {
       const result = await getCachedZones();
       expect(result).toEqual([ZONE_A]);
       expect(db.zone.findMany).not.toHaveBeenCalled();
+    });
+
+    it('serves repeated reads from process memory without Redis commands', async () => {
+      vi.mocked(redis.get).mockResolvedValue(null);
+      vi.mocked(redis.set).mockResolvedValue('OK');
+      vi.mocked(redis.sadd).mockResolvedValue(1);
+      db.zone.findMany.mockResolvedValue([ZONE_A]);
+
+      await getCachedZones();
+      vi.clearAllMocks();
+
+      const result = await getCachedZones();
+
+      expect(result).toEqual([ZONE_A]);
+      expect(redis.get).not.toHaveBeenCalled();
+      expect(redis.set).not.toHaveBeenCalled();
+      expect(redis.sadd).not.toHaveBeenCalled();
+      expect(db.zone.findMany).not.toHaveBeenCalled();
+    });
+
+    it('does not let process memory outlive the Redis TTL on cache hits', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-06-26T08:00:00.000Z'));
+        vi.mocked(redis.get).mockResolvedValue(JSON.stringify([ZONE_A]));
+        vi.mocked(redis.ttl).mockResolvedValue(1);
+
+        await getCachedZones();
+
+        vi.clearAllMocks();
+        vi.mocked(redis.get).mockResolvedValue(JSON.stringify([ZONE_A]));
+        vi.mocked(redis.ttl).mockResolvedValue(1);
+        vi.setSystemTime(new Date('2026-06-26T08:00:01.500Z'));
+
+        const result = await getCachedZones();
+
+        expect(result).toEqual([ZONE_A]);
+        expect(redis.get).toHaveBeenCalledTimes(1);
+        expect(db.zone.findMany).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('namespaces cache keys by database name', async () => {

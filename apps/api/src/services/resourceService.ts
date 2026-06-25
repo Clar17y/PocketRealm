@@ -54,7 +54,7 @@ async function getSkillLevels(playerId: string): Promise<SkillLevels> {
 // Get resource state (lazy regen)
 // ---------------------------------------------------------------------------
 
-interface CombatResourceState {
+export interface CombatResourceState {
   stamina: ResourceState;
   mana: ResourceState;
   lastStaminaRegenAt: Date;

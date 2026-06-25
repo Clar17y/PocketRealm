@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameController } from './useGameController';
+import { useVisibleInterval } from '@/hooks/usePageVisible';
 import { getCraftingRecipes, getZoneEvents, getZones } from '@/lib/api';
 import type { InventoryItemDTO } from '@pocketrealm/shared';
 
@@ -36,6 +37,7 @@ vi.mock('@/lib/api', () => ({
   allocatePlayerAttribute: vi.fn(),
   craft: vi.fn(),
   getCraftingRecipes: vi.fn(),
+  getGameBootstrap: vi.fn(),
   getEquipment: vi.fn(),
   getHpState: vi.fn(),
   getInventory: vi.fn(),
@@ -390,6 +392,14 @@ describe('useGameController', () => {
 
     expect(hook.result.current.activeScreen).toBe('zones');
     expect(hook.result.current.getActiveTab()).toBe('explore');
+  });
+
+  it('uses low-frequency visible polling intervals', () => {
+    renderHook(() => useGameController({ isAuthenticated: false }));
+
+    expect(vi.mocked(useVisibleInterval)).toHaveBeenCalledWith(expect.any(Function), 60_000, false);
+    expect(vi.mocked(useVisibleInterval)).toHaveBeenCalledWith(expect.any(Function), 300_000, false);
+    expect(vi.mocked(useVisibleInterval)).toHaveBeenCalledWith(expect.any(Function), 300_000, false);
   });
 
   it('blocks a stale zone reload immediately after the active zone changes', async () => {
