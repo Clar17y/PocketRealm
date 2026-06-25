@@ -74,6 +74,26 @@ function EventCard({ event }: { event: WorldEventResponse }) {
   );
 }
 
+function VexCampCard({ onNavigate }: { onNavigate: (screen: string) => void }) {
+  return (
+    <PixelCard className="p-4 border-[var(--rpg-gold)]/60">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="font-almendra text-lg font-bold text-[var(--rpg-gold)]">
+            Vex&apos;s Camp
+          </h3>
+          <p className="text-sm text-[var(--rpg-text-secondary)]">
+            A travelling collector trades world boss trophies for rare gear, tempering, and boss stones.
+          </p>
+        </div>
+        <PixelButton type="button" variant="gold" size="sm" onClick={() => onNavigate('vex')}>
+          Trade with Vex
+        </PixelButton>
+      </div>
+    </PixelCard>
+  );
+}
+
 interface WorldEventsProps {
   currentZoneId: string | null;
   currentZoneName: string | null;
@@ -151,6 +171,8 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
           onRewardsLoaded={onBossRewardsLoaded}
         />
       )}
+
+      <VexCampCard onNavigate={onNavigate} />
 
       {/* Boss Encounters */}
       {bosses.length > 0 && !selectedBossId && (

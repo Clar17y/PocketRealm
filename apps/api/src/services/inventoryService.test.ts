@@ -5,6 +5,7 @@ import {
   addStackableItem,
   getTotalQuantityByTemplate,
   consumeItemsByTemplate,
+  consumeItemsByTemplateTx,
   getUsedSlots,
   getPlayerCapacity,
 } from './inventoryService';
@@ -139,6 +140,33 @@ describe('consumeItemsByTemplate', () => {
 
     await expect(consumeItemsByTemplate('p1', 'tpl-1', 5)).rejects.toThrow(
       'Insufficient materials'
+    );
+  });
+
+  it('locks matching item rows before transactional consumption reads quantities', async () => {
+    mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.item.findMany.mockResolvedValue([
+      { id: 'item-1', quantity: 10 },
+    ]);
+    mockPrisma.item.update.mockResolvedValue({});
+
+    await consumeItemsByTemplateTx(mockPrisma as never, 'p1', 'tpl-1', 3);
+
+    const lockQuery = mockPrisma.$queryRaw.mock.calls[0][0];
+    expect(lockQuery.strings.join('')).toContain('ORDER BY created_at ASC, id ASC');
+    expect(mockPrisma.$queryRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        strings: expect.arrayContaining([expect.stringContaining('FOR UPDATE')]),
+      }),
+    );
+    expect(mockPrisma.item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+    );
+    expect(mockPrisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPrisma.item.findMany.mock.invocationCallOrder[0],
+    );
+    expect(mockPrisma.item.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { quantity: 7 } }),
     );
   });
 });

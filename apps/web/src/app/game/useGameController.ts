@@ -534,7 +534,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const getActiveTab = () => {
     if (['home', 'achievements', 'quests', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
-    if (['zones', 'explore', 'gathering', 'crafting', 'forge', 'worldEvents', 'casino', 'training'].includes(activeScreen)) return 'explore';
+    if (['zones', 'explore', 'gathering', 'crafting', 'forge', 'worldEvents', 'vex', 'casino', 'training'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment', 'skills'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena', 'templates', 'talentTree', 'bestiary'].includes(activeScreen)) return 'combat';
     if (['guild', 'friends', 'mail'].includes(activeScreen)) return 'social';

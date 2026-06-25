@@ -410,13 +410,29 @@ model Item {
   inStash           Boolean  @default(false) @map("in_stash")
   isSoulbound       Boolean  @default(false) @map("is_soulbound")
 
-  template  ItemTemplate      @relation(fields: [templateId], references: [id])
-  owner     Player            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  equipment PlayerEquipment[]
+  template     ItemTemplate      @relation(fields: [templateId], references: [id])
+  owner        Player            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  equipment    PlayerEquipment[]
+  itemAugments ItemAugment[]
 
   @@index([ownerId, inStash])
   @@index([ownerId, templateId, inStash])
   @@map("items")
+}
+
+model ItemAugment {
+  id          String   @id @default(uuid())
+  itemId      String   @map("item_id")
+  augmentType String   @map("augment_type") @db.VarChar(64)
+  sourceKey   String   @map("source_key") @db.VarChar(64)
+  metadata    Json?
+  appliedAt   DateTime @default(now()) @map("applied_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, augmentType])
+  @@index([sourceKey])
+  @@map("item_augments")
 }
 
 // =============================================================================

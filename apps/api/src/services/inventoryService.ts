@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
 
 interface InventoryClient {
+  $queryRaw?: Prisma.TransactionClient['$queryRaw'];
   itemTemplate: {
     findUnique: Prisma.TransactionClient['itemTemplate']['findUnique'];
   };
@@ -108,15 +109,20 @@ async function consumeItemsByTemplateWithClient(
   client: InventoryClient,
   playerId: string,
   itemTemplateId: string,
-  quantity: number
+  quantity: number,
+  lockRows = false,
 ): Promise<ConsumeItemsResult> {
   if (!Number.isInteger(quantity) || quantity <= 0) {
     throw new AppError(400, 'Quantity must be a positive integer', 'INVALID_QUANTITY');
   }
 
+  if (lockRows) {
+    await lockItemsForConsumption(client, playerId, itemTemplateId);
+  }
+
   const items = await client.item.findMany({
     where: { ownerId: playerId, templateId: itemTemplateId },
-    orderBy: [{ createdAt: 'asc' }],
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { id: true, quantity: true },
   });
 
@@ -148,6 +154,25 @@ async function consumeItemsByTemplateWithClient(
   return { fullyConsumedIds, partiallyConsumedIds };
 }
 
+async function lockItemsForConsumption(
+  client: InventoryClient,
+  playerId: string,
+  itemTemplateId: string,
+): Promise<void> {
+  if (!client.$queryRaw) {
+    return;
+  }
+
+  await client.$queryRaw(Prisma.sql`
+    SELECT id
+    FROM items
+    WHERE owner_id = ${playerId}
+      AND template_id = ${itemTemplateId}
+    ORDER BY created_at ASC, id ASC
+    FOR UPDATE
+  `);
+}
+
 export async function consumeItemsByTemplate(
   playerId: string,
   itemTemplateId: string,
@@ -162,7 +187,7 @@ export async function consumeItemsByTemplateTx(
   itemTemplateId: string,
   quantity: number
 ): Promise<ConsumeItemsResult> {
-  return consumeItemsByTemplateWithClient(tx, playerId, itemTemplateId, quantity);
+  return consumeItemsByTemplateWithClient(tx, playerId, itemTemplateId, quantity, true);
 }
 
 /** Fetch current slot usage and capacity in a single parallel call. */

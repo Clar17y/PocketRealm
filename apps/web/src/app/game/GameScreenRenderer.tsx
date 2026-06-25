@@ -8,6 +8,7 @@ import {
   ExploreScreenRenderer,
   HomeScreenRenderer,
   RestScreenRenderer,
+  VexScreenRenderer,
   WorldEventsScreenRenderer,
   ZonesScreenRenderer,
 } from './renderers/coreScreenRenderers';
@@ -111,6 +112,8 @@ export function GameScreenRenderer({
       );
     case 'worldEvents':
       return <WorldEventsScreenRenderer gc={gc} player={player} />;
+    case 'vex':
+      return <VexScreenRenderer gc={gc} />;
     case 'achievements':
       return (
         <AchievementsScreenRenderer

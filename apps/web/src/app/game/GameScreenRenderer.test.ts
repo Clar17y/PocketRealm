@@ -13,6 +13,9 @@ const { inventorySpy } = vi.hoisted(() => ({
 const { guildScreenSpy } = vi.hoisted(() => ({
   guildScreenSpy: vi.fn(),
 }));
+const { vexScreenSpy } = vi.hoisted(() => ({
+  vexScreenSpy: vi.fn(),
+}));
 
 vi.mock('@/components/screens/Dashboard', () => ({
   Dashboard: (props: unknown) => {
@@ -35,6 +38,13 @@ vi.mock('@/components/screens/GuildScreen', () => ({
   },
 }));
 
+vi.mock('@/components/screens/VexScreen', () => ({
+  VexScreen: (props: unknown) => {
+    vexScreenSpy(props);
+    return null;
+  },
+}));
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-04-01T00:00:00.000Z'));
@@ -44,6 +54,8 @@ afterEach(() => {
   vi.useRealTimers();
   dashboardSpy.mockReset();
   inventorySpy.mockReset();
+  guildScreenSpy.mockReset();
+  vexScreenSpy.mockReset();
 });
 
 function createBaseGc() {
@@ -192,6 +204,7 @@ function createBaseGc() {
     handleSetShowBestiaryLore: vi.fn(),
     notificationPrefs: {},
     handleSetNotificationPref: vi.fn(),
+    handleStateUpdates: vi.fn(),
     zoneCraftingLevel: 1,
     zoneCraftingName: 'Starter Town',
     achievementData: null,
@@ -354,5 +367,27 @@ describe('GameScreenRenderer', () => {
     expect(guildScreenSpy).toHaveBeenCalledWith(expect.objectContaining({
       onGuildMembershipChange,
     }));
+  });
+
+  it('routes the Vex screen with dialogue and state update props', () => {
+    const handleStateUpdates = vi.fn();
+
+    renderGameScreen(null, {
+      activeScreen: 'vex',
+      handleStateUpdates,
+      showNpcDialogue: false,
+    });
+
+    expect(vexScreenSpy).toHaveBeenCalledTimes(1);
+    expect(vexScreenSpy.mock.calls[0][0]).toMatchObject({
+      showNpcDialogue: false,
+    });
+
+    const props = vexScreenSpy.mock.calls[0][0] as {
+      onStateUpdates: (updates: { gold: number }) => void;
+    };
+    props.onStateUpdates({ gold: 250 });
+
+    expect(handleStateUpdates).toHaveBeenCalledWith({ gold: 250 });
   });
 });

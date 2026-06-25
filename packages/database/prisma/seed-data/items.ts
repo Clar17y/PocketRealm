@@ -455,6 +455,7 @@ const advancedGear = [
   it({ id: IDS.adv.ironbarkGloves, name: 'Ironbark Gloves', itemType: 'armor', slot: 'gloves', tier: 2, weightClass: 'heavy', requiredLevel: 5, baseStats: { armor: 4, magicDefence: 3 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.batWingBoots, name: 'Bat Wing Boots', itemType: 'armor', slot: 'boots', tier: 2, weightClass: 'light', requiredLevel: 5, baseStats: { dodge: 5 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.goblinTrinketCharm, name: 'Goblin Trinket Charm', itemType: 'armor', slot: 'charm', tier: 2, requiredLevel: 5, baseStats: { luck: 2, health: 3 }, maxDurability: 80, sellPrice: 0 }),
+  it({ id: 'vex_wayfarer_aegis', name: 'Wayfarer Aegis', itemType: 'armor', slot: 'off_hand', tier: 2, weightClass: 'medium', requiredLevel: 8, baseStats: { accuracy: 10, armor: 4, health: 8 }, maxDurability: 100, sellPrice: 0 }),
   // Tier 3
   it({ id: IDS.adv.spriteDustRing, name: 'Sprite Dust Ring', itemType: 'armor', slot: 'ring', tier: 3, requiredLevel: 12, baseStats: { magicPower: 4, luck: 2 }, maxDurability: 100, sellPrice: 0 }),
   it({ id: IDS.adv.faeCrown, name: 'Fae Crown', itemType: 'armor', slot: 'charm', tier: 3, requiredLevel: 12, baseStats: { magicDefence: 5, dodge: 3 }, maxDurability: 100, sellPrice: 0 }),
@@ -467,6 +468,7 @@ const advancedGear = [
   // Tier 4
   it({ id: IDS.adv.deathKnightsRing, name: "Death Knight's Ring", itemType: 'armor', slot: 'ring', tier: 4, requiredLevel: 20, baseStats: { attack: 5, critChance: 0.02 }, maxDurability: 120, sellPrice: 0 }),
   it({ id: IDS.adv.hydraScaleShield, name: 'Hydra Scale Shield', itemType: 'armor', slot: 'off_hand', tier: 4, weightClass: 'heavy', requiredLevel: 20, baseStats: { armor: 8, health: 6 }, maxDurability: 120, sellPrice: 0 }),
+  it({ id: 'vex_spiritbound_aegis', name: 'Spiritbound Aegis', itemType: 'armor', slot: 'off_hand', tier: 4, weightClass: 'medium', requiredLevel: 16, baseStats: { accuracy: 14, magicDefence: 8, armor: 5, health: 12 }, maxDurability: 140, sellPrice: 0 }),
   it({ id: IDS.adv.covenAmulet, name: 'Coven Amulet', itemType: 'armor', slot: 'neck', tier: 4, requiredLevel: 20, baseStats: { magicPower: 6, critChance: 0.02 }, maxDurability: 120, sellPrice: 0 }),
   it({ id: IDS.adv.stormCrystalCharm, name: 'Storm Crystal Charm', itemType: 'armor', slot: 'charm', tier: 4, requiredLevel: 20, baseStats: { magicPower: 5, critDamage: 0.15 }, maxDurability: 120, sellPrice: 0 }),
   it({ id: IDS.adv.diamondGolemBelt, name: 'Diamond Golem Belt', itemType: 'armor', slot: 'belt', tier: 4, weightClass: 'heavy', requiredLevel: 20, baseStats: { armor: 8, magicDefence: 6 }, maxDurability: 120, sellPrice: 0 }),
@@ -493,10 +495,10 @@ const bossTrophyMaterials = [
 // ── Boss Equipment ──────────────────────────────────────────────────────────
 
 const bossEquipment = [
-  { ...weapon(IDS.bossGear.wolfsbaneBlade, 'Wolfsbane Blade', 2, 'melee', 8, { attack: 8, critChance: 0.02 }), sellPrice: 0 },
-  it({ id: IDS.bossGear.alphaPeltChest, name: 'Alpha Pelt Chest', itemType: 'armor', slot: 'chest', tier: 2, weightClass: 'medium', requiredLevel: 8, baseStats: { armor: 6, health: 5, dodge: 2 }, maxDurability: 100, sellPrice: 0 }),
-  { ...weapon(IDS.bossGear.spiritStaff, 'Spirit Staff', 4, 'magic', 16, { magicPower: 10, critChance: 0.03 }), sellPrice: 0 },
-  it({ id: IDS.bossGear.etherealRobes, name: 'Ethereal Robes', itemType: 'armor', slot: 'chest', tier: 4, weightClass: 'light', requiredLevel: 16, baseStats: { magicDefence: 8, health: 6, dodge: 3 }, maxDurability: 120, sellPrice: 0 }),
+  { ...weapon(IDS.bossGear.wolfsbaneBlade, 'Wolfsbane Blade', 2, 'melee', 8, { attack: 13, accuracy: 4, critChance: 0.03 }), maxDurability: 110, sellPrice: 0 },
+  it({ id: IDS.bossGear.alphaPeltChest, name: 'Alpha Pelt Chest', itemType: 'armor', slot: 'chest', tier: 2, weightClass: 'medium', requiredLevel: 8, baseStats: { armor: 7, health: 8, dodge: 3 }, maxDurability: 120, sellPrice: 0 }),
+  { ...weapon(IDS.bossGear.spiritStaff, 'Spirit Staff', 4, 'magic', 16, { magicPower: 24, accuracy: 4, critChance: 0.04 }), maxDurability: 130, sellPrice: 0 },
+  it({ id: IDS.bossGear.etherealRobes, name: 'Ethereal Robes', itemType: 'armor', slot: 'chest', tier: 4, weightClass: 'light', requiredLevel: 16, baseStats: { magicDefence: 12, health: 12, dodge: 4, magicPower: 3 }, maxDurability: 140, sellPrice: 0 }),
 ];
 
 // ── Achievement Family Reward Items ──────────────────────────────────────────

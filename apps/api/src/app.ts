@@ -41,6 +41,7 @@ import { trainingRouter } from './routes/training';
 import { questsRouter } from './routes/quests';
 import { expeditionRouter } from './routes/expedition';
 import { shopRouter } from './routes/shop';
+import { vexRouter } from './routes/vex';
 import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { premiumRouter } from './routes/premium';
@@ -162,6 +163,7 @@ export function createApp({ isAllowedCorsOrigin }: CreateAppOptions): express.Ex
   app.use('/api/v1/quests', questsRouter);
   app.use('/api/v1/expedition', expeditionRouter);
   app.use('/api/v1/shop', shopRouter);
+  app.use('/api/v1/vex', vexRouter);
   app.use('/api/v1/friends', friendsRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/premium', premiumRouter);
