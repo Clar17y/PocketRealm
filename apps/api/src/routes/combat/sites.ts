@@ -18,7 +18,10 @@ import {
 } from '../../services/worldEventService';
 import {
   listEncounterSitesQuerySchema,
+  applyEncounterSiteDecayInMemory,
   applyEncounterSiteDecayAndPersist,
+  countEncounterSiteState,
+  parseEncounterSiteMobs,
 } from '../../services/combat/helpers';
 import { buildEncounterSiteMobPreview } from '../../services/encounterSiteMobRoleService';
 import {
@@ -87,18 +90,54 @@ export function registerSiteRoutes(router: Router): void {
       const query = parsedQuery.data;
       const now = new Date();
 
-      const sites = await prisma.encounterSite.findMany({
-        where: {
-          playerId,
-          ...(query.zoneId ? { zoneId: query.zoneId } : {}),
-          ...(query.mobFamilyId ? { mobFamilyId: query.mobFamilyId } : {}),
-        },
-        include: {
-          zone: { select: { name: true } },
-          mobFamily: { select: { id: true, name: true } },
-        },
-        orderBy: [{ discoveredAt: 'desc' }],
+      const [filterSiteRows, sites] = await Promise.all([
+        prisma.encounterSite.findMany({
+          where: { playerId },
+          select: {
+            zoneId: true,
+            mobFamilyId: true,
+            discoveredAt: true,
+            mobs: true,
+            zone: { select: { name: true } },
+            mobFamily: { select: { id: true, name: true } },
+          },
+          orderBy: [{ discoveredAt: 'desc' }],
+        }),
+        prisma.encounterSite.findMany({
+          where: {
+            playerId,
+            ...(query.zoneId ? { zoneId: query.zoneId } : {}),
+            ...(query.mobFamilyId ? { mobFamilyId: query.mobFamilyId } : {}),
+          },
+          include: {
+            zone: { select: { name: true } },
+            mobFamily: { select: { id: true, name: true } },
+          },
+          orderBy: [{ discoveredAt: 'desc' }],
+        }),
+      ]);
+
+      const activeFilterSites = filterSiteRows.filter((site) => {
+        const parsed = parseEncounterSiteMobs(site.mobs);
+        if (parsed.length === 0) return false;
+
+        const decayed = applyEncounterSiteDecayInMemory(parsed, site.discoveredAt, now);
+        return countEncounterSiteState(decayed.mobs).alive > 0;
       });
+
+      const zoneEntries = new Map(activeFilterSites.map((site) => [site.zoneId, site.zone.name]));
+      if (query.zoneId && !zoneEntries.has(query.zoneId)) {
+        const player = await prisma.player.findUnique({
+          where: { id: playerId },
+          select: {
+            currentZoneId: true,
+            currentZone: { select: { id: true, name: true } },
+          },
+        });
+        if (player?.currentZoneId === query.zoneId && player.currentZone) {
+          zoneEntries.set(player.currentZone.id, player.currentZone.name);
+        }
+      }
 
       const activeSites: Array<{
         encounterSiteId: string;
@@ -175,9 +214,19 @@ export function registerSiteRoutes(router: Router): void {
         });
       }
 
-      // Collect all mob template IDs (next mob + current room mobs) for name/HP lookup
+      activeSites.sort((a, b) => {
+        if (query.sort === 'danger') {
+          if (b.aliveMobs !== a.aliveMobs) return b.aliveMobs - a.aliveMobs;
+        }
+        return new Date(b.discoveredAt).getTime() - new Date(a.discoveredAt).getTime();
+      });
+
+      const total = activeSites.length;
+      const offset = (query.page - 1) * query.pageSize;
+      const pageItems = activeSites.slice(offset, offset + query.pageSize);
+
       const allMobTemplateIds = new Set<string>();
-      for (const site of activeSites) {
+      for (const site of pageItems) {
         if (site.nextMobTemplateId) allMobTemplateIds.add(site.nextMobTemplateId);
         for (const mob of site.currentRoomMobs) allMobTemplateIds.add(mob.mobTemplateId);
       }
@@ -190,20 +239,10 @@ export function registerSiteRoutes(router: Router): void {
       const mobTemplateById = new Map(mobTemplateRows.map((row) => [row.id, row]));
       const nextMobNameById = new Map(mobTemplateRows.map((row) => [row.id, row.name]));
 
-      activeSites.sort((a, b) => {
-        if (query.sort === 'danger') {
-          if (b.aliveMobs !== a.aliveMobs) return b.aliveMobs - a.aliveMobs;
-        }
-        return new Date(b.discoveredAt).getTime() - new Date(a.discoveredAt).getTime();
-      });
-
-      const total = activeSites.length;
-      const offset = (query.page - 1) * query.pageSize;
-      const pageItems = activeSites.slice(offset, offset + query.pageSize);
-      const zones = Array.from(new Map(activeSites.map((site) => [site.zoneId, site.zoneName])).entries())
+      const zones = Array.from(zoneEntries.entries())
         .map(([id, name]) => ({ id, name }))
         .sort((a, b) => a.name.localeCompare(b.name));
-      const mobFamilies = Array.from(new Map(activeSites.map((site) => [site.mobFamilyId, site.mobFamilyName])).entries())
+      const mobFamilies = Array.from(new Map(activeFilterSites.map((site) => [site.mobFamilyId, site.mobFamily.name])).entries())
         .map(([id, name]) => ({ id, name }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
