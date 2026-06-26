@@ -97,15 +97,42 @@ interface ManualCombatState {
 const COMBAT_SESSION_PREFIX = 'encounter-combat:';
 // TTL covers worst-case decay — 80h for 20 mobs at 0.25/hr, rounded to 3.5 days
 const COMBAT_SESSION_TTL_SECONDS = 84 * 60 * 60;
+const COMBAT_SESSION_UNAVAILABLE_MESSAGE = 'Combat session storage is unavailable. Try again shortly.';
+const COMBAT_SESSION_UNAVAILABLE_CODE = 'COMBAT_SESSION_UNAVAILABLE';
+const COMBAT_SESSION_OPERATION = Symbol('manualCombatSessionOperation');
+type CombatSessionOperation = 'read' | 'write';
 
 function combatSessionKey(playerId: string, siteId: string): string {
   return `${COMBAT_SESSION_PREFIX}${playerId}:${siteId}`;
 }
 
+type ManualCombatSessionStorageError = AppError & {
+  [COMBAT_SESSION_OPERATION]: CombatSessionOperation;
+};
+
+function combatSessionUnavailableError(operation: CombatSessionOperation): AppError {
+  const error = new AppError(503, COMBAT_SESSION_UNAVAILABLE_MESSAGE, COMBAT_SESSION_UNAVAILABLE_CODE);
+  (error as ManualCombatSessionStorageError)[COMBAT_SESSION_OPERATION] = operation;
+  return error;
+}
+
+export function isManualCombatSessionPersistenceError(err: unknown): boolean {
+  return err instanceof AppError
+    && err.code === COMBAT_SESSION_UNAVAILABLE_CODE
+    && (err as Partial<ManualCombatSessionStorageError>)[COMBAT_SESSION_OPERATION] === 'write';
+}
+
 async function getCombatSession(playerId: string, siteId: string): Promise<ManualCombatState | null> {
+  let data: string | null;
   try {
-    const data = await redis.get(combatSessionKey(playerId, siteId));
-    if (!data) return null;
+    data = await redis.get(combatSessionKey(playerId, siteId));
+  } catch {
+    throw combatSessionUnavailableError('read');
+  }
+
+  if (!data) return null;
+
+  try {
     return JSON.parse(data) as ManualCombatState;
   } catch {
     return null;
@@ -113,10 +140,17 @@ async function getCombatSession(playerId: string, siteId: string): Promise<Manua
 }
 
 async function setCombatSession(playerId: string, siteId: string, state: ManualCombatState): Promise<void> {
+  let data: string;
   try {
-    await redis.set(combatSessionKey(playerId, siteId), JSON.stringify(state), 'EX', COMBAT_SESSION_TTL_SECONDS);
+    data = JSON.stringify(state);
   } catch {
-    // Best-effort — fall through, combat will fail on next round if Redis is down
+    throw new AppError(500, 'Manual combat session could not be serialized.', 'COMBAT_SESSION_SERIALIZATION_FAILED');
+  }
+
+  try {
+    await redis.set(combatSessionKey(playerId, siteId), data, 'EX', COMBAT_SESSION_TTL_SECONDS);
+  } catch {
+    throw combatSessionUnavailableError('write');
   }
 }
 

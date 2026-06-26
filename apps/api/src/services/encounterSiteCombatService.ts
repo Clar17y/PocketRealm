@@ -62,7 +62,12 @@ export type {
 } from './encounterSiteCombatCore';
 
 // Re-exports from encounterSiteManualCombat so existing importers don't break
-export { clearManualCombatSession, startManualEncounterRoom, resolveManualEncounterRound } from './encounterSiteManualCombat';
+export {
+  clearManualCombatSession,
+  isManualCombatSessionPersistenceError,
+  startManualEncounterRoom,
+  resolveManualEncounterRound,
+} from './encounterSiteManualCombat';
 export type { StartManualRoomResult, ManualRoundResult } from './encounterSiteManualCombat';
 
 // ---------------------------------------------------------------------------

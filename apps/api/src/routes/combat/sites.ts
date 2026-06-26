@@ -26,6 +26,7 @@ import {
   startManualEncounterRoom,
   resolveManualEncounterRound,
   clearManualCombatSession,
+  isManualCombatSessionPersistenceError,
   parseEncounterMobSlot,
 } from '../../services/encounterSiteCombatService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers.js';
@@ -384,7 +385,15 @@ export function registerSiteRoutes(router: Router): void {
       // Set lockout
       await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: siteId } });
 
-      const result = await startManualEncounterRoom(playerId, siteId, username);
+      let result: Awaited<ReturnType<typeof startManualEncounterRoom>>;
+      try {
+        result = await startManualEncounterRoom(playerId, siteId, username);
+      } catch (err) {
+        if (isManualCombatSessionPersistenceError(err)) {
+          await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } }).catch(() => {});
+        }
+        throw err;
+      }
 
       // Site was auto-cleared (all remaining rooms decayed) — clear lockout and return
       if (result.siteAutoCleared) {
