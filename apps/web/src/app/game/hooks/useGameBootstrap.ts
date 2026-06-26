@@ -5,18 +5,10 @@ import { RARITY_RANK } from '@/lib/rarity';
 import {
   allocateSkillPoint,
   getCraftingRecipes,
-  getEquipment,
-  getExpeditionCooldowns,
-  getHpState,
+  getGameBootstrap,
   getInventory,
-  getPlayer,
-  getPlayerBuffs,
-  getPlayerGuild,
-  getResources,
   getSkillPointState,
-  getSkills,
   getTemplates,
-  getTurns,
   getZoneEvents,
   getZones,
   respecSkillPoints,
@@ -182,6 +174,40 @@ interface UseGameBootstrapOptions {
   setGuildTaxRate: (rate: number) => void;
 }
 
+interface GameBootstrapPayload {
+  turns: { currentTurns: number };
+  player: { player: LoadedPlayerData };
+  skills: { skills: SkillStateDTO[] };
+  zones: {
+    zones: ZoneState;
+    connections: ZoneConnections;
+    undiscoveredZones?: UndiscoveredZones;
+    currentZoneId: string | null;
+  };
+  inventory: {
+    items: InventoryItemDTO[];
+    capacity: number;
+    usedSlots: number;
+    materialTotals?: Record<string, number>;
+  };
+  equipment: { equipment: EquipmentState };
+  hp: HpState;
+  resources: {
+    stamina: ResourceState;
+    mana: ResourceState;
+  };
+  skillPoints: SkillPointState;
+  buffs: { buffs: PlayerBuffData[] };
+  expeditionCooldowns: { hasActiveExpedition: boolean };
+  zoneEvents: { events: WorldEventResponse[] };
+  crafting: {
+    recipes: Parameters<UseGameBootstrapOptions['setCraftingRecipes']>[0];
+    zoneCraftingLevel: number | null;
+    zoneName: string | null;
+  };
+  guild: { guild: { taxRate: number } } | null;
+}
+
 export function useGameBootstrap({
   tutorialStep,
   activeZoneIdRef,
@@ -319,12 +345,17 @@ export function useGameBootstrap({
     zones: ZoneState;
     connections: ZoneConnections;
     undiscoveredZones?: UndiscoveredZones;
-    currentZoneId: string;
-  }) => {
+    currentZoneId: string | null;
+  }, options: { events?: WorldEventResponse[] } = {}) => {
     setZones(data.zones);
     setZoneConnections(data.connections);
     setUndiscoveredZones(data.undiscoveredZones ?? []);
     setActiveZoneId(data.currentZoneId);
+
+    if (options.events) {
+      setActiveEvents(options.events);
+      return;
+    }
 
     if (data.currentZoneId) {
       getZoneEvents(data.currentZoneId).then((response) => {
@@ -353,136 +384,82 @@ export function useGameBootstrap({
   const loadAll = useCallback(async () => {
     setActionError(null);
 
-    const [
-      turnsResponse,
-      playerResponse,
-      skillsResponse,
-      zonesResponse,
-      inventoryResponse,
-      equipmentResponse,
-      hpResponse,
-      resourcesResponse,
-      skillPointResponse,
-      buffsResponse,
-    ] = await Promise.all([
-      getTurns(),
-      getPlayer(),
-      getSkills(),
-      getZones(),
-      getInventory(),
-      getEquipment(),
-      getHpState(),
-      getResources(),
-      getSkillPointState(),
-      getPlayerBuffs(),
-    ]);
-
-    if (turnsResponse.data) {
-      setTurns(turnsResponse.data.currentTurns);
+    const bootstrapResponse = await getGameBootstrap<GameBootstrapPayload>();
+    if (!bootstrapResponse.data) {
+      setActionError(bootstrapResponse.error?.message ?? 'Failed to load game state.');
+      return;
     }
+    const bootstrap = bootstrapResponse.data;
 
-    if (playerResponse.data) {
-      const player = playerResponse.data.player as LoadedPlayerData;
+    setTurns(bootstrap.turns.currentTurns);
 
-      setCharacterProgression({
-        characterXp: player.characterXp,
-        characterLevel: player.characterLevel,
-        attributePoints: player.attributePoints,
-        attributes: player.attributes,
-      });
-      setGold(player.gold ?? 0);
-      setActiveEncounterSiteId(player.activeEncounterSiteId ?? null);
-      playerCreatedAtRef.current = player.createdAt;
-      initSettingsFromServer(player);
+    const player = bootstrap.player.player;
 
-      const serverTutorialStep = player.tutorialStep ?? TUTORIAL_COMPLETED;
-      setTutorialStep(serverTutorialStep);
-
-      const latestVersion = getLatestVersion();
-      if (latestVersion && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVersion) {
-        if (serverTutorialStep === 0) {
-          localStorage.setItem(CHANGELOG_STORAGE_KEY, latestVersion);
-        } else {
-          setShowChangelog(true);
-        }
-      }
-    }
-
-    if (skillsResponse.data) {
-      setSkills(skillsResponse.data.skills);
-    }
-
-    if (hpResponse.data) {
-      setHpState(hpResponse.data);
-    }
-
-    if (resourcesResponse.data) {
-      setStaminaState(resourcesResponse.data.stamina);
-      setManaState(resourcesResponse.data.mana);
-    }
-
-    if (skillPointResponse.data) {
-      setSkillPointState(skillPointResponse.data);
-    }
-
-    if (buffsResponse.data) {
-      setActiveBuffs(buffsResponse.data.buffs);
-    }
-
-    getExpeditionCooldowns().then((response) => {
-      if (response.data) {
-        setHasActiveExpedition(response.data.hasActiveExpedition);
-      }
+    setCharacterProgression({
+      characterXp: player.characterXp,
+      characterLevel: player.characterLevel,
+      attributePoints: player.attributePoints,
+      attributes: player.attributes,
     });
+    setGold(player.gold ?? 0);
+    setActiveEncounterSiteId(player.activeEncounterSiteId ?? null);
+    playerCreatedAtRef.current = player.createdAt;
+    initSettingsFromServer(player);
 
-    if (zonesResponse.data) {
-      applyZonesData(zonesResponse.data);
+    const serverTutorialStep = player.tutorialStep ?? TUTORIAL_COMPLETED;
+    setTutorialStep(serverTutorialStep);
+
+    const latestVersion = getLatestVersion();
+    if (latestVersion && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVersion) {
+      if (serverTutorialStep === 0) {
+        localStorage.setItem(CHANGELOG_STORAGE_KEY, latestVersion);
+      } else {
+        setShowChangelog(true);
+      }
     }
 
-    if (inventoryResponse.data) {
-      applyInventoryData(inventoryResponse.data);
-    }
+    setSkills(bootstrap.skills.skills);
+    setHpState(bootstrap.hp);
+    setStaminaState(bootstrap.resources.stamina);
+    setManaState(bootstrap.resources.mana);
+    setSkillPointState(bootstrap.skillPoints);
+    setActiveBuffs(bootstrap.buffs.buffs);
 
-    if (equipmentResponse.data) {
-      setEquipment(
-        equipmentResponse.data.equipment.map((entry) => ({
-          slot: entry.slot,
-          itemId: entry.itemId,
-          item: entry.item
-            ? {
-                id: entry.item.id,
-                rarity: entry.item.rarity,
-                currentDurability: entry.item.currentDurability,
-                maxDurability: entry.item.maxDurability,
-                bonusStats: entry.item.bonusStats ?? null,
-                template: entry.item.template,
-              }
-            : null,
-        })),
-      );
-    }
+    applyZonesData(bootstrap.zones, { events: bootstrap.zoneEvents.events });
+    applyInventoryData(bootstrap.inventory);
 
-    void refreshCraftingRecipes();
+    setEquipment(
+      bootstrap.equipment.equipment.map((entry) => ({
+        slot: entry.slot,
+        itemId: entry.itemId,
+        item: entry.item
+          ? {
+              id: entry.item.id,
+              rarity: entry.item.rarity,
+              currentDurability: entry.item.currentDurability,
+              maxDurability: entry.item.maxDurability,
+              bonusStats: entry.item.bonusStats ?? null,
+              template: entry.item.template,
+            }
+          : null,
+      })),
+    );
 
-    getPlayerGuild()
-      .then((response) => {
-        if (response.data?.guild) {
-          setGuildTaxRate(response.data.guild.taxRate);
-        } else {
-          setGuildTaxRate(0);
-        }
-      })
-      .catch(() => setGuildTaxRate(0));
+    setCraftingRecipes(bootstrap.crafting.recipes);
+    setZoneCraftingLevel(bootstrap.crafting.zoneCraftingLevel);
+    setZoneCraftingName(bootstrap.crafting.zoneName);
+    setHasActiveExpedition(bootstrap.expeditionCooldowns.hasActiveExpedition);
+    setGuildTaxRate(bootstrap.guild?.guild.taxRate ?? 0);
   }, [
     applyZonesData,
     applyInventoryData,
     initSettingsFromServer,
     playerCreatedAtRef,
-    refreshCraftingRecipes,
     setActionError,
     setActiveBuffs,
     setActiveEncounterSiteId,
     setCharacterProgression,
+    setCraftingRecipes,
     setEquipment,
     setGold,
     setGuildTaxRate,
@@ -496,6 +473,8 @@ export function useGameBootstrap({
     setTemplates,
     setTutorialStep,
     setTurns,
+    setZoneCraftingLevel,
+    setZoneCraftingName,
   ]);
 
   return {

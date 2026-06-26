@@ -513,9 +513,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, [isAuthenticated, loadAll, loadPvpNotificationCount, loadFriendCounts]);
 
   // Recurring polls pause unless the page is visible, focused, and recently active.
-  useVisibleInterval(() => void pollScreenData(), 10000, isAuthenticated);
-  useVisibleInterval(() => void loadPvpNotificationCount(), 60000, isAuthenticated);
-  useVisibleInterval(() => void loadFriendCounts(), 60000, isAuthenticated);
+  useVisibleInterval(() => void pollScreenData(), 60_000, isAuthenticated);
+  useVisibleInterval(() => void loadPvpNotificationCount(), 300_000, isAuthenticated);
+  useVisibleInterval(() => void loadFriendCounts(), 300_000, isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated || sessionTrackedRef.current || characterProgression.characterLevel === 0) return;

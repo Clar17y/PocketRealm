@@ -36,3 +36,22 @@ export function createEndpointLimiter(
     ...(options?.skip && { skip: options.skip }),
   });
 }
+
+/**
+ * Creates an in-process limiter for broad, low-risk request caps.
+ * Use this for coarse global protection so normal reads do not spend Redis commands.
+ */
+export function createLocalEndpointLimiter(
+  _name: string, windowMs: number, max: number,
+  options?: EndpointLimiterOptions,
+) {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: options?.message ?? 'Too many requests, please try again later', code: 'RATE_LIMITED' },
+    passOnStoreError: options?.passOnStoreError ?? true,
+    ...(options?.skip && { skip: options.skip }),
+  });
+}

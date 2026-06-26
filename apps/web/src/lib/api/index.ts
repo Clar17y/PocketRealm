@@ -1,4 +1,5 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs, checkApiReady, ensureFreshAccessToken } from './core';
+export { getGameBootstrap } from './game';
 export type { ApiRequestOptions, ApiResponse, TaxInfo } from './core';
 
 export { getDiscordLinkStatus, claimDiscordLinkCode, normalizeDiscordLinkStatus } from './discord';
