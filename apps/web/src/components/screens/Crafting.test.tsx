@@ -76,6 +76,12 @@ describe('Crafting', () => {
       },
       {
         ...baseRecipe,
+        id: 'cleanse-all',
+        name: 'Purifying Potion',
+        consumableEffect: { type: 'cleanse_magic_dot', value: 0 },
+      },
+      {
+        ...baseRecipe,
         id: 'resist',
         name: 'Resist Potion',
         consumableEffect: { type: 'buff_defence', value: 15, duration: 5 },
@@ -103,6 +109,11 @@ describe('Crafting', () => {
     expect(screen.queryByText('No base stats')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /Cleansing Potion/i }));
+
+    expect(screen.getByText('Cleanses 1 magic DoT')).toBeTruthy();
+    expect(screen.queryByText('No base stats')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Purifying Potion/i }));
 
     expect(screen.getByText('Cleanses all magic DoTs')).toBeTruthy();
     expect(screen.queryByText('No base stats')).toBeNull();

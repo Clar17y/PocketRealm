@@ -135,7 +135,8 @@ function formatConsumableEffect(effect: CraftingConsumableEffect | null | undefi
     case 'restore_mana':
       return value === null ? 'Restores mana' : `Restores ${formatEffectValue(value)} mana`;
     case 'cleanse_magic_dot':
-      if (value === null || value <= 0) return 'Cleanses all magic DoTs';
+      if (value === null) return 'Cleanses 1 magic DoT';
+      if (value <= 0) return 'Cleanses all magic DoTs';
       return `Cleanses ${formatEffectValue(value)} magic DoT${value === 1 ? '' : 's'}`;
     case 'buff_attack':
       return withDuration(
