@@ -29,6 +29,7 @@ import {
   type WorldEventResponse,
   type SkillPointState,
   type ProspectableResourceNodeResponse,
+  type CraftingRecipeResponse,
 } from '@/lib/api';
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
@@ -143,21 +144,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }>>([]);
   const [zoneCraftingLevel, setZoneCraftingLevel] = useState<number | null>(0);
   const [zoneCraftingName, setZoneCraftingName] = useState<string | null>(null);
-  const [craftingRecipes, setCraftingRecipes] = useState<Array<{
-    id: string;
-    skillType: string;
-    requiredLevel: number;
-    isAdvanced: boolean;
-    isDiscovered: boolean;
-    discoveryHint: string | null;
-    soulbound: boolean;
-    mobFamilyId: string | null;
-    resultTemplate: { id: string; name: string; itemType: string; weightClass?: 'heavy' | 'medium' | 'light' | null; setId?: string | null; slot: string | null; tier: number; baseStats: Record<string, unknown>; stackable: boolean; maxDurability: number; requiredSkill: string | null; requiredLevel: number };
-    turnCost: number;
-    materials: Array<{ templateId: string; quantity: number }>;
-    materialTemplates: Array<{ id: string; name: string; itemType: string; stackable: boolean }>;
-    xpReward: number;
-  }>>([]);
+  const [craftingRecipes, setCraftingRecipes] = useState<CraftingRecipeResponse[]>([]);
   const [activeCraftingSkill, setActiveCraftingSkill] = useState<'refining' | 'tanning' | 'weaving' | 'weaponsmithing' | 'armorsmithing' | 'leatherworking' | 'tailoring' | 'alchemy' | 'jewelcrafting'>('weaponsmithing');
   const { activityLog, setActivityLog, pushLog } = useActivityLog();
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);

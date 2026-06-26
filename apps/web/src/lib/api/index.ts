@@ -121,6 +121,10 @@ export {
 } from './items';
 export type {
   PendingLootItem,
+  CraftingConsumableEffect,
+  CraftingRecipeResponse,
+  CraftingRecipeResultTemplate,
+  CraftingRecipesResponse,
   GatheringNodesQuery,
   GatheringNodesResponse,
   InventoryItem,

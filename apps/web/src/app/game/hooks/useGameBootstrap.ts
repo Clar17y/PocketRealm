@@ -16,6 +16,7 @@ import {
   type SkillPointState,
   type WorldEventResponse,
   type ProspectableResourceNodeResponse,
+  type CraftingRecipeResponse,
 } from '@/lib/api';
 import { TUTORIAL_COMPLETED, TUTORIAL_STEP_SKILL_POINTS } from '@/lib/tutorial';
 import type {
@@ -140,34 +141,7 @@ interface UseGameBootstrapOptions {
   setMaterialTotals: (totals: Record<string, number>) => void;
   setLootRevealItems: Dispatch<SetStateAction<LootRevealItem[] | null>>;
   setEquipment: (equipment: EquipmentState) => void;
-  setCraftingRecipes: (recipes: Array<{
-    id: string;
-    skillType: string;
-    requiredLevel: number;
-    isAdvanced: boolean;
-    isDiscovered: boolean;
-    discoveryHint: string | null;
-    soulbound: boolean;
-    mobFamilyId: string | null;
-    resultTemplate: {
-      id: string;
-      name: string;
-      itemType: string;
-      weightClass?: 'heavy' | 'medium' | 'light' | null;
-      setId?: string | null;
-      slot: string | null;
-      tier: number;
-      baseStats: Record<string, unknown>;
-      stackable: boolean;
-      maxDurability: number;
-      requiredSkill: string | null;
-      requiredLevel: number;
-    };
-    turnCost: number;
-    materials: Array<{ templateId: string; quantity: number }>;
-    materialTemplates: Array<{ id: string; name: string; itemType: string; stackable: boolean }>;
-    xpReward: number;
-  }>) => void;
+  setCraftingRecipes: (recipes: CraftingRecipeResponse[]) => void;
   setZoneCraftingLevel: (level: number | null) => void;
   setZoneCraftingName: (name: string | null) => void;
   setTemplates: (templates: CombatTemplateData[]) => void;
