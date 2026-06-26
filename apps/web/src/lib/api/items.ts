@@ -1,6 +1,48 @@
-import type { QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
+import type { ConsumableEffect, QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { EventModifierBadge } from './combat';
+
+export type CraftingConsumableEffect = Omit<ConsumableEffect, 'value'> & {
+  value?: number;
+};
+
+export interface CraftingRecipeResultTemplate {
+  id: string;
+  name: string;
+  itemType: string;
+  weightClass: 'heavy' | 'medium' | 'light' | null;
+  setId: string | null;
+  slot: string | null;
+  tier: number;
+  baseStats: Record<string, unknown>;
+  requiredSkill: string | null;
+  requiredLevel: number;
+  maxDurability: number;
+  stackable: boolean;
+  consumableEffect: CraftingConsumableEffect | null;
+}
+
+export interface CraftingRecipeResponse {
+  id: string;
+  skillType: string;
+  requiredLevel: number;
+  isAdvanced: boolean;
+  isDiscovered: boolean;
+  discoveryHint: string | null;
+  soulbound: boolean;
+  mobFamilyId: string | null;
+  resultTemplate: CraftingRecipeResultTemplate;
+  turnCost: number;
+  materials: Array<{ templateId: string; quantity: number }>;
+  materialTemplates: Array<{ id: string; name: string; itemType: string; stackable: boolean }>;
+  xpReward: number;
+}
+
+export interface CraftingRecipesResponse {
+  recipes: CraftingRecipeResponse[];
+  zoneCraftingLevel: number | null;
+  zoneName: string | null;
+}
 
 // Inventory
 
@@ -238,38 +280,7 @@ export async function mine(playerNodeId: string, turns: number) {
 // Crafting
 
 export async function getCraftingRecipes() {
-  return fetchApi<{
-    recipes: Array<{
-      id: string;
-      skillType: string;
-      requiredLevel: number;
-      isAdvanced: boolean;
-      isDiscovered: boolean;
-      discoveryHint: string | null;
-      soulbound: boolean;
-      mobFamilyId: string | null;
-      resultTemplate: {
-        id: string;
-        name: string;
-        itemType: string;
-        weightClass: 'heavy' | 'medium' | 'light' | null;
-        setId: string | null;
-        slot: string | null;
-        tier: number;
-        baseStats: Record<string, unknown>;
-        requiredSkill: string | null;
-        requiredLevel: number;
-        maxDurability: number;
-        stackable: boolean;
-      };
-      turnCost: number;
-      materials: Array<{ templateId: string; quantity: number }>;
-      materialTemplates: Array<{ id: string; name: string; itemType: string; stackable: boolean }>;
-      xpReward: number;
-    }>;
-    zoneCraftingLevel: number | null;
-    zoneName: string | null;
-  }>('/api/v1/crafting/recipes');
+  return fetchApi<CraftingRecipesResponse>('/api/v1/crafting/recipes');
 }
 
 export async function craft(recipeId: string, quantity: number = 1) {

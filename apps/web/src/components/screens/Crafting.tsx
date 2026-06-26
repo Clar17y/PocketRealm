@@ -13,6 +13,7 @@ import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
+import type { CraftingConsumableEffect } from '@/lib/api';
 import { ItemIcon } from '@/components/common/ItemIcon';
 import { SkillHeader } from '@/components/common/SkillHeader';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -41,6 +42,7 @@ interface Recipe {
   turnCost: number;
   xpReward: number;
   baseStats: Record<string, unknown>;
+  consumableEffect?: CraftingConsumableEffect | null;
   materials: Material[];
   rarity: Rarity;
 }
@@ -93,6 +95,63 @@ function getCraftingNpc(skillType: string, zoneName: string | null): NpcKey | un
   return zoneMap[key] ?? zoneMap['millbrook'];
 }
 
+function formatRoundCount(rounds: number): string {
+  return `${rounds} round${rounds === 1 ? '' : 's'}`;
+}
+
+function formatEffectValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function formatEffectPercent(value: number): string {
+  return `${formatEffectValue(value * 100)}%`;
+}
+
+function finiteEffectValue(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function withDuration(text: string, duration: number | undefined): string {
+  return duration ? `${text} for ${formatRoundCount(duration)}` : text;
+}
+
+function assertNeverEffect(type: never): null {
+  void type;
+  return null;
+}
+
+function formatConsumableEffect(effect: CraftingConsumableEffect | null | undefined): string | null {
+  if (!effect) return null;
+
+  const value = finiteEffectValue(effect.value);
+
+  switch (effect.type) {
+    case 'heal_flat':
+      return value === null ? 'Restores HP' : `Restores ${formatEffectValue(value)} HP`;
+    case 'heal_percent':
+      return value === null ? 'Restores HP' : `Restores ${formatEffectPercent(value)} HP`;
+    case 'restore_stamina':
+      return value === null ? 'Restores stamina' : `Restores ${formatEffectValue(value)} stamina`;
+    case 'restore_mana':
+      return value === null ? 'Restores mana' : `Restores ${formatEffectValue(value)} mana`;
+    case 'cleanse_magic_dot':
+      if (value === null || value <= 0) return 'Cleanses all magic DoTs';
+      return `Cleanses ${formatEffectValue(value)} magic DoT${value === 1 ? '' : 's'}`;
+    case 'buff_attack':
+      return withDuration(
+        value === null ? 'Increases attack' : `Increases attack by ${formatEffectPercent(value)}`,
+        effect.duration,
+      );
+    case 'buff_defence':
+      return withDuration(
+        value === null ? 'Increases defence and magic defence' : `Increases defence and magic defence by ${formatEffectValue(value)}`,
+        effect.duration,
+      );
+    default:
+      return assertNeverEffect(effect.type);
+  }
+}
+
 interface CraftingProps {
   skillType?: string;
   skillName: string;
@@ -134,6 +193,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
 
   const selectedRecipe = selectedRecipeId ? recipes.find((recipe) => recipe.id === selectedRecipeId) ?? null : null;
   const selectedBaseStats = statEntries(selectedRecipe?.baseStats);
+  const selectedEffect = formatConsumableEffect(selectedRecipe?.consumableEffect);
   const selectedRecipeLocked = selectedRecipe?.isAdvanced && selectedRecipe?.isDiscovered === false;
   const selectedLevelLocked = selectedRecipe ? selectedRecipe.requiredLevel > skillLevel : false;
 
@@ -301,10 +361,14 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
             </div>
           </div>
 
-          {/* Base Stats */}
+          {/* Base Stats / Effects */}
           <div className="space-y-2 mb-4">
-            <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm">Base Stats</h4>
-            {selectedBaseStats.length === 0 ? (
+            <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm">
+              {selectedEffect ? 'Effect' : 'Base Stats'}
+            </h4>
+            {selectedEffect ? (
+              <div className="text-sm text-[var(--rpg-green-light)]">{selectedEffect}</div>
+            ) : selectedBaseStats.length === 0 ? (
               <div className="text-sm text-[var(--rpg-text-secondary)]">No base stats</div>
             ) : (
               selectedBaseStats.map(([stat, value]) => (

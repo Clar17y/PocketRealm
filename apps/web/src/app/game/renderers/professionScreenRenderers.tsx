@@ -58,6 +58,7 @@ export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
           turnCost: recipe.turnCost,
           xpReward: recipe.xpReward,
           baseStats: recipe.resultTemplate.baseStats,
+          consumableEffect: recipe.resultTemplate.consumableEffect,
           materials: recipe.materials.map((material) => {
             const meta = recipe.materialTemplates.find((template) => template.id === material.templateId);
             const owned = gc.ownedByTemplateId.get(material.templateId) ?? 0;
