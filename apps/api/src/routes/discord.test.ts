@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   ackDiscordNotificationEvents: vi.fn(),
   lookupItemForDiscord: vi.fn(),
   lookupMobForDiscord: vi.fn(),
+  lookupResourceForDiscord: vi.fn(),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -128,6 +129,7 @@ vi.mock('../services/discordNotificationService', () => ({
 vi.mock('../services/discordLookupService', () => ({
   lookupItemForDiscord: mocks.lookupItemForDiscord,
   lookupMobForDiscord: mocks.lookupMobForDiscord,
+  lookupResourceForDiscord: mocks.lookupResourceForDiscord,
 }));
 
 import { discordRouter } from './discord';
@@ -1029,6 +1031,32 @@ describe('discordRouter', () => {
       .expect(200);
 
     expect(res.body).toEqual({ match: null, suggestions: ['Forest Spider'] });
+  });
+
+  it('requires bot auth and returns a resource lookup card', async () => {
+    await request(app()).get('/api/v1/discord/resources/lookup?q=iron').expect(401);
+
+    mocks.lookupResourceForDiscord.mockResolvedValue({
+      match: {
+        query: 'iron',
+        resources: [
+          {
+            name: 'Iron Ore',
+            tier: 3,
+            zones: [{ name: 'Deep Mines', skillRequired: 'mining', levelRequired: 12 }],
+          },
+        ],
+      },
+      suggestions: [],
+    });
+
+    const res = await request(app())
+      .get('/api/v1/discord/resources/lookup?q=iron')
+      .set('x-pocketrealm-bot-key', 'bot-key')
+      .expect(200);
+
+    expect(res.body.match.resources[0].zones[0].name).toBe('Deep Mines');
+    expect(mocks.lookupResourceForDiscord).toHaveBeenCalledWith('iron');
   });
 
   it('rejects an empty lookup query', async () => {

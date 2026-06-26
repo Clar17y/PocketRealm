@@ -2,7 +2,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import type { PocketRealmApiClient } from '../api/pocketRealmApi.js';
 import { cardText, expectV2Card } from '../test/v2CardAssertions.js';
-import { handleItemCommand, handleMobCommand } from './lookupCommand.js';
+import { handleItemCommand, handleMobCommand, handleResourceCommand } from './lookupCommand.js';
 
 const config = { emojiMap: {} };
 
@@ -81,6 +81,61 @@ describe('handleMobCommand', () => {
     expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
     expect(get).toHaveBeenCalledWith('/api/v1/discord/mobs/lookup?q=warg');
     expect(cardText(editReply.mock.calls[0]?.[0])).toContain('Whispering Plains');
+  });
+});
+
+describe('handleResourceCommand', () => {
+  it('renders a resource card on a containing search match', async () => {
+    const get = vi.fn(async <T>(): Promise<T> => ({
+      match: {
+        query: 'iron',
+        resources: [
+          {
+            name: 'Iron Ore',
+            tier: 3,
+            zones: [
+              {
+                name: 'Deep Mines',
+                skillRequired: 'mining',
+                levelRequired: 12,
+                baseYield: 1,
+                discoveryChancePct: 25,
+                minCapacity: 25,
+                maxCapacity: 120,
+              },
+            ],
+          },
+          {
+            name: 'Dark Iron Ore',
+            tier: 4,
+            zones: [
+              {
+                name: 'Haunted Marsh',
+                skillRequired: 'mining',
+                levelRequired: 20,
+                baseYield: 1,
+                discoveryChancePct: 20,
+                minCapacity: 30,
+                maxCapacity: 150,
+              },
+            ],
+          },
+        ],
+      },
+      suggestions: [],
+    }) as T);
+    const { interaction, deferReply, editReply } = makeInteraction('iron');
+    await handleResourceCommand(interaction, { get } as Pick<PocketRealmApiClient, 'get'>, config);
+
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: false });
+    expect(get).toHaveBeenCalledWith('/api/v1/discord/resources/lookup?q=iron');
+    const payload = editReply.mock.calls[0]?.[0];
+    expectV2Card(payload);
+    const text = cardText(payload);
+    expect(text).toContain('Iron Ore');
+    expect(text).toContain('Deep Mines');
+    expect(text).toContain('Dark Iron Ore');
+    expect(text).toContain('Haunted Marsh');
   });
 });
 

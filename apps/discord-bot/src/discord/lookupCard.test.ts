@@ -4,9 +4,11 @@ import {
   buildItemCard,
   buildMobCard,
   buildNotFoundCard,
+  buildResourceCard,
   buildSuggestionCard,
   type ItemCardData,
   type MobCardData,
+  type ResourceCardData,
 } from './lookupCard.js';
 
 const emojiMap = {};
@@ -37,6 +39,42 @@ const mob: MobCardData = {
   zones: ['Whispering Plains', 'Frostpeak'],
   flavorAppearance: 'A grey wolf.',
   drops: [{ itemName: 'Warg Pelt', itemType: 'resource', tier: 1, dropRatePct: 50, minQty: 1, maxQty: 1 }],
+};
+
+const resource: ResourceCardData = {
+  query: 'iron',
+  resources: [
+    {
+      name: 'Iron Ore',
+      tier: 3,
+      zones: [
+        {
+          name: 'Deep Mines',
+          skillRequired: 'mining',
+          levelRequired: 12,
+          baseYield: 1,
+          discoveryChancePct: 25,
+          minCapacity: 25,
+          maxCapacity: 120,
+        },
+      ],
+    },
+    {
+      name: 'Dark Iron Ore',
+      tier: 4,
+      zones: [
+        {
+          name: 'Haunted Marsh',
+          skillRequired: 'mining',
+          levelRequired: 20,
+          baseYield: 1,
+          discoveryChancePct: 20,
+          minCapacity: 30,
+          maxCapacity: 150,
+        },
+      ],
+    },
+  ],
 };
 
 describe('buildItemCard', () => {
@@ -87,6 +125,21 @@ describe('buildMobCard', () => {
     const text = cardText(payload);
     expect(text).toContain('Expeditions (expedition only)');
     expect(text).not.toContain('Forest Edge');
+  });
+});
+
+describe('buildResourceCard', () => {
+  it('renders matching resources and the zones that contain them', () => {
+    const payload = buildResourceCard(resource, emojiMap);
+
+    expectV2Card(payload);
+    const text = cardText(payload);
+    expect(text).toContain('Resources matching "iron"');
+    expect(text).toContain('Iron Ore');
+    expect(text).toContain('Deep Mines');
+    expect(text).toContain('Dark Iron Ore');
+    expect(text).toContain('Haunted Marsh');
+    expect(text).toContain('mining Lv. 12');
   });
 });
 

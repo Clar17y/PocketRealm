@@ -64,7 +64,7 @@ import { notifySupportTicketCreated } from '../services/discordSupportNotifier';
 import { createDiscordSupportTicket } from '../services/supportTicketService';
 import { createSupportTicketSchema, supportTicketPublicIdParamsSchema } from '../services/supportTicketSchemas';
 import { searchWikiForDiscord } from '../services/wikiSearchService';
-import { lookupItemForDiscord, lookupMobForDiscord } from '../services/discordLookupService';
+import { lookupItemForDiscord, lookupMobForDiscord, lookupResourceForDiscord } from '../services/discordLookupService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const discordRouter = Router();
@@ -284,6 +284,13 @@ discordRouter.get('/items/lookup', requireInternalBotAuth, asyncHandler(async (r
 discordRouter.get('/mobs/lookup', requireInternalBotAuth, asyncHandler(async (req, res) => {
   const query = discordLookupQuerySchema.parse(req.query);
   const result = await lookupMobForDiscord(query.q);
+
+  res.json(result);
+}));
+
+discordRouter.get('/resources/lookup', requireInternalBotAuth, asyncHandler(async (req, res) => {
+  const query = discordLookupQuerySchema.parse(req.query);
+  const result = await lookupResourceForDiscord(query.q);
 
   res.json(result);
 }));
