@@ -26,6 +26,7 @@ import {
   startManualEncounterRoom,
   resolveManualEncounterRound,
   clearManualCombatSession,
+  isManualCombatSessionPersistenceError,
   parseEncounterMobSlot,
 } from '../../services/encounterSiteCombatService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers.js';
@@ -388,7 +389,9 @@ export function registerSiteRoutes(router: Router): void {
       try {
         result = await startManualEncounterRoom(playerId, siteId, username);
       } catch (err) {
-        await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } }).catch(() => {});
+        if (isManualCombatSessionPersistenceError(err)) {
+          await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } }).catch(() => {});
+        }
         throw err;
       }
 

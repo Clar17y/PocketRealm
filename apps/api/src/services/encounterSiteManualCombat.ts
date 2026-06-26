@@ -99,13 +99,27 @@ const COMBAT_SESSION_PREFIX = 'encounter-combat:';
 const COMBAT_SESSION_TTL_SECONDS = 84 * 60 * 60;
 const COMBAT_SESSION_UNAVAILABLE_MESSAGE = 'Combat session storage is unavailable. Try again shortly.';
 const COMBAT_SESSION_UNAVAILABLE_CODE = 'COMBAT_SESSION_UNAVAILABLE';
+const COMBAT_SESSION_OPERATION = Symbol('manualCombatSessionOperation');
+type CombatSessionOperation = 'read' | 'write';
 
 function combatSessionKey(playerId: string, siteId: string): string {
   return `${COMBAT_SESSION_PREFIX}${playerId}:${siteId}`;
 }
 
-function combatSessionUnavailableError(): AppError {
-  return new AppError(503, COMBAT_SESSION_UNAVAILABLE_MESSAGE, COMBAT_SESSION_UNAVAILABLE_CODE);
+type ManualCombatSessionStorageError = AppError & {
+  [COMBAT_SESSION_OPERATION]: CombatSessionOperation;
+};
+
+function combatSessionUnavailableError(operation: CombatSessionOperation): AppError {
+  const error = new AppError(503, COMBAT_SESSION_UNAVAILABLE_MESSAGE, COMBAT_SESSION_UNAVAILABLE_CODE);
+  (error as ManualCombatSessionStorageError)[COMBAT_SESSION_OPERATION] = operation;
+  return error;
+}
+
+export function isManualCombatSessionPersistenceError(err: unknown): boolean {
+  return err instanceof AppError
+    && err.code === COMBAT_SESSION_UNAVAILABLE_CODE
+    && (err as Partial<ManualCombatSessionStorageError>)[COMBAT_SESSION_OPERATION] === 'write';
 }
 
 async function getCombatSession(playerId: string, siteId: string): Promise<ManualCombatState | null> {
@@ -113,7 +127,7 @@ async function getCombatSession(playerId: string, siteId: string): Promise<Manua
   try {
     data = await redis.get(combatSessionKey(playerId, siteId));
   } catch {
-    throw combatSessionUnavailableError();
+    throw combatSessionUnavailableError('read');
   }
 
   if (!data) return null;
@@ -136,7 +150,7 @@ async function setCombatSession(playerId: string, siteId: string, state: ManualC
   try {
     await redis.set(combatSessionKey(playerId, siteId), data, 'EX', COMBAT_SESSION_TTL_SECONDS);
   } catch {
-    throw combatSessionUnavailableError();
+    throw combatSessionUnavailableError('write');
   }
 }
 

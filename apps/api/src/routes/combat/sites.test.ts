@@ -15,6 +15,7 @@ const encounterSiteCombatMocks = vi.hoisted(() => ({
   startManualEncounterRoom: vi.fn(),
   resolveManualEncounterRound: vi.fn(),
   clearManualCombatSession: vi.fn(),
+  isManualCombatSessionPersistenceError: vi.fn(),
   parseEncounterMobSlot: vi.fn(),
 }));
 
@@ -85,6 +86,7 @@ function mockRes() {
 beforeEach(() => {
   vi.resetAllMocks();
   databaseMocks.prisma.player.update.mockResolvedValue({});
+  encounterSiteCombatMocks.isManualCombatSessionPersistenceError.mockReturnValue(false);
 });
 
 describe('encounter site route helpers', () => {
@@ -104,6 +106,7 @@ describe('POST /combat/sites/:id/start-room', () => {
     const siteId = '8d0b93ac-3f3b-4de9-8cef-ea7066a12261';
     const error = new Error('Combat session storage is unavailable. Try again shortly.');
     encounterSiteCombatMocks.startManualEncounterRoom.mockRejectedValueOnce(error);
+    encounterSiteCombatMocks.isManualCombatSessionPersistenceError.mockReturnValueOnce(true);
 
     const req = {
       params: { id: siteId },
@@ -124,6 +127,34 @@ describe('POST /combat/sites/:id/start-room', () => {
       where: { id: 'player-1' },
       data: { activeEncounterSiteId: null },
     });
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('preserves the encounter lockout when manual session startup fails before persistence', async () => {
+    const router = Router();
+    registerSiteRoutes(router);
+    const siteId = '8d0b93ac-3f3b-4de9-8cef-ea7066a12261';
+    const error = new Error('Combat session storage is unavailable. Try again shortly.');
+    encounterSiteCombatMocks.startManualEncounterRoom.mockRejectedValueOnce(error);
+
+    const req = {
+      params: { id: siteId },
+      player: { playerId: 'player-1', username: 'Tester' },
+      body: {},
+    };
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler(router, 'post', '/sites/:id/start-room');
+    await handler(req, res, next);
+
+    expect(databaseMocks.prisma.player.update).toHaveBeenCalledTimes(1);
+    expect(databaseMocks.prisma.player.update).toHaveBeenCalledWith({
+      where: { id: 'player-1' },
+      data: { activeEncounterSiteId: siteId },
+    });
+    expect(encounterSiteCombatMocks.isManualCombatSessionPersistenceError).toHaveBeenCalledWith(error);
     expect(next).toHaveBeenCalledWith(error);
     expect(res.json).not.toHaveBeenCalled();
   });

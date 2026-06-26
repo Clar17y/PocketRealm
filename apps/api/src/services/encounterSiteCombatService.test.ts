@@ -105,7 +105,18 @@ const serviceMocks = vi.hoisted(() => ({
 // Mock DB modules so tests don't require JWT_SECRET / DB connection
 vi.mock('@pocketrealm/database', () => ({ prisma: databaseMocks.prisma, Prisma: {} }));
 vi.mock('../redis', () => ({ redis: redisMock }));
-vi.mock('../middleware/errorHandler', () => ({ AppError: class extends Error { constructor(s: number, m: string) { super(m); } } }));
+vi.mock('../middleware/errorHandler', () => ({
+  AppError: class extends Error {
+    statusCode: number;
+    code?: string;
+
+    constructor(statusCode: number, message: string, code?: string) {
+      super(message);
+      this.statusCode = statusCode;
+      this.code = code;
+    }
+  },
+}));
 vi.mock('./combatOrchestrationService', () => combatOrchestrationMocks);
 vi.mock('./progressService', () => progressMocks);
 vi.mock('../utils/routeHelpers', () => guardMocks);
@@ -139,6 +150,7 @@ import {
   rebuildEncounterSiteXpContributionsFromRoundLogs,
   createEncounterSiteXpContributions,
   autoResolveEncounterRoom,
+  isManualCombatSessionPersistenceError,
   startManualEncounterRoom,
   resolveManualEncounterRound,
 } from './encounterSiteCombatService';
@@ -1090,8 +1102,16 @@ describe('startManualEncounterRoom', () => {
     mockAutoEncounterSite(playerId, siteId, [makeEncounterSlot(1)]);
     redisMock.set.mockRejectedValueOnce(new Error('ERR monthly request limit exceeded'));
 
-    await expect(startManualEncounterRoom(playerId, siteId, 'Tester'))
-      .rejects.toThrow('Combat session storage is unavailable. Try again shortly.');
+    let thrown: unknown;
+    try {
+      await startManualEncounterRoom(playerId, siteId, 'Tester');
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe('Combat session storage is unavailable. Try again shortly.');
+    expect(isManualCombatSessionPersistenceError(thrown)).toBe(true);
   });
 });
 
@@ -1101,8 +1121,16 @@ describe('resolveManualEncounterRound', () => {
     const siteId = 'site-1';
     redisMock.get.mockRejectedValueOnce(new Error('ERR monthly request limit exceeded'));
 
-    await expect(resolveManualEncounterRound(playerId, siteId, {}))
-      .rejects.toThrow('Combat session storage is unavailable. Try again shortly.');
+    let thrown: unknown;
+    try {
+      await resolveManualEncounterRound(playerId, siteId, {});
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe('Combat session storage is unavailable. Try again shortly.');
+    expect(isManualCombatSessionPersistenceError(thrown)).toBe(false);
     expect(databaseMocks.prisma.player.update).not.toHaveBeenCalled();
   });
 
