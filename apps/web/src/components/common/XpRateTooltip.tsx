@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { Info } from 'lucide-react';
+import { SKILL_CONSTANTS } from '@pocketrealm/shared';
 
-const TOOLTIP_TEXT = 'Your XP rate decreases as you train a skill within each 6-hour window. Take a break or train other skills!';
+const TOOLTIP_TEXT =
+  `Your XP rate decreases as you train a skill during its ${SKILL_CONSTANTS.XP_WINDOW_HOURS}-hour rolling window. ` +
+  'Take a break or train other skills!';
 
 export function XpRateTooltip() {
   const [show, setShow] = useState(false);
