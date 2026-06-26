@@ -3,6 +3,7 @@ import type { DiscordEmojiMap } from './emojis.js';
 import { statusCard, textCard, type V2CardPayload } from './v2Card.js';
 
 const MAX_LIST = 15;
+const MAX_RESOURCE_ZONES = 8;
 const MAX_FLAVOR = 300;
 
 export interface ItemCardData {
@@ -37,6 +38,23 @@ export interface MobCardData {
   zones: string[];
   flavorAppearance: string | null;
   drops: Array<{ itemName: string; itemType: string; tier: number; dropRatePct: number; minQty: number; maxQty: number }>;
+}
+
+export interface ResourceCardData {
+  query: string;
+  resources: Array<{
+    name: string;
+    tier: number | null;
+    zones: Array<{
+      name: string;
+      skillRequired: string;
+      levelRequired: number;
+      baseYield: number;
+      discoveryChancePct: number;
+      minCapacity: number;
+      maxCapacity: number;
+    }>;
+  }>;
 }
 
 function seasonLine(season: { name: string } | null): string | null {
@@ -158,10 +176,40 @@ export function buildMobCard(data: MobCardData, emojiMap: DiscordEmojiMap): V2Ca
   });
 }
 
+export function buildResourceCard(data: ResourceCardData, emojiMap: DiscordEmojiMap): V2CardPayload {
+  const lines: string[] = [];
+
+  for (const resource of data.resources.slice(0, MAX_LIST)) {
+    const tier = typeof resource.tier === 'number' ? ` (Tier ${resource.tier})` : '';
+    lines.push(`**${escapeDiscordText(resource.name)}${tier}**`);
+
+    for (const zone of resource.zones.slice(0, MAX_RESOURCE_ZONES)) {
+      lines.push(
+        `• ${escapeDiscordText(zone.name)} — ${escapeDiscordText(zone.skillRequired)} Lv. ${zone.levelRequired}, ${zone.discoveryChancePct}% discovery, capacity ${zone.minCapacity}-${zone.maxCapacity}`,
+      );
+    }
+
+    if (resource.zones.length > MAX_RESOURCE_ZONES) {
+      lines.push(`…and ${resource.zones.length - MAX_RESOURCE_ZONES} more zones`);
+    }
+  }
+
+  if (data.resources.length > MAX_LIST) {
+    lines.push(`…and ${data.resources.length - MAX_LIST} more resources`);
+  }
+
+  return textCard({
+    emojiKey: 'resource',
+    title: `Resources matching "${escapeDiscordText(data.query)}"`,
+    emojiMap,
+    lines,
+  });
+}
+
 export function buildSuggestionCard(
   query: string,
   suggestions: string[],
-  kind: 'item' | 'mob',
+  kind: 'item' | 'mob' | 'resource',
   emojiMap: DiscordEmojiMap,
 ): V2CardPayload {
   const lines = suggestions.map((name) => `• ${escapeDiscordText(name)}`);
@@ -175,7 +223,7 @@ export function buildSuggestionCard(
 
 export function buildNotFoundCard(
   query: string,
-  kind: 'item' | 'mob',
+  kind: 'item' | 'mob' | 'resource',
   emojiMap: DiscordEmojiMap,
 ): V2CardPayload {
   return statusCard(

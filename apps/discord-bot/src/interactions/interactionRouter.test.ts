@@ -51,6 +51,7 @@ vi.mock('./staffCommands.js', () => ({
 vi.mock('./lookupCommand.js', () => ({
   handleItemCommand: vi.fn(),
   handleMobCommand: vi.fn(),
+  handleResourceCommand: vi.fn(),
 }));
 
 const routerConfig = {
@@ -123,6 +124,22 @@ describe('routeInteraction', () => {
     await routeInteraction(interaction, { api, config: routerConfig });
 
     expect(handleMobCommand).toHaveBeenCalledOnce();
+  });
+
+  it('routes resource commands to the resource handler', async () => {
+    const { handleResourceCommand } = await import('./lookupCommand.js');
+    const api = createApi(null);
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'resource',
+      options: { getString: vi.fn(() => 'iron') },
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    } as unknown as Interaction;
+
+    await routeInteraction(interaction, { api, config: routerConfig });
+
+    expect(handleResourceCommand).toHaveBeenCalledOnce();
   });
 
   it('routes player commands with guild config', async () => {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPrisma } from '../__test__/setup';
-import { lookupItemForDiscord, lookupMobForDiscord } from './discordLookupService';
+import { lookupItemForDiscord, lookupMobForDiscord, lookupResourceForDiscord } from './discordLookupService';
 
 describe('lookupItemForDiscord', () => {
   beforeEach(() => {
@@ -187,5 +187,164 @@ describe('lookupMobForDiscord', () => {
 
     expect(result.match).toBeNull();
     expect(result.suggestions).toContain('Forest Spider');
+  });
+});
+
+describe('lookupResourceForDiscord', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.season.findFirst.mockResolvedValue(null);
+  });
+
+  it('returns all resources containing the query with their zones', async () => {
+    mockPrisma.resourceNode.findMany.mockResolvedValueOnce([
+      {
+        id: 'iron-node',
+        resourceType: 'Iron Ore',
+        skillRequired: 'mining',
+        levelRequired: 12,
+        baseYield: 1,
+        discoveryChance: 0.25,
+        minCapacity: 25,
+        maxCapacity: 120,
+        zone: { name: 'Deep Mines', difficulty: 3, seasonId: null, season: null },
+      },
+      {
+        id: 'dark-iron-node',
+        resourceType: 'Dark Iron Ore',
+        skillRequired: 'mining',
+        levelRequired: 20,
+        baseYield: 1,
+        discoveryChance: 0.2,
+        minCapacity: 30,
+        maxCapacity: 150,
+        zone: { name: 'Haunted Marsh', difficulty: 4, seasonId: null, season: null },
+      },
+      {
+        id: 'oak-node',
+        resourceType: 'Oak Log',
+        skillRequired: 'woodcutting',
+        levelRequired: 1,
+        baseYield: 1,
+        discoveryChance: 0.35,
+        minCapacity: 15,
+        maxCapacity: 80,
+        zone: { name: 'Forest Edge', difficulty: 1, seasonId: null, season: null },
+      },
+    ]);
+    mockPrisma.itemTemplate.findMany.mockResolvedValueOnce([
+      { id: 'iron-template', name: 'Iron Ore', tier: 3, seasonId: null, season: null },
+      { id: 'dark-iron-template', name: 'Dark Iron Ore', tier: 4, seasonId: null, season: null },
+    ]);
+    const result = await lookupResourceForDiscord('Iron');
+
+    expect(result.suggestions).toEqual([]);
+    expect(result.match).toEqual({
+      query: 'Iron',
+      resources: [
+        {
+          name: 'Iron Ore',
+          tier: 3,
+          zones: [
+            {
+              name: 'Deep Mines',
+              skillRequired: 'mining',
+              levelRequired: 12,
+              baseYield: 1,
+              discoveryChancePct: 25,
+              minCapacity: 25,
+              maxCapacity: 120,
+            },
+          ],
+        },
+        {
+          name: 'Dark Iron Ore',
+          tier: 4,
+          zones: [
+            {
+              name: 'Haunted Marsh',
+              skillRequired: 'mining',
+              levelRequired: 20,
+              baseYield: 1,
+              discoveryChancePct: 20,
+              minCapacity: 30,
+              maxCapacity: 150,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('prefers active-season resource nodes over base duplicates', async () => {
+    mockPrisma.season.findFirst.mockResolvedValue({ id: 'season-2' });
+    mockPrisma.resourceNode.findMany.mockResolvedValueOnce([
+      {
+        id: 'base-iron-node',
+        resourceType: 'Iron Ore',
+        skillRequired: 'mining',
+        levelRequired: 12,
+        baseYield: 1,
+        discoveryChance: 0.25,
+        minCapacity: 25,
+        maxCapacity: 120,
+        zone: { name: 'Deep Mines', difficulty: 3, seasonId: null, season: null },
+      },
+      {
+        id: 'seasonal-iron-node',
+        resourceType: 'Iron Ore',
+        skillRequired: 'mining',
+        levelRequired: 14,
+        baseYield: 1,
+        discoveryChance: 0.35,
+        minCapacity: 30,
+        maxCapacity: 140,
+        zone: {
+          name: 'Deep Mines',
+          difficulty: 3,
+          seasonId: 'season-2',
+          season: { id: 'season-2', name: 'Season of Embers', startsAt: new Date('2026-06-01') },
+        },
+      },
+      {
+        id: 'old-iron-node',
+        resourceType: 'Iron Ore',
+        skillRequired: 'mining',
+        levelRequired: 16,
+        baseYield: 1,
+        discoveryChance: 0.4,
+        minCapacity: 40,
+        maxCapacity: 160,
+        zone: {
+          name: 'Deep Mines',
+          difficulty: 3,
+          seasonId: 'season-1',
+          season: { id: 'season-1', name: 'Old Season', startsAt: new Date('2026-01-01') },
+        },
+      },
+    ]);
+    mockPrisma.itemTemplate.findMany.mockResolvedValueOnce([
+      { id: 'iron-template', name: 'Iron Ore', tier: 3, seasonId: null, season: null },
+    ]);
+
+    const result = await lookupResourceForDiscord('Iron Ore');
+
+    expect(result.match?.resources).toEqual([
+      {
+        name: 'Iron Ore',
+        tier: 3,
+        zones: [
+          {
+            name: 'Deep Mines',
+            skillRequired: 'mining',
+            levelRequired: 14,
+            baseYield: 1,
+            discoveryChancePct: 35,
+            minCapacity: 30,
+            maxCapacity: 140,
+          },
+        ],
+      },
+    ]);
   });
 });

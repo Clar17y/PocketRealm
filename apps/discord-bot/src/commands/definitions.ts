@@ -34,6 +34,15 @@ export function buildCommandDefinitions(): RESTPostAPIChatInputApplicationComman
           .setRequired(true),
       ),
     new SlashCommandBuilder()
+      .setName('resource')
+      .setDescription('Find which zones contain a Pocketrealm resource.')
+      .addStringOption((option) =>
+        option
+          .setName('query')
+          .setDescription('Resource name to search for.')
+          .setRequired(true),
+      ),
+    new SlashCommandBuilder()
       .setName('profile')
       .setDescription('View a Pocketrealm player profile.')
       .addUserOption((option) =>
