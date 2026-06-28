@@ -179,6 +179,7 @@ interface GameBootstrapPayload {
     zoneCraftingLevel: number | null;
     zoneName: string | null;
   };
+  templates?: { templates: CombatTemplateData[] };
   guild: { guild: { taxRate: number } } | null;
 }
 
@@ -422,6 +423,7 @@ export function useGameBootstrap({
     setCraftingRecipes(bootstrap.crafting.recipes);
     setZoneCraftingLevel(bootstrap.crafting.zoneCraftingLevel);
     setZoneCraftingName(bootstrap.crafting.zoneName);
+    setTemplates(bootstrap.templates?.templates ?? []);
     setHasActiveExpedition(bootstrap.expeditionCooldowns.hasActiveExpedition);
     setGuildTaxRate(bootstrap.guild?.guild.taxRate ?? 0);
   }, [

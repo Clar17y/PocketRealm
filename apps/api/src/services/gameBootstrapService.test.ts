@@ -138,6 +138,7 @@ describe('getGameBootstrap', () => {
     vi.mocked(prisma.item.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.item.groupBy).mockResolvedValue([] as never);
     vi.mocked(prisma.playerEquipment.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.combatTemplate.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.itemTemplate.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.guildMember.findUnique).mockResolvedValue(null as never);
     vi.mocked(prisma.zone.findUnique).mockResolvedValue({
@@ -204,7 +205,52 @@ describe('getGameBootstrap', () => {
     });
   });
 
-  it('uses the zone resolved by bootstrap zones when building crafting metadata', async () => {
+  it('loads bootstrap state with crafting metadata and combat templates', async () => {
+    vi.mocked(prisma.combatTemplate.findMany).mockResolvedValue([
+      {
+        id: 'template-1',
+        playerId: PLAYER_ID,
+        name: 'Alpha Rotation',
+        isActive: true,
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+        slots: [
+          {
+            id: 'slot-1',
+            templateId: 'template-1',
+            sortOrder: 0,
+            actionId: 'light_attack',
+            conditionType: null,
+            resource: null,
+            threshold: null,
+            effectName: null,
+            thenActionId: null,
+          },
+        ],
+      },
+      {
+        id: 'template-2',
+        playerId: PLAYER_ID,
+        name: 'Defensive Rotation',
+        isActive: false,
+        createdAt: new Date('2026-06-02T00:00:00.000Z'),
+        updatedAt: new Date('2026-06-02T00:00:00.000Z'),
+        slots: [
+          {
+            id: 'slot-2',
+            templateId: 'template-2',
+            sortOrder: 0,
+            actionId: 'defend',
+            conditionType: null,
+            resource: null,
+            threshold: null,
+            effectName: null,
+            thenActionId: null,
+          },
+        ],
+      },
+    ] as never);
+
     const result = await getGameBootstrap(PLAYER_ID);
 
     expect(result.zones.currentZoneId).toBe(STARTER_ZONE_ID);
@@ -221,6 +267,26 @@ describe('getGameBootstrap', () => {
     });
     expect(serviceMocks.getActiveEventsForZone).toHaveBeenCalledWith(STARTER_ZONE_ID);
     expect(result.zoneEvents.events).toEqual([{ id: 'event-1', name: 'Festival' }]);
+    expect(result.templates.templates).toEqual([
+      {
+        id: 'template-1',
+        playerId: PLAYER_ID,
+        name: 'Alpha Rotation',
+        isActive: true,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+        slots: [{ id: 'slot-1', sortOrder: 0, actionId: 'light_attack' }],
+      },
+      {
+        id: 'template-2',
+        playerId: PLAYER_ID,
+        name: 'Defensive Rotation',
+        isActive: false,
+        createdAt: '2026-06-02T00:00:00.000Z',
+        updatedAt: '2026-06-02T00:00:00.000Z',
+        slots: [{ id: 'slot-2', sortOrder: 0, actionId: 'defend' }],
+      },
+    ]);
     expect(result.guild).toBeNull();
   });
 });
