@@ -20,6 +20,7 @@ import { getActiveEventsForZone } from './worldEventService';
 import { getCachedCraftingRecipes } from './staticDataCacheService';
 import { buildRecipeDiscoveryHint, parseMaterials } from './crafting/helpers';
 import { getPlayerGuild } from './guildService';
+import { getTemplates as getCombatTemplates } from './combatTemplateService';
 
 interface BootstrapZonesPayload {
   currentZoneId: string | null;
@@ -302,6 +303,7 @@ export async function getGameBootstrap(playerId: string) {
     buffs,
     expeditionCooldowns,
     crafting,
+    templates,
     guild,
   ] = await Promise.all([
     getTurnState(playerId),
@@ -315,6 +317,7 @@ export async function getGameBootstrap(playerId: string) {
     getActiveBuffs(playerId),
     getExpeditionCooldownPayload(playerId),
     craftingPromise,
+    getCombatTemplates(playerId),
     getPlayerGuild(playerId),
   ]);
 
@@ -340,6 +343,7 @@ export async function getGameBootstrap(playerId: string) {
     expeditionCooldowns,
     zoneEvents,
     crafting,
+    templates: { templates },
     guild,
   };
 }

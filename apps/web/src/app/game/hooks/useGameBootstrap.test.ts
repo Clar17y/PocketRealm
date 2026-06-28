@@ -82,6 +82,45 @@ function createOptions() {
   };
 }
 
+function buildBootstrapPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    turns: { currentTurns: 42, timeToCapMs: null, lastRegenAt: '2026-06-24T08:00:00.000Z' },
+    player: {
+      player: {
+        characterXp: 100,
+        characterLevel: 3,
+        attributePoints: 2,
+        attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
+        gold: 25,
+        activeEncounterSiteId: null,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        tutorialStep: 99,
+      },
+    },
+    skills: { skills: [{ id: 'skill-1', skillType: 'mining', level: 2, xp: 5, dailyXpGained: 0 }] },
+    zones: {
+      zones: [],
+      connections: [],
+      undiscoveredZones: [],
+      currentZoneId: 'zone-forest',
+    },
+    inventory: { items: [], capacity: 24, usedSlots: 0, materialTotals: {} },
+    equipment: { equipment: [] },
+    hp: { currentHp: 10, maxHp: 10, regenPerSecond: 1, isRecovering: false, recoveryCost: null },
+    resources: {
+      stamina: { current: 10, max: 10, regenPerRound: 1, regenPerSecond: 1, restHealPerTurn: 1 },
+      mana: { current: 10, max: 10, regenPerRound: 1, regenPerSecond: 1, restHealPerTurn: 1 },
+    },
+    skillPoints: { availablePoints: 0, spentPoints: 0, allocations: [], trees: [] },
+    buffs: { buffs: [{ id: 'buff-1', name: 'Well Fed' }] },
+    expeditionCooldowns: { weeklyCooldowns: {}, betweenCooldown: null, hasActiveExpedition: false },
+    zoneEvents: { events: [] },
+    crafting: { recipes: [], zoneCraftingLevel: 0, zoneName: null },
+    guild: null,
+    ...overrides,
+  };
+}
+
 describe('useGameBootstrap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -165,42 +204,28 @@ describe('useGameBootstrap', () => {
   });
 
   it('loads initial game state with one bootstrap API call', async () => {
-    apiMocks.getGameBootstrap.mockResolvedValue({
-      data: {
-        turns: { currentTurns: 42, timeToCapMs: null, lastRegenAt: '2026-06-24T08:00:00.000Z' },
-        player: {
-          player: {
-            characterXp: 100,
-            characterLevel: 3,
-            attributePoints: 2,
-            attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
-            gold: 25,
-            activeEncounterSiteId: null,
-            createdAt: '2026-06-01T00:00:00.000Z',
-            tutorialStep: 99,
-          },
-        },
-        skills: { skills: [{ id: 'skill-1', skillType: 'mining', level: 2, xp: 5, dailyXpGained: 0 }] },
-        zones: {
-          zones: [],
-          connections: [],
-          undiscoveredZones: [],
-          currentZoneId: 'zone-forest',
-        },
-        inventory: { items: [], capacity: 24, usedSlots: 0, materialTotals: {} },
-        equipment: { equipment: [] },
-        hp: { currentHp: 10, maxHp: 10, regenPerSecond: 1, isRecovering: false, recoveryCost: null },
-        resources: {
-          stamina: { current: 10, max: 10, regenPerRound: 1, regenPerSecond: 1, restHealPerTurn: 1 },
-          mana: { current: 10, max: 10, regenPerRound: 1, regenPerSecond: 1, restHealPerTurn: 1 },
-        },
-        skillPoints: { availablePoints: 0, spentPoints: 0, allocations: [], trees: [] },
-        buffs: { buffs: [{ id: 'buff-1', name: 'Well Fed' }] },
-        expeditionCooldowns: { weeklyCooldowns: {}, betweenCooldown: null, hasActiveExpedition: false },
-        zoneEvents: { events: [] },
-        crafting: { recipes: [], zoneCraftingLevel: 0, zoneName: null },
-        guild: null,
+    const templates = [
+      {
+        id: 'template-1',
+        playerId: 'player-1',
+        name: 'Alpha Rotation',
+        isActive: true,
+        slots: [{ id: 'slot-1', sortOrder: 0, actionId: 'light_attack' }],
+        createdAt: '2026-06-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
       },
+      {
+        id: 'template-2',
+        playerId: 'player-1',
+        name: 'Defensive Rotation',
+        isActive: false,
+        slots: [{ id: 'slot-2', sortOrder: 0, actionId: 'defend' }],
+        createdAt: '2026-06-02T00:00:00.000Z',
+        updatedAt: '2026-06-02T00:00:00.000Z',
+      },
+    ];
+    apiMocks.getGameBootstrap.mockResolvedValue({
+      data: buildBootstrapPayload({ templates: { templates } }),
       error: null,
     } as never);
     const options = createOptions();
@@ -216,6 +241,7 @@ describe('useGameBootstrap', () => {
     expect(apiMocks.getPlayer).not.toHaveBeenCalled();
     expect(apiMocks.getInventory).not.toHaveBeenCalled();
     expect(apiMocks.getCraftingRecipes).not.toHaveBeenCalled();
+    expect(apiMocks.getTemplates).not.toHaveBeenCalled();
     expect(options.setTurns).toHaveBeenCalledWith(42);
     expect(options.setCharacterProgression).toHaveBeenCalledWith({
       characterXp: 100,
@@ -227,6 +253,24 @@ describe('useGameBootstrap', () => {
       { id: 'skill-1', skillType: 'mining', level: 2, xp: 5, dailyXpGained: 0 },
     ]);
     expect(options.setActiveBuffs).toHaveBeenCalledWith([{ id: 'buff-1', name: 'Well Fed' }]);
+    expect(options.setTemplates).toHaveBeenCalledWith(templates);
+    expect(options.setGuildTaxRate).toHaveBeenCalledWith(0);
+  });
+
+  it('tolerates bootstrap responses without templates', async () => {
+    apiMocks.getGameBootstrap.mockResolvedValue({
+      data: buildBootstrapPayload(),
+      error: null,
+    } as never);
+    const options = createOptions();
+
+    const { result } = renderHook(() => useGameBootstrap(options));
+
+    await act(async () => {
+      await result.current.loadAll();
+    });
+
+    expect(options.setTemplates).toHaveBeenCalledWith([]);
     expect(options.setGuildTaxRate).toHaveBeenCalledWith(0);
   });
 });
