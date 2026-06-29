@@ -438,7 +438,7 @@ export async function advanceToFirstAliveRoom(
 export async function handleDecayedSiteClearance(
   playerId: string,
   siteId: string,
-  site: { mobFamilyId: string; totalRooms: number | null; roomStrategy: unknown; mobs: unknown },
+  site: { mobFamilyId: string; zoneId: string; totalRooms: number | null; roomStrategy: unknown; mobs: unknown },
 ): Promise<{ completionRewards: EncounterSiteChestRewards; pendingLootSessionId: string | null }> {
   const { availableSlots } = await getInventoryState(playerId);
   const totalRoomsCount = site.totalRooms ?? 1;
@@ -451,6 +451,7 @@ export async function handleDecayedSiteClearance(
       mobFamilyId: site.mobFamilyId,
       totalRooms: totalRoomsCount,
       autoResolvedBonusRooms: autoResolvedCount,
+      zoneId: site.zoneId,
       defeatedPromotedRoleCounts,
       availableSlots,
     });

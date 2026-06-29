@@ -522,6 +522,7 @@ export async function resolveManualEncounterRound(
       where: { id: siteId, playerId },
       select: {
         id: true, playerId: true, mobFamilyId: true, size: true,
+        zoneId: true,
         discoveredAt: true, mobs: true, currentRoom: true, totalRooms: true,
         roomStrategy: true,
       },
@@ -586,6 +587,7 @@ export async function resolveManualEncounterRound(
         mobFamilyId: freshSite.mobFamilyId,
         totalRooms: totalRoomsCount,
         autoResolvedBonusRooms: autoResolvedCount,
+        zoneId: freshSite.zoneId,
         defeatedPromotedRoleCounts: countDefeatedPromotedEncounterRoles(mobs),
         availableSlots: chestAvailableSlots,
       });

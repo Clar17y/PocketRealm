@@ -220,6 +220,7 @@ export async function autoResolveEncounterRoom(
       where: { id: siteId, playerId },
       select: {
         id: true, playerId: true, mobFamilyId: true, size: true,
+        zoneId: true,
         discoveredAt: true, mobs: true, currentRoom: true, totalRooms: true,
         roomStrategy: true,
       },
@@ -291,6 +292,7 @@ export async function autoResolveEncounterRoom(
         mobFamilyId: freshSite.mobFamilyId,
         totalRooms: totalRoomsCount,
         autoResolvedBonusRooms: autoResolvedCount,
+        zoneId: freshSite.zoneId,
         defeatedPromotedRoleCounts: countDefeatedPromotedEncounterRoles(mobs),
         availableSlots: chestAvailableSlots,
       });

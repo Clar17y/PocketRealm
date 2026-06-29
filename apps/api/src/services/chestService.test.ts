@@ -76,10 +76,14 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledWith({
         where: {
           mobFamilyId: 'family-1',
+          zoneId: null,
           chestRarity: 'common',
         },
         include: {
           mobFamily: {
+            select: { name: true },
+          },
+          zone: {
             select: { name: true },
           },
           itemTemplate: {
@@ -92,6 +96,81 @@ describe('grantEncounterSiteChestRewardsTx', () => {
           },
         },
       });
+    });
+
+    it('prefers zone-specific chest rows when a matching zone table exists', async () => {
+      mockPrisma.chestDropTable.findMany.mockResolvedValueOnce([
+        {
+          itemTemplateId: 'zone-cloth',
+          dropChance: 10,
+          minQuantity: 1,
+          maxQuantity: 1,
+          zoneId: 'deep-forest-zone',
+          mobFamily: { name: 'Bandits' },
+          zone: { name: 'Deep Forest' },
+          itemTemplate: { name: 'Bandit Cloth', itemType: 'resource', stackable: true, maxDurability: 0 },
+        },
+      ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        zoneId: 'deep-forest-zone',
+      });
+
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'zone-cloth')).toBe(true);
+      expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            mobFamilyId: 'family-1',
+            chestRarity: 'common',
+            zoneId: 'deep-forest-zone',
+          },
+        }),
+      );
+    });
+
+    it('falls back to family-wide chest rows when a zone has no specific table', async () => {
+      mockPrisma.chestDropTable.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            itemTemplateId: 'fallback-cloth',
+            dropChance: 10,
+            minQuantity: 1,
+            maxQuantity: 1,
+            zoneId: null,
+            mobFamily: { name: 'Bandits' },
+            itemTemplate: { name: 'Bandit Cloth', itemType: 'resource', stackable: true, maxDurability: 0 },
+          },
+        ]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        zoneId: 'unconfigured-zone',
+      });
+
+      expect(result.loot.some((drop) => drop.itemTemplateId === 'fallback-cloth')).toBe(true);
+      expect(mockPrisma.chestDropTable.findMany).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: {
+            mobFamilyId: 'family-1',
+            chestRarity: 'common',
+            zoneId: 'unconfigured-zone',
+          },
+        }),
+      );
+      expect(mockPrisma.chestDropTable.findMany).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          where: {
+            mobFamilyId: 'family-1',
+            chestRarity: 'common',
+            zoneId: null,
+          },
+        }),
+      );
     });
 
     it('returns loot from drop table entries', async () => {
@@ -166,10 +245,11 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(addStackableItemTx).not.toHaveBeenCalledWith(expect.anything(), 'p1', 'minor-health-potion', expect.any(Number));
       expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
+          where: expect.objectContaining({
             mobFamilyId: 'family-1',
+            zoneId: null,
             chestRarity: { in: ['uncommon', 'rare', 'epic', 'legendary'] },
-          },
+          }),
         })
       );
     });
