@@ -21,6 +21,7 @@ import { applyResourceCosts, resolveSupportiveActions } from '../combatHelpers';
 import { tickTaunts } from '../threatSystem';
 import { actionLabel, resolvePlayerOffensive, type OffensiveAttackContext, type RaidRoundRng } from '../raidPlayerPhase';
 import { resolveMobActions } from '../raidMobPhase';
+import { findStrongestResourcePotionIndex, isResourcePotionType } from '../potionSelection';
 
 export function resolveRaidOutcomePhases({
   input,
@@ -119,9 +120,14 @@ export function resolveRaidOutcomePhases({
 
     if (definition.actionType === 'use_potion') {
       const potionType = definition.potionType ?? 'hp';
-      const potionIndex = potions.findIndex((potion: CombatPotion, potionIdx: number) =>
-        potion.potionType === potionType && (!usedIndices || !usedIndices.has(potionIdx)),
-      );
+      if (!isResourcePotionType(potionType)) {
+        if (state.alternateActionDef) {
+          potionFallbackIndices.push(index);
+        }
+        continue;
+      }
+
+      const potionIndex = findStrongestResourcePotionIndex(potions, potionType, usedIndices);
       if (potionIndex === -1) {
         if (state.alternateActionDef) {
           potionFallbackIndices.push(index);

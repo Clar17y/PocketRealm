@@ -751,6 +751,35 @@ describe('resolveRaidRound', () => {
       expect(sickness!.roundsRemaining).toBe(COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS - 1);
     });
 
+    it('use_hp_potion consumes the strongest matching health potion regardless of pool order', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 100, maxHp: 500,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }],
+        availablePotions: [
+          makePotion({ name: 'Minor Health Potion', healAmount: 50, templateId: 'minor-hp' }),
+          makePotion({ name: 'Greater Health Potion', healAmount: 200, templateId: 'greater-hp' }),
+        ],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      expect(result.participantResults[0].potionsConsumed[0]).toMatchObject({
+        name: 'Greater Health Potion',
+        templateId: 'greater-hp',
+        healAmount: 200,
+      });
+      expect(result.participantResults[0].hpAfter).toBe(300);
+    });
+
     it('use_hp_potion with potion sickness active does not heal or consume', () => {
       const potion = makePotion({ healAmount: 40 });
       const p1 = makeParticipant({

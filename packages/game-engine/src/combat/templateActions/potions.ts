@@ -18,6 +18,7 @@ import {
   isMagicDot,
   isStatDebuff,
 } from '../templateEffects';
+import { findStrongestResourcePotionIndex, isResourcePotionType } from '../potionSelection';
 
 export function executePotionAction(
   state: TemplateCombatState,
@@ -28,7 +29,7 @@ export function executePotionAction(
   availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
-  const potionType = (action.potionType ?? 'hp') as 'hp' | 'stamina' | 'mana';
+  const potionType = action.potionType ?? 'hp';
 
   if (hasPotionSickness(state, actorKey)) {
     state.log.push(buildLogEntry(state, ctx, {
@@ -40,7 +41,17 @@ export function executePotionAction(
     return;
   }
 
-  const potionIndex = availablePotions.findIndex((potion) => potion.potionType === potionType);
+  if (!isResourcePotionType(potionType)) {
+    state.log.push(buildLogEntry(state, ctx, {
+      actor: actorKey,
+      actorName,
+      action: 'potion',
+      message: `${actorName} tries to drink a potion but has none left!`,
+    }));
+    return;
+  }
+
+  const potionIndex = findStrongestResourcePotionIndex(availablePotions, potionType);
   if (potionIndex === -1) {
     state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
