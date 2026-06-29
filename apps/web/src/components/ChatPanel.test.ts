@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChatPanel } from './ChatPanel';
 
@@ -9,6 +9,7 @@ if (!Element.prototype.scrollIntoView) {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 const baseProps: React.ComponentProps<typeof ChatPanel> = {
@@ -64,6 +65,9 @@ describe('ChatPanel', () => {
   });
 
   it('renders world activity messages in the activity shelf, not the main world stream', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-18T12:02:00.000Z'));
+
     renderChatPanel({
       worldMessages: [
         {
@@ -93,6 +97,46 @@ describe('ChatPanel', () => {
     expect(screen.getByText('hello')).toBeTruthy();
     expect(screen.getByText('The Ashen Herald has been defeated.')).toBeTruthy();
     expect(screen.getByLabelText('Chat activity')).toBeTruthy();
+  });
+
+  it('removes world activity messages after the display window expires', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-20T12:00:00.000Z'));
+
+    renderChatPanel({
+      globalActivityMessages: [
+        {
+          id: 'expired',
+          channelType: 'world',
+          channelId: 'world',
+          playerId: 'system',
+          username: 'System',
+          message: 'The old boss has been defeated.',
+          messageType: 'activity',
+          createdAt: new Date('2026-04-18T11:59:59.999Z').toISOString(),
+        },
+        {
+          id: 'expiring',
+          channelType: 'world',
+          channelId: 'world',
+          playerId: 'system',
+          username: 'System',
+          message: 'The recent boss has been defeated.',
+          messageType: 'activity',
+          createdAt: new Date('2026-04-18T12:00:30.000Z').toISOString(),
+        },
+      ],
+    });
+
+    expect(screen.queryByText('The old boss has been defeated.')).toBeNull();
+    expect(screen.getByText('The recent boss has been defeated.')).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(30_001);
+    });
+
+    expect(screen.queryByText('The recent boss has been defeated.')).toBeNull();
+    expect(screen.queryByLabelText('Chat activity')).toBeNull();
   });
 
   it('keeps non-tab controls outside the channel tablist', () => {

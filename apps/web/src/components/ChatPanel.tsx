@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useEffect, useState, type FormEvent } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
 import { CHAT_ACTIVITY_CONSTANTS, CHAT_CONSTANTS } from '@pocketrealm/shared';
 import { PlayerTitle } from '@/components/common/PlayerTitle';
@@ -32,6 +32,17 @@ interface ChatPanelProps {
   pinnedMessage: ChatPinnedMessageEvent | null;
 }
 
+const GLOBAL_ACTIVITY_DISPLAY_MS = CHAT_ACTIVITY_CONSTANTS.NPC_REACTION_LOOKBACK_HOURS * 60 * 60 * 1000;
+
+function getActivityExpiresAtMs(message: ChatMessageEvent): number {
+  return new Date(message.createdAt).getTime() + GLOBAL_ACTIVITY_DISPLAY_MS;
+}
+
+function isActivityVisible(message: ChatMessageEvent, nowMs: number): boolean {
+  const expiresAtMs = getActivityExpiresAtMs(message);
+  return Number.isFinite(expiresAtMs) && expiresAtMs >= nowMs;
+}
+
 export function ChatPanel({
   isOpen,
   toggleChat,
@@ -58,6 +69,7 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const [pinnedDismissed, setPinnedDismissed] = useState(false);
+  const [activityNowMs, setActivityNowMs] = useState(() => Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,8 +77,36 @@ export function ChatPanel({
     : activeChannel === 'guild' ? guildMessages
     : activeChannel === 'casino' ? casinoMessages
     : zoneMessages;
-  const visibleGlobalActivity = globalActivityMessages.slice(-CHAT_ACTIVITY_CONSTANTS.VISIBLE_GLOBAL_ACTIVITY_COUNT);
+  const visibleGlobalActivity = useMemo(
+    () => globalActivityMessages
+      .filter((msg) => isActivityVisible(msg, activityNowMs))
+      .slice(-CHAT_ACTIVITY_CONSTANTS.VISIBLE_GLOBAL_ACTIVITY_COUNT),
+    [activityNowMs, globalActivityMessages],
+  );
   const pinnedId = pinnedMessage?.id;
+
+  useEffect(() => {
+    setActivityNowMs(Date.now());
+  }, [globalActivityMessages]);
+
+  useEffect(() => {
+    let nextExpiryAtMs = Number.POSITIVE_INFINITY;
+
+    for (const message of visibleGlobalActivity) {
+      const expiresAtMs = getActivityExpiresAtMs(message);
+      if (Number.isFinite(expiresAtMs) && expiresAtMs >= activityNowMs && expiresAtMs < nextExpiryAtMs) {
+        nextExpiryAtMs = expiresAtMs;
+      }
+    }
+
+    if (!Number.isFinite(nextExpiryAtMs)) {
+      return;
+    }
+
+    const timeoutMs = Math.max(0, nextExpiryAtMs - Date.now() + 1);
+    const timeoutId = window.setTimeout(() => setActivityNowMs(Date.now()), timeoutMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [activityNowMs, visibleGlobalActivity]);
 
   // Reset dismiss when a new pin arrives
   useEffect(() => {
