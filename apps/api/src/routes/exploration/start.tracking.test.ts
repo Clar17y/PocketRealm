@@ -686,6 +686,18 @@ describe('POST /exploration/start tracking contract', () => {
       expect.objectContaining({ trackingFamilyId }),
       expect.any(Array),
     );
+    expect(mockAddExplorationTurns).toHaveBeenCalledWith(
+      'p1',
+      ZONE_ID,
+      500,
+      expect.objectContaining({
+        currentTurnsExplored: 0,
+        turnsToExplore: 10000,
+      }),
+    );
+    expect(res.json).toHaveBeenCalledWith(expect.not.objectContaining({
+      explorationProgressPaused: expect.anything(),
+    }));
   });
 
   it('keeps discovered zone keys on direct zone-exit outcomes', async () => {
@@ -712,7 +724,8 @@ describe('POST /exploration/start tracking contract', () => {
     );
   });
 
-  it('ignores a submitted tier while tracking and uses the highest unlocked tier for progression', async () => {
+  it('honors a submitted tier while tracking when that family has members at that tier', async () => {
+    const trackingFamilyId = '22222222-2222-2222-2222-222222222222';
     mockPrisma.zone.findUnique.mockResolvedValue({
       id: ZONE_ID,
       name: 'Test Zone',
@@ -722,53 +735,128 @@ describe('POST /exploration/start tracking contract', () => {
       explorationTiers: { '1': 0, '2': 25, '3': 50 },
     });
     mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
-      [ZONE_ID, [{ mobFamilyId: '22222222-2222-2222-2222-222222222222', name: 'Spiders' }]],
+      [ZONE_ID, [{ mobFamilyId: trackingFamilyId, name: 'Spiders' }]],
     ]));
     mockGetCachedZoneMobFamilies.mockResolvedValue([
-      {
-        zoneId: ZONE_ID,
-        mobFamilyId: '22222222-2222-2222-2222-222222222222',
-        discoveryWeight: 100,
-        minSize: 'small',
-        maxSize: 'small',
-        mobFamily: {
-          id: '22222222-2222-2222-2222-222222222222',
-          name: 'Spiders',
-          siteNounSmall: 'Nest',
-          siteNounMedium: 'Nest',
-          siteNounLarge: 'Nest',
-          members: [
-            {
-              role: 'trash',
-              mobTemplate: {
-                id: 'spider-basic',
-                name: 'Spiderling',
-                zoneId: ZONE_ID,
-                explorationTier: 1,
-              },
+      createZoneFamily({
+        mobFamilyId: trackingFamilyId,
+        name: 'Spiders',
+        members: [
+          {
+            role: 'trash',
+            mobTemplate: {
+              id: 'spider-basic',
+              name: 'Spiderling',
+              zoneId: ZONE_ID,
+              explorationTier: 1,
             },
-            {
-              role: 'elite',
-              mobTemplate: {
-                id: 'spider-elite',
-                name: 'Elite Spider',
-                zoneId: ZONE_ID,
-                explorationTier: 3,
-              },
+          },
+          {
+            role: 'elite',
+            mobTemplate: {
+              id: 'spider-elite',
+              name: 'Elite Spider',
+              zoneId: ZONE_ID,
+              explorationTier: 3,
             },
-          ],
-        },
-      },
+          },
+        ],
+      }),
     ]);
     mockGetExplorationPercent.mockResolvedValueOnce({
       turnsExplored: 5000,
       percent: 50,
       turnsToExplore: 10000,
     });
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        tier: 1,
+        trackingFamilyId,
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/start');
+    await handler(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedTier: 1,
+        trackingFamilyId,
+      }),
+      expect.any(Array),
+    );
+    expect(mockAddExplorationTurns).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      explorationProgress: expect.objectContaining({
+        turnsExplored: 5000,
+      }),
+    }));
+  });
+
+  it('uses the highest unlocked family tier and pauses zone progress when tracking below the requested tier', async () => {
+    const trackingFamilyId = '22222222-2222-2222-2222-222222222222';
+    mockPrisma.zone.findUnique.mockResolvedValue({
+      id: ZONE_ID,
+      name: 'Test Zone',
+      difficulty: 1,
+      zoneType: 'wild',
+      zoneExitChance: 0.01,
+      explorationTiers: { '1': 0, '2': 25, '3': 50, '4': 75 },
+    });
+    mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
+      [ZONE_ID, [{ mobFamilyId: trackingFamilyId, name: 'Spiders' }]],
+    ]));
+    mockGetCachedZoneMobFamilies.mockResolvedValue([
+      createZoneFamily({
+        mobFamilyId: trackingFamilyId,
+        name: 'Spiders',
+        members: [
+          {
+            role: 'trash',
+            mobTemplate: {
+              id: 'spider-basic',
+              name: 'Spiderling',
+              zoneId: ZONE_ID,
+              explorationTier: 1,
+            },
+          },
+          {
+            role: 'mini_boss',
+            mobTemplate: {
+              id: 'spider-depths',
+              name: 'Brood Mother',
+              zoneId: ZONE_ID,
+              explorationTier: 3,
+            },
+          },
+        ],
+      }),
+      createZoneFamily({
+        mobFamilyId: '33333333-3333-3333-3333-333333333333',
+        name: 'Boars',
+        members: [
+          {
+            role: 'mini_boss',
+            mobTemplate: {
+              id: 'boar-apex',
+              name: 'Great Boar',
+              zoneId: ZONE_ID,
+              explorationTier: 4,
+            },
+          },
+        ],
+      }),
+    ]);
     mockGetExplorationPercent.mockResolvedValueOnce({
-      turnsExplored: 5500,
-      percent: 55,
-      turnsToExplore: 10000,
+      turnsExplored: 22500,
+      percent: 75,
+      turnsToExplore: 30000,
     });
 
     const req = {
@@ -776,8 +864,8 @@ describe('POST /exploration/start tracking contract', () => {
       body: {
         zoneId: ZONE_ID,
         turns: 500,
-        tier: 1,
-        trackingFamilyId: '22222222-2222-2222-2222-222222222222',
+        tier: 4,
+        trackingFamilyId,
       },
     } as any;
     const res = mockRes();
@@ -790,23 +878,20 @@ describe('POST /exploration/start tracking contract', () => {
     expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({
         selectedTier: 3,
-        trackingFamilyId: '22222222-2222-2222-2222-222222222222',
+        trackingFamilyId,
       }),
       expect.any(Array),
     );
-    expect(mockAddExplorationTurns).toHaveBeenCalledWith(
-      'p1',
-      ZONE_ID,
-      500,
-      expect.objectContaining({
-        currentTurnsExplored: 5000,
-        turnsToExplore: 10000,
-      }),
-    );
+    expect(mockAddExplorationTurns).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       explorationProgress: expect.objectContaining({
-        turnsExplored: 5500,
+        turnsExplored: 22500,
       }),
+      explorationProgressPaused: {
+        requestedTier: 4,
+        effectiveTier: 3,
+        reason: 'Tracking Spiders uses Depths enemies here, so zone exploration progress is paused.',
+      },
     }));
   });
 

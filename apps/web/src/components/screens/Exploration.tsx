@@ -127,7 +127,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
     ? unlockedTierNumbers[unlockedTierNumbers.length - 1]!
     : null;
   const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
-  const trackingSelectedTier = maxUnlockedTier;
+  const trackingSelectedTier = effectiveSelectedTier;
   const trackingEnabled = focusMode === 'tracking';
   const prospectingEnabled = focusMode === 'prospecting';
   const availableTrackingFamilies = trackableMobFamilies.filter((family) =>
@@ -357,7 +357,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
           )}
 
           {/* Tier Selector */}
-          {unlockedTiers.length > 1 && !tutorialLocked && focusMode !== 'tracking' && (
+          {unlockedTiers.length > 1 && !tutorialLocked && (
             <PixelCard>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">

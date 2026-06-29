@@ -157,6 +157,11 @@ export async function startExploration(
       percent: number;
       turnsToExplore: number | null;
     };
+    explorationProgressPaused?: {
+      requestedTier: number;
+      effectiveTier: number;
+      reason: string;
+    };
     pendingLootSessionIds?: string[];
     tax: TaxInfo | null;
     questProgress?: QuestProgressUpdate[];

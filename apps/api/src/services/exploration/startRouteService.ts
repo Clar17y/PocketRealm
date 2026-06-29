@@ -9,6 +9,8 @@ import {
   PREMIUM_CONSTANTS,
   getUnlockedTiers,
   getHighestUnlockedTier,
+  getTierName,
+  isPermanentEncounterFamilyRole,
   type PotionConsumed,
   type QuestProgressUpdate,
   EXPLORATION_TRACKING_CONSTANTS,
@@ -57,14 +59,20 @@ import {
 } from '../../utils/routeServiceResponse';
 
 
-function familyHasEligibleMembersForTier(
+function getHighestEligibleFamilyTier(
   family: ZoneFamilyRow,
   zoneId: string,
-  selectedTier: number,
-): boolean {
-  return family.mobFamily.members.some((member) =>
-    member.mobTemplate.zoneId === zoneId && (member.mobTemplate.explorationTier ?? 1) <= selectedTier,
-  );
+  requestedTier: number,
+): number | null {
+  const eligibleTiers = family.mobFamily.members
+    .filter((member) =>
+      member.mobTemplate.zoneId === zoneId
+      && isPermanentEncounterFamilyRole(member.role)
+      && (member.mobTemplate.explorationTier ?? 1) <= requestedTier,
+    )
+    .map((member) => member.mobTemplate.explorationTier ?? 1);
+
+  return eligibleTiers.length > 0 ? Math.max(...eligibleTiers) : null;
 }
 
 export async function startExploration(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
@@ -126,10 +134,16 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
     // Determine unlocked tiers and selected tier
     const unlockedTiers = getUnlockedTiers(explorationProgress.percent, zoneTiers);
     const maxUnlockedTier = getHighestUnlockedTier(explorationProgress.percent, zoneTiers);
-    const selectedTier = trackingFamilyId ? maxUnlockedTier : (body.tier ?? maxUnlockedTier);
+    const requestedTier = body.tier ?? maxUnlockedTier;
+    let selectedTier = requestedTier;
+    let explorationProgressPaused: {
+      requestedTier: number;
+      effectiveTier: number;
+      reason: string;
+    } | null = null;
 
-    if (!trackingFamilyId && body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
-      throw new AppError(400, `Tier ${selectedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
+    if (body.tier !== undefined && !unlockedTiers.includes(requestedTier)) {
+      throw new AppError(400, `Tier ${requestedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
     }
 
     if (trackingFamilyId) {
@@ -140,8 +154,20 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
       }
 
       const trackingFamily = zoneFamilies.find((family) => family.mobFamilyId === trackingFamilyId);
-      if (!trackingFamily || !familyHasEligibleMembersForTier(trackingFamily, body.zoneId, selectedTier)) {
+      const effectiveTrackingTier = trackingFamily
+        ? getHighestEligibleFamilyTier(trackingFamily, body.zoneId, requestedTier)
+        : null;
+      if (!trackingFamily || effectiveTrackingTier === null) {
         effectiveTrackingFamilyId = null;
+      } else {
+        selectedTier = effectiveTrackingTier;
+        if (effectiveTrackingTier < requestedTier) {
+          explorationProgressPaused = {
+            requestedTier,
+            effectiveTier: effectiveTrackingTier,
+            reason: `Tracking ${trackingFamily.mobFamily.name} uses ${getTierName(effectiveTrackingTier)} enemies here, so zone exploration progress is paused.`,
+          };
+        }
       }
     }
 
@@ -467,6 +493,7 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
       zoneExitDiscovered: finalZoneExitDiscovered,
       ...(respawnedTo ? { respawnedTo } : {}),
       ...(pendingLootSessionIds.length > 0 ? { pendingLootSessionIds } : {}),
+      ...(explorationProgressPaused ? { explorationProgressPaused } : {}),
       explorationProgress: {
         turnsExplored: explorationProgress.turnsExplored + explorationTurnsToAdd,
         percent: calculateExplorationPercent(explorationProgress.turnsExplored + explorationTurnsToAdd, explorationProgress.turnsToExplore),

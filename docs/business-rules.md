@@ -145,6 +145,13 @@ Every turn-spending action is validated: positive integer, sufficient balance, g
 - Same-name effects refresh duration (don't stack)
 - Life leech: some offensive actions heal the attacker for a % of damage dealt (capped at max HP)
 
+## Exploration Targeting
+
+- Players can select an unlocked exploration tier for wild-zone exploration.
+- Mob family tracking targets the highest member tier in that family that is unlocked and at or below the selected tier.
+- If tracking falls back below the selected tier, zone exploration progress is paused for that run and the response includes a user-facing pause reason.
+- Tracking still lowers broad combat/site yield and does not remove non-family outcomes such as resources, caches, and exits.
+
 ## Encounter Site Lifecycle
 
 ```
