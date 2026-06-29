@@ -132,7 +132,7 @@ describe('chatService', () => {
       await getChannelHistory('zone', 'zone:z1');
 
       expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith({
-        where: { channelType: 'zone', channelId: 'zone:z1' },
+        where: expect.objectContaining({ channelType: 'zone', channelId: 'zone:z1' }),
         orderBy: { createdAt: 'desc' },
         take: 50,
       });
@@ -154,7 +154,7 @@ describe('chatService', () => {
       }));
     });
 
-    it('can query only activity history', async () => {
+    it('queries only unexpired activity history', async () => {
       mockPrisma.chatMessage.findMany.mockResolvedValue([]);
       mockPrisma.player.findMany.mockResolvedValue([]);
 
@@ -165,6 +165,36 @@ describe('chatService', () => {
           channelType: 'world',
           channelId: 'world',
           messageType: 'activity',
+          activity: {
+            is: {
+              expiresAt: { gte: expect.any(Date) },
+            },
+          },
+        },
+      }));
+    });
+
+    it('keeps expired activity out of default mixed history', async () => {
+      mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await getChannelHistory('world', 'world');
+
+      expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: {
+          channelType: 'world',
+          channelId: 'world',
+          OR: [
+            { NOT: { messageType: 'activity' } },
+            {
+              messageType: 'activity',
+              activity: {
+                is: {
+                  expiresAt: { gte: expect.any(Date) },
+                },
+              },
+            },
+          ],
         },
       }));
     });
@@ -197,7 +227,7 @@ describe('getAuthorizedChannelHistory', () => {
     await getAuthorizedChannelHistory('player-1', 'zone', 'zone:zone-current');
 
     expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { channelType: 'zone', channelId: 'zone:zone-current' },
+      where: expect.objectContaining({ channelType: 'zone', channelId: 'zone:zone-current' }),
     }));
   });
 
@@ -232,7 +262,7 @@ describe('getAuthorizedChannelHistory', () => {
     await getAuthorizedChannelHistory('player-1', 'guild', 'guild:guild-current');
 
     expect(mockPrisma.chatMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { channelType: 'guild', channelId: 'guild:guild-current' },
+      where: expect.objectContaining({ channelType: 'guild', channelId: 'guild:guild-current' }),
     }));
   });
 });

@@ -48,10 +48,22 @@ export async function getChannelHistory(
   options: { messageType?: ChatHistoryMessageTypeFilter } = {},
 ): Promise<ChatMessageEvent[]> {
   const where: Prisma.ChatMessageWhereInput = { channelType, channelId };
+  const unexpiredActivityWhere: Prisma.ChatMessageWhereInput = {
+    messageType: 'activity',
+    activity: { is: { expiresAt: { gte: new Date() } } },
+  };
+
   if (options.messageType === 'non_activity') {
     where.NOT = { messageType: 'activity' };
+  } else if (options.messageType === 'activity') {
+    Object.assign(where, unexpiredActivityWhere);
   } else if (options.messageType) {
     where.messageType = options.messageType;
+  } else {
+    where.OR = [
+      { NOT: { messageType: 'activity' } },
+      unexpiredActivityWhere,
+    ];
   }
 
   const rows = await prisma.chatMessage.findMany({
