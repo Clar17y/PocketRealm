@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.78',
+    date: '2026-06-29',
+    title: 'Sharper Family Tracking',
+    summary:
+      'Exploration family tracking now respects your selected tier instead of jumping straight to the highest unlocked tier. If a tracked family does not have enemies at that tier, the run uses the highest matching family tier below it and pauses zone exploration progress with a clear warning, so targeted material hunts stay useful without giving lower-tier fights full progression credit.',
+  },
+  {
     version: '0.77',
     date: '2026-06-24',
     title: 'Vex Trophy Exchanges',

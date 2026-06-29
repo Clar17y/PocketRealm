@@ -106,7 +106,7 @@ describe('Exploration', () => {
     expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-spider', undefined);
   });
 
-  it('hides tier selection while tracking and always uses the highest unlocked tier', () => {
+  it('keeps tier selection available while tracking and uses the selected tier', () => {
     const { onStartExploration } = renderExploration({
       trackableMobFamilies: [
         { mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 },
@@ -116,14 +116,14 @@ describe('Exploration', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Outskirts' }));
     fireEvent.click(screen.getByRole('button', { name: 'Track' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Track Spiders' }));
 
-    expect(screen.queryByText('Exploration Tier')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Track Spiders' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('Exploration Tier')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Track Spiders' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Track Wolves' }).getAttribute('aria-pressed')).toBe('true');
 
     fireEvent.click(screen.getByRole('button', { name: 'Start Exploration' }));
 
-    expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-spider', undefined);
+    expect(onStartExploration).toHaveBeenCalledWith(100, 1, 'family-wolf', undefined);
   });
 
   it('shows prospecting resource nodes and starts with the selected resource target', () => {

@@ -66,6 +66,60 @@ describe('useExplorationActions', () => {
     expect(reloadZones).toHaveBeenCalledTimes(1);
   });
 
+  it('logs the server reason when tracked exploration progress is paused', async () => {
+    apiMock.startExploration.mockResolvedValue({
+      data: {
+        turns: { currentTurns: 500 },
+        zone: { id: 'zone-forest', name: 'Forest Edge', difficulty: 1 },
+        aborted: false,
+        refundedTurns: 0,
+        events: [],
+        encounterSites: [],
+        resourceDiscoveries: [],
+        hiddenCaches: [],
+        zoneExitDiscovered: false,
+        explorationProgress: { turnsExplored: 900, percent: 30, turnsToExplore: 3000 },
+        explorationProgressPaused: {
+          requestedTier: 4,
+          effectiveTier: 3,
+          reason: 'Tracking Spiders uses Depths enemies here, so zone exploration progress is paused.',
+        },
+        tax: null,
+      },
+    });
+    const pushLog = vi.fn();
+
+    const hook = renderHook(() => useExplorationActions({
+      hpStateRef: { current: { currentHp: 100, maxHp: 100 } } as never,
+      currentZone: { id: 'zone-forest', name: 'Forest Edge' },
+      runAction: async (_name, fn) => { await fn(); },
+      pushLog,
+      setTurns: vi.fn(),
+      setActionError: vi.fn(),
+      setPlaybackActive: vi.fn(),
+      stateSetters: {} as never,
+      advanceTutorial: vi.fn(),
+      combatLogPrefetchClear: vi.fn(),
+      refreshPendingEncounters: vi.fn().mockResolvedValue(undefined),
+      loadGatheringNodes: vi.fn().mockResolvedValue(undefined),
+      pendingLootQueueRef: { current: [] },
+      activatePendingLoot: vi.fn().mockResolvedValue(undefined),
+      updateZoneExploration: vi.fn(),
+      updateQuestProgress: vi.fn(),
+      reloadZones: vi.fn().mockResolvedValue(undefined),
+      refreshCraftingRecipes: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    await act(async () => {
+      await hook.result.current.handleStartExploration(500, 4, 'family-spider');
+    });
+
+    expect(pushLog).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'warning',
+      message: 'Tracking Spiders uses Depths enemies here, so zone exploration progress is paused.',
+    }));
+  });
+
   it('passes prospectingResourceNodeId into the exploration api helper', async () => {
     apiMock.startExploration.mockResolvedValue({
       data: {

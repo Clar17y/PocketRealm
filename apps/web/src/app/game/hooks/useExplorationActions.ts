@@ -150,6 +150,13 @@ export function useExplorationActions({
       updateQuestProgress(data.questProgress);
       recordTurnsSpent(currentZone.id, turnSpend);
       updateZoneExploration(currentZone.id, data.explorationProgress);
+      if (data.explorationProgressPaused) {
+        pushLog({
+          timestamp: nowStamp(),
+          type: 'warning',
+          message: data.explorationProgressPaused.reason,
+        });
+      }
 
       setExplorationPlaybackData({
         totalTurns: turnSpend,
