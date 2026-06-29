@@ -724,6 +724,32 @@ describe('runTemplateCombat', () => {
       expect(result.potionsConsumed[0].round).toBe(1);
     });
 
+    it('uses the strongest matching health potion regardless of pool order', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Player', {
+        template: templateOf('use_hp_potion', 'light_attack'),
+        stats: makeStats({ hp: 100, maxHp: 500, damageMin: 5, damageMax: 5 }),
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Minor Health Potion', healAmount: 50, templateId: 'minor-hp', potionType: 'hp' },
+          { name: 'Greater Health Potion', healAmount: 200, templateId: 'greater-hp', potionType: 'hp' },
+        ],
+      });
+
+      expect(result.potionsConsumed[0]).toMatchObject({
+        name: 'Greater Health Potion',
+        templateId: 'greater-hp',
+        healAmount: 200,
+      });
+    });
+
     it('potion sickness prevents re-use within cooldown period', () => {
       mockCombatRandom();
 
