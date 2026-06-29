@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.79',
+    date: '2026-06-30',
+    title: 'Encounter Chest Reward Balance',
+    summary:
+      'Encounter site chests now better match the crafting materials tied to the enemies inside them. Bandit camps prioritise Bandit Cloth over piles of Stolen Coin, zone-specific chests now surface progression drops like Warg Hide, Fae Silk, Spectral Silk, Croc Hide, Goblin Gold, Cut Gem, and Dark Crystal in the places that need them, and unused lore drops no longer crowd out practical crafting rewards.',
+  },
+  {
     version: '0.78',
     date: '2026-06-29',
     title: 'Sharper Family Tracking',
