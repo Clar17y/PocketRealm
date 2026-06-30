@@ -21,6 +21,9 @@ type ChestDropEntry = DropTableEntry & {
   mobFamily?: {
     name: string;
   };
+  zone?: {
+    name: string;
+  } | null;
   itemTemplate: DropTableEntry['itemTemplate'] & {
     name?: string;
   };
@@ -58,6 +61,9 @@ export type EncounterSiteDefeatedPromotedRoleCounts = Partial<Record<Exclude<Enc
 
 const CHEST_DROP_ENTRY_INCLUDE = {
   mobFamily: {
+    select: { name: true },
+  },
+  zone: {
     select: { name: true },
   },
   itemTemplate: {
@@ -143,9 +149,30 @@ const PREFERRED_SIGNATURE_RESOURCE_NAMES_BY_FAMILY = new Map<string, Set<string>
   ['Spiders', new Set(['Spider Silk'])],
   ['Boars', new Set(['Boar Hide'])],
   ['Wolves', new Set(['Wolf Pelt'])],
-  ['Bandits', new Set(['Stolen Coin'])],
-  ['Goblins', new Set(['Stolen Coin'])],
+  ['Bandits', new Set(['Bandit Cloth'])],
+  ['Goblins', new Set(['Crude Gemstone'])],
   ['Treants', new Set(['Ancient Bark'])],
+  ['Fae', new Set(['Fae Silk'])],
+  ['Golems', new Set(['Crystal Shard'])],
+  ['Undead', new Set(['Wraith Essence'])],
+  ['Swamp Beasts', new Set(['Croc Hide'])],
+  ['Witches', new Set(['Witch Cloth'])],
+  ['Elementals', new Set(['Dark Crystal'])],
+  ['Serpents', new Set(['Naga Scale'])],
+  ['Abominations', new Set(['Eldritch Fragment'])],
+]);
+
+const PREFERRED_SIGNATURE_RESOURCE_NAMES_BY_FAMILY_ZONE = new Map<string, Set<string>>([
+  ['Bandits|Deep Forest', new Set(['Bandit Cloth'])],
+  ['Bandits|Whispering Plains', new Set(['Bandit Cloth'])],
+  ['Wolves|Deep Forest', new Set(['Wolf Pelt'])],
+  ['Wolves|Whispering Plains', new Set(['Warg Hide'])],
+  ['Fae|Ancient Grove', new Set(['Fae Silk'])],
+  ['Undead|Haunted Marsh', new Set(['Wraith Essence'])],
+  ['Undead|Sunken Ruins', new Set(['Spectral Silk'])],
+  ['Swamp Beasts|Haunted Marsh', new Set(['Croc Hide'])],
+  ['Goblins|Crystal Caverns', new Set(['Goblin Gold'])],
+  ['Golems|Crystal Caverns', new Set(['Dark Crystal'])],
 ]);
 
 function getHigherChestRarities(chestRarity: ChestRarity): ChestRarity[] {
@@ -171,8 +198,14 @@ function isFamilySignatureDrop(entry: ChestDropEntry): boolean {
 
 function isPreferredSignatureDrop(entry: ChestDropEntry): boolean {
   const familyName = entry.mobFamily?.name;
+  const zoneName = entry.zone?.name;
   const itemName = getResourceItemName(entry);
   if (typeof familyName !== 'string' || itemName == null) return false;
+
+  if (typeof zoneName === 'string') {
+    const zonePreferred = PREFERRED_SIGNATURE_RESOURCE_NAMES_BY_FAMILY_ZONE.get(`${familyName}|${zoneName}`);
+    if (zonePreferred) return zonePreferred.has(itemName);
+  }
 
   return PREFERRED_SIGNATURE_RESOURCE_NAMES_BY_FAMILY.get(familyName)?.has(itemName) ?? false;
 }
@@ -236,11 +269,25 @@ function remainingSlotsAfter(
 async function getChestDropEntriesTx(
   tx: Prisma.TransactionClient,
   mobFamilyId: string,
-  chestRarity: ChestRarity | { in: ChestRarity[] }
+  chestRarity: ChestRarity | { in: ChestRarity[] },
+  zoneId?: string | null,
 ): Promise<ChestDropEntry[]> {
+  if (zoneId) {
+    const zoneEntries = await tx.chestDropTable.findMany({
+      where: {
+        mobFamilyId,
+        zoneId,
+        chestRarity,
+      },
+      include: CHEST_DROP_ENTRY_INCLUDE,
+    });
+    if (zoneEntries.length > 0) return zoneEntries;
+  }
+
   return tx.chestDropTable.findMany({
     where: {
       mobFamilyId,
+      zoneId: null,
       chestRarity,
     },
     include: CHEST_DROP_ENTRY_INCLUDE,
@@ -290,7 +337,8 @@ async function getSignatureChestDropEntriesTx(
   tx: Prisma.TransactionClient,
   mobFamilyId: string,
   chestRarity: ChestRarity,
-  currentDropEntries: ChestDropEntry[]
+  currentDropEntries: ChestDropEntry[],
+  zoneId?: string | null,
 ): Promise<ChestDropEntry[]> {
   const currentSignatureEntries = currentDropEntries.filter(isFamilySignatureDrop);
   if (currentSignatureEntries.length > 0) return getPreferredSignatureDrops(currentSignatureEntries);
@@ -298,7 +346,7 @@ async function getSignatureChestDropEntriesTx(
   const fallbackRarities = getHigherChestRarities(chestRarity);
   if (fallbackRarities.length === 0) return [];
 
-  const fallbackEntries = await getChestDropEntriesTx(tx, mobFamilyId, { in: fallbackRarities });
+  const fallbackEntries = await getChestDropEntriesTx(tx, mobFamilyId, { in: fallbackRarities }, zoneId);
   for (const fallbackRarity of fallbackRarities) {
     const signatureEntries = fallbackEntries.filter(
       (entry) => entry.chestRarity === fallbackRarity && isFamilySignatureDrop(entry)
@@ -343,6 +391,7 @@ export async function grantEncounterSiteChestRewardsTx(
     mobFamilyId: string;
     totalRooms: number;
     autoResolvedBonusRooms: number;
+    zoneId?: string | null;
     availableSlots?: number;
     defeatedPromotedRoleCounts?: EncounterSiteDefeatedPromotedRoleCounts;
   }
@@ -367,8 +416,14 @@ export async function grantEncounterSiteChestRewardsTx(
   );
   const roleMaterialRolls = Math.max(0, materialRolls - baseMaterialRolls);
 
-  const dropEntries = await getChestDropEntriesTx(tx, params.mobFamilyId, chestRarity);
-  const signatureEntries = await getSignatureChestDropEntriesTx(tx, params.mobFamilyId, chestRarity, dropEntries);
+  const dropEntries = await getChestDropEntriesTx(tx, params.mobFamilyId, chestRarity, params.zoneId);
+  const signatureEntries = await getSignatureChestDropEntriesTx(
+    tx,
+    params.mobFamilyId,
+    chestRarity,
+    dropEntries,
+    params.zoneId,
+  );
   const randomDropEntries = getRandomChestDropEntries(dropEntries);
   const roleBonusDropEntries = getRoleBonusChestDropEntries(randomDropEntries);
   const signatureResult = signatureEntries.length > 0

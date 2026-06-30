@@ -279,6 +279,10 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
       tx.chestDropTable.findMany({
         where: {
           itemTemplateId: { in: permanentItemTemplateIds },
+          OR: [
+            { zoneId: null },
+            { zoneId: { in: permanentZoneIds } },
+          ],
         },
       }),
       tx.resourceNode.findMany({
@@ -347,9 +351,14 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
           if (!itemTemplateId) {
             throw new AppError(500, 'Missing cloned template for chest drop table', 'BOOTSTRAP_TEMPLATE_MAP_MISSING');
           }
+          const zoneId = dropTable.zoneId ? zoneIdMap.get(dropTable.zoneId) : null;
+          if (dropTable.zoneId && !zoneId) {
+            throw new AppError(500, 'Missing cloned zone for chest drop table', 'BOOTSTRAP_ZONE_MAP_MISSING');
+          }
 
           return {
             mobFamilyId: dropTable.mobFamilyId,
+            zoneId,
             chestRarity: dropTable.chestRarity,
             itemTemplateId,
             dropChance: dropTable.dropChance,

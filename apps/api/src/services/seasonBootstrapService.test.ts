@@ -160,11 +160,22 @@ describe('bootstrapSeason', () => {
       {
         id: 'chest-perm-1',
         mobFamilyId: 'family-perm-1',
+        zoneId: null,
         chestRarity: 'rare',
         itemTemplateId: 'item-perm-2',
         dropChance: 0.25,
         minQuantity: 1,
         maxQuantity: 1,
+      },
+      {
+        id: 'chest-perm-2',
+        mobFamilyId: 'family-perm-1',
+        zoneId: 'zone-perm-2',
+        chestRarity: 'uncommon',
+        itemTemplateId: 'item-perm-1',
+        dropChance: 0.5,
+        minQuantity: 2,
+        maxQuantity: 3,
       },
     ]);
     mockPrisma.resourceNode.findMany.mockResolvedValue([
@@ -259,15 +270,34 @@ describe('bootstrapSeason', () => {
         },
       ],
     });
+    expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledWith({
+      where: {
+        itemTemplateId: { in: ['item-perm-1', 'item-perm-2'] },
+        OR: [
+          { zoneId: null },
+          { zoneId: { in: ['zone-perm-1', 'zone-perm-2'] } },
+        ],
+      },
+    });
     expect(mockPrisma.chestDropTable.createMany).toHaveBeenCalledWith({
       data: [
         {
           mobFamilyId: 'family-perm-1',
+          zoneId: null,
           chestRarity: 'rare',
           itemTemplateId: 'item-season-2',
           dropChance: 0.25,
           minQuantity: 1,
           maxQuantity: 1,
+        },
+        {
+          mobFamilyId: 'family-perm-1',
+          zoneId: 'zone-season-2',
+          chestRarity: 'uncommon',
+          itemTemplateId: 'item-season-1',
+          dropChance: 0.5,
+          minQuantity: 2,
+          maxQuantity: 3,
         },
       ],
     });

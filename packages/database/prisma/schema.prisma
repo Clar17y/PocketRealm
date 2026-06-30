@@ -460,6 +460,7 @@ model Zone {
   mobs               MobTemplate[]
   resourceNodes      ResourceNode[]
   zoneMobFamilies    ZoneMobFamily[]
+  chestDropTables    ChestDropTable[]
   encounterSites     EncounterSite[]
   connectionsFrom    ZoneConnection[]        @relation("from_zone")
   connectionsTo      ZoneConnection[]        @relation("to_zone")
@@ -796,6 +797,7 @@ model PlayerRecipe {
 model ChestDropTable {
   id             String  @id @default(uuid())
   mobFamilyId    String  @map("mob_family_id")
+  zoneId         String? @map("zone_id")
   chestRarity    String  @map("chest_rarity") @db.VarChar(16)
   itemTemplateId String  @map("item_template_id")
   dropChance     Decimal @map("drop_chance") @db.Decimal(5, 4)
@@ -803,9 +805,11 @@ model ChestDropTable {
   maxQuantity    Int     @default(1) @map("max_quantity")
 
   mobFamily    MobFamily    @relation(fields: [mobFamilyId], references: [id], onDelete: Cascade)
+  zone         Zone?        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   itemTemplate ItemTemplate @relation(fields: [itemTemplateId], references: [id], onDelete: Cascade)
 
   @@index([mobFamilyId, chestRarity])
+  @@index([mobFamilyId, zoneId, chestRarity])
   @@map("chest_drop_tables")
 }
 
