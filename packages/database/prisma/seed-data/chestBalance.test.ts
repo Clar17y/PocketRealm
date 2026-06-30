@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@pocketrealm/shared', async () => import('../../../shared/src/index'));
@@ -17,6 +19,8 @@ const allRecipes = getAllRecipes();
 const itemTemplates = new Map(allItemTemplates.map((item) => [item.id, item]));
 const itemTemplateIdsByName = new Map(allItemTemplates.map((item) => [item.name, item.id]));
 const recipesByResultTemplateId = new Map(allRecipes.map((recipe) => [recipe.resultTemplateId, recipe]));
+const ZONE_ID_CHEST_MIGRATION = '20260629190000_add_chest_drop_table_zone_id';
+const CHEST_BALANCE_BACKFILL_MIGRATION = '20260630162000_backfill_zone_specific_chest_rewards';
 
 function getItemId(name: string): string {
   const itemTemplateId = itemTemplateIdsByName.get(name);
@@ -103,6 +107,13 @@ function expectedQuantity(rows: ChestDropRow[], itemTemplateId: string): number 
     .reduce((sum, row) => sum + row.dropChance * ((row.minQuantity + row.maxQuantity) / 2), 0);
 }
 
+function chestBalanceBackfillMigrationSql(): string {
+  return readFileSync(
+    resolve(process.cwd(), 'prisma', 'migrations', CHEST_BALANCE_BACKFILL_MIGRATION, 'migration.sql'),
+    'utf8',
+  );
+}
+
 describe('encounter chest crafting reward balance', () => {
   it('expands processed crafting materials down to their raw recipe demand', () => {
     const reinforcedPackRecipe = allRecipes.find(
@@ -129,6 +140,16 @@ describe('encounter chest crafting reward balance', () => {
     const commonBanditRows = chestRowsForFamilyZoneRarity(IDS.families.bandits, IDS.zones.deepForest, 'common');
 
     expect(commonBanditRows.some((row) => row.itemTemplateId === IDS.drop.banditCloth)).toBe(true);
+  });
+
+  it('backfills zone-specific chest balance through a migration for existing databases', () => {
+    expect(CHEST_BALANCE_BACKFILL_MIGRATION.localeCompare(ZONE_ID_CHEST_MIGRATION)).toBeGreaterThan(0);
+
+    const migrationSql = chestBalanceBackfillMigrationSql();
+
+    for (const requiredFragment of ['chest_drop_tables', 'zone_id', 'Bandits', 'Deep Forest', 'Bandit Cloth', 'Stolen Coin']) {
+      expect(migrationSql).toContain(requiredFragment);
+    }
   });
 
   it('provides chest sources for high-demand zone-specific crafting drops', () => {
