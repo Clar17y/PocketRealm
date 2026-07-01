@@ -15,6 +15,31 @@ describe('potionService', () => {
       expect(result).toEqual([]);
     });
 
+    it('queries only backpack consumables for combat potions', async () => {
+      mockPrisma.item.findMany.mockResolvedValue([
+        {
+          quantity: 1,
+          template: {
+            id: 'tmpl-mana',
+            name: 'Mana Potion',
+            consumableEffect: { type: 'restore_mana', value: 40 },
+          },
+        },
+      ]);
+
+      const result = await buildPotionPool('player-1', 200);
+
+      expect(mockPrisma.item.findMany).toHaveBeenCalledWith({
+        where: {
+          ownerId: 'player-1',
+          inStash: false,
+          template: { itemType: 'consumable' },
+        },
+        include: { template: true },
+      });
+      expect(result).toHaveLength(1);
+    });
+
     it('builds potions from heal_flat consumables', async () => {
       mockPrisma.item.findMany.mockResolvedValue([
         {
@@ -160,14 +185,14 @@ describe('potionService', () => {
   describe('deductConsumedPotions', () => {
     it('does nothing when consumed list is empty', async () => {
       await deductConsumedPotions('player-1', []);
-      expect(mockPrisma.item.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.item.findMany).not.toHaveBeenCalled();
     });
 
     it('deletes item when quantity consumed equals stack size', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue({
+      mockPrisma.item.findMany.mockResolvedValue([{
         id: 'item-1',
         quantity: 2,
-      });
+      }]);
 
       await deductConsumedPotions('player-1', [
         { templateId: 'tmpl-1', name: 'Potion', round: 1, healAmount: 50 },
@@ -180,10 +205,10 @@ describe('potionService', () => {
     });
 
     it('decrements quantity when not fully consumed', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue({
+      mockPrisma.item.findMany.mockResolvedValue([{
         id: 'item-1',
         quantity: 5,
-      });
+      }]);
 
       await deductConsumedPotions('player-1', [
         { templateId: 'tmpl-1', name: 'Potion', round: 1, healAmount: 50 },
@@ -195,11 +220,52 @@ describe('potionService', () => {
       });
     });
 
+    it('deducts consumed potions from backpack stacks only', async () => {
+      mockPrisma.item.findMany.mockResolvedValue([{
+        id: 'item-1',
+        quantity: 1,
+      }]);
+
+      await deductConsumedPotions('player-1', [
+        { templateId: 'tmpl-mana', name: 'Mana Potion', round: 1, healAmount: 40 },
+      ]);
+
+      expect(mockPrisma.item.findMany).toHaveBeenCalledWith({
+        where: { ownerId: 'player-1', templateId: 'tmpl-mana', inStash: false },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: { id: true, quantity: true },
+      });
+    });
+
+    it('deducts consumed potions across duplicate backpack stacks', async () => {
+      mockPrisma.item.findMany.mockResolvedValue([
+        { id: 'item-1', quantity: 1 },
+        { id: 'item-2', quantity: 3 },
+      ]);
+
+      const result = await deductConsumedPotions('player-1', [
+        { templateId: 'tmpl-mana', name: 'Mana Potion', round: 1, healAmount: 40 },
+        { templateId: 'tmpl-mana', name: 'Mana Potion', round: 3, healAmount: 40 },
+      ]);
+
+      expect(mockPrisma.item.delete).toHaveBeenCalledWith({
+        where: { id: 'item-1' },
+      });
+      expect(mockPrisma.item.update).toHaveBeenCalledWith({
+        where: { id: 'item-2' },
+        data: { quantity: 2 },
+      });
+      expect(result).toEqual({
+        fullyConsumedIds: ['item-1'],
+        partiallyConsumedIds: ['item-2'],
+      });
+    });
+
     it('aggregates multiple potions of same template', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue({
+      mockPrisma.item.findMany.mockResolvedValue([{
         id: 'item-1',
         quantity: 10,
-      });
+      }]);
 
       await deductConsumedPotions('player-1', [
         { templateId: 'tmpl-1', name: 'Potion', round: 1, healAmount: 50 },
@@ -207,8 +273,8 @@ describe('potionService', () => {
         { templateId: 'tmpl-1', name: 'Potion', round: 7, healAmount: 50 },
       ]);
 
-      // Should only do one findFirst call for the single template
-      expect(mockPrisma.item.findFirst).toHaveBeenCalledTimes(1);
+      // Should only do one inventory query for the single template
+      expect(mockPrisma.item.findMany).toHaveBeenCalledTimes(1);
       expect(mockPrisma.item.update).toHaveBeenCalledWith({
         where: { id: 'item-1' },
         data: { quantity: 7 },
@@ -216,7 +282,7 @@ describe('potionService', () => {
     });
 
     it('skips items not found in DB', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue(null);
+      mockPrisma.item.findMany.mockResolvedValue([]);
 
       await deductConsumedPotions('player-1', [
         { templateId: 'tmpl-missing', name: 'Ghost Potion', round: 1, healAmount: 50 },
@@ -228,9 +294,9 @@ describe('potionService', () => {
 
     it('uses provided transaction client', async () => {
       const fakeTx = {
-        item: { findFirst: vi.fn(), update: vi.fn(), delete: vi.fn() },
+        item: { findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
       };
-      fakeTx.item.findFirst.mockResolvedValue({ id: 'item-1', quantity: 3 });
+      fakeTx.item.findMany.mockResolvedValue([{ id: 'item-1', quantity: 3 }]);
 
       await deductConsumedPotions(
         'player-1',
@@ -238,9 +304,9 @@ describe('potionService', () => {
         fakeTx as any,
       );
 
-      expect(fakeTx.item.findFirst).toHaveBeenCalled();
+      expect(fakeTx.item.findMany).toHaveBeenCalled();
       expect(fakeTx.item.update).toHaveBeenCalled();
-      expect(mockPrisma.item.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.item.findMany).not.toHaveBeenCalled();
     });
   });
 });

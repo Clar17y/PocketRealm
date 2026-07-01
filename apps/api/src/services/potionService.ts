@@ -33,6 +33,7 @@ export async function buildPotionPool(playerId: string, maxHp: number): Promise<
   const consumables = await prisma.item.findMany({
     where: {
       ownerId: playerId,
+      inStash: false,
       template: { itemType: 'consumable' },
     },
     include: { template: true },
@@ -93,20 +94,28 @@ export async function deductConsumedPotions(
   }
 
   for (const [templateId, count] of counts) {
-    const item = await db.item.findFirst({
-      where: { ownerId: playerId, templateId },
+    const items = await db.item.findMany({
+      where: { ownerId: playerId, templateId, inStash: false },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, quantity: true },
     });
-    if (!item) continue;
 
-    if (item.quantity <= count) {
-      await db.item.delete({ where: { id: item.id } });
-      result.fullyConsumedIds.push(item.id);
-    } else {
-      await db.item.update({
-        where: { id: item.id },
-        data: { quantity: item.quantity - count },
-      });
-      result.partiallyConsumedIds.push(item.id);
+    let remaining = count;
+    for (const item of items) {
+      if (remaining <= 0) break;
+
+      if (item.quantity > remaining) {
+        await db.item.update({
+          where: { id: item.id },
+          data: { quantity: item.quantity - remaining },
+        });
+        result.partiallyConsumedIds.push(item.id);
+        remaining = 0;
+      } else {
+        remaining -= item.quantity;
+        await db.item.delete({ where: { id: item.id } });
+        result.fullyConsumedIds.push(item.id);
+      }
     }
   }
 
