@@ -107,8 +107,9 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
   const [bosses, setBosses] = useState<BossEncounterResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBossId, setSelectedBossId] = useState<string | null>(null);
+  const [bossDetailRefreshSignal, setBossDetailRefreshSignal] = useState(0);
 
-  const refresh = useCallback(async () => {
+  const refreshEventsAndBosses = useCallback(async () => {
     setLoading(true);
     try {
       const [eventsRes, bossRes] = await Promise.all([
@@ -124,7 +125,12 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const refresh = useCallback(async () => {
+    setBossDetailRefreshSignal((signal) => signal + 1);
+    await refreshEventsAndBosses();
+  }, [refreshEventsAndBosses]);
+
+  useEffect(() => { refreshEventsAndBosses(); }, [refreshEventsAndBosses]);
 
   const worldEvents = events.filter((e) => e.scope === 'world');
   const localEvents = currentZoneId
@@ -166,6 +172,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
         <BossEncounterPanel
           encounterId={selectedBossId}
           playerId={playerId ?? undefined}
+          refreshSignal={bossDetailRefreshSignal}
           onClose={() => setSelectedBossId(null)}
           onNavigate={onNavigate}
           onRewardsLoaded={onBossRewardsLoaded}

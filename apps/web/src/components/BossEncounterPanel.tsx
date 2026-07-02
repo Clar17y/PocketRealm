@@ -24,6 +24,7 @@ import { BossRewardsDisplay } from '@/components/common/BossRewardsDisplay';
 interface BossEncounterPanelProps {
   encounterId: string;
   playerId?: string;
+  refreshSignal?: number;
   onClose?: () => void;
   onNavigate?: (screen: string) => void;
   onRewardsLoaded?: () => void | boolean | Promise<void | boolean>;
@@ -45,7 +46,7 @@ function bossStatusLabel(status: BossEncounterResponse['status']): string {
   }
 }
 
-export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate, onRewardsLoaded }: BossEncounterPanelProps) {
+export function BossEncounterPanel({ encounterId, playerId, refreshSignal, onClose, onNavigate, onRewardsLoaded }: BossEncounterPanelProps) {
   const [encounter, setEncounter] = useState<BossEncounterResponse | null>(null);
   const [participants, setParticipants] = useState<BossParticipantResponse[]>([]);
   const [myRewards, setMyRewards] = useState<BossPlayerReward | null>(null);
@@ -59,6 +60,9 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate,
   const rewardSyncRetryCountsRef = useRef<Map<string, number>>(new Map());
   const rewardSyncRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardSyncMountedRef = useRef(true);
+  const handledRefreshSignalRef = useRef(refreshSignal ?? 0);
+  const nextRefreshRequestIdRef = useRef(0);
+  const latestAppliedRefreshRequestIdRef = useRef(0);
   const [rewardSyncRetryTick, setRewardSyncRetryTick] = useState(0);
 
   // Active template state
@@ -66,10 +70,13 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate,
   const [activeTemplateActionCount, setActiveTemplateActionCount] = useState(0);
 
   const refresh = useCallback(async (silent = false) => {
+    const requestId = nextRefreshRequestIdRef.current + 1;
+    nextRefreshRequestIdRef.current = requestId;
     startLoad(silent);
     try {
       const res = await getBossEncounter(encounterId);
-      if (res.data) {
+      if (res.data && requestId > latestAppliedRefreshRequestIdRef.current) {
+        latestAppliedRefreshRequestIdRef.current = requestId;
         setEncounter(res.data.encounter);
         setParticipants(res.data.participants);
         setMyRewards(res.data.myRewards ?? null);
@@ -82,6 +89,15 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate,
   }, [encounterId, startLoad, endLoad]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    if (refreshSignal === undefined || refreshSignal === handledRefreshSignalRef.current) {
+      return;
+    }
+
+    handledRefreshSignalRef.current = refreshSignal;
+    void refresh(true);
+  }, [refresh, refreshSignal]);
 
   const scheduleRewardSyncRetry = useCallback((rewardsKey: string) => {
     if (!rewardSyncMountedRef.current) return;
