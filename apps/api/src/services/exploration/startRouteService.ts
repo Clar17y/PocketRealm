@@ -473,7 +473,11 @@ export async function startExploration(input: AuthenticatedRouteServiceRequest):
       });
     }
 
-    const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+    const earnedCombatSkillXp = events.some((event) => event.type === 'ambush_victory');
+    const stateUpdates = await buildStateUpdates(
+      playerId,
+      earnedCombatSkillXp ? ['hp', 'resources', 'skills', 'characterProgression'] : ['hp', 'resources'],
+    );
     await mergeLootIntoStateUpdates(playerId, allNewItemIds, allUpdatedItemIds, stateUpdates);
 
     return routeJson({
