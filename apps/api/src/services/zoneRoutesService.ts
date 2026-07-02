@@ -640,8 +640,12 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
         travelPendingLootSessionId = await storePendingLoot(playerId, allTravelOverflow);
       }
 
+      const travelStateFields: Parameters<typeof buildStateUpdates>[1] = ambushKillCount > 0
+        ? ['hp', 'resources', 'skills', 'characterProgression']
+        : ['hp', 'resources'];
+
       if (ambushAbort?.type === 'knockout') {
-        const knockoutStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+        const knockoutStateUpdates = await buildStateUpdates(playerId, travelStateFields);
         knockoutStateUpdates.currentZoneId = ambushAbort.respawn.townId;
         return routeJson({
           zone: { id: ambushAbort.respawn.townId, name: ambushAbort.respawn.townName, zoneType: 'town' },
@@ -660,7 +664,7 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
       }
 
       if (ambushAbort?.type === 'flee') {
-        const fleeStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+        const fleeStateUpdates = await buildStateUpdates(playerId, travelStateFields);
         fleeStateUpdates.currentZoneId = currentZoneId;
         return routeJson({
           zone: { id: currentZoneId, name: currentZone.name, zoneType: currentZone.zoneType },
@@ -717,9 +721,10 @@ export async function travelToZone(input: AuthenticatedRouteServiceRequest): Pro
     await trackAchievements(playerId, travelCounters, { statKeys: travelAchKeys, familyIds: ambushMobFamilyIds });
   }
 
-  const [travelStateUpdates] = await Promise.all([
-    buildStateUpdates(playerId, ['hp', 'resources']),
-  ]);
+  const travelStateFields: Parameters<typeof buildStateUpdates>[1] = ambushKillCount > 0
+    ? ['hp', 'resources', 'skills', 'characterProgression']
+    : ['hp', 'resources'];
+  const travelStateUpdates = await buildStateUpdates(playerId, travelStateFields);
   await mergeLootIntoStateUpdates(playerId, allTravelNewItemIds, allTravelUpdatedItemIds, travelStateUpdates);
   travelStateUpdates.currentZoneId = destinationId;
   return routeJson({

@@ -247,6 +247,7 @@ import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@pocketrealm/game-engine';
 import { startRouter } from './start';
 import { getCachedMobTemplatesByZone, getCachedResourceNodesByZone, getCachedZoneMobFamilies } from '../../services/staticDataCacheService';
+import { buildStateUpdates } from '../../services/stateUpdateHelpers';
 
 const mockGetCachedMobTemplatesByZone = getCachedMobTemplatesByZone as ReturnType<typeof vi.fn>;
 const mockGetCachedResourceNodesByZone = getCachedResourceNodesByZone as ReturnType<typeof vi.fn>;
@@ -256,6 +257,7 @@ const mockSpendPlayerTurnsTx = spendPlayerTurnsTx as ReturnType<typeof vi.fn>;
 const mockApplyMobPrefix = applyMobPrefix as ReturnType<typeof vi.fn>;
 const mockSimulateExploration = simulateExploration as ReturnType<typeof vi.fn>;
 const mockRunTemplateCombat = runTemplateCombat as ReturnType<typeof vi.fn>;
+const mockBuildStateUpdates = buildStateUpdates as ReturnType<typeof vi.fn>;
 
 function findHandler(method: string, path: string) {
   const layer = (startRouter as any).stack.find(
@@ -433,5 +435,21 @@ describe('exploration tutorial path', () => {
         expect.objectContaining({ type: 'ambush_victory' }),
       ]),
     );
+  });
+
+  it('includes fresh skill state when exploration combat grants XP', async () => {
+    setupZoneAndMobs(TUTORIAL_STEP_EXPLORE);
+
+    const req = baseReq();
+    const res = mockRes();
+    const handler = findHandler('post', '/start');
+    await handler(req, res, vi.fn());
+
+    expect(mockBuildStateUpdates).toHaveBeenCalledWith('p1', [
+      'hp',
+      'resources',
+      'skills',
+      'characterProgression',
+    ]);
   });
 });

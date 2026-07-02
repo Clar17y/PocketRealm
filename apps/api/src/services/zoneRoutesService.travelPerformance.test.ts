@@ -178,6 +178,7 @@ import {
 import { createActivityLog } from './activityLogService';
 import { processCombatVictoryRewards } from './combatOrchestrationService';
 import { setHp } from './hpService';
+import { buildStateUpdates } from './stateUpdateHelpers';
 import { travelToZone } from './zoneRoutesService';
 
 interface TravelResponseBody {
@@ -188,6 +189,8 @@ interface TravelResponseBody {
 }
 
 describe('travelToZone performance-sensitive ambush persistence', () => {
+  const mockBuildStateUpdates = buildStateUpdates as ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
@@ -240,6 +243,12 @@ describe('travelToZone performance-sensitive ambush persistence', () => {
     expect(processCombatVictoryRewards).toHaveBeenCalledWith(
       expect.objectContaining({ guildXpBoost: 0.15 }),
     );
+    expect(mockBuildStateUpdates).toHaveBeenCalledWith('p1', [
+      'hp',
+      'resources',
+      'skills',
+      'characterProgression',
+    ]);
   });
 
   it('applies elite role scaling and display names to travel ambushes', async () => {
