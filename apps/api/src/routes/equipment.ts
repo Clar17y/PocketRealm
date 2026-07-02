@@ -46,7 +46,7 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
 
   await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
 
-  const [equipment, { inventoryUsedSlots }] = await Promise.all([
+  const [equipment, { inventoryCapacity, inventoryUsedSlots }] = await Promise.all([
     fetchEquipmentMap(playerId),
     fetchInventoryMeta(playerId),
   ]);
@@ -70,6 +70,7 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
   const stateUpdates = {
     equipment,
     inventoryUpdated: updatedItems,
+    inventoryCapacity,
     inventoryUsedSlots,
   };
 
@@ -95,7 +96,7 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
 
   await unequipSlot(playerId, body.slot as EquipmentSlot);
 
-  const [equipment, { inventoryUsedSlots }] = await Promise.all([
+  const [equipment, { inventoryCapacity, inventoryUsedSlots }] = await Promise.all([
     fetchEquipmentMap(playerId),
     fetchInventoryMeta(playerId),
   ]);
@@ -112,6 +113,7 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
             ),
           ]
         : [],
+      inventoryCapacity,
       inventoryUsedSlots,
     },
   });
