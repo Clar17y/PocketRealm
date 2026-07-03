@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BossEncounterPanel } from './BossEncounterPanel';
 import { getActiveTemplate, getBossEncounter, getTemplates } from '@/lib/api';
@@ -25,6 +25,53 @@ vi.mock('@/lib/api', () => ({
   signUpForBoss: vi.fn(),
 }));
 
+type BossEncounterApiResult = Awaited<ReturnType<typeof getBossEncounter>>;
+type BossEncounterPanelProps = React.ComponentProps<typeof BossEncounterPanel>;
+
+function bossEncounterResponse(currentHp: number): BossEncounterApiResult {
+  return {
+    data: {
+      encounter: {
+        id: 'enc-1',
+        eventId: 'evt-1',
+        mobTemplateId: 'mob-alpha',
+        currentHp,
+        maxHp: 1000,
+        baseHp: 1000,
+        roundNumber: 3,
+        nextRoundAt: null,
+        status: 'in_progress' as const,
+        killedBy: null,
+        killedByUsername: null,
+        mobName: 'Alpha Wolf',
+        mobLevel: 10,
+        bossEffects: [],
+        roundSummaries: null,
+      },
+      participants: [],
+      myRewards: null,
+    },
+  };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
+
+function bossPanelProps(overrides: Partial<BossEncounterPanelProps> = {}): BossEncounterPanelProps {
+  return {
+    encounterId: 'enc-1',
+    playerId: 'player-1',
+    refreshSignal: 0,
+    ...overrides,
+  };
+}
+
 describe('BossEncounterPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,7 +80,70 @@ describe('BossEncounterPanel', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
+  });
+
+  it('refetches boss encounter details when the parent refresh signal changes', async () => {
+    vi.mocked(getBossEncounter)
+      .mockResolvedValueOnce(bossEncounterResponse(900))
+      .mockResolvedValueOnce(bossEncounterResponse(600));
+
+    const initialProps = bossPanelProps();
+
+    const { rerender } = render(<BossEncounterPanel {...initialProps} />);
+
+    await waitFor(() => expect(getBossEncounter).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('90%')).toBeTruthy();
+
+    rerender(
+      <BossEncounterPanel
+        {...initialProps}
+        refreshSignal={1}
+      />,
+    );
+
+    await waitFor(() => expect(getBossEncounter).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByText('60%')).toBeTruthy());
+    expect(startLoadMock).toHaveBeenLastCalledWith(true);
+    expect(endLoadMock).toHaveBeenLastCalledWith(true);
+  });
+
+  it('does not let an older boss detail response overwrite a newer refresh response', async () => {
+    const initialRequest = createDeferred<BossEncounterApiResult>();
+    const refreshRequest = createDeferred<BossEncounterApiResult>();
+    vi.mocked(getBossEncounter)
+      .mockReturnValueOnce(initialRequest.promise)
+      .mockReturnValueOnce(refreshRequest.promise);
+
+    const initialProps = bossPanelProps();
+
+    const { rerender } = render(<BossEncounterPanel {...initialProps} />);
+
+    await waitFor(() => expect(getBossEncounter).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <BossEncounterPanel
+        {...initialProps}
+        refreshSignal={1}
+      />,
+    );
+
+    await waitFor(() => expect(getBossEncounter).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      refreshRequest.resolve(bossEncounterResponse(600));
+      await Promise.resolve();
+    });
+    expect(screen.getByText('60%')).toBeTruthy();
+
+    await act(async () => {
+      initialRequest.resolve(bossEncounterResponse(900));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('60%')).toBeTruthy();
+    expect(screen.queryByText('90%')).toBeNull();
   });
 
   it('notifies parent to refresh inventory when defeated boss rewards load', async () => {
