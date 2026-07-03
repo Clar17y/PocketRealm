@@ -89,6 +89,64 @@ export async function getTurnConfig(
   };
 }
 
+export interface TurnAffordabilityResult {
+  currentTurns: number;
+  requiredTurns: number;
+  timeToCapMs: number | null;
+  lastRegenAt: string;
+}
+
+export async function assertPlayerCanSpendTurnsTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  amount: number,
+  now: Date = new Date(),
+): Promise<TurnAffordabilityResult> {
+  if (!Number.isInteger(amount) || amount < 0) {
+    throw new AppError(400, 'Turn spend amount must be a non-negative integer', 'INVALID_TURNS');
+  }
+
+  const [turnBank, turnConfig] = await Promise.all([
+    tx.turnBank.findUnique({ where: { playerId } }),
+    getTurnConfig(tx, playerId, now),
+  ]);
+
+  if (!turnBank) {
+    throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
+  }
+
+  const currentTurns = calculateCurrentTurns(
+    turnBank.currentTurns,
+    turnBank.lastRegenAt,
+    now,
+    turnConfig.regenRate,
+    turnConfig.bankCap,
+    turnBank.regenProgress,
+  );
+  const regenProgress = calculateTurnProgress(
+    turnBank.lastRegenAt,
+    now,
+    turnConfig.regenRate,
+    turnBank.regenProgress,
+  );
+
+  if (currentTurns < amount) {
+    throw new AppError(400, 'Insufficient turns', 'INSUFFICIENT_TURNS');
+  }
+
+  return {
+    currentTurns,
+    requiredTurns: amount,
+    lastRegenAt: turnBank.lastRegenAt.toISOString(),
+    timeToCapMs: calculateTimeToCapMs(
+      currentTurns,
+      turnConfig.regenRate,
+      turnConfig.bankCap,
+      currentTurns >= turnConfig.bankCap ? 0 : regenProgress,
+    ),
+  };
+}
+
 async function spendPlayerTurnsWithClient(
   client: TurnBankClient,
   playerId: string,

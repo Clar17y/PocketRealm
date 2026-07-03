@@ -5,6 +5,7 @@ import {
   getTurnState,
   spendPlayerTurns,
   refundPlayerTurns,
+  assertPlayerCanSpendTurnsTx,
 } from './turnBankService';
 const now = new Date('2025-06-01T12:00:00Z');
 
@@ -257,5 +258,40 @@ describe('refundPlayerTurns', () => {
         regenProgress: 10,
       }),
     }));
+  });
+});
+
+describe('assertPlayerCanSpendTurnsTx', () => {
+  it('returns current turn state without updating the bank when affordable', async () => {
+    const now = new Date('2026-07-02T12:00:00.000Z');
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'p1',
+      currentTurns: 500,
+      regenProgress: 0,
+      lastRegenAt: now,
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({ account: { isPremium: false, premiumExpiresAt: null } });
+
+    const result = await assertPlayerCanSpendTurnsTx(mockPrisma, 'p1', 400, now);
+
+    expect(result.currentTurns).toBe(500);
+    expect(result.requiredTurns).toBe(400);
+    expect(mockPrisma.turnBank.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('throws INSUFFICIENT_TURNS when current turns are below the required amount', async () => {
+    const now = new Date('2026-07-02T12:00:00.000Z');
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'p1',
+      currentTurns: 399,
+      regenProgress: 0,
+      lastRegenAt: now,
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({ account: { isPremium: false, premiumExpiresAt: null } });
+
+    await expect(assertPlayerCanSpendTurnsTx(mockPrisma, 'p1', 400, now)).rejects.toMatchObject({
+      code: 'INSUFFICIENT_TURNS',
+    });
+    expect(mockPrisma.turnBank.updateMany).not.toHaveBeenCalled();
   });
 });
