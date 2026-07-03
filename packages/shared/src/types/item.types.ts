@@ -48,7 +48,31 @@ export interface Item {
 
 export type ItemType = 'weapon' | 'armor' | 'resource' | 'consumable';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export type CraftDestination = 'inventory' | 'stash';
+export type AutoForgeTarget = 'rare' | 'epic' | 'legendary';
 export type WeightClass = 'heavy' | 'medium' | 'light';
+
+export interface CraftAutoForgeAttempt {
+  action: 'upgrade';
+  fromRarity: 'common' | 'uncommon' | 'rare' | 'epic';
+  toRarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
+  success: boolean;
+  roll: number;
+  successChance: number;
+  turnCost: number;
+  targetVirtualId: string;
+  sacrificeVirtualId: string;
+  resultVirtualId: string | null;
+}
+
+export interface CraftAutoForgeSummary {
+  targetRarity: AutoForgeTarget;
+  attempts: CraftAutoForgeAttempt[];
+  finalCountsByRarity: Partial<Record<ItemRarity, number>>;
+  leftoverCountsByRarity: Partial<Record<ItemRarity, number>>;
+  actualForgeTurnCost: number;
+  maxReservedTurnCost: number;
+}
 
 export interface ItemStats {
   attack?: number;
