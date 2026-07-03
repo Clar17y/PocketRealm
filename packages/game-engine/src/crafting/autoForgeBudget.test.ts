@@ -32,13 +32,13 @@ describe('autoForgeBudget', () => {
   });
 
   it('calculates conservative max forge cost from all-common successful cascades', () => {
-    expect(calculateAutoForgeMaxForgeTurnCost(8, 'rare')).toBe(8 / 2 * 100 + 8 / 4 * 250);
-    expect(calculateAutoForgeMaxForgeTurnCost(8, 'epic')).toBe(400 + 500 + 500);
-    expect(calculateAutoForgeMaxForgeTurnCost(16, 'legendary')).toBe(800 + 1000 + 1000 + 1000);
+    expect(calculateAutoForgeMaxForgeTurnCost(8, 'rare')).toBe(1000);
+    expect(calculateAutoForgeMaxForgeTurnCost(8, 'epic')).toBe(2000);
+    expect(calculateAutoForgeMaxForgeTurnCost(16, 'legendary')).toBe(8000);
   });
 
   it('uses discounted upgrade costs when supplied', () => {
-    expect(calculateAutoForgeMaxForgeTurnCost(8, 'rare', { common: 80, uncommon: 200 })).toBe(720);
+    expect(calculateAutoForgeMaxForgeTurnCost(8, 'rare', { common: 80, uncommon: 200 })).toBe(800);
   });
 
   it('includes craft and max forge costs in max reserved base cost', () => {
@@ -48,7 +48,7 @@ describe('autoForgeBudget', () => {
         craftTurnCostPerAttempt: 20,
         autoForgeTarget: 'rare',
       }),
-    ).toBe(160 + 900);
+    ).toBe(160 + 1000);
   });
 
   it('returns craft-only max reserved base cost when auto-forge is off', () => {
@@ -69,5 +69,17 @@ describe('autoForgeBudget', () => {
     });
     expect(expected).toBeGreaterThan(0);
     expect(expected).toBeLessThan(calculateAutoForgeMaxForgeTurnCost(8, 'rare'));
+  });
+
+  it('covers uncommon crit-started pools when reserving rare auto-forge turns', () => {
+    expect(calculateAutoForgeMaxForgeTurnCost(4, 'rare')).toBeGreaterThanOrEqual(500);
+  });
+
+  it('covers rare crit-started pools when reserving epic auto-forge turns', () => {
+    expect(calculateAutoForgeMaxForgeTurnCost(4, 'epic')).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('covers epic crit-started pools when reserving legendary auto-forge turns', () => {
+    expect(calculateAutoForgeMaxForgeTurnCost(4, 'legendary')).toBeGreaterThanOrEqual(2000);
   });
 });

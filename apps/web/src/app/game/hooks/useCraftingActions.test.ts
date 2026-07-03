@@ -94,7 +94,12 @@ describe('useCraftingActions', () => {
   it('logs actual auto-forge turn cost and tracks the total turns spent', async () => {
     apiMock.craft.mockResolvedValueOnce({
       data: {
-        turns: { currentTurns: 400 },
+        turns: {
+          currentTurns: 400,
+          timeToCapMs: null,
+          lastRegenAt: '2026-07-03T12:00:00.000Z',
+          spent: 216,
+        },
         crafted: {
           recipeId: 'robe',
           resultTemplateId: 'robe-template',
@@ -145,7 +150,7 @@ describe('useCraftingActions', () => {
       expect.objectContaining({ message: 'Crafted Silk Robe x2.' }),
       expect.objectContaining({ message: 'Auto-forge results: epic x1.' }),
       expect.objectContaining({ message: 'Auto-forge leftovers: rare x1.' }),
-      expect.objectContaining({ message: 'Auto-forge spent 180 turns.' }),
+      expect.objectContaining({ message: 'Craft + auto-forge spent 216 turns total (180 base forge).' }),
       expect.objectContaining({ message: 'Gained 25 Tailoring XP.' }),
     );
     expect(analyticsMock.trackEvent).toHaveBeenCalledWith('action', { type: 'tailoring', turns: 204 });

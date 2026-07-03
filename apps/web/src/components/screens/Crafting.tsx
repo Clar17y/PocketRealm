@@ -7,7 +7,7 @@ import {
   getAutoForgeMinimumOpenSlots,
   isAutoForgeEligibleItemType,
 } from '@pocketrealm/game-engine';
-import type { AutoForgeTarget, CraftDestination, ItemType } from '@pocketrealm/shared';
+import { CRAFTING_CONSTANTS, type AutoForgeTarget, type CraftDestination, type ItemType } from '@pocketrealm/shared';
 import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -246,14 +246,15 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
     if (forgeLocked(recipe)) return 0;
     if (recipe.requiredLevel > skillLevel) return 0;
     if (recipe.isAdvanced && recipe.isDiscovered === false) return 0;
+    const clampAttempts = (value: number) => Math.min(value, CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP);
     if (recipe.materials.length === 0) {
-      if (recipe.stackable) return 99;
-      return destination === 'stash' || selectedAutoForgeTarget ? 99 : Math.min(99, availableSlots);
+      if (recipe.stackable) return clampAttempts(99);
+      return clampAttempts(destination === 'stash' || selectedAutoForgeTarget ? 99 : Math.min(99, availableSlots));
     }
     const materialMax = Math.min(...recipe.materials.map((m) => Math.floor(m.owned / m.required)));
-    if (recipe.stackable) return materialMax;
-    if (destination === 'stash' || selectedAutoForgeTarget) return materialMax;
-    return Math.min(materialMax, availableSlots);
+    if (recipe.stackable) return clampAttempts(materialMax);
+    if (destination === 'stash' || selectedAutoForgeTarget) return clampAttempts(materialMax);
+    return clampAttempts(Math.min(materialMax, availableSlots));
   };
 
   const selectedMax = selectedRecipe ? maxCraftable(selectedRecipe) : 0;
@@ -603,7 +604,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
                 return (
                   <>
                     <div>Craft: {inflateCost(craftCost, guildTaxRate).toLocaleString()} turns</div>
-                    <div>Expected forge: ~{inflateCost(expectedForge, guildTaxRate).toLocaleString()} turns</div>
+                    <div>Rough forge: ~{inflateCost(expectedForge, guildTaxRate).toLocaleString()} turns</div>
                     <div>Max reserved: {inflateCost(maxReserved, guildTaxRate).toLocaleString()} turns</div>
                     <div>Unspent turns are kept</div>
                   </>

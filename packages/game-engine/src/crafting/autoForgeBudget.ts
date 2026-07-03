@@ -24,11 +24,6 @@ function raritiesBelowTarget(target: AutoForgeTarget): UpgradeableRarity[] {
   return UPGRADEABLE_RARITIES.filter((rarity) => rarityIndex(rarity) < targetIndex);
 }
 
-function nextRarity(rarity: UpgradeableRarity): ItemRarity {
-  const index = rarityIndex(rarity);
-  return ITEM_RARITY_CONSTANTS.ORDER[index + 1] as ItemRarity;
-}
-
 function upgradeCost(
   rarity: UpgradeableRarity,
   upgradeCostsByRarity: Partial<Record<UpgradeableRarity, number>> | undefined,
@@ -57,19 +52,46 @@ export function calculateAutoForgeMaxForgeTurnCost(
 ): number {
   if (craftAttempts <= 1) return 0;
 
-  const pool: Partial<Record<ItemRarity, number>> = { common: craftAttempts };
-  let total = 0;
+  const rarities = raritiesBelowTarget(target);
+  let states = new Map<string, number>([['0:0', 0]]);
 
-  for (const rarity of raritiesBelowTarget(target)) {
-    const pairs = Math.floor((pool[rarity] ?? 0) / 2);
-    if (pairs <= 0) continue;
+  for (let rarityPosition = 0; rarityPosition < rarities.length; rarityPosition++) {
+    const rarity = rarities[rarityPosition];
+    const nextStates = new Map<string, number>();
 
-    total += pairs * upgradeCost(rarity, upgradeCostsByRarity);
-    const promoted = nextRarity(rarity);
-    pool[promoted] = (pool[promoted] ?? 0) + pairs;
+    for (const [stateKey, totalCost] of states) {
+      const [usedItemsText, carryItemsText] = stateKey.split(':');
+      const usedItems = Number(usedItemsText);
+      const carryItems = Number(carryItemsText);
+      const remainingItems = craftAttempts - usedItems;
+
+      for (let startItems = 0; startItems <= remainingItems; startItems++) {
+        const totalItemsAtRarity = carryItems + startItems;
+        const pairs = Math.floor(totalItemsAtRarity / 2);
+        const nextUsedItems = usedItems + startItems;
+        const nextCarryItems = rarityPosition === rarities.length - 1 ? 0 : pairs;
+        const nextCost = totalCost + pairs * upgradeCost(rarity, upgradeCostsByRarity);
+        const nextKey = `${nextUsedItems}:${nextCarryItems}`;
+        const previousBest = nextStates.get(nextKey) ?? -1;
+
+        if (nextCost > previousBest) {
+          nextStates.set(nextKey, nextCost);
+        }
+      }
+    }
+
+    states = nextStates;
   }
 
-  return total;
+  let maximumCost = 0;
+  for (const [stateKey, totalCost] of states) {
+    const [usedItemsText] = stateKey.split(':');
+    if (Number(usedItemsText) === craftAttempts && totalCost > maximumCost) {
+      maximumCost = totalCost;
+    }
+  }
+
+  return maximumCost;
 }
 
 export function calculateAutoForgeExpectedForgeTurnCost(input: {

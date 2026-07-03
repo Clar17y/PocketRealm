@@ -131,7 +131,9 @@ export function useCraftingActions({
         newLogs.push({
           timestamp,
           type: 'info',
-          message: `Auto-forge spent ${data.autoForge.actualForgeTurnCost.toLocaleString()} turns.`,
+          message: typeof data.turns.spent === 'number'
+            ? `Craft + auto-forge spent ${data.turns.spent.toLocaleString()} turns total (${data.autoForge.actualForgeTurnCost.toLocaleString()} base forge).`
+            : `Auto-forge spent ${data.autoForge.actualForgeTurnCost.toLocaleString()} base forge turns.`,
         });
       }
 

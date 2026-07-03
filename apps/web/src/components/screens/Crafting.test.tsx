@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CRAFTING_CONSTANTS } from '@pocketrealm/shared';
 import { Crafting } from './Crafting';
 
 vi.mock('@/hooks/useNpcDialogue', () => ({
@@ -239,5 +240,28 @@ describe('Crafting', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stash' }));
 
     expect(screen.getByRole('button', { name: /Craft Silk Robe to stash/i })).toHaveProperty('disabled', false);
+  });
+
+  it('caps stash auto-forge craft quantity at the shared 200 attempt budget', () => {
+    const onCraft = renderCraftingWithSpy([
+      {
+        ...equipmentRecipe,
+        materials: [{ name: 'Silk', icon: '?', required: 1, owned: 500 }],
+      },
+    ], { availableSlots: 999 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stash' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rare+' }));
+
+    expect(screen.getByRole('button', { name: `Max (${CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP})` })).toBeTruthy();
+    expect(screen.getByText(/Rough forge/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: `Max (${CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP})` }));
+    fireEvent.click(screen.getByRole('button', { name: /Craft 200x Silk Robe to stash and forge to Rare\+/i }));
+
+    expect(onCraft).toHaveBeenCalledWith('robe', 200, {
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    });
   });
 });

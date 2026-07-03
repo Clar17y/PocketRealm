@@ -235,7 +235,7 @@ const autoForgeTargetSchema = z.enum(['rare', 'epic', 'legendary']);
 
 export const craftSchema = z.object({
   recipeId: z.string().uuid(),
-  quantity: z.number().int().positive().max(CRAFTING_CONSTANTS.MAX_CRAFT_QUANTITY_SANITY).default(1),
+  quantity: z.number().int().positive().max(CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP).default(1),
   destination: z.enum(['inventory', 'stash']).default('inventory'),
   autoForgeMinRarity: autoForgeTargetSchema.nullable().default(null),
 });
