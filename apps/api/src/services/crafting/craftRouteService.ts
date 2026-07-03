@@ -10,6 +10,7 @@ import {
   ITEM_RARITY_CONSTANTS,
   PREMIUM_CONSTANTS,
   isRarityAtLeast,
+  type CraftDestination,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
@@ -21,7 +22,7 @@ import {
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
+import { addStackableItemTx, consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
 import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta, fetchMaterialTotals, buildInventoryStateUpdates } from '../../services/stateUpdateHelpers';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
@@ -30,7 +31,7 @@ import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../../services/buffService';
 import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
 import { trackProgress } from '../../services/progressService';
-import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, assertCanAct, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isSkillType,
   isItemType,
@@ -52,11 +53,15 @@ import {
 export async function craftItem(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
     const playerId = input.player.playerId;
     const body = craftSchema.parse(input.body);
+    const destination: CraftDestination = body.destination;
 
     await checkActivityLockout(playerId);
 
-    // Pre-flight: not recovering, not over-encumbered
-    await assertCanAct(playerId);
+    if (destination === 'inventory') {
+      await assertCanAct(playerId);
+    } else {
+      await assertNotRecovering(playerId);
+    }
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);
@@ -106,20 +111,22 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     }
 
     // Check backpack capacity before spending turns
-    if (recipe.resultTemplate.stackable) {
-      const existingStack = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
-      });
-      if (!existingStack) {
+    if (destination === 'inventory') {
+      if (recipe.resultTemplate.stackable) {
+        const existingStack = await prisma.item.findFirst({
+          where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
+        });
+        if (!existingStack) {
+          const { availableSlots } = await getInventoryState(playerId);
+          if (availableSlots < 1) {
+            throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
+          }
+        }
+      } else {
         const { availableSlots } = await getInventoryState(playerId);
-        if (availableSlots < 1) {
+        if (availableSlots < quantity) {
           throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
         }
-      }
-    } else {
-      const { availableSlots } = await getInventoryState(playerId);
-      if (availableSlots < quantity) {
-        throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
       }
     }
 
@@ -186,6 +193,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     // Single transaction: spend turns + consume materials + create items
     const baseTurnCost = recipe.turnCost * quantity;
     const { turnSpend, taxResult, newItemIds, updatedItemIds, craftedItemDetails, fullyConsumedIds, partiallyConsumedIds } = await prisma.$transaction(async (tx) => {
+      const outputInStash = destination === 'stash';
       const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
 
       const allFullyConsumed: string[] = [];
@@ -206,31 +214,17 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       }> = [];
 
       if (recipe.resultTemplate.stackable) {
-        const existing = await tx.item.findFirst({
-          where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
-          select: { id: true, quantity: true },
-        });
-
-        if (existing) {
-          const updated = await tx.item.update({
-            where: { id: existing.id },
-            data: { quantity: existing.quantity + quantity },
-            select: { id: true },
-          });
-          updatedItemIds.push(updated.id);
+        const added = await addStackableItemTx(
+          tx,
+          playerId,
+          recipe.resultTemplateId,
+          quantity,
+          outputInStash,
+        );
+        if (added.created) {
+          newItemIds.push(added.itemId);
         } else {
-          const created = await tx.item.create({
-            data: {
-              ownerId: playerId,
-              templateId: recipe.resultTemplateId,
-              rarity: 'common',
-              quantity,
-              maxDurability: craftedMax,
-              currentDurability: craftedMax,
-            },
-            select: { id: true },
-          });
-          newItemIds.push(created.id);
+          updatedItemIds.push(added.itemId);
         }
       } else {
         for (const rolled of preRolledItems!) {
@@ -243,6 +237,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
               maxDurability: craftedMax,
               currentDurability: craftedMax,
               bonusStats: rolled.bonusStats,
+              inStash: outputInStash,
             },
             select: { id: true },
           });
@@ -264,6 +259,8 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     });
 
     const allCraftedItemIds = [...newItemIds, ...updatedItemIds];
+    const backpackNewItemIds = destination === 'inventory' ? newItemIds : [];
+    const backpackUpdatedOutputIds = destination === 'inventory' ? updatedItemIds : [];
 
     // Consume shop crafting crit buff (one use per craft action)
     if (shopCraftingCrit > 0) await consumeBuffStandalone(playerId, 'crafting_crit');
@@ -354,8 +351,8 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
 
     const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta, materialTotals] = await Promise.all([
-      fetchItemDTOs(newItemIds),
-      fetchItemDTOs([...partiallyConsumedIds, ...updatedItemIds]),
+      fetchItemDTOs(backpackNewItemIds),
+      fetchItemDTOs([...partiallyConsumedIds, ...backpackUpdatedOutputIds]),
       fetchSkillDTOs(playerId),
       fetchCharacterProgression(playerId),
       fetchInventoryMeta(playerId),
