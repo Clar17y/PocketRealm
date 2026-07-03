@@ -1,6 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  calculateAutoForgeExpectedForgeTurnCost,
+  calculateCraftMaxReservedBaseTurnCost,
+  getAutoForgeMinimumOpenSlots,
+  isAutoForgeEligibleItemType,
+} from '@pocketrealm/game-engine';
+import type { AutoForgeTarget, CraftDestination, ItemType } from '@pocketrealm/shared';
+import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
@@ -30,6 +38,7 @@ interface Material {
 interface Recipe {
   id: string;
   name: string;
+  itemType: string;
   icon?: string;
   imageSrc?: string;
   isAdvanced?: boolean;
@@ -46,8 +55,6 @@ interface Recipe {
   materials: Material[];
   rarity: Rarity;
 }
-
-import type { NpcKey } from '@pocketrealm/shared/constants/npcDialogue';
 
 const CRAFTING_NPC_MAP: Record<string, Record<string, NpcKey>> = {
   weaponsmithing: {
@@ -153,13 +160,21 @@ function formatConsumableEffect(effect: CraftingConsumableEffect | null | undefi
   }
 }
 
+function isKnownItemType(value: string): value is ItemType {
+  return value === 'weapon' || value === 'armor' || value === 'resource' || value === 'consumable';
+}
+
 interface CraftingProps {
   skillType?: string;
   skillName: string;
   skillLevel: number;
   xpRate: number;
   recipes: Recipe[];
-  onCraft: (recipeId: string, quantity: number) => void;
+  onCraft: (
+    recipeId: string,
+    quantity: number,
+    options: { destination: CraftDestination; autoForgeMinRarity: AutoForgeTarget | null },
+  ) => void;
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   recoveryCost?: number | null;
@@ -179,6 +194,8 @@ interface CraftingProps {
 export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [destination, setDestination] = useState<CraftDestination>('inventory');
+  const [autoForgeMinRarity, setAutoForgeMinRarity] = useState<AutoForgeTarget | null>(null);
   const npcKey = skillType ? getCraftingNpc(skillType, zoneName) : undefined;
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(npcKey);
 
@@ -197,6 +214,16 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
   const selectedEffect = formatConsumableEffect(selectedRecipe?.consumableEffect);
   const selectedRecipeLocked = selectedRecipe?.isAdvanced && selectedRecipe?.isDiscovered === false;
   const selectedLevelLocked = selectedRecipe ? selectedRecipe.requiredLevel > skillLevel : false;
+  const autoForgeEligible = selectedRecipe
+    ? isKnownItemType(selectedRecipe.itemType)
+      && isAutoForgeEligibleItemType(selectedRecipe.itemType, Boolean(selectedRecipe.stackable))
+    : false;
+  const selectedAutoForgeTarget = autoForgeEligible ? autoForgeMinRarity : null;
+  const quantityLabel = selectedAutoForgeTarget ? 'Craft attempts' : 'Quantity';
+  const minimumOpenSlots = selectedAutoForgeTarget ? getAutoForgeMinimumOpenSlots(selectedAutoForgeTarget) : 0;
+  const lacksAutoForgeSlots = destination === 'inventory'
+    && selectedAutoForgeTarget !== null
+    && availableSlots < minimumOpenSlots;
 
   const noFacility = zoneCraftingLevel === 0;
   const forgeLocked = (recipe: Recipe) =>
@@ -208,9 +235,13 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
     if (forgeLocked(recipe)) return 0;
     if (recipe.requiredLevel > skillLevel) return 0;
     if (recipe.isAdvanced && recipe.isDiscovered === false) return 0;
-    if (recipe.materials.length === 0) return recipe.stackable ? 99 : Math.min(99, availableSlots);
+    if (recipe.materials.length === 0) {
+      if (recipe.stackable) return 99;
+      return destination === 'stash' || selectedAutoForgeTarget ? 99 : Math.min(99, availableSlots);
+    }
     const materialMax = Math.min(...recipe.materials.map((m) => Math.floor(m.owned / m.required)));
     if (recipe.stackable) return materialMax;
+    if (destination === 'stash' || selectedAutoForgeTarget) return materialMax;
     return Math.min(materialMax, availableSlots);
   };
 
@@ -224,6 +255,11 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
       setQuantity((prev) => Math.max(1, Math.min(prev, selectedMax || 1)));
     }
   }, [selectedRecipeId, selectedMax, defaultMaxQuantity, selectedRecipe?.stackable]);
+
+  useEffect(() => {
+    setAutoForgeMinRarity(null);
+    setDestination('inventory');
+  }, [selectedRecipeId]);
 
   const canCraft = (recipe: Recipe) => {
     if (noFacility) return false;
@@ -466,10 +502,51 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
 
       {selectedRecipe && (
         <DockedActionBar>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            {(['inventory', 'stash'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setDestination(value)}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  destination === value
+                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
+                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                }`}
+              >
+                {value === 'inventory' ? 'Inventory' : 'Stash'}
+              </button>
+            ))}
+          </div>
+
+          {autoForgeEligible && (
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {[
+                { label: 'Off', value: null },
+                { label: 'Rare+', value: 'rare' as const },
+                { label: 'Epic+', value: 'epic' as const },
+                { label: 'Legendary', value: 'legendary' as const },
+              ].map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  onClick={() => setAutoForgeMinRarity(option.value)}
+                  className={`px-2 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    autoForgeMinRarity === option.value
+                      ? 'bg-[var(--rpg-blue)] text-white'
+                      : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Quantity Selector */}
           {selectedMax > 1 && !selectedRecipeLocked && !selectedLevelLocked && (
             <div className="flex items-center justify-between mb-2 bg-[var(--rpg-surface)] rounded-lg p-3">
-              <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">Quantity</span>
+              <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{quantityLabel}</span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
@@ -498,33 +575,83 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
             </div>
           )}
 
+          {selectedAutoForgeTarget && selectedRecipe && (
+            <div className="mb-2 text-xs text-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)] rounded-lg p-3 space-y-1">
+              {(() => {
+                const craftCost = selectedRecipe.turnCost * quantity;
+                const expectedForge = calculateAutoForgeExpectedForgeTurnCost({
+                  craftAttempts: quantity,
+                  target: selectedAutoForgeTarget,
+                  luckStat: 0,
+                });
+                const maxReserved = calculateCraftMaxReservedBaseTurnCost({
+                  craftAttempts: quantity,
+                  craftTurnCostPerAttempt: selectedRecipe.turnCost,
+                  autoForgeTarget: selectedAutoForgeTarget,
+                });
+                return (
+                  <>
+                    <div>Craft: {inflateCost(craftCost, guildTaxRate).toLocaleString()} turns</div>
+                    <div>Expected forge: ~{inflateCost(expectedForge, guildTaxRate).toLocaleString()} turns</div>
+                    <div>Max reserved: {inflateCost(maxReserved, guildTaxRate).toLocaleString()} turns</div>
+                    <div>Unspent turns are kept</div>
+                  </>
+                );
+              })()}
+              {lacksAutoForgeSlots && (
+                <div className="text-[var(--rpg-red)]">
+                  {selectedAutoForgeTarget[0].toUpperCase() + selectedAutoForgeTarget.slice(1)}+ auto-forge needs {minimumOpenSlots} open backpack slots.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Craft Button */}
           <PixelButton
             variant="gold"
             size="lg"
             className="w-full"
             onClick={() => {
-              onCraft(selectedRecipe.id, quantity);
+              onCraft(selectedRecipe.id, quantity, {
+                destination,
+                autoForgeMinRarity: selectedAutoForgeTarget,
+              });
               triggerDialogueEvent('buy');
             }}
-            disabled={isOverEncumbered || isRecovering || isActivityLocked || noFacility || selectedMax < 1 || backpackFull}
+            disabled={
+              (destination === 'inventory' && isOverEncumbered)
+              || isRecovering
+              || isActivityLocked
+              || noFacility
+              || selectedMax < 1
+              || (destination === 'inventory' && !selectedAutoForgeTarget && backpackFull)
+              || lacksAutoForgeSlots
+            }
           >
             {isActivityLocked
               ? (activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition')
-              : isOverEncumbered
+              : destination === 'inventory' && isOverEncumbered
               ? 'Over-Encumbered'
               : isRecovering
               ? 'Recover First'
               : noFacility
               ? 'No Crafting Facility'
-              : backpackFull
+              : destination === 'inventory' && !selectedAutoForgeTarget && backpackFull
               ? 'Backpack Full'
+              : lacksAutoForgeSlots
+              ? `Need ${minimumOpenSlots} Open Slots`
               : selectedForgeLocked
               ? 'Requires Higher-Level Forge'
               : selectedLevelLocked
               ? `Requires Lv. ${selectedRecipe.requiredLevel}`
               : selectedRecipeLocked
               ? 'Discover Recipe First'
+              : selectedAutoForgeTarget && destination === 'stash'
+              ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} to stash and forge to ${selectedAutoForgeTarget[0].toUpperCase() + selectedAutoForgeTarget.slice(1)}+`
+              : selectedAutoForgeTarget
+              ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} and forge to ${selectedAutoForgeTarget[0].toUpperCase() + selectedAutoForgeTarget.slice(1)}+`
+              : destination === 'stash'
+              ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} to stash`
               : quantity > 1
               ? `Craft ${quantity}x ${selectedRecipe.name}`
               : `Craft ${selectedRecipe.name}`}

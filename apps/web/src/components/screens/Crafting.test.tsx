@@ -17,6 +17,7 @@ afterEach(() => {
 
 const baseRecipe = {
   icon: '?',
+  itemType: 'resource',
   isAdvanced: false,
   isDiscovered: true,
   discoveryHint: null,
@@ -46,6 +47,38 @@ function renderCrafting(recipes: React.ComponentProps<typeof Crafting>['recipes'
     />,
   );
 }
+
+function renderCraftingWithSpy(
+  recipes: React.ComponentProps<typeof Crafting>['recipes'],
+  props: Partial<React.ComponentProps<typeof Crafting>> = {},
+) {
+  const onCraft = vi.fn();
+  render(
+    <Crafting
+      skillName="Tailoring"
+      skillLevel={10}
+      xpRate={100}
+      recipes={recipes}
+      onCraft={onCraft}
+      activityLog={[]}
+      zoneCraftingLevel={null}
+      zoneName={null}
+      showNpcDialogue={false}
+      availableSlots={10}
+      {...props}
+    />
+  );
+  return onCraft;
+}
+
+const equipmentRecipe = {
+  ...baseRecipe,
+  id: 'robe',
+  name: 'Silk Robe',
+  itemType: 'armor',
+  stackable: false,
+  materials: [{ name: 'Silk', icon: '?', required: 1, owned: 200 }],
+};
 
 describe('Crafting', () => {
   it('displays potion effects instead of empty base stats', () => {
@@ -144,5 +177,47 @@ describe('Crafting', () => {
     expect(screen.getByText('Attack')).toBeTruthy();
     expect(screen.getByText('+8')).toBeTruthy();
     expect(screen.queryByText('Effect')).toBeNull();
+  });
+
+  it('defaults craft destination to inventory', () => {
+    const onCraft = renderCraftingWithSpy([equipmentRecipe]);
+
+    fireEvent.click(screen.getByRole('button', { name: /Craft Silk Robe/i }));
+
+    expect(onCraft).toHaveBeenCalledWith('robe', 1, {
+      destination: 'inventory',
+      autoForgeMinRarity: null,
+    });
+  });
+
+  it('sends stash destination and rare auto-forge target', () => {
+    const onCraft = renderCraftingWithSpy([equipmentRecipe]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stash' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rare+' }));
+    fireEvent.click(screen.getByRole('button', { name: /Craft Silk Robe to stash and forge to Rare\+/i }));
+
+    expect(screen.getByText('Craft attempts')).toBeTruthy();
+    expect(onCraft).toHaveBeenCalledWith('robe', 1, {
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    });
+  });
+
+  it('hides auto-forge controls for stackable recipes', () => {
+    renderCraftingWithSpy([
+      { ...baseRecipe, id: 'thread', name: 'Thread', itemType: 'resource', stackable: true },
+    ]);
+
+    expect(screen.queryByRole('button', { name: 'Rare+' })).toBeNull();
+  });
+
+  it('disables inventory auto-forge when minimum open slots are missing', () => {
+    renderCraftingWithSpy([equipmentRecipe], { availableSlots: 2 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rare+' }));
+
+    expect(screen.getByText('Rare+ auto-forge needs 3 open backpack slots.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Need 3 Open Slots/i })).toHaveProperty('disabled', true);
   });
 });

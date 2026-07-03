@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { trackEvent, trackOnce } from '@/lib/analytics';
 import { craft } from '@/lib/api';
+import type { CraftRequestOptions } from '@/lib/api/items';
 import type { QuestProgressUpdate } from '@pocketrealm/shared';
 import { TUTORIAL_STEP_CRAFT, TUTORIAL_STEP_REFINE } from '@/lib/tutorial';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
@@ -39,10 +40,14 @@ export function useCraftingActions({
   updateQuestProgress,
   advanceTutorial,
 }: UseCraftingActionsParams) {
-  const handleCraft = useCallback(async (recipeId: string, quantity: number = 1) => {
+  const handleCraft = useCallback(async (
+    recipeId: string,
+    quantity: number = 1,
+    options: CraftRequestOptions = {},
+  ) => {
     await runAction('crafting', async () => {
       const recipe = craftingRecipes.find((entry) => entry.id === recipeId);
-      const res = await craft(recipeId, quantity);
+      const res = await craft(recipeId, quantity, options);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Crafting failed');
@@ -90,6 +95,40 @@ export function useCraftingActions({
         }
       }
 
+      if (data.autoForge) {
+        for (const attempt of data.autoForge.attempts) {
+          newLogs.push({
+            timestamp,
+            type: attempt.success ? 'success' : 'info',
+            message: attempt.success
+              ? `Auto-forge ${attempt.fromRarity} -> ${attempt.toRarity} succeeded.`
+              : `Auto-forge ${attempt.fromRarity} -> ${attempt.toRarity} failed.`,
+          });
+        }
+
+        const finalSummary = Object.entries(data.autoForge.finalCountsByRarity)
+          .map(([rarity, count]) => `${rarity} x${count}`)
+          .join(', ');
+        if (finalSummary) {
+          newLogs.push({
+            timestamp,
+            type: 'success',
+            message: `Auto-forge results: ${finalSummary}.`,
+          });
+        }
+
+        const leftoverSummary = Object.entries(data.autoForge.leftoverCountsByRarity)
+          .map(([rarity, count]) => `${rarity} x${count}`)
+          .join(', ');
+        if (leftoverSummary) {
+          newLogs.push({
+            timestamp,
+            type: 'info',
+            message: `Auto-forge leftovers: ${leftoverSummary}.`,
+          });
+        }
+      }
+
       newLogs.push({
         timestamp,
         type: 'success',
@@ -114,7 +153,7 @@ export function useCraftingActions({
 
       pushLog(...newLogs);
       applyStateUpdates(data.stateUpdates, stateSetters);
-      const craftTurns = recipe ? recipe.turnCost * quantity : 50;
+      const craftTurns = recipe ? recipe.turnCost * data.crafted.quantity : 50;
       trackEvent('action', { type: data.xp.skillType, turns: craftTurns });
       trackOnce('first_craft', { skill: data.xp.skillType });
       if (data.xp?.leveledUp) {

@@ -52,6 +52,7 @@ export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
           isDiscovered: recipe.isDiscovered,
           discoveryHint: recipe.discoveryHint,
           soulbound: recipe.soulbound,
+          itemType: recipe.resultTemplate.itemType,
           stackable: recipe.resultTemplate.stackable,
           resultQuantity: 1,
           requiredLevel: recipe.requiredLevel,
