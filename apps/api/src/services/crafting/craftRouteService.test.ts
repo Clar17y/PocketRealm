@@ -3,6 +3,22 @@ import { prisma } from '@pocketrealm/database';
 import { mockPrisma } from '../../__test__/setup';
 import { craftItem } from './craftRouteService';
 
+interface CraftRouteResponseBody {
+  crafted: { quantity: number; craftedItemIds: string[] };
+  autoForge?: {
+    attempts: Array<{
+      fromRarity: 'common' | 'uncommon' | 'rare' | 'epic';
+      toRarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
+      success: boolean;
+    }>;
+    leftoverCountsByRarity: Partial<Record<'common' | 'uncommon' | 'rare' | 'epic' | 'legendary', number>>;
+  };
+  stateUpdates?: {
+    inventoryAdded?: unknown;
+    materialTotals?: unknown;
+  };
+}
+
 function mockProgressionState(luck: number) {
   return {
     characterXp: 0,
@@ -11,6 +27,8 @@ function mockProgressionState(luck: number) {
     attributes: {
       strength: 0,
       agility: 0,
+      dexterity: 0,
+      evasion: 0,
       vitality: 0,
       intelligence: 0,
       luck,
@@ -174,12 +192,13 @@ describe('craftItem stash destination', () => {
       quantity: 1,
       destination: 'stash',
     }));
+    const body = res.body as CraftRouteResponseBody;
 
     expect(mockPrisma.item.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ inStash: true }),
     }));
-    expect(res.body.stateUpdates.inventoryAdded).toBeUndefined();
-    expect(res.body.stateUpdates.materialTotals).toBeDefined();
+    expect(body.stateUpdates?.inventoryAdded).toBeUndefined();
+    expect(body.stateUpdates?.materialTotals).toBeDefined();
   });
 
   it('allows stash destination while over-encumbered by skipping assertCanAct', async () => {
@@ -270,9 +289,10 @@ describe('craftItem auto-forge', () => {
       destination: 'stash',
       autoForgeMinRarity: 'rare',
     }));
+    const body = res.body as CraftRouteResponseBody;
 
-    expect(res.body.autoForge.leftoverCountsByRarity).toEqual({ common: 1 });
-    expect(res.body.autoForge.attempts[0].success).toBe(false);
+    expect(body.autoForge?.leftoverCountsByRarity).toEqual({ common: 1 });
+    expect(body.autoForge?.attempts[0]?.success).toBe(false);
     expect(mockPrisma.item.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ inStash: true }),
     }));
@@ -298,13 +318,14 @@ describe('craftItem auto-forge', () => {
       destination: 'inventory',
       autoForgeMinRarity: 'rare',
     }));
+    const body = res.body as CraftRouteResponseBody;
 
-    expect(res.body.crafted.quantity).toBeLessThanOrEqual(10);
-    expect(res.body.crafted.craftedItemIds.length).toBeLessThanOrEqual(3);
+    expect(body.crafted.quantity).toBeLessThanOrEqual(10);
+    expect(body.crafted.craftedItemIds.length).toBeLessThanOrEqual(3);
   });
 
   it('uses character attribute luck for auto-forge success chance', async () => {
-    const { getPlayerProgressionState } = await import('../../services/attributesService');
+    const { getPlayerProgressionState } = await import('../../services/attributesService.js');
     vi.mocked(getPlayerProgressionState).mockResolvedValue(mockProgressionState(6));
     vi.spyOn(Math, 'random').mockReturnValue(0.605);
 
@@ -314,12 +335,13 @@ describe('craftItem auto-forge', () => {
       destination: 'stash',
       autoForgeMinRarity: 'rare',
     }));
+    const body = res.body as CraftRouteResponseBody;
 
-    expect(res.body.autoForge.attempts[0]).toMatchObject({
+    expect(body.autoForge?.attempts[0]).toMatchObject({
       fromRarity: 'common',
       toRarity: 'uncommon',
       success: true,
     });
-    expect(res.body.autoForge.leftoverCountsByRarity).toEqual({ uncommon: 1 });
+    expect(body.autoForge?.leftoverCountsByRarity).toEqual({ uncommon: 1 });
   });
 });

@@ -97,7 +97,7 @@ export interface TurnAffordabilityResult {
 }
 
 export async function assertPlayerCanSpendTurnsTx(
-  tx: Prisma.TransactionClient,
+  tx: TurnBankClient,
   playerId: string,
   amount: number,
   now: Date = new Date(),

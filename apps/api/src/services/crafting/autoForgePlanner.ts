@@ -71,6 +71,10 @@ const RARITY_INDEX = new Map<ItemRarity, number>(
   ITEM_RARITY_CONSTANTS.ORDER.map((rarity, index) => [rarity, index]),
 );
 
+function isUpgradeResultRarity(rarity: ItemRarity): rarity is CraftAutoForgeAttempt['toRarity'] {
+  return rarity !== 'common';
+}
+
 function rarityIndex(rarity: ItemRarity): number {
   return RARITY_INDEX.get(rarity) ?? 0;
 }
@@ -162,7 +166,7 @@ function reducePools(accumulator: CraftAutoForgeAccumulator): void {
         const successChance = calculateForgeUpgradeSuccessChance(rarity, accumulator.luckStat);
         const turnCost = accumulator.upgradeCostsByRarity[rarity];
 
-        if (!nextRarity || successChance === null) {
+        if (!nextRarity || !isUpgradeResultRarity(nextRarity) || successChance === null) {
           throw new AppError(400, 'Legendary items cannot be upgraded', 'MAX_RARITY');
         }
 

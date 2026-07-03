@@ -7,6 +7,9 @@ import {
   refundPlayerTurns,
   assertPlayerCanSpendTurnsTx,
 } from './turnBankService';
+
+const turnBankTx = mockPrisma as unknown as Parameters<typeof assertPlayerCanSpendTurnsTx>[0];
+
 const now = new Date('2025-06-01T12:00:00Z');
 
 beforeEach(() => {
@@ -272,7 +275,7 @@ describe('assertPlayerCanSpendTurnsTx', () => {
     });
     mockPrisma.player.findUnique.mockResolvedValue({ account: { isPremium: false, premiumExpiresAt: null } });
 
-    const result = await assertPlayerCanSpendTurnsTx(mockPrisma, 'p1', 400, now);
+    const result = await assertPlayerCanSpendTurnsTx(turnBankTx, 'p1', 400, now);
 
     expect(result.currentTurns).toBe(500);
     expect(result.requiredTurns).toBe(400);
@@ -289,7 +292,7 @@ describe('assertPlayerCanSpendTurnsTx', () => {
     });
     mockPrisma.player.findUnique.mockResolvedValue({ account: { isPremium: false, premiumExpiresAt: null } });
 
-    await expect(assertPlayerCanSpendTurnsTx(mockPrisma, 'p1', 400, now)).rejects.toMatchObject({
+    await expect(assertPlayerCanSpendTurnsTx(turnBankTx, 'p1', 400, now)).rejects.toMatchObject({
       code: 'INSUFFICIENT_TURNS',
     });
     expect(mockPrisma.turnBank.updateMany).not.toHaveBeenCalled();
