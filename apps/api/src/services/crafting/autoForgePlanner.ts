@@ -118,6 +118,7 @@ function addBonusStat(input: {
     ...input.item,
     rarity: input.nextRarity,
     bonusStats: nextBonusStats as Prisma.InputJsonObject,
+    isCrit: true,
     bonusEntries: Object.entries(nextBonusStats).filter(
       (entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]),
     ),

@@ -63,7 +63,12 @@ describe('autoForgePlanner', () => {
     const result = finishCraftAutoForge(accumulator);
 
     expect(result.survivors).toHaveLength(1);
-    expect(result.survivors[0]).toMatchObject({ rarity: 'rare', bonusStats: { attack: 4 } });
+    expect(result.survivors[0]).toMatchObject({
+      rarity: 'rare',
+      bonusStats: { attack: 4 },
+      isCrit: true,
+      bonusEntries: [['attack', 4]],
+    });
     expect(result.leftovers).toHaveLength(0);
     expect(result.summary.attempts).toHaveLength(3);
     expect(result.summary.actualForgeTurnCost).toBe(450);
