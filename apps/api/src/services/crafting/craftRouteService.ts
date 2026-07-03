@@ -35,6 +35,7 @@ import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../../services/buffService';
 import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
 import { trackProgress } from '../../services/progressService';
+import { getPlayerProgressionState } from '../../services/attributesService';
 import { serializeXpGrant, assertCanAct, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isSkillType,
@@ -205,12 +206,13 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       const equipStats = await getEquipmentStats(playerId);
       const guildMods = await getPlayerGuildModifiers(playerId);
       const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
+      const progression = autoForgeEnabled ? await getPlayerProgressionState(playerId) : null;
       const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
       const combinedCritBonus = guildMods.craftingCrit + shopCraftingCrit;
       const effectiveCraftLuck = combinedCritBonus > 0
         ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
         : equipStats.luck;
-      const forgeLuck = equipStats.luck;
+      const forgeLuck = equipStats.luck + (progression?.attributes.luck ?? 0);
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
       const templateSlot = (recipe.resultTemplate.slot as EquipmentSlot | null) ?? undefined;
 

@@ -3,6 +3,21 @@ import { prisma } from '@pocketrealm/database';
 import { mockPrisma } from '../../__test__/setup';
 import { craftItem } from './craftRouteService';
 
+function mockProgressionState(luck: number) {
+  return {
+    characterXp: 0,
+    characterLevel: 1,
+    attributePoints: 0,
+    attributes: {
+      strength: 0,
+      agility: 0,
+      vitality: 0,
+      intelligence: 0,
+      luck,
+    },
+  };
+}
+
 vi.mock('../../services/activityLogService', () => ({
   createActivityLog: vi.fn().mockResolvedValue({ id: 'log-1' }),
 }));
@@ -11,6 +26,9 @@ vi.mock('../../services/chatActivityService', () => ({
 }));
 vi.mock('../../services/equipmentService', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({ luck: 0 }),
+}));
+vi.mock('../../services/attributesService', () => ({
+  getPlayerProgressionState: vi.fn().mockResolvedValue(mockProgressionState(0)),
 }));
 vi.mock('../../services/guildService', () => ({
   addGuildXp: vi.fn(),
@@ -283,5 +301,25 @@ describe('craftItem auto-forge', () => {
 
     expect(res.body.crafted.quantity).toBeLessThanOrEqual(10);
     expect(res.body.crafted.craftedItemIds.length).toBeLessThanOrEqual(3);
+  });
+
+  it('uses character attribute luck for auto-forge success chance', async () => {
+    const { getPlayerProgressionState } = await import('../../services/attributesService');
+    vi.mocked(getPlayerProgressionState).mockResolvedValue(mockProgressionState(6));
+    vi.spyOn(Math, 'random').mockReturnValue(0.605);
+
+    const res = await craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 2,
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    }));
+
+    expect(res.body.autoForge.attempts[0]).toMatchObject({
+      fromRarity: 'common',
+      toRarity: 'uncommon',
+      success: true,
+    });
+    expect(res.body.autoForge.leftoverCountsByRarity).toEqual({ uncommon: 1 });
   });
 });
