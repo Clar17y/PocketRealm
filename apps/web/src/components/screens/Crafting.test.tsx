@@ -81,6 +81,8 @@ const equipmentRecipe = {
   materials: [{ name: 'Silk', icon: '?', required: 1, owned: 200 }],
 };
 
+const attemptBudgetCap = CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP;
+
 describe('Crafting', () => {
   it('displays potion effects instead of empty base stats', () => {
     renderCrafting([
@@ -253,13 +255,35 @@ describe('Crafting', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stash' }));
     fireEvent.click(screen.getByRole('button', { name: 'Rare+' }));
 
-    expect(screen.getByRole('button', { name: `Max (${CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP})` })).toBeTruthy();
+    expect(screen.getByRole('button', { name: `Max (${attemptBudgetCap})` })).toBeTruthy();
     expect(screen.getByText(/Rough forge/i)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: `Max (${CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP})` }));
-    fireEvent.click(screen.getByRole('button', { name: /Craft 200x Silk Robe to stash and forge to Rare\+/i }));
+    fireEvent.click(screen.getByRole('button', { name: `Max (${attemptBudgetCap})` }));
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Craft ${attemptBudgetCap}x Silk Robe to stash and forge to Rare\\+`, 'i') }));
 
-    expect(onCraft).toHaveBeenCalledWith('robe', 200, {
+    expect(onCraft).toHaveBeenCalledWith('robe', attemptBudgetCap, {
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    });
+  });
+
+  it('uses the shared attempt budget cap for no-material stash auto-forge recipes', () => {
+    const onCraft = renderCraftingWithSpy([
+      {
+        ...equipmentRecipe,
+        materials: [],
+      },
+    ], { availableSlots: 999 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stash' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rare+' }));
+
+    expect(screen.getByRole('button', { name: `Max (${attemptBudgetCap})` })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: `Max (${attemptBudgetCap})` }));
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Craft ${attemptBudgetCap}x Silk Robe to stash and forge to Rare\\+`, 'i') }));
+
+    expect(onCraft).toHaveBeenCalledWith('robe', attemptBudgetCap, {
       destination: 'stash',
       autoForgeMinRarity: 'rare',
     });

@@ -246,10 +246,11 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
     if (forgeLocked(recipe)) return 0;
     if (recipe.requiredLevel > skillLevel) return 0;
     if (recipe.isAdvanced && recipe.isDiscovered === false) return 0;
-    const clampAttempts = (value: number) => Math.min(value, CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP);
+    const attemptBudgetCap = CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP;
+    const clampAttempts = (value: number) => Math.min(value, attemptBudgetCap);
     if (recipe.materials.length === 0) {
-      if (recipe.stackable) return clampAttempts(99);
-      return clampAttempts(destination === 'stash' || selectedAutoForgeTarget ? 99 : Math.min(99, availableSlots));
+      if (recipe.stackable) return attemptBudgetCap;
+      return destination === 'stash' || selectedAutoForgeTarget ? attemptBudgetCap : clampAttempts(availableSlots);
     }
     const materialMax = Math.min(...recipe.materials.map((m) => Math.floor(m.owned / m.required)));
     if (recipe.stackable) return clampAttempts(materialMax);
