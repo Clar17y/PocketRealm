@@ -127,6 +127,12 @@ export function useCraftingActions({
             message: `Auto-forge leftovers: ${leftoverSummary}.`,
           });
         }
+
+        newLogs.push({
+          timestamp,
+          type: 'info',
+          message: `Auto-forge spent ${data.autoForge.actualForgeTurnCost.toLocaleString()} turns.`,
+        });
       }
 
       newLogs.push({
@@ -154,7 +160,8 @@ export function useCraftingActions({
       pushLog(...newLogs);
       applyStateUpdates(data.stateUpdates, stateSetters);
       const craftTurns = recipe ? recipe.turnCost * data.crafted.quantity : 50;
-      trackEvent('action', { type: data.xp.skillType, turns: craftTurns });
+      const totalTurnsSpent = craftTurns + (data.autoForge?.actualForgeTurnCost ?? 0);
+      trackEvent('action', { type: data.xp.skillType, turns: totalTurnsSpent });
       trackOnce('first_craft', { skill: data.xp.skillType });
       if (data.xp?.leveledUp) {
         trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });

@@ -164,6 +164,17 @@ function isKnownItemType(value: string): value is ItemType {
   return value === 'weapon' || value === 'armor' || value === 'resource' || value === 'consumable';
 }
 
+function formatAutoForgeTargetLabel(target: AutoForgeTarget): string {
+  switch (target) {
+    case 'rare':
+      return 'Rare+';
+    case 'epic':
+      return 'Epic+';
+    case 'legendary':
+      return 'Legendary';
+  }
+}
+
 interface CraftingProps {
   skillType?: string;
   skillName: string;
@@ -600,7 +611,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
               })()}
               {lacksAutoForgeSlots && (
                 <div className="text-[var(--rpg-red)]">
-                  {selectedAutoForgeTarget[0].toUpperCase() + selectedAutoForgeTarget.slice(1)}+ auto-forge needs {minimumOpenSlots} open backpack slots.
+                  {formatAutoForgeTargetLabel(selectedAutoForgeTarget)} auto-forge needs {minimumOpenSlots} open backpack slots.
                 </div>
               )}
             </div>
@@ -647,9 +658,9 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
               : selectedRecipeLocked
               ? 'Discover Recipe First'
               : selectedAutoForgeTarget && destination === 'stash'
-              ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} to stash and forge to ${selectedAutoForgeTarget[0].toUpperCase() + selectedAutoForgeTarget.slice(1)}+`
+              ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} to stash and forge to ${formatAutoForgeTargetLabel(selectedAutoForgeTarget)}`
               : selectedAutoForgeTarget
-              ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} and forge to ${selectedAutoForgeTarget[0].toUpperCase() + selectedAutoForgeTarget.slice(1)}+`
+              ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} and forge to ${formatAutoForgeTargetLabel(selectedAutoForgeTarget)}`
               : destination === 'stash'
               ? `Craft ${quantity > 1 ? `${quantity}x ` : ''}${selectedRecipe.name} to stash`
               : quantity > 1

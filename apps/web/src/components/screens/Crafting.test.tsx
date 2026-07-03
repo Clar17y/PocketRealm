@@ -220,4 +220,24 @@ describe('Crafting', () => {
     expect(screen.getByText('Rare+ auto-forge needs 3 open backpack slots.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Need 3 Open Slots/i })).toHaveProperty('disabled', true);
   });
+
+  it('does not append a plus sign to legendary auto-forge labels', () => {
+    renderCraftingWithSpy([equipmentRecipe]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Legendary' }));
+
+    expect(screen.getByRole('button', { name: /Craft Silk Robe and forge to Legendary/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Legendary\+/i })).toBeNull();
+  });
+
+  it('allows stash crafting even when the backpack is full and over-encumbered', () => {
+    renderCraftingWithSpy([equipmentRecipe], {
+      backpackFull: true,
+      isOverEncumbered: true,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stash' }));
+
+    expect(screen.getByRole('button', { name: /Craft Silk Robe to stash/i })).toHaveProperty('disabled', false);
+  });
 });
