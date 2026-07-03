@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@pocketrealm/database';
 import { mockPrisma } from '../../__test__/setup';
 import { craftItem } from './craftRouteService';
@@ -7,7 +7,7 @@ vi.mock('../../services/activityLogService', () => ({
   createActivityLog: vi.fn().mockResolvedValue({ id: 'log-1' }),
 }));
 vi.mock('../../services/chatActivityService', () => ({
-  broadcastCraftActivity: vi.fn(),
+  broadcastCraftActivity: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../services/equipmentService', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({ luck: 0 }),
@@ -50,13 +50,13 @@ vi.mock('../../services/xpService', () => ({
 vi.mock('../../services/progressService', () => ({
   trackProgress: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('../../services/guildTaxService', () => ({
-  spendWithTaxTx: vi.fn().mockResolvedValue({
-    turnSpend: { spent: 20, taxed: 0, baseCost: 20, remaining: 4980 },
-    taxResult: null,
-  }),
-  taxInfoFromResult: vi.fn().mockReturnValue(null),
-}));
+vi.mock('../../services/guildTaxService', async () => {
+  const actual = await vi.importActual<typeof import('../../services/guildTaxService')>('../../services/guildTaxService');
+  return {
+    ...actual,
+    taxInfoFromResult: vi.fn().mockReturnValue(null),
+  };
+});
 vi.mock('../../services/stateUpdateHelpers', () => ({
   fetchItemDTOs: vi.fn().mockImplementation(async (ids: string[]) => ids.map((id) => ({ id }))),
   fetchSkillDTOs: vi.fn().mockResolvedValue([]),
@@ -114,6 +114,8 @@ function mockRecipe(stackable = false) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-07-02T12:00:00.000Z'));
   vi.clearAllMocks();
   mockRecipe(false);
   mockPrisma.player.findUnique.mockResolvedValue({ currentZoneId: 'zone-1' });
@@ -141,6 +143,10 @@ beforeEach(() => {
   mockPrisma.guildMember.findUnique.mockResolvedValue(null);
   mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.fetchItemDTOs?.mockReset?.();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('craftItem stash destination', () => {
@@ -181,5 +187,101 @@ describe('craftItem stash destination', () => {
     }));
 
     expect(routeHelpers.assertCanAct).toHaveBeenCalledWith('player-1');
+  });
+});
+
+describe('craftItem auto-forge', () => {
+  it('rejects auto-forge for stackable recipes', async () => {
+    mockRecipe(true);
+
+    await expect(craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 2,
+      autoForgeMinRarity: 'rare',
+    }))).rejects.toMatchObject({
+      code: 'AUTO_FORGE_INELIGIBLE',
+    });
+  });
+
+  it('preflights max reserved turns before consuming materials', async () => {
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'player-1',
+      currentTurns: 10,
+      regenProgress: 0,
+      lastRegenAt: new Date('2026-07-02T12:00:00.000Z'),
+    });
+
+    await expect(craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 4,
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    }))).rejects.toMatchObject({
+      code: 'INSUFFICIENT_TURNS',
+    });
+
+    expect(mockPrisma.item.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.item.update).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ quantity: expect.any(Number) }),
+    }));
+  });
+
+  it('spends actual craft plus forge turns, not max reserved turns', async () => {
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.99)
+      .mockReturnValueOnce(0.99);
+
+    await craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 2,
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    }));
+
+    expect(mockPrisma.turnBank.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ currentTurns: 5000 - 140 }),
+    }));
+  });
+
+  it('persists below-target leftovers and reports them', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+    const res = await craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 3,
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    }));
+
+    expect(res.body.autoForge.leftoverCountsByRarity).toEqual({ common: 1 });
+    expect(res.body.autoForge.attempts[0].success).toBe(false);
+    expect(mockPrisma.item.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ inStash: true }),
+    }));
+  });
+
+  it('stops inventory auto-forge when persisted outputs fill available slots', async () => {
+    mockPrisma.item.findFirst.mockResolvedValue(null);
+    mockPrisma.item.findMany.mockImplementation(async (args?: { select?: Record<string, unknown> }) => {
+      if (args?.select && 'template' in args.select) {
+        return Array.from({ length: 21 }, (_, index) => ({
+          templateId: `inv-${index}`,
+          template: { stackable: false },
+        }));
+      }
+
+      return [{ id: 'mat-1', quantity: 20 }];
+    });
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+
+    const res = await craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 10,
+      destination: 'inventory',
+      autoForgeMinRarity: 'rare',
+    }));
+
+    expect(res.body.crafted.quantity).toBeLessThanOrEqual(10);
+    expect(res.body.crafted.craftedItemIds.length).toBeLessThanOrEqual(3);
   });
 });
