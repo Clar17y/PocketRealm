@@ -199,10 +199,11 @@ interface CraftingProps {
   activityLockReason?: 'encounter' | 'expedition' | null;
   availableSlots?: number;
   showNpcDialogue?: boolean;
+  equippedLuck?: number;
 }
 
 
-export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
+export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, availableSlots = 0, showNpcDialogue = true, equippedLuck = 0 }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [destination, setDestination] = useState<CraftDestination>('inventory');
@@ -253,7 +254,8 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
       return destination === 'stash' || selectedAutoForgeTarget ? attemptBudgetCap : clampAttempts(availableSlots);
     }
     const materialMax = Math.min(...recipe.materials.map((m) => Math.floor(m.owned / m.required)));
-    if (recipe.stackable) return clampAttempts(materialMax);
+    // Stackable batches are a single item stack — no attempt cap (issue #175).
+    if (recipe.stackable) return materialMax;
     if (destination === 'stash' || selectedAutoForgeTarget) return clampAttempts(materialMax);
     return clampAttempts(Math.min(materialMax, availableSlots));
   };
@@ -595,7 +597,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
                 const expectedForge = calculateAutoForgeExpectedForgeTurnCost({
                   craftAttempts: quantity,
                   target: selectedAutoForgeTarget,
-                  luckStat: 0,
+                  luckStat: equippedLuck,
                 });
                 const maxReserved = calculateCraftMaxReservedBaseTurnCost({
                   craftAttempts: quantity,

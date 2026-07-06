@@ -191,10 +191,13 @@ export async function consumeItemsByTemplateTx(
 }
 
 /** Fetch current slot usage and capacity in a single parallel call. */
-export async function getInventoryState(playerId: string): Promise<{ usedSlots: number; capacity: number; availableSlots: number }> {
+export async function getInventoryState(
+  playerId: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<{ usedSlots: number; capacity: number; availableSlots: number }> {
   const [usedSlots, capacity] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
+    getUsedSlots(playerId, client),
+    getPlayerCapacity(playerId, client),
   ]);
   return { usedSlots, capacity, availableSlots: Math.max(0, capacity - usedSlots) };
 }
@@ -212,8 +215,11 @@ export async function assertNotOverEncumbered(playerId: string): Promise<void> {
 }
 
 /** Count occupied backpack slots (excludes equipped and stashed items). */
-export async function getUsedSlots(playerId: string): Promise<number> {
-  const items = await prisma.item.findMany({
+export async function getUsedSlots(
+  playerId: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<number> {
+  const items = await client.item.findMany({
     where: {
       ownerId: playerId,
       inStash: false,
@@ -238,10 +244,13 @@ export async function getUsedSlots(playerId: string): Promise<number> {
 }
 
 /** Compute inventory capacity from equipped backpack + belt bonus. */
-export async function getPlayerCapacity(playerId: string): Promise<number> {
+export async function getPlayerCapacity(
+  playerId: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<number> {
   const [hasActivePremiumEntitlement, equipped] = await Promise.all([
-    getHasActivePremiumEntitlement(prisma, playerId),
-    prisma.playerEquipment.findMany({
+    getHasActivePremiumEntitlement(client, playerId),
+    client.playerEquipment.findMany({
       where: { playerId, slot: { in: ['backpack', 'belt'] }, itemId: { not: null } },
       select: {
         slot: true,

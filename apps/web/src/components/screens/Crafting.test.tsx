@@ -288,4 +288,17 @@ describe('Crafting', () => {
       autoForgeMinRarity: 'rare',
     });
   });
+
+  it('does not clamp stackable batch quantities to the attempt budget cap', () => {
+    renderCraftingWithSpy([
+      {
+        ...baseRecipe,
+        id: 'thread',
+        name: 'Silk Thread',
+        materials: [{ name: 'Silk', icon: '?', required: 1, owned: 500 }],
+      },
+    ]);
+
+    expect(screen.getByRole('button', { name: 'Max (500)' })).toBeTruthy();
+  });
 });

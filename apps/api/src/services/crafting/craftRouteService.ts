@@ -66,6 +66,43 @@ function makeVirtualId(index: number): string {
   return `craft-${index}`;
 }
 
+interface CraftRollParams {
+  skillLevel: number;
+  requiredLevel: number;
+  craftLuck: number;
+  itemType: ItemType;
+  baseStats: ItemStats | null | undefined;
+  slot: EquipmentSlot | undefined;
+  championMultiplier: number;
+}
+
+function rollCraftedVirtualItem(index: number, params: CraftRollParams): CraftVirtualItem {
+  const critResult = calculateCraftingCrit({
+    skillLevel: params.skillLevel,
+    requiredLevel: params.requiredLevel,
+    luckStat: params.craftLuck,
+    itemType: params.itemType,
+    baseStats: params.baseStats,
+    slot: params.slot,
+    championMultiplier: params.championMultiplier,
+  });
+  const rolledBonusStats = rollBonusStatsForRarity({
+    itemType: params.itemType,
+    rarity: critResult.rarity,
+    baseStats: params.baseStats,
+    slot: params.slot,
+  });
+  const bonusEntries = Object.entries(rolledBonusStats ?? {})
+    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
+  return {
+    virtualId: makeVirtualId(index + 1),
+    rarity: critResult.rarity,
+    bonusStats: rolledBonusStats ? (rolledBonusStats as Prisma.InputJsonObject) : undefined,
+    isCrit: critResult.isCrit,
+    bonusEntries,
+  };
+}
+
 function countRareOrBetter(details: Array<{ rarity: ItemRarity }>): number {
   return details.filter((d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary').length;
 }
@@ -126,6 +163,17 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     const autoForgeEnabled = autoForgeTarget !== null;
     const inventoryState = await getInventoryState(playerId);
 
+    // Attempt budget cap only applies to non-stackable output: each attempt is
+    // its own item row (and auto-forge planning work). Stackable batches are a
+    // single DB write and stay uncapped beyond the schema sanity limit.
+    if (!recipe.resultTemplate.stackable && quantity > CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP) {
+      throw new AppError(
+        400,
+        `Craft requests for equipment are limited to ${CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP} attempts`,
+        'INVALID_QUANTITY',
+      );
+    }
+
     if (autoForgeEnabled && !isAutoForgeEligibleItemType(itemType, recipe.resultTemplate.stackable)) {
       throw new AppError(
         400,
@@ -147,13 +195,20 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
 
     const materials = parseMaterials(recipe.materials);
 
-    // Validate inventory has all materials
+    // Validate inventory has all materials. With auto-forge the requested
+    // quantity is an attempt budget, so clamp it to what materials allow
+    // instead of rejecting the whole request.
+    let attemptBudget = quantity;
     for (const mat of materials) {
-      const needed = mat.quantity * quantity;
       const available = await getTotalQuantityByTemplate(playerId, mat.templateId);
-      if (available < needed) {
+      if (autoForgeEnabled) {
+        attemptBudget = Math.min(attemptBudget, Math.floor(available / mat.quantity));
+      } else if (available < mat.quantity * quantity) {
         throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
       }
+    }
+    if (attemptBudget < 1) {
+      throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
     }
 
     // Check backpack capacity before spending turns
@@ -186,7 +241,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       epic: await getRecipeDiscountedCost(playerId, recipe.resultTemplateId, ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY.epic),
     };
     const maxReservedBaseTurnCost = calculateCraftMaxReservedBaseTurnCost({
-      craftAttempts: quantity,
+      craftAttempts: attemptBudget,
       craftTurnCostPerAttempt: recipe.turnCost,
       autoForgeTarget,
       upgradeCostsByRarity,
@@ -195,12 +250,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     // Pre-roll crit results for non-stackable items (pure functions, safe outside tx)
     let actualQuantity = quantity;
     let autoForgePlan: ReturnType<typeof finishCraftAutoForge> | null = null;
-    let preRolledItems: Array<{
-      rarity: ItemRarity;
-      bonusStats: Prisma.InputJsonObject | undefined;
-      isCrit: boolean;
-      bonusEntries: [string, number][];
-    }> | null = null;
+    let preRolledItems: CraftVirtualItem[] | null = null;
 
     if (!recipe.resultTemplate.stackable) {
       const equipStats = await getEquipmentStats(playerId);
@@ -215,6 +265,15 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       const forgeLuck = equipStats.luck + (progression?.attributes.luck ?? 0);
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
       const templateSlot = (recipe.resultTemplate.slot as EquipmentSlot | null) ?? undefined;
+      const rollParams: CraftRollParams = {
+        skillLevel,
+        requiredLevel: recipe.requiredLevel,
+        craftLuck: effectiveCraftLuck,
+        itemType,
+        baseStats: templateBaseStats,
+        slot: templateSlot,
+        championMultiplier,
+      };
 
       if (autoForgeEnabled) {
         const accumulator = createCraftAutoForgeAccumulator({
@@ -226,33 +285,8 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
           upgradeCostsByRarity,
         });
 
-        for (let i = 0; i < quantity; i++) {
-          const critResult = calculateCraftingCrit({
-            skillLevel,
-            requiredLevel: recipe.requiredLevel,
-            luckStat: effectiveCraftLuck,
-            itemType,
-            baseStats: templateBaseStats,
-            slot: templateSlot,
-            championMultiplier,
-          });
-          const rolledBonusStats = rollBonusStatsForRarity({
-            itemType,
-            rarity: critResult.rarity,
-            baseStats: templateBaseStats,
-            slot: templateSlot,
-          });
-          const bonusEntries = Object.entries(rolledBonusStats ?? {})
-            .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
-
-          const virtualItem: CraftVirtualItem = {
-            virtualId: makeVirtualId(i + 1),
-            rarity: critResult.rarity,
-            bonusStats: rolledBonusStats ? (rolledBonusStats as Prisma.InputJsonObject) : undefined,
-            isCrit: critResult.isCrit,
-            bonusEntries,
-          };
-          addCraftedItemToAutoForge(accumulator, virtualItem);
+        for (let i = 0; i < attemptBudget; i++) {
+          addCraftedItemToAutoForge(accumulator, rollCraftedVirtualItem(i, rollParams));
           actualQuantity = i + 1;
 
           if (destination === 'inventory' && getAutoForgePersistedItemCount(accumulator) >= inventoryState.availableSlots) {
@@ -264,27 +298,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       } else {
         preRolledItems = [];
         for (let i = 0; i < quantity; i++) {
-          const critResult = calculateCraftingCrit({
-            skillLevel,
-            requiredLevel: recipe.requiredLevel,
-            luckStat: effectiveCraftLuck,
-            itemType,
-            baseStats: templateBaseStats,
-            slot: templateSlot,
-            championMultiplier,
-          });
-          const rolledBonusStats = rollBonusStatsForRarity({
-            itemType,
-            rarity: critResult.rarity,
-            baseStats: templateBaseStats,
-            slot: templateSlot,
-          });
-          const bonusStats = rolledBonusStats
-            ? (rolledBonusStats as Prisma.InputJsonObject)
-            : undefined;
-          const bonusEntries = Object.entries(rolledBonusStats ?? {})
-            .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
-          preRolledItems.push({ rarity: critResult.rarity, bonusStats, isCrit: critResult.isCrit, bonusEntries });
+          preRolledItems.push(rollCraftedVirtualItem(i, rollParams));
         }
       }
     }
@@ -327,13 +341,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
           updatedItemIds.push(added.itemId);
         }
       } else {
-        const persistedVirtualItems = autoForgePlan?.allPersistedItems ?? preRolledItems!.map((rolled, index) => ({
-          virtualId: makeVirtualId(index + 1),
-          rarity: rolled.rarity,
-          bonusStats: rolled.bonusStats,
-          isCrit: rolled.isCrit,
-          bonusEntries: rolled.bonusEntries,
-        }));
+        const persistedVirtualItems = autoForgePlan?.allPersistedItems ?? preRolledItems!;
 
         for (const virtualItem of persistedVirtualItems) {
           const created = await tx.item.create({
@@ -360,6 +368,16 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
           } else {
             itemDetails.push({ id: created.id, isCrit: false, rarity: virtualItem.rarity });
           }
+        }
+      }
+
+      // Re-check capacity with the tx client: the pre-transaction snapshot that
+      // sized this craft may be stale if a concurrent action changed the
+      // backpack between the read and this commit.
+      if (destination === 'inventory') {
+        const txInventoryState = await getInventoryState(playerId, tx);
+        if (txInventoryState.usedSlots > txInventoryState.capacity) {
+          throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
         }
       }
 

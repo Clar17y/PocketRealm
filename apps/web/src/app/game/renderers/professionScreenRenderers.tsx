@@ -15,6 +15,7 @@ import { useEquipmentStats } from '../hooks/useEquipmentStats';
 import type { GameControllerState } from './gameScreenRenderer.types';
 
 export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
+  const equipmentLuck = useEquipmentStats(gc.equipment).luck;
   const activeCraftingSkillMeta = SKILL_META[gc.activeCraftingSkill];
   const activeCraftingSkillData = gc.skills.find((skill) => skill.skillType === gc.activeCraftingSkill);
   const filteredCraftingRecipes = useMemo(
@@ -87,6 +88,7 @@ export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
         backpackFull={gc.backpackFull}
         availableSlots={Math.max(0, gc.inventoryCapacity - gc.inventoryUsedSlots)}
         showNpcDialogue={gc.showNpcDialogue}
+        equippedLuck={equipmentLuck + gc.characterProgression.attributes.luck}
       />
     </div>
   );

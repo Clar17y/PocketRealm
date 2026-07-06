@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@pocketrealm/database';
+import { CRAFTING_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma } from '../../__test__/setup';
 import { craftItem } from './craftRouteService';
 
@@ -324,6 +325,37 @@ describe('craftItem auto-forge', () => {
     expect(body.crafted.craftedItemIds.length).toBeLessThanOrEqual(3);
   });
 
+  it('clamps the auto-forge attempt budget to available materials instead of rejecting', async () => {
+    // Default mocks: 10 materials available, 2 per attempt → 5 attempts max.
+    const res = await craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 8,
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    }));
+    const body = res.body as CraftRouteResponseBody;
+
+    expect(body.crafted.quantity).toBe(5);
+  });
+
+  it('rejects auto-forge when materials do not cover a single attempt', async () => {
+    mockPrisma.item.findMany.mockImplementation(async (args?: { select?: Record<string, unknown> }) => {
+      if (args?.select && 'template' in args.select) {
+        return [];
+      }
+      return [{ id: 'mat-1', quantity: 1 }];
+    });
+
+    await expect(craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 4,
+      destination: 'stash',
+      autoForgeMinRarity: 'rare',
+    }))).rejects.toMatchObject({
+      code: 'INSUFFICIENT_ITEMS',
+    });
+  });
+
   it('uses character attribute luck for auto-forge success chance', async () => {
     const { getPlayerProgressionState } = await import('../../services/attributesService.js');
     vi.mocked(getPlayerProgressionState).mockResolvedValue(mockProgressionState(6));
@@ -343,5 +375,67 @@ describe('craftItem auto-forge', () => {
       success: true,
     });
     expect(body.autoForge?.leftoverCountsByRarity).toEqual({ uncommon: 1 });
+  });
+});
+
+describe('craftItem quantity caps', () => {
+  it('rejects non-stackable craft requests above the attempt budget cap', async () => {
+    await expect(craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP + 1,
+      destination: 'stash',
+    }))).rejects.toMatchObject({
+      code: 'INVALID_QUANTITY',
+    });
+  });
+
+  it('allows stackable batch crafts above the attempt budget cap', async () => {
+    mockRecipe(true);
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'player-1',
+      currentTurns: 20000,
+      regenProgress: 0,
+      lastRegenAt: new Date('2026-07-02T12:00:00.000Z'),
+    });
+    mockPrisma.item.findMany.mockImplementation(async (args?: { select?: Record<string, unknown> }) => {
+      if (args?.select && 'template' in args.select) {
+        return [];
+      }
+      return [{ id: 'mat-1', quantity: 2000 }];
+    });
+
+    const res = await craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 500,
+      destination: 'stash',
+    }));
+    const body = res.body as CraftRouteResponseBody;
+
+    expect(body.crafted.quantity).toBe(500);
+  });
+
+  it('aborts inventory crafts when the in-transaction capacity re-check fails', async () => {
+    let usedSlotReads = 0;
+    mockPrisma.item.findMany.mockImplementation(async (args?: { select?: Record<string, unknown> }) => {
+      if (args?.select && 'template' in args.select) {
+        usedSlotReads += 1;
+        // Pre-transaction snapshot sees space; the in-transaction re-check
+        // sees a backpack filled by a concurrent action.
+        const count = usedSlotReads === 1 ? 0 : 25;
+        return Array.from({ length: count }, (_, index) => ({
+          templateId: `inv-${index}`,
+          template: { stackable: false },
+        }));
+      }
+      return [{ id: 'mat-1', quantity: 10 }];
+    });
+
+    await expect(craftItem(baseInput({
+      recipeId: '11111111-1111-4111-8111-111111111111',
+      quantity: 1,
+      destination: 'inventory',
+    }))).rejects.toMatchObject({
+      code: 'BACKPACK_FULL',
+    });
   });
 });
