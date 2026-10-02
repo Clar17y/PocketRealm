@@ -346,6 +346,15 @@ export const CRAFTING_CONSTANTS = {
 
   /** Sanity cap for craft request payload — not a gameplay limit */
   MAX_CRAFT_QUANTITY_SANITY: 99999,
+  /** Gameplay cap for a single craft request attempt budget */
+  CRAFT_ATTEMPT_BUDGET_CAP: 200,
+
+  AUTO_FORGE_TARGETS: ['rare', 'epic', 'legendary'] as const,
+  AUTO_FORGE_MIN_OPEN_SLOTS: {
+    rare: 3,
+    epic: 4,
+    legendary: 5,
+  } as const,
 } as const;
 
 // =============================================================================

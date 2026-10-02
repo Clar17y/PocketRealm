@@ -29,6 +29,7 @@ export interface TurnStateResponse {
   currentTurns: number;
   timeToCapMs: number | null;
   lastRegenAt: string;
+  spent?: number;
 }
 
 export interface TaxInfo {

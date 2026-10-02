@@ -4,10 +4,14 @@ import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 vi.mock('./guildService', () => ({
   calculateTreasuryCap: vi.fn().mockReturnValue(110_000),
 }));
-vi.mock('./turnBankService', () => ({
+vi.mock('./turnBankService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./turnBankService')>()),
   spendPlayerTurnsTx: vi.fn().mockResolvedValue({
-    previousTurns: 5000, spent: 100, currentTurns: 4900,
-    lastRegenAt: '2026-01-01T00:00:00.000Z', timeToCapMs: null,
+    previousTurns: 5000,
+    spent: 100,
+    currentTurns: 4900,
+    lastRegenAt: '2026-01-01T00:00:00.000Z',
+    timeToCapMs: null,
   }),
 }));
 vi.mock('@pocketrealm/game-engine', () => ({
@@ -30,6 +34,7 @@ import {
   spendWithTaxTx,
   applyGuildTaxTx,
   applyGuildTax,
+  assertCanSpendWithTaxTx,
   type TaxResult,
 } from './guildTaxService';
 
@@ -428,6 +433,69 @@ describe('spendWithTaxTx', () => {
 
     // ceil(500 / 0.8) = 625
     expect(spendPlayerTurnsTx).toHaveBeenCalledWith(prisma, 'p1', 625);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assertCanSpendWithTaxTx
+// ---------------------------------------------------------------------------
+
+describe('assertCanSpendWithTaxTx', () => {
+  it('checks inflated cost when the player has guild tax', async () => {
+    const suppliedNow = new Date('2026-07-02T12:00:00.000Z');
+    vi.mocked(calculateCurrentTurns).mockReturnValueOnce(625);
+    mockPrisma.guildMember.findUnique.mockResolvedValue({ guild: { id: 'g1', taxRate: 20 } });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'p1',
+      currentTurns: 0,
+      regenProgress: 0,
+      lastRegenAt: suppliedNow,
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({
+      account: {
+        isPremium: false,
+        premiumExpiresAt: null,
+      },
+    });
+
+    const result = await assertCanSpendWithTaxTx(prisma, 'p1', 500, suppliedNow);
+
+    expect(result).toMatchObject({
+      baseCost: 500,
+      inflatedCost: 625,
+      taxRatePercent: 20,
+      guildId: 'g1',
+      currentTurns: 625,
+    });
+    expect(mockPrisma.turnBank.findUnique).toHaveBeenCalledWith({
+      where: { playerId: 'p1' },
+    });
+    expect(spendPlayerTurnsTx).not.toHaveBeenCalled();
+  });
+
+  it('throws before spending when inflated max reserved cost is not affordable', async () => {
+    const suppliedNow = new Date('2026-07-02T12:00:00.000Z');
+    vi.mocked(calculateCurrentTurns).mockReturnValueOnce(624);
+    mockPrisma.guildMember.findUnique.mockResolvedValue({ guild: { id: 'g1', taxRate: 20 } });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'p1',
+      currentTurns: 0,
+      regenProgress: 0,
+      lastRegenAt: suppliedNow,
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({
+      account: {
+        isPremium: false,
+        premiumExpiresAt: null,
+      },
+    });
+
+    await expect(assertCanSpendWithTaxTx(prisma, 'p1', 500, suppliedNow))
+      .rejects.toMatchObject({ code: 'INSUFFICIENT_TURNS' });
+    expect(mockPrisma.turnBank.findUnique).toHaveBeenCalledWith({
+      where: { playerId: 'p1' },
+    });
+    expect(spendPlayerTurnsTx).not.toHaveBeenCalled();
   });
 });
 

@@ -106,6 +106,23 @@ Every turn-spending action is validated: positive integer, sufficient balance, g
 - **Loot overflow**: if inventory full at loot time, items go to pending loot session; player claims later via `/inventory/loot/claim`
 - **Stash**: separate storage with own capacity; deposit/withdraw including batch operations
 
+## Crafting
+
+### Craft To Stash
+
+Crafting can output directly to stash when the craft request uses `destination: "stash"`.
+Craft-to-stash still requires recovery, activity lockout, zone, recipe unlock, skill, material, and turn checks.
+Craft-to-stash is an exception to the over-encumbrance action block and does not require backpack slots for crafted outputs.
+
+### Craft Auto-Forge
+
+Craft auto-forge is selected in the crafting workflow with `autoForgeMinRarity: "rare" | "epic" | "legendary"`.
+It is valid only for non-stackable weapon and armor recipes.
+It only uses virtual items created by the current craft request, never existing backpack or stash items.
+The server checks conservative max reserved turns before consuming materials, then charges only actual craft and forge work performed.
+Forge Luck and Forge Protection buffs are not consumed by craft auto-forge.
+Below-target leftovers are kept in the selected craft destination and reported in the craft response.
+
 ## Skill & XP Rules
 
 - Daily XP cap per skill (`SKILL_CONSTANTS.DAILY_XP_CAP`) — excess XP is silently wasted

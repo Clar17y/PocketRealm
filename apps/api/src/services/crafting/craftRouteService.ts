@@ -10,6 +10,7 @@ import {
   ITEM_RARITY_CONSTANTS,
   PREMIUM_CONSTANTS,
   isRarityAtLeast,
+  type CraftDestination,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
@@ -17,20 +18,25 @@ import {
 } from '@pocketrealm/shared';
 import {
   calculateCraftingCrit,
+  calculateCraftMaxReservedBaseTurnCost,
+  getAutoForgeMinimumOpenSlots,
+  isAutoForgeEligibleItemType,
   rollBonusStatsForRarity,
+  type UpgradeableRarity,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
+import { addStackableItemTx, consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
 import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta, fetchMaterialTotals, buildInventoryStateUpdates } from '../../services/stateUpdateHelpers';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
-import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
+import { assertCanSpendWithTaxTx, spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../../services/buffService';
 import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
 import { trackProgress } from '../../services/progressService';
-import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
+import { getPlayerProgressionState } from '../../services/attributesService';
+import { serializeXpGrant, assertCanAct, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isSkillType,
   isItemType,
@@ -38,9 +44,17 @@ import {
   getZoneCraftingLevel,
   assertZoneAllowsCrafting,
   assertZoneAllowsRecipeLevel,
+  getRecipeDiscountedCost,
   parseMaterials,
   craftSchema,
 } from './helpers';
+import {
+  addCraftedItemToAutoForge,
+  createCraftAutoForgeAccumulator,
+  finishCraftAutoForge,
+  getAutoForgePersistedItemCount,
+  type CraftVirtualItem,
+} from './autoForgePlanner';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import {
   routeJson,
@@ -48,15 +62,63 @@ import {
   type RouteServiceResponse,
 } from '../../utils/routeServiceResponse';
 
+function makeVirtualId(index: number): string {
+  return `craft-${index}`;
+}
+
+interface CraftRollParams {
+  skillLevel: number;
+  requiredLevel: number;
+  craftLuck: number;
+  itemType: ItemType;
+  baseStats: ItemStats | null | undefined;
+  slot: EquipmentSlot | undefined;
+  championMultiplier: number;
+}
+
+function rollCraftedVirtualItem(index: number, params: CraftRollParams): CraftVirtualItem {
+  const critResult = calculateCraftingCrit({
+    skillLevel: params.skillLevel,
+    requiredLevel: params.requiredLevel,
+    luckStat: params.craftLuck,
+    itemType: params.itemType,
+    baseStats: params.baseStats,
+    slot: params.slot,
+    championMultiplier: params.championMultiplier,
+  });
+  const rolledBonusStats = rollBonusStatsForRarity({
+    itemType: params.itemType,
+    rarity: critResult.rarity,
+    baseStats: params.baseStats,
+    slot: params.slot,
+  });
+  const bonusEntries = Object.entries(rolledBonusStats ?? {})
+    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
+  return {
+    virtualId: makeVirtualId(index + 1),
+    rarity: critResult.rarity,
+    bonusStats: rolledBonusStats ? (rolledBonusStats as Prisma.InputJsonObject) : undefined,
+    isCrit: critResult.isCrit,
+    bonusEntries,
+  };
+}
+
+function countRareOrBetter(details: Array<{ rarity: ItemRarity }>): number {
+  return details.filter((d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary').length;
+}
 
 export async function craftItem(input: AuthenticatedRouteServiceRequest): Promise<RouteServiceResponse> {
     const playerId = input.player.playerId;
     const body = craftSchema.parse(input.body);
+    const destination: CraftDestination = body.destination;
 
     await checkActivityLockout(playerId);
 
-    // Pre-flight: not recovering, not over-encumbered
-    await assertCanAct(playerId);
+    if (destination === 'inventory') {
+      await assertCanAct(playerId);
+    } else {
+      await assertNotRecovering(playerId);
+    }
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);
@@ -94,31 +156,71 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     }
 
     const quantity = body.quantity;
-    const materials = parseMaterials(recipe.materials);
+    const autoForgeTarget = body.autoForgeMinRarity;
+    const itemType: ItemType = isItemType(recipe.resultTemplate.itemType)
+      ? recipe.resultTemplate.itemType
+      : 'resource';
+    const autoForgeEnabled = autoForgeTarget !== null;
+    const inventoryState = await getInventoryState(playerId);
 
-    // Validate inventory has all materials
-    for (const mat of materials) {
-      const needed = mat.quantity * quantity;
-      const available = await getTotalQuantityByTemplate(playerId, mat.templateId);
-      if (available < needed) {
-        throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
+    // Attempt budget cap only applies to non-stackable output: each attempt is
+    // its own item row (and auto-forge planning work). Stackable batches are a
+    // single DB write and stay uncapped beyond the schema sanity limit.
+    if (!recipe.resultTemplate.stackable && quantity > CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP) {
+      throw new AppError(
+        400,
+        `Craft requests for equipment are limited to ${CRAFTING_CONSTANTS.CRAFT_ATTEMPT_BUDGET_CAP} attempts`,
+        'INVALID_QUANTITY',
+      );
+    }
+
+    if (autoForgeEnabled && !isAutoForgeEligibleItemType(itemType, recipe.resultTemplate.stackable)) {
+      throw new AppError(
+        400,
+        'Auto-forge can only be used on non-stackable weapon and armor recipes',
+        'AUTO_FORGE_INELIGIBLE',
+      );
+    }
+
+    if (autoForgeEnabled && destination === 'inventory') {
+      const minimumSlots = getAutoForgeMinimumOpenSlots(autoForgeTarget);
+      if (inventoryState.availableSlots < minimumSlots) {
+        throw new AppError(
+          400,
+          `Auto-forge to ${autoForgeTarget}+ requires ${minimumSlots} open backpack slots`,
+          'BACKPACK_FULL',
+        );
       }
     }
 
+    const materials = parseMaterials(recipe.materials);
+
+    // Validate inventory has all materials. With auto-forge the requested
+    // quantity is an attempt budget, so clamp it to what materials allow
+    // instead of rejecting the whole request.
+    let attemptBudget = quantity;
+    for (const mat of materials) {
+      const available = await getTotalQuantityByTemplate(playerId, mat.templateId);
+      if (autoForgeEnabled) {
+        attemptBudget = Math.min(attemptBudget, Math.floor(available / mat.quantity));
+      } else if (available < mat.quantity * quantity) {
+        throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
+      }
+    }
+    if (attemptBudget < 1) {
+      throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
+    }
+
     // Check backpack capacity before spending turns
-    if (recipe.resultTemplate.stackable) {
-      const existingStack = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
-      });
-      if (!existingStack) {
-        const { availableSlots } = await getInventoryState(playerId);
-        if (availableSlots < 1) {
+    if (destination === 'inventory') {
+      if (recipe.resultTemplate.stackable) {
+        const existingStack = await prisma.item.findFirst({
+          where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
+        });
+        if (!existingStack && inventoryState.availableSlots < 1) {
           throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
         }
-      }
-    } else {
-      const { availableSlots } = await getInventoryState(playerId);
-      if (availableSlots < quantity) {
+      } else if (!autoForgeEnabled && inventoryState.availableSlots < quantity) {
         throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
       }
     }
@@ -132,66 +234,86 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     const durabilityBonusPct = levelBuckets * CRAFTING_CONSTANTS.DURABILITY_BONUS_PER_10_LEVELS;
     const baseMax = recipe.resultTemplate.maxDurability;
     const craftedMax = needsDurability ? Math.floor(baseMax * (1 + durabilityBonusPct / 100)) : null;
+    const upgradeCostsByRarity: Record<UpgradeableRarity, number> = {
+      common: await getRecipeDiscountedCost(playerId, recipe.resultTemplateId, ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY.common),
+      uncommon: await getRecipeDiscountedCost(playerId, recipe.resultTemplateId, ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY.uncommon),
+      rare: await getRecipeDiscountedCost(playerId, recipe.resultTemplateId, ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY.rare),
+      epic: await getRecipeDiscountedCost(playerId, recipe.resultTemplateId, ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY.epic),
+    };
+    const maxReservedBaseTurnCost = calculateCraftMaxReservedBaseTurnCost({
+      craftAttempts: attemptBudget,
+      craftTurnCostPerAttempt: recipe.turnCost,
+      autoForgeTarget,
+      upgradeCostsByRarity,
+    });
 
     // Pre-roll crit results for non-stackable items (pure functions, safe outside tx)
-    let preRolledItems: Array<{
-      rarity: ItemRarity;
-      bonusStats: Prisma.InputJsonObject | undefined;
-      isCrit: boolean;
-      bonusEntries: [string, number][];
-    }> | null = null;
+    let actualQuantity = quantity;
+    let autoForgePlan: ReturnType<typeof finishCraftAutoForge> | null = null;
+    let preRolledItems: CraftVirtualItem[] | null = null;
 
     if (!recipe.resultTemplate.stackable) {
-      const itemType: ItemType = isItemType(recipe.resultTemplate.itemType)
-        ? recipe.resultTemplate.itemType
-        : 'resource';
       const equipStats = await getEquipmentStats(playerId);
       const guildMods = await getPlayerGuildModifiers(playerId);
       const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
+      const progression = autoForgeEnabled ? await getPlayerProgressionState(playerId) : null;
       const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
       const combinedCritBonus = guildMods.craftingCrit + shopCraftingCrit;
-      const effectiveLuck = combinedCritBonus > 0
+      const effectiveCraftLuck = combinedCritBonus > 0
         ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
         : equipStats.luck;
+      const forgeLuck = equipStats.luck + (progression?.attributes.luck ?? 0);
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
       const templateSlot = (recipe.resultTemplate.slot as EquipmentSlot | null) ?? undefined;
+      const rollParams: CraftRollParams = {
+        skillLevel,
+        requiredLevel: recipe.requiredLevel,
+        craftLuck: effectiveCraftLuck,
+        itemType,
+        baseStats: templateBaseStats,
+        slot: templateSlot,
+        championMultiplier,
+      };
 
-      preRolledItems = [];
-      for (let i = 0; i < quantity; i++) {
-        const critResult = calculateCraftingCrit({
-          skillLevel,
-          requiredLevel: recipe.requiredLevel,
-          luckStat: effectiveLuck,
+      if (autoForgeEnabled) {
+        const accumulator = createCraftAutoForgeAccumulator({
+          targetRarity: autoForgeTarget,
           itemType,
           baseStats: templateBaseStats,
           slot: templateSlot,
-          championMultiplier,
+          luckStat: forgeLuck,
+          upgradeCostsByRarity,
         });
-        const rarity: ItemRarity = critResult.rarity;
-        const rolledBonusStats = rollBonusStatsForRarity({
-          itemType,
-          rarity,
-          baseStats: templateBaseStats,
-          slot: templateSlot,
-        });
-        const bonusStats = rolledBonusStats
-          ? (rolledBonusStats as Prisma.InputJsonObject)
-          : undefined;
-        const bonusEntries = Object.entries(rolledBonusStats ?? {})
-          .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
-        preRolledItems.push({ rarity, bonusStats, isCrit: critResult.isCrit, bonusEntries });
+
+        for (let i = 0; i < attemptBudget; i++) {
+          addCraftedItemToAutoForge(accumulator, rollCraftedVirtualItem(i, rollParams));
+          actualQuantity = i + 1;
+
+          if (destination === 'inventory' && getAutoForgePersistedItemCount(accumulator) >= inventoryState.availableSlots) {
+            break;
+          }
+        }
+
+        autoForgePlan = finishCraftAutoForge(accumulator);
+      } else {
+        preRolledItems = [];
+        for (let i = 0; i < quantity; i++) {
+          preRolledItems.push(rollCraftedVirtualItem(i, rollParams));
+        }
       }
     }
 
     // Single transaction: spend turns + consume materials + create items
-    const baseTurnCost = recipe.turnCost * quantity;
     const { turnSpend, taxResult, newItemIds, updatedItemIds, craftedItemDetails, fullyConsumedIds, partiallyConsumedIds } = await prisma.$transaction(async (tx) => {
-      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
+      const outputInStash = destination === 'stash';
+      await assertCanSpendWithTaxTx(tx, playerId, maxReservedBaseTurnCost);
+      const actualBaseTurnCost = recipe.turnCost * actualQuantity + (autoForgePlan?.summary.actualForgeTurnCost ?? 0);
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, actualBaseTurnCost);
 
       const allFullyConsumed: string[] = [];
       const allPartiallyConsumed: string[] = [];
       for (const mat of materials) {
-        const consumeResult = await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
+        const consumeResult = await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * actualQuantity);
         allFullyConsumed.push(...consumeResult.fullyConsumedIds);
         allPartiallyConsumed.push(...consumeResult.partiallyConsumedIds);
       }
@@ -206,57 +328,56 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       }> = [];
 
       if (recipe.resultTemplate.stackable) {
-        const existing = await tx.item.findFirst({
-          where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
-          select: { id: true, quantity: true },
-        });
-
-        if (existing) {
-          const updated = await tx.item.update({
-            where: { id: existing.id },
-            data: { quantity: existing.quantity + quantity },
-            select: { id: true },
-          });
-          updatedItemIds.push(updated.id);
+        const added = await addStackableItemTx(
+          tx,
+          playerId,
+          recipe.resultTemplateId,
+          quantity,
+          outputInStash,
+        );
+        if (added.created) {
+          newItemIds.push(added.itemId);
         } else {
-          const created = await tx.item.create({
-            data: {
-              ownerId: playerId,
-              templateId: recipe.resultTemplateId,
-              rarity: 'common',
-              quantity,
-              maxDurability: craftedMax,
-              currentDurability: craftedMax,
-            },
-            select: { id: true },
-          });
-          newItemIds.push(created.id);
+          updatedItemIds.push(added.itemId);
         }
       } else {
-        for (const rolled of preRolledItems!) {
+        const persistedVirtualItems = autoForgePlan?.allPersistedItems ?? preRolledItems!;
+
+        for (const virtualItem of persistedVirtualItems) {
           const created = await tx.item.create({
             data: {
               ownerId: playerId,
               templateId: recipe.resultTemplateId,
-              rarity: rolled.rarity,
+              rarity: virtualItem.rarity,
               quantity: 1,
               maxDurability: craftedMax,
               currentDurability: craftedMax,
-              bonusStats: rolled.bonusStats,
+              bonusStats: virtualItem.bonusStats ?? undefined,
+              inStash: outputInStash,
             },
             select: { id: true },
           });
           newItemIds.push(created.id);
-          if (rolled.isCrit && rolled.bonusEntries.length > 0) {
+          if (virtualItem.isCrit && virtualItem.bonusEntries.length > 0) {
             itemDetails.push({
               id: created.id,
               isCrit: true,
-              rarity: rolled.rarity,
-              bonusStats: Object.fromEntries(rolled.bonusEntries),
+              rarity: virtualItem.rarity,
+              bonusStats: Object.fromEntries(virtualItem.bonusEntries),
             });
           } else {
-            itemDetails.push({ id: created.id, isCrit: false, rarity: rolled.rarity });
+            itemDetails.push({ id: created.id, isCrit: false, rarity: virtualItem.rarity });
           }
+        }
+      }
+
+      // Re-check capacity with the tx client: the pre-transaction snapshot that
+      // sized this craft may be stale if a concurrent action changed the
+      // backpack between the read and this commit.
+      if (destination === 'inventory') {
+        const txInventoryState = await getInventoryState(playerId, tx);
+        if (txInventoryState.usedSlots > txInventoryState.capacity) {
+          throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
         }
       }
 
@@ -264,11 +385,19 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     });
 
     const allCraftedItemIds = [...newItemIds, ...updatedItemIds];
+    const backpackNewItemIds = destination === 'inventory' ? newItemIds : [];
+    const backpackUpdatedOutputIds = destination === 'inventory' ? updatedItemIds : [];
+    const autoForgeSummary = autoForgePlan
+      ? {
+          ...autoForgePlan.summary,
+          maxReservedTurnCost: maxReservedBaseTurnCost,
+        }
+      : undefined;
 
     // Consume shop crafting crit buff (one use per craft action)
     if (shopCraftingCrit > 0) await consumeBuffStandalone(playerId, 'crafting_crit');
 
-    const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
+    const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * actualQuantity);
 
     logger.info({
       playerId,
@@ -279,12 +408,10 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     // --- Guild XP & contract/quest progress ---
     const guildId = await getPlayerGuildId(playerId);
     if (guildId) {
-      await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
+      await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * actualQuantity);
     }
-    const craftQuestProgress = await trackProgress(playerId, 'craft_items', quantity);
-    const rareCount = craftedItemDetails.filter(
-      (d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary',
-    ).length;
+    const craftQuestProgress = await trackProgress(playerId, 'craft_items', actualQuantity);
+    const rareCount = countRareOrBetter(craftedItemDetails);
     if (rareCount > 0) {
       const rareQuestProgress = await trackProgress(playerId, 'craft_rare', rareCount);
       craftQuestProgress.push(...rareQuestProgress);
@@ -294,7 +421,7 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     const isRealCraft = recipe.resultTemplate.itemType !== 'resource';
     const craftCounters: Record<string, number> = { totalTurnsSpent: turnSpend.spent };
     if (isRealCraft) {
-      craftCounters.totalCrafts = quantity;
+      craftCounters.totalCrafts = actualQuantity;
       for (const item of craftedItemDetails) {
         if (item.rarity === 'rare') craftCounters.totalRaresCrafted = (craftCounters.totalRaresCrafted ?? 0) + 1;
         if (item.rarity === 'epic') craftCounters.totalEpicsCrafted = (craftCounters.totalEpicsCrafted ?? 0) + 1;
@@ -318,7 +445,11 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
         recipeId: recipe.id,
         skillType: recipe.skillType,
         requiredLevel: recipe.requiredLevel,
-        quantity,
+        quantity: actualQuantity,
+        requestedQuantity: quantity,
+        actualQuantity,
+        destination,
+        autoForge: autoForgeSummary ?? null,
         turnCost: recipe.turnCost,
         materials,
         resultTemplateId: recipe.resultTemplateId,
@@ -354,8 +485,8 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
 
     const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta, materialTotals] = await Promise.all([
-      fetchItemDTOs(newItemIds),
-      fetchItemDTOs([...partiallyConsumedIds, ...updatedItemIds]),
+      fetchItemDTOs(backpackNewItemIds),
+      fetchItemDTOs([...partiallyConsumedIds, ...backpackUpdatedOutputIds]),
       fetchSkillDTOs(playerId),
       fetchCharacterProgression(playerId),
       fetchInventoryMeta(playerId),
@@ -368,12 +499,13 @@ export async function craftItem(input: AuthenticatedRouteServiceRequest): Promis
       crafted: {
         recipeId: recipe.id,
         resultTemplateId: recipe.resultTemplateId,
-        quantity,
+        quantity: actualQuantity,
         craftedItemIds: allCraftedItemIds,
       },
       craftedItemDetails,
       xp: serializeXpGrant(xpGrant),
       tax: taxInfoFromResult(taxResult),
+      ...(autoForgeSummary ? { autoForge: autoForgeSummary } : {}),
       ...(craftQuestProgress.length > 0 ? { questProgress: craftQuestProgress } : {}),
       ...(craftingBuffBadges.length > 0 ? { activeEvents: craftingBuffBadges } : {}),
       stateUpdates: {

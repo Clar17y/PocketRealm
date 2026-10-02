@@ -4,7 +4,7 @@ import { calculateCurrentTurns, calculateTimeToCapMs, calculateTurnProgress } fr
 import { AppError } from '../middleware/errorHandler';
 import { calculateTreasuryCap } from './guildService';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
-import { spendPlayerTurnsTx, type SpendTurnsResult } from './turnBankService';
+import { assertPlayerCanSpendTurnsTx, spendPlayerTurnsTx, type SpendTurnsResult } from './turnBankService';
 
 export interface TaxResult {
   preTaxAmount: number;
@@ -42,6 +42,39 @@ export function calculateInflatedCost(baseCost: number, taxRatePercent: number):
 export function calculateEffectiveTurns(turns: number, taxRatePercent: number): number {
   if (taxRatePercent <= 0) return turns;
   return Math.floor(turns * (1 - taxRatePercent / 100));
+}
+
+export interface TaxAffordabilityResult {
+  baseCost: number;
+  inflatedCost: number;
+  taxRatePercent: number;
+  guildId: string | null;
+  currentTurns: number;
+}
+
+export async function assertCanSpendWithTaxTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  baseCost: number,
+  now: Date = new Date(),
+): Promise<TaxAffordabilityResult> {
+  if (!Number.isInteger(baseCost) || baseCost < 0) {
+    throw new AppError(400, 'Turn spend amount must be a non-negative integer', 'INVALID_TURNS');
+  }
+
+  const { taxRate, guildId } = baseCost > 0
+    ? await getPlayerTaxRateTx(tx, playerId)
+    : { taxRate: 0, guildId: null };
+  const inflatedCost = calculateInflatedCost(baseCost, taxRate);
+  const affordability = await assertPlayerCanSpendTurnsTx(tx, playerId, inflatedCost, now);
+
+  return {
+    baseCost,
+    inflatedCost,
+    taxRatePercent: taxRate,
+    guildId,
+    currentTurns: affordability.currentTurns,
+  };
 }
 
 export function taxInfoFromResult(result: TaxResult): TaxInfo | null {

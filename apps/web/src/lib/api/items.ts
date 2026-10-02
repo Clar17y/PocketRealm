@@ -1,4 +1,11 @@
-import type { ConsumableEffect, QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
+import type {
+  AutoForgeTarget,
+  ConsumableEffect,
+  CraftAutoForgeSummary,
+  CraftDestination,
+  QuestProgressUpdate,
+  StateUpdates,
+} from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { EventModifierBadge } from './combat';
 
@@ -283,7 +290,12 @@ export async function getCraftingRecipes() {
   return fetchApi<CraftingRecipesResponse>('/api/v1/crafting/recipes');
 }
 
-export async function craft(recipeId: string, quantity: number = 1) {
+export interface CraftRequestOptions {
+  destination?: CraftDestination;
+  autoForgeMinRarity?: AutoForgeTarget | null;
+}
+
+export async function craft(recipeId: string, quantity: number = 1, options: CraftRequestOptions = {}) {
   return fetchApi<{
     logId: string;
     turns: TurnStateResponse;
@@ -310,12 +322,18 @@ export async function craft(recipeId: string, quantity: number = 1) {
       attributePointsAfter: number;
       characterLeveledUp: boolean;
     };
+    autoForge?: CraftAutoForgeSummary;
     tax: TaxInfo | null;
     questProgress?: QuestProgressUpdate[];
     stateUpdates?: StateUpdates;
   }>('/api/v1/crafting/craft', {
     method: 'POST',
-    body: JSON.stringify({ recipeId, quantity }),
+    body: JSON.stringify({
+      recipeId,
+      quantity,
+      destination: options.destination ?? 'inventory',
+      autoForgeMinRarity: options.autoForgeMinRarity ?? null,
+    }),
   });
 }
 

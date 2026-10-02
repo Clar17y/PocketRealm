@@ -38,6 +38,7 @@ export * from './gathering/gatheringCrit';
 
 // Crafting
 export * from './crafting/craftingCrit';
+export * from './crafting/autoForgeBudget';
 
 // Items
 export * from './items/itemRarity';
