@@ -2,9 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "cd ../.. && npx tsc -p packages/shared/tsconfig.json && npx tsc -p packages/game-engine/tsconfig.json && cd apps/web && npx next build --webpack",
   "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "**": false
-    }
+    "deploymentEnabled": false
   }
 }

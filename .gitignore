@@ -28,9 +28,14 @@ packages/*/src/**/*.d.ts.map
 
 # Environment
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 .discord-setup.env
+!.discord-setup.env.example
+
+# Local agent settings and run output
+.llm-output/
+.claude/settings.local.json
 
 # IDE
 .idea/
